@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import GlobalSearch from './GlobalSearch';
 
 const BUSINESS_LINKS = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -44,6 +45,7 @@ export default function Navbar() {
           <>
             {/* Desktop links */}
             <div className="hidden items-center gap-5 lg:flex">
+              <GlobalSearch className="max-w-[180px] xl:max-w-[220px]" />
               {BUSINESS_LINKS.map((link) => (
                 <Link
                   key={link.to}
@@ -99,6 +101,9 @@ export default function Navbar() {
 
       {user && menuOpen && (
         <div className="border-t border-slate-200 px-4 py-2 lg:hidden">
+          <div className="py-2">
+            <GlobalSearch onNavigate={() => setMenuOpen(false)} />
+          </div>
           {BUSINESS_LINKS.map((link) => (
             <Link
               key={link.to}
