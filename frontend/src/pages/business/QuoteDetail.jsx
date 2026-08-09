@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../../components/StatusBadge';
+import Accordion from '../../components/Accordion';
 
 const todayPlus = (days) => {
   const d = new Date();
@@ -150,54 +151,57 @@ export default function QuoteDetail() {
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       <div className="mt-6 grid gap-6 sm:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xs font-semibold uppercase text-slate-500">Bill to</h2>
-          <p className="mt-2 font-medium text-slate-900">{client.company || client.name}</p>
+        <Accordion title="Bill to">
+          <p className="font-medium text-slate-900">{client.company || client.name}</p>
           <p className="text-sm text-slate-600">{client.company ? client.name : ''}</p>
           <p className="text-sm text-slate-600">{client.email}</p>
           <p className="text-sm text-slate-600">{client.phone}</p>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xs font-semibold uppercase text-slate-500">Details</h2>
-          <dl className="mt-2 space-y-1 text-sm">
+        </Accordion>
+        <Accordion title="Details">
+          <dl className="space-y-1 text-sm">
             <div className="flex justify-between"><dt className="text-slate-500">Issue date</dt><dd className="text-slate-900">{quote.issue_date}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Expiry date</dt><dd className="text-slate-900">{quote.expiry_date || '—'}</dd></div>
           </dl>
-        </div>
+        </Accordion>
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead>
-            <tr className="text-left text-xs font-medium uppercase text-slate-500">
-              <th className="px-4 py-3">Description</th>
-              <th className="px-4 py-3 text-right">Qty</th>
-              <th className="px-4 py-3 text-right">Unit price</th>
-              <th className="px-4 py-3 text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {items.map((item) => (
-              <tr key={item.id}>
-                <td className="px-4 py-3">{item.description}</td>
-                <td className="px-4 py-3 text-right">{item.quantity}</td>
-                <td className="px-4 py-3 text-right">{symbol}{item.unit_price.toFixed(2)}</td>
-                <td className="px-4 py-3 text-right">{symbol}{item.amount.toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="border-t border-slate-200 px-4 py-3 text-right text-sm">
-          <p className="text-slate-600">Subtotal: {symbol}{quote.subtotal.toFixed(2)}</p>
-          {quote.tax_rate > 0 && <p className="text-slate-600">Tax ({quote.tax_rate}%): {symbol}{quote.tax_amount.toFixed(2)}</p>}
-          <p className="mt-1 text-base font-semibold text-slate-900">Total: {symbol}{quote.total.toFixed(2)}</p>
-        </div>
+      <div className="mt-6">
+        <Accordion title="Items">
+          <div className="-mx-6 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead>
+                <tr className="text-left text-xs font-medium uppercase text-slate-500">
+                  <th className="px-6 py-3">Description</th>
+                  <th className="px-4 py-3 text-right">Qty</th>
+                  <th className="px-4 py-3 text-right">Unit price</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {items.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-6 py-3">{item.description}</td>
+                    <td className="px-4 py-3 text-right">{item.quantity}</td>
+                    <td className="px-4 py-3 text-right">{symbol}{item.unit_price.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right">{symbol}{item.amount.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="border-t border-slate-200 px-6 py-3 text-right text-sm">
+              <p className="text-slate-600">Subtotal: {symbol}{quote.subtotal.toFixed(2)}</p>
+              {quote.tax_rate > 0 && <p className="text-slate-600">Tax ({quote.tax_rate}%): {symbol}{quote.tax_amount.toFixed(2)}</p>}
+              <p className="mt-1 text-base font-semibold text-slate-900">Total: {symbol}{quote.total.toFixed(2)}</p>
+            </div>
+          </div>
+        </Accordion>
       </div>
 
       {quote.notes && (
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xs font-semibold uppercase text-slate-500">Notes</h2>
-          <p className="mt-2 whitespace-pre-line text-sm text-slate-600">{quote.notes}</p>
+        <div className="mt-6">
+          <Accordion title="Notes">
+            <p className="whitespace-pre-line text-sm text-slate-600">{quote.notes}</p>
+          </Accordion>
         </div>
       )}
     </div>

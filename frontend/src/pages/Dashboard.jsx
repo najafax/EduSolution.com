@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import RevenueTrendChart from '../components/RevenueTrendChart';
 import StatusBreakdownChart from '../components/StatusBreakdownChart';
+import Accordion from '../components/Accordion';
 
 const SHORTCUTS = [
   { to: '/clients', label: 'Clients' },
@@ -66,46 +67,43 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-3">
-            <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
-              <h2 className="text-sm font-semibold text-slate-900">Revenue, last 6 months</h2>
-              <div className="mt-4">
+            <div className="lg:col-span-2">
+              <Accordion title="Revenue, last 6 months">
                 <RevenueTrendChart data={summary.monthlyTrend} currencySymbol={symbol} />
-              </div>
+              </Accordion>
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Invoices by status</h2>
-              <div className="mt-4">
-                <StatusBreakdownChart counts={summary.invoiceCounts} />
-              </div>
-            </div>
+            <Accordion title="Invoices by status">
+              <StatusBreakdownChart counts={summary.invoiceCounts} />
+            </Accordion>
           </div>
 
-          <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-            <h2 className="px-6 py-4 text-sm font-semibold text-slate-900">Recent payments</h2>
-            {summary.recentPayments.length === 0 ? (
-              <p className="border-t border-slate-200 px-6 py-4 text-sm text-slate-500">No payments recorded yet.</p>
-            ) : (
-              <div className="divide-y divide-slate-100 border-t border-slate-200">
-                {summary.recentPayments.slice(0, 5).map((p) => (
-                  <div key={p.id} className="flex flex-col gap-1 px-6 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div>
-                      <Link to={`/invoices/${p.invoice_id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
-                        {p.invoice_number}
-                      </Link>
-                      <span className="ml-2 text-slate-500">{p.client_name}</span>
+          <div className="mt-6">
+            <Accordion title="Recent payments">
+              {summary.recentPayments.length === 0 ? (
+                <p className="text-sm text-slate-500">No payments recorded yet.</p>
+              ) : (
+                <div className="-mx-6 divide-y divide-slate-100">
+                  {summary.recentPayments.slice(0, 5).map((p) => (
+                    <div key={p.id} className="flex flex-col gap-1 px-6 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                      <div>
+                        <Link to={`/invoices/${p.invoice_id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
+                          {p.invoice_number}
+                        </Link>
+                        <span className="ml-2 text-slate-500">{p.client_name}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-slate-500">{p.paid_at}</span>
+                        <span className="font-medium text-slate-900">
+                          {symbol}
+                          {p.amount.toFixed(2)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-slate-500">{p.paid_at}</span>
-                      <span className="font-medium text-slate-900">
-                        {symbol}
-                        {p.amount.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </Accordion>
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">

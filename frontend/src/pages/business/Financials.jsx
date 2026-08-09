@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import Accordion from '../../components/Accordion';
 
 export default function Financials() {
   const { token } = useAuth();
@@ -42,38 +43,41 @@ export default function Financials() {
         ))}
       </div>
 
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <h2 className="px-6 py-4 text-sm font-semibold text-slate-900">Recent payments</h2>
-        {summary.recentPayments.length === 0 ? (
-          <p className="border-t border-slate-200 px-6 py-4 text-sm text-slate-500">No payments recorded yet.</p>
-        ) : (
-          <table className="min-w-full divide-y divide-slate-200 border-t border-slate-200 text-sm">
-            <thead>
-              <tr className="text-left text-xs font-medium uppercase text-slate-500">
-                <th className="px-4 py-3">Receipt</th>
-                <th className="px-4 py-3">Invoice</th>
-                <th className="px-4 py-3">Client</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {summary.recentPayments.map((p) => (
-                <tr key={p.id}>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{p.receipt_number}</td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <Link to={`/invoices/${p.invoice_id}`} className="text-indigo-600 hover:text-indigo-500">
-                      {p.invoice_number}
-                    </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{p.client_name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{p.paid_at}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900">{symbol}{p.amount.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="mt-8">
+        <Accordion title="Recent payments">
+          {summary.recentPayments.length === 0 ? (
+            <p className="text-sm text-slate-500">No payments recorded yet.</p>
+          ) : (
+            <div className="-mx-6 overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500">
+                    <th className="px-6 py-3">Receipt</th>
+                    <th className="px-4 py-3">Invoice</th>
+                    <th className="px-4 py-3">Client</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {summary.recentPayments.map((p) => (
+                    <tr key={p.id}>
+                      <td className="whitespace-nowrap px-6 py-3 font-medium text-slate-900">{p.receipt_number}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <Link to={`/invoices/${p.invoice_id}`} className="text-indigo-600 hover:text-indigo-500">
+                          {p.invoice_number}
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{p.client_name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{p.paid_at}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900">{symbol}{p.amount.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Accordion>
       </div>
     </div>
   );
