@@ -93,9 +93,11 @@ column anywhere in this module.
   `POST /:id/convert-to-invoice`, which copies the quote's line items into
   a new invoice and stamps `quotes.converted_invoice_id`.
 - `routes/financials.js` — `GET /summary`: totals invoiced/paid/outstanding,
-  overdue count/amount, and the 10 most recent payments. Computed from
-  `invoices`/`payments` on every request, nothing is cached or denormalized
-  beyond `invoices.amount_paid`.
+  overdue count/amount, client count, quote/invoice counts by status, a
+  6-month invoiced-vs-paid trend (`monthlyTrend`, oldest month first), and
+  the 10 most recent payments. Same endpoint backs both `Dashboard` and
+  `Financials` pages. Computed from `invoices`/`payments`/`clients` on every
+  request, nothing is cached or denormalized beyond `invoices.amount_paid`.
 - `lib/totals.js` — `computeTotals(items, taxRate)` validates a raw
   line-items payload and computes subtotal/tax/total. Shared by quotes and
   invoices; this is the only place that math happens — don't recompute
@@ -154,6 +156,12 @@ Status/derived-field conventions worth knowing before touching this code:
   `components/StatusBadge.jsx` are shared between the quote and invoice
   form/detail pages — extend those rather than duplicating item-row or
   status-color logic per page.
+- `pages/Dashboard.jsx` charts (`components/RevenueTrendChart.jsx`,
+  `components/StatusBreakdownChart.jsx`) are hand-rolled SVG/CSS, no
+  charting library. Status colors there are pinned to match
+  `StatusBadge`/`lib/pdf.js` (draft=slate, sent=indigo, paid=emerald,
+  void=red) rather than a generic categorical palette — status is state,
+  not series identity, so don't reassign those colors when adding a chart.
 - Styling is Tailwind CSS v4 via the `@tailwindcss/vite` plugin (see
   `vite.config.js` and `src/index.css`) — no `tailwind.config.js`/PostCSS
   setup exists or is needed for v4's Vite integration. Utility classes are

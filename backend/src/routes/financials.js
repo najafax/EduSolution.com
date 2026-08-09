@@ -6,6 +6,18 @@ const router = Router();
 router.use(requireAuth);
 
 const today = () => new Date().toISOString().slice(0, 10);
+const monthKey = (dateStr) => dateStr.slice(0, 7); // 'YYYY-MM'
+
+// Last `count` calendar months including the current one, oldest first.
+function recentMonths(count) {
+  const months = [];
+  const now = new Date();
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return months;
+}
 
 router.get('/summary', (req, res) => {
   const invoices = db.prepare("SELECT * FROM invoices WHERE status != 'void'").all();
@@ -26,6 +38,31 @@ router.get('/summary', (req, res) => {
     .all()
     .reduce((acc, row) => ({ ...acc, [row.status]: row.c }), {});
 
+  const invoiceCounts = db
+    .prepare('SELECT status, COUNT(*) AS c FROM invoices GROUP BY status')
+    .all()
+    .reduce((acc, row) => ({ ...acc, [row.status]: row.c }), {});
+
+  const clientCount = db.prepare('SELECT COUNT(*) AS c FROM clients').get().c;
+
+  const months = recentMonths(6);
+  const invoicedByMonth = Object.fromEntries(months.map((m) => [m, 0]));
+  for (const inv of invoices) {
+    const key = monthKey(inv.issue_date);
+    if (key in invoicedByMonth) invoicedByMonth[key] += inv.total;
+  }
+  const allPayments = db.prepare('SELECT amount, paid_at FROM payments').all();
+  const paidByMonth = Object.fromEntries(months.map((m) => [m, 0]));
+  for (const p of allPayments) {
+    const key = monthKey(p.paid_at);
+    if (key in paidByMonth) paidByMonth[key] += p.amount;
+  }
+  const monthlyTrend = months.map((m) => ({
+    month: m,
+    invoiced: Math.round(invoicedByMonth[m] * 100) / 100,
+    paid: Math.round(paidByMonth[m] * 100) / 100,
+  }));
+
   const recentPayments = db
     .prepare(
       `SELECT payments.*, invoices.number AS invoice_number, clients.name AS client_name
@@ -44,7 +81,10 @@ router.get('/summary', (req, res) => {
     overdueCount: overdue.length,
     overdueAmount,
     invoiceCount: invoices.length,
+    clientCount,
     quoteCounts,
+    invoiceCounts,
+    monthlyTrend,
     recentPayments,
   });
 });
