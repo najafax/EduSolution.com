@@ -10,9 +10,11 @@ JWT-based auth flow (signup/login/dashboard). There is no root package.json
 — each package is installed and run independently.
 
 Beyond auth, the backend/frontend implement a small business-management
-module — clients, quotes, invoices, payments/receipts, and a financials
-summary — shared across every logged-in user (single-business model, not
-multi-tenant). See "Business module" below.
+module — clients, quotes, invoices, payments/receipts, expenses, recurring
+invoices, a financials summary, an activity log, and global search —
+shared across every logged-in user (single-business model, not
+multi-tenant). Quotes and invoices also have unauthenticated client-facing
+views via a `public_token` link. See "Business module" below.
 
 ## Commands
 
@@ -67,10 +69,18 @@ backend port in frontend code.
   protected route should use this middleware rather than re-implementing
   token checks.
 - `routes/auth.js` — `POST /api/auth/signup`, `POST /api/auth/login`,
-  `GET /api/auth/me`. Passwords are hashed with bcryptjs before storage;
-  JWTs are signed with `JWT_SECRET` from env and expire after 7 days.
-  `publicUser()` is the single place that shapes what user data is ever
-  sent to the client — extend it rather than returning raw DB rows elsewhere.
+  `GET /api/auth/me`, plus `POST /api/auth/forgot-password` and
+  `POST /api/auth/reset-password`. Passwords are hashed with bcryptjs before
+  storage; JWTs are signed with `JWT_SECRET` from env and expire after 7
+  days. `publicUser()` is the single place that shapes what user data is
+  ever sent to the client — extend it rather than returning raw DB rows
+  elsewhere. `forgot-password` always returns the same generic response
+  regardless of whether the email exists (prevents account enumeration);
+  it stores a random token + 1-hour expiry on `users.reset_token`/
+  `reset_token_expires` and emails a `${CLIENT_ORIGIN}/reset-password?token=`
+  link (silently logs if email isn't configured — the response doesn't
+  change either way). `reset-password` validates the token/expiry, requires
+  an 8+ char password, and clears the token after use (single-use).
 
 Environment variables (see `backend/.env.example` for the full list with
 comments): `PORT`, `JWT_SECRET`, `CLIENT_ORIGIN`, and `SMTP_HOST`/`PORT`/
@@ -86,22 +96,69 @@ column anywhere in this module.
 - `routes/clients.js`, `routes/settings.js` — plain CRUD for `clients`, and
   GET/PUT for the single-row `business_settings` table (business name,
   address, tax ID, currency symbol, bank details — this is what prints on
-  every PDF's header/footer).
+  every PDF's header/footer). `clients.js` also has `GET /export.csv`
+  (registered before `GET /:id` so it isn't shadowed by the `:id` param).
 - `routes/quotes.js`, `routes/invoices.js` — CRUD plus PDF download
-  (`GET /:id/pdf`), email send (`POST /:id/send`), and (invoices only)
+  (`GET /:id/pdf`), email send (`POST /:id/send`), `POST /:id/duplicate`
+  (copies client/items/discount/tax/notes into a new `draft` with a fresh
+  number, `public_token`, and today's date — invoice duplicate also resets
+  `due_date` to +14 days), and `GET /export.csv`. Invoices only:
   `POST /:id/remind` and `POST /:id/payments`. `quotes.js` also has
   `POST /:id/convert-to-invoice`, which copies the quote's line items into
-  a new invoice and stamps `quotes.converted_invoice_id`.
+  a new invoice and stamps `quotes.converted_invoice_id`. Both accept
+  `discount_type` (`percentage|fixed`) and `discount_value` on create/update,
+  computed via `lib/totals.js`. Every mutation (create/update/delete/send/
+  duplicate/convert/payment) calls `lib/activity.js`'s `logActivity()`.
+- `routes/expenses.js` — CRUD for `expenses` (category/description/amount/
+  expense_date/notes) plus `GET /` (`?q=` search) and `GET /export.csv`.
+  `CATEGORIES` is a fixed list (`rent, utilities, supplies, salaries,
+  marketing, software, travel, other`) served to the frontend for the
+  category `<select>`.
+- `routes/recurring.js` — CRUD for `recurring_invoices` (+ their
+  `recurring_invoice_items` template line items) mounted at
+  `/api/recurring-invoices`. Frequency is `weekly|monthly|yearly`. Creating/
+  updating a template validates line items and discount/tax via
+  `computeTotals()` for feedback only — the real totals are recomputed fresh
+  from current unit prices every time an invoice is actually generated (see
+  `lib/scheduler.js` below), since prices may have changed since the
+  template was saved.
+- `routes/public.js` — mounted at `/api/public`, the one route file **not**
+  behind `requireAuth`. Looks quotes/invoices up by their `public_token`
+  (a random 16-byte hex column generated on every quote/invoice create,
+  duplicate, convert-to-invoice, and recurring-invoice generation) rather
+  than by id, so a client with the link can view/download a document
+  without an account. `GET /quotes/:token` and `GET /invoices/:token`
+  return the document + client + business settings; `GET .../pdf` streams
+  the same PDF the authenticated routes produce; `POST /quotes/:token/respond`
+  lets the client accept/decline (only while `status` is `draft`/`sent`;
+  stores `quotes.client_response`/`client_responded_at` and updates
+  `status`). The emails sent from `quotes.js`/`invoices.js` `/send` routes
+  link here (`${CLIENT_ORIGIN}/q/:token`, `${CLIENT_ORIGIN}/i/:token`).
+- `routes/activity.js` — `GET /` returns a paginated (30/page) read of the
+  `activity_log` table, newest first. There's no write endpoint — every
+  other route's mutations write to this table themselves via
+  `lib/activity.js`'s `logActivity({ userName, action, entityType,
+  entityId, entityLabel })`.
+- `routes/search.js` — `GET /?q=` runs one `LIKE %q%` query per entity
+  (clients, quotes, invoices, expenses — each matched on its own set of
+  text columns, quotes/invoices also match on client name via a join) and
+  returns up to 8 grouped results per entity. Empty/missing `q` returns all
+  empty arrays rather than erroring.
 - `routes/financials.js` — `GET /summary`: totals invoiced/paid/outstanding,
   overdue count/amount, client count, quote/invoice counts by status, a
-  6-month invoiced-vs-paid trend (`monthlyTrend`, oldest month first), and
-  the 10 most recent payments. Same endpoint backs both `Dashboard` and
-  `Financials` pages. Computed from `invoices`/`payments`/`clients` on every
-  request, nothing is cached or denormalized beyond `invoices.amount_paid`.
-- `lib/totals.js` — `computeTotals(items, taxRate)` validates a raw
-  line-items payload and computes subtotal/tax/total. Shared by quotes and
-  invoices; this is the only place that math happens — don't recompute
-  totals in route handlers or on the frontend.
+  6-month invoiced-vs-paid trend (`monthlyTrend`, oldest month first), the
+  10 most recent payments, `totalExpenses` (sum of `expenses.amount`), and
+  `netProfit` (`totalPaid - totalExpenses`). Same endpoint backs both
+  `Dashboard` and `Financials` pages. Computed from `invoices`/`payments`/
+  `clients`/`expenses` on every request, nothing is cached or denormalized
+  beyond `invoices.amount_paid`.
+- `lib/totals.js` — `computeTotals(items, taxRate, discountType, discountValue)`
+  validates a raw line-items payload and computes subtotal → discount → tax
+  → total, in that order (tax applies to the post-discount amount).
+  `discountType` is `percentage` (validated ≤100) or `fixed` (validated ≤
+  subtotal). Shared by quotes, invoices, and recurring-invoice
+  create/update/generate; this is the only place that math happens — don't
+  recompute totals in route handlers or on the frontend.
 - `lib/numbering.js` — sequential per-year document numbers
   (`Q-2026-0001`, `INV-2026-0001`, `R-2026-0001` for quotes/invoices/
   receipts). Relies on `better-sqlite3` being synchronous (no `await`
@@ -109,26 +166,67 @@ column anywhere in this module.
   any of this code becomes async, this numbering scheme needs a real lock.
 - `lib/pdf.js` — renders quote/invoice/receipt PDFs with `pdfkit` (pure JS,
   no headless browser). One shared header/items-table/totals layout, reused
-  by `renderQuotePdf`/`renderInvoicePdf`/`renderReceiptPdf`.
+  by `renderQuotePdf`/`renderInvoicePdf`/`renderReceiptPdf`, and by both the
+  authenticated `:id/pdf` routes and the public `public.js` routes.
 - `lib/mailer.js` — `sendMail()` wraps `nodemailer` with SMTP settings from
   env (`SMTP_HOST`/`PORT`/`USER`/`PASS`/`FROM`/`SECURE`). If `SMTP_HOST`
   isn't set, it throws `EMAIL_NOT_CONFIGURED` rather than crashing — routes
   catch this and return `503` with a message telling the caller which env
   vars to set. Everything else (PDF download, payments, financials) works
   with no SMTP configured at all.
+- `lib/activity.js` — `logActivity({ userName, action, entityType,
+  entityId, entityLabel })` inserts one row into `activity_log`. Called
+  from every create/update/delete/send/duplicate/convert/payment/respond
+  across clients, quotes, invoices, expenses, and recurring invoices —
+  when adding a new mutation, call this too rather than letting it go
+  unlogged.
+- `lib/csv.js` — `toCsv(rows, columns)`, a minimal hand-rolled RFC-4180-ish
+  serializer (`columns` is `{ label, key }` or `{ label, value: fn }`).
+  Backs every `GET /export.csv` route; not a general-purpose library, just
+  enough quoting/escaping for this app's exports.
+- `lib/scheduler.js` — `startScheduler()` (called once from `index.js`'s
+  `app.listen` callback) registers two `node-cron` jobs, both server-time:
+  - `0 7 * * *` — `generateDueRecurringInvoices()`: for every
+    `recurring_invoices` row with `active=1` and `next_run_date <= today`,
+    recomputes totals from the template's current line items via
+    `computeTotals()`, inserts a new **draft** invoice (with
+    `recurring_invoice_id` set, a fresh number/`public_token`, and
+    `due_date = today + due_in_days`), then advances `next_run_date` by the
+    template's frequency (`advanceDate()`: weekly +7d, yearly +1y, else
+    +1 month) and stamps `last_generated_at`. Generated invoices are never
+    auto-emailed — they're created as drafts for a human to review and send
+    from the Invoices page. Per-row try/catch so one bad template doesn't
+    block the rest.
+  - `0 8 * * *` — `runOverdueReminders()`: skips entirely if `SMTP_HOST`
+    isn't set. Selects `invoices` where `status='sent'`,
+    `amount_paid < total`, `due_date < today`, and
+    `last_reminder_sent_at` is either null or over 7 days old (so a human
+    sending a manual reminder, or a previous automated one, suppresses
+    re-nagging for a week). Emails the invoice PDF and updates
+    `last_reminder_sent_at`.
+  Both jobs are also exported directly (`generateDueRecurringInvoices`,
+  `runOverdueReminders`) so they can be invoked outside the cron schedule
+  (tests, or a future manual "run now" action).
 
 Status/derived-field conventions worth knowing before touching this code:
-- Quote `status`: `draft | sent | accepted | declined | expired`, all
-  set explicitly (by `PUT`, `/send`, or `/convert-to-invoice`).
+- Quote `status`: `draft | sent | accepted | declined | expired`, set
+  explicitly by `PUT`/`/send`/`/convert-to-invoice`, or by the client via
+  `POST /api/public/quotes/:token/respond` (`accepted`/`declined`, also
+  stored in `client_response`/`client_responded_at`).
 - Invoice `status`: only `draft | sent | void | paid` are ever stored —
   `paid` is set automatically the moment `amount_paid >= total` inside the
   `POST /:id/payments` handler. "Overdue" and "partially paid" are **not**
-  stored; `invoices.js`'s `withComputed()` derives `is_overdue` and
-  `is_partially_paid` from `status`/`due_date`/`amount_paid` on every read,
-  so there's no cron job or background process keeping status in sync.
+  stored; `invoices.js`'s `withComputed()` (also duplicated in `public.js`
+  for the unauthenticated view) derives `is_overdue` and `is_partially_paid`
+  from `status`/`due_date`/`amount_paid` on every read, so there's no cron
+  job or background process keeping status in sync.
 - Deletes are guarded at the DB level in the route handlers, not via FK
   constraints: a client with any quotes/invoices can't be deleted, and an
   invoice with any recorded payments can't be deleted.
+- `public_token` (random 16-byte hex, unique) exists on every quote and
+  invoice row and is regenerated on duplicate/convert/recurring-generation
+  — never reused across documents, and never exposed anywhere except the
+  document it belongs to.
 
 ### Frontend (`frontend/src/`)
 
@@ -149,13 +247,38 @@ Status/derived-field conventions worth knowing before touching this code:
   binary, not JSON) — `openPdf()` fetches with the auth header, turns the
   response into a blob URL, and `window.open()`s it; a plain `<a href>`
   can't attach the Authorization header, which is why this exists.
+  `downloadFile()` is the equivalent for CSV/other exports that should
+  force a real download rather than open in a tab (throwaway `<a download>`
+  click). The `public` object (`getQuote`, `respondQuote`, `getInvoice`,
+  `openQuotePdf`, `openInvoicePdf`) hits `/api/public/...` and is the one
+  set of calls that never passes a token.
 - `pages/` — one component per route (`Landing`, `Login`, `Signup`,
-  `Dashboard`), wired up in `App.jsx` via `react-router-dom`.
-- `pages/business/` — the client/quote/invoice/payment/settings/financials
-  pages (see "Business module" below). `components/LineItemsEditor.jsx` and
-  `components/StatusBadge.jsx` are shared between the quote and invoice
-  form/detail pages — extend those rather than duplicating item-row or
-  status-color logic per page.
+  `ForgotPassword`, `ResetPassword`, `Dashboard`), wired up in `App.jsx` via
+  `react-router-dom`. `ForgotPassword`/`ResetPassword` are public routes;
+  `ResetPassword` reads its token from `useSearchParams()` and, on success,
+  navigates to `/login` passing a message via router state (shown as a
+  banner on the login page). `PublicQuote`/`PublicInvoice` (routes `/q/:token`
+  and `/i/:token`) are also public — they render a read-only view of a
+  quote/invoice by its `public_token` via `api.public.*`, with a "Download
+  PDF" button and, on quotes still `draft`/`sent`, Accept/Decline buttons.
+  These pages exist *outside* `ProtectedRoute` and never touch
+  `AuthContext`/`localStorage`.
+- `pages/business/` — the client/quote/invoice/payment/settings/financials/
+  expenses/recurring-invoices/activity pages (see "Business module" below).
+  `components/LineItemsEditor.jsx` and `components/StatusBadge.jsx` are
+  shared between the quote and invoice form/detail pages — extend those
+  rather than duplicating item-row or status-color logic per page.
+  `Expenses.jsx` and `RecurringInvoices.jsx` follow the same
+  list+inline-form+FAB pattern as `Clients.jsx` (no separate detail page —
+  edit happens inline in the list). `ActivityLog.jsx` is a simple paginated
+  read-only list.
+- `components/GlobalSearch.jsx` — a debounced (250ms) search box that calls
+  `api.search.query()` and renders a grouped dropdown (clients/quotes/
+  invoices/expenses); clicking a result navigates there. Mounted twice in
+  `Navbar.jsx` — once in the desktop nav (narrower, `hidden lg:flex`) and
+  once inside the mobile slide-down menu — both instances exist in the DOM
+  simultaneously, so anything that queries this input in tests must scope
+  to the visible one.
 - `pages/Dashboard.jsx` charts (`components/RevenueTrendChart.jsx`,
   `components/StatusBreakdownChart.jsx`) are hand-rolled SVG/CSS, no
   charting library. Status colors there are pinned to match
@@ -206,3 +329,9 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
 4. Every subsequent authenticated request (e.g. the `/auth/me` check on
    page load) sends the token as `Authorization: Bearer <token>`, verified
    server-side by `requireAuth`.
+5. Forgotten passwords: `ForgotPassword` submits an email to
+   `api.forgotPassword`, which always shows the same generic success
+   message (see `routes/auth.js` above). The emailed link
+   (`/reset-password?token=...`) opens `ResetPassword`, which submits the
+   new password + token to `api.resetPassword` and redirects to `/login`
+   with a success banner.
