@@ -1,4 +1,7 @@
-const BASE_URL = '/api';
+// In dev, Vite proxies /api to the backend (see vite.config.js).
+// In production the frontend and backend are on different origins, so
+// VITE_API_URL must point at the deployed backend's base URL.
+const BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api`;
 
 async function request(path, { method = 'GET', body, token } = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {

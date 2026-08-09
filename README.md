@@ -34,3 +34,25 @@ backend.
 
 See [CLAUDE.md](./CLAUDE.md) for a deeper look at the architecture and
 conventions.
+
+## Deploying (Render)
+
+This repo includes a [`render.yaml`](./render.yaml) blueprint that
+provisions both services — the backend as a Node web service, the frontend
+as a static site — wired to talk to each other.
+
+1. Push this branch to GitHub (already done if you're reading this from
+   the repo).
+2. Go to [Render's New Blueprint page](https://dashboard.render.com/blueprints),
+   connect this GitHub repo, and select the branch to deploy.
+3. Render reads `render.yaml` and creates `edusolution-backend` and
+   `edusolution-frontend`. Click **Apply** to deploy both.
+4. Once deployed, the frontend will be live at
+   `https://edusolution-frontend.onrender.com` (and the API at
+   `https://edusolution-backend.onrender.com`).
+
+**Note:** on Render's free plan the backend has no persistent disk, so the
+SQLite database resets whenever the service restarts or redeploys — fine
+for trying the app out, not for keeping real data. Attach a paid instance
+with a disk (or swap SQLite for a hosted Postgres) before relying on it
+long-term.
