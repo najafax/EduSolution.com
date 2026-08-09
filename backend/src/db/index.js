@@ -27,8 +27,6 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
-  INSERT OR IGNORE INTO business_settings (id) VALUES (1);
-
   CREATE TABLE IF NOT EXISTS clients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -117,5 +115,11 @@ db.exec(`
 `);
 
 db.pragma('foreign_keys = ON');
+
+// Bound params rather than string-interpolated into the exec() block above,
+// so a value like an apostrophe in an address can't break the SQL literal.
+db.prepare(
+  `INSERT OR IGNORE INTO business_settings (id, business_name, address, phone) VALUES (1, ?, ?, ?)`,
+).run('Edu Solutions Pvt Ltd', "Vinares tower, aboomaa hin'gun", '+960 7921335');
 
 module.exports = db;
