@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 EduSolution.com is a two-package web app: a React SPA (`frontend/`) and a
 Node/Express API (`backend/`) with a SQLite database, connected by a
-JWT-based auth flow (signup/login/dashboard). There is no root package.json
+JWT-based auth flow (login/dashboard). There is no root package.json
 — each package is installed and run independently.
 
 Beyond auth, the backend/frontend implement a small business-management
@@ -71,13 +71,34 @@ backend port in frontend code.
   <jwt>` header and attaches the decoded payload to `req.user`. Any new
   protected route should use this middleware rather than re-implementing
   token checks.
-- `routes/auth.js` — `POST /api/auth/signup`, `POST /api/auth/login`,
-  `GET /api/auth/me`, plus `POST /api/auth/forgot-password` and
-  `POST /api/auth/reset-password`. Passwords are hashed with bcryptjs before
-  storage; JWTs are signed with `JWT_SECRET` from env and expire after 7
-  days. `publicUser()` is the single place that shapes what user data is
-  ever sent to the client — extend it rather than returning raw DB rows
-  elsewhere. `forgot-password` always returns the same generic response
+- `routes/auth.js` — `POST /api/auth/login`, `GET /api/auth/me`, plus
+  `POST /api/auth/forgot-password` and `POST /api/auth/reset-password`.
+  **There is deliberately no signup route.** Every logged-in user can see
+  and edit all business data (single-business model, no per-user ownership),
+  so open registration would give anyone who found the URL full read/write
+  access to real financial records. Accounts are created out-of-band with
+  `npm run create-user` (see `scripts/create-user.js`) — don't add a public
+  signup endpoint back without also adding per-user authorization. Passwords
+  are hashed with bcryptjs before storage; JWTs are signed with `JWT_SECRET`
+  from env and expire after 7 days. `publicUser()` is the single place that
+  shapes what user data is ever sent to the client — extend it rather than
+  returning raw DB rows elsewhere.
+- `middleware/rateLimit.js` — `express-rate-limit` instances applied to the
+  unauthenticated auth routes: `loginLimiter` (10 per 15min, brute-force
+  protection), `forgotPasswordLimiter` (5/hour — tighter because each
+  accepted request sends mail from your SMTP account), and
+  `resetPasswordLimiter` (10/hour, guards the reset token). All return the
+  app's usual `{ error }` shape on 429. State is per-process memory, so it
+  resets on restart/redeploy — fine at this scale, but it means a restart
+  clears an in-progress lockout. `index.js` sets `trust proxy` to 1 because
+  Render terminates TLS at a proxy; without it every visitor would share one
+  rate-limit bucket.
+- `scripts/create-user.js` (`npm run create-user`) — interactive by default
+  (hidden password entry, with a visible-input fallback when stdin isn't a
+  TTY, e.g. over `render ssh`). `--list` shows existing accounts; `--name`/
+  `--email`/`--password` (or `CREATE_USER_PASSWORD`) allow non-interactive
+  use. Re-running for an existing email offers to reset that user's password
+  instead, which doubles as account recovery before SMTP is configured. `forgot-password` always returns the same generic response
   regardless of whether the email exists (prevents account enumeration);
   it stores a random token + 1-hour expiry on `users.reset_token`/
   `reset_token_expires` and emails a `${CLIENT_ORIGIN}/reset-password?token=`
@@ -278,9 +299,11 @@ Status/derived-field conventions worth knowing before touching this code:
   click). The `public` object (`getQuote`, `respondQuote`, `getInvoice`,
   `openQuotePdf`, `openInvoicePdf`) hits `/api/public/...` and is the one
   set of calls that never passes a token.
-- `pages/` — one component per route (`Landing`, `Login`, `Signup`,
-  `ForgotPassword`, `ResetPassword`, `Dashboard`), wired up in `App.jsx` via
-  `react-router-dom`. `ForgotPassword`/`ResetPassword` are public routes;
+- `pages/` — one component per route (`Landing`, `Login`, `ForgotPassword`,
+  `ResetPassword`, `Dashboard`), wired up in `App.jsx` via
+  `react-router-dom`. There is no `Signup` page or `/signup` route — see
+  `routes/auth.js` above for why. `ForgotPassword`/`ResetPassword` are
+  public routes;
   `ResetPassword` reads its token from `useSearchParams()` and, on success,
   navigates to `/login` passing a message via router state (shown as a
   banner on the login page). `PublicQuote`/`PublicInvoice` (routes `/q/:token`
@@ -347,7 +370,8 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
 
 ### Auth flow end-to-end
 
-1. `Signup`/`Login` pages submit to `api.signup`/`api.login`.
+1. An operator creates the account out-of-band with `npm run create-user`
+   (there is no self-serve signup); the `Login` page submits to `api.login`.
 2. On success, the returned `{ token, user }` is passed to
    `AuthContext.login()`, which persists the token and updates state.
 3. `ProtectedRoute` (used for `/dashboard`) checks `AuthContext` and

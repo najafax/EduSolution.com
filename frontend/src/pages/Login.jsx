@@ -35,10 +35,7 @@ export default function Login() {
     <div className="mx-auto flex max-w-md flex-col px-4 py-12 sm:px-6 sm:py-20">
       <h1 className="text-2xl font-bold text-slate-900">Log in</h1>
       <p className="mt-2 text-sm text-slate-600">
-        Don&apos;t have an account?{' '}
-        <Link to="/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
-          Sign up
-        </Link>
+        Accounts are created by an administrator — contact yours if you need access.
       </p>
 
       {notice && <p className="mt-4 rounded-md bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</p>}

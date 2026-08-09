@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "create-user": "node scripts/create-user.js",
     "backup": "node scripts/backup.js",
     "backup:list": "node scripts/list-backups.js",
     "backup:restore": "node scripts/restore.js"
@@ -21,6 +22,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^4.6.0",
     "nodemailer": "^9.0.5",

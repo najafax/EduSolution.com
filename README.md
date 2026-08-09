@@ -1,7 +1,7 @@
 # EduSolution.com
 
 A web application with a React frontend and a Node/Express + SQLite backend,
-featuring email/password signup and login, plus a small business-management
+featuring email/password login, plus a small business-management
 module — clients, quotes, invoices, payments/receipts, and financials —
 with PDF generation and emailing of quotes/invoices/reminders/receipts.
 Responsive on phone, tablet, and desktop, and installable as a PWA on iOS
@@ -30,6 +30,22 @@ npm run dev
 ```
 
 The API runs on `http://localhost:4000`.
+
+### Creating user accounts
+
+There is **no public signup** — every logged-in user can see and edit all
+business data, so accounts are created deliberately by an operator:
+
+```bash
+cd backend
+npm run create-user              # interactive; password entry is hidden
+npm run create-user -- --list    # show existing accounts
+```
+
+Re-running it for an email that already exists offers to reset that user's
+password, which is also how you recover a locked-out account before SMTP is
+configured. In production, run the same command from Render's shell on the
+`edusolution-backend` service.
 
 ### Frontend
 
@@ -105,17 +121,17 @@ the backend, swap the file in at `DB_PATH`, and restart.
 
 ### Custom domain (Namecheap)
 
-`render.yaml` is already wired for **edusolutionsmaldives.cm** — the
-frontend serves from `www.edusolutionsmaldives.cm` (with the bare domain
-redirecting to it) and the API from `api.edusolutionsmaldives.cm`. If you
+`render.yaml` is already wired for **edusolutionsmaldives.com** — the
+frontend serves from `www.edusolutionsmaldives.com` (with the bare domain
+redirecting to it) and the API from `api.edusolutionsmaldives.com`. If you
 use a different domain, edit the two `value:` lines in `render.yaml`
 (`CLIENT_ORIGIN` and `VITE_API_URL`) first, then redeploy before continuing.
 
 **In Render**, on each service → **Settings → Custom Domains**:
 
-- `edusolution-frontend` → add `www.edusolutionsmaldives.cm`. Render shows
+- `edusolution-frontend` → add `www.edusolutionsmaldives.com`. Render shows
   a CNAME target (looks like `edusolution-frontend.onrender.com`).
-- `edusolution-backend` → add `api.edusolutionsmaldives.cm`. Render shows
+- `edusolution-backend` → add `api.edusolutionsmaldives.com`. Render shows
   a CNAME target (looks like `edusolution-backend.onrender.com`).
 
 Render provisions a free TLS certificate for each domain automatically
@@ -127,12 +143,12 @@ once the DNS below resolves — this can take a few minutes to a few hours.
 |---|---|---|
 | CNAME Record | `www` | `edusolution-frontend.onrender.com` (Render's exact target) |
 | CNAME Record | `api` | `edusolution-backend.onrender.com` (Render's exact target) |
-| Redirect Record (or ALIAS Record) | `@` | `https://www.edusolutionsmaldives.cm` |
+| Redirect Record (or ALIAS Record) | `@` | `https://www.edusolutionsmaldives.com` |
 
 Use the exact CNAME targets Render shows you in the Custom Domains panel
 (they may differ slightly from the plain `*.onrender.com` names above).
 For the bare/apex domain (`@`), a **Redirect Record** (301, to
-`https://www.edusolutionsmaldives.cm`) is the simplest option in Namecheap;
+`https://www.edusolutionsmaldives.com`) is the simplest option in Namecheap;
 if you'd rather the apex serve the site directly without a redirect, use
 Namecheap's **ALIAS Record** type pointed at the same CNAME target instead
 — DNS doesn't allow a plain CNAME on an apex domain.
@@ -144,3 +160,33 @@ CNAME records it created.
 DNS changes can take anywhere from a few minutes up to 24–48 hours to
 propagate fully, though Namecheap's own records are usually fast (well
 under an hour).
+
+## Going live with real data — checklist
+
+Ordered so nothing depends on a step that hasn't happened yet.
+
+1. **Deploy the blueprint** and confirm both `*.onrender.com` URLs respond.
+2. **Backend on Starter with the disk attached** — without the persistent
+   disk the database is wiped on every redeploy. Verify `DB_PATH` is set to
+   `/var/data/data.sqlite3` on the service.
+3. **Create your account**: `npm run create-user` from Render's shell, then
+   confirm you can log in. (No public signup exists — see above.)
+4. **Custom domain + DNS**, then confirm HTTPS works on both `www` and `api`.
+5. **SMTP** — set the `SMTP_*` vars. Until this is done, sending quotes and
+   invoices, overdue reminders, and password reset all fail (with a clear
+   "not configured" error, not a crash). Send one real quote to yourself to
+   confirm deliverability before relying on it.
+6. **Backups** — set the `BACKUP_S3_*` vars, then run `npm run backup` once
+   and `npm run backup:list` to confirm an object actually landed in the
+   bucket. Don't skip the verification; an untested backup isn't a backup.
+7. **Business settings** — in the app under Settings, set the currency
+   symbol (defaults to `$`), tax ID, and bank details. These print on every
+   quote, invoice, and receipt PDF, so check one PDF before sending to a
+   real client.
+8. **Test a full cycle on real-ish data**: create a client → quote → send →
+   convert to invoice → record payment → download the receipt PDF.
+
+Worth knowing: rate-limit state lives in process memory, so a redeploy
+clears any in-progress login lockout. And the daily cron jobs (backup 03:00,
+recurring invoices 07:00, reminders 08:00) run on **server** time, which is
+UTC on Render — five hours behind Maldives time.

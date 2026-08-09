@@ -14,7 +14,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_ORIGIN
-        value: https://www.edusolutionsmaldives.cm
+        value: https://www.edusolutionsmaldives.com
       - key: DB_PATH
         value: /var/data/data.sqlite3
 
@@ -26,7 +26,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://api.edusolutionsmaldives.cm
+        value: https://api.edusolutionsmaldives.com
     routes:
       - type: rewrite
         source: /*

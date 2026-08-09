@@ -37,20 +37,12 @@ export default function Landing() {
               Go to dashboard
             </Link>
           ) : (
-            <>
-              <Link
-                to="/signup"
-                className="rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-500"
-              >
-                Get started
-              </Link>
-              <Link
-                to="/login"
-                className="rounded-md border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Log in
-              </Link>
-            </>
+            <Link
+              to="/login"
+              className="rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-500"
+            >
+              Log in
+            </Link>
           )}
         </div>
       </section>

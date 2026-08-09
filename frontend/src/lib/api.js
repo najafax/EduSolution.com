@@ -60,7 +60,6 @@ async function downloadFile(path, token, filename) {
 }
 
 export const api = {
-  signup: (payload) => request('/auth/signup', { method: 'POST', body: payload }),
   login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
   me: (token) => request('/auth/me', { token }),
   forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: { email } }),

@@ -17,6 +17,11 @@ const { startScheduler } = require('./lib/scheduler');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Render (and most PaaS) terminate TLS at a proxy, so req.ip is the proxy's
+// address unless we trust one hop. The rate limiters in middleware/rateLimit.js
+// key on req.ip, so without this they'd bucket every visitor together.
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
 app.use(express.json());
 

@@ -57,7 +57,7 @@ export default function Navbar() {
               ))}
               <button
                 onClick={handleLogout}
-                className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700"
+                className="min-h-11 shrink-0 whitespace-nowrap rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700"
               >
                 Log out
               </button>
@@ -85,15 +85,9 @@ export default function Navbar() {
           <div className="flex items-center gap-2 sm:gap-4">
             <Link
               to="/login"
-              className="min-h-11 flex items-center px-2 text-sm font-medium text-slate-700 hover:text-slate-900 sm:px-0"
-            >
-              Log in
-            </Link>
-            <Link
-              to="/signup"
               className="flex min-h-11 items-center rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 sm:px-4"
             >
-              Sign up
+              Log in
             </Link>
           </div>
         )}
