@@ -1,9 +1,17 @@
 # EduSolution.com
 
 A web application with a React frontend and a Node/Express + SQLite backend,
-featuring email/password signup and login. Responsive on phone, tablet, and
-desktop, and installable as a PWA on iOS and Android (add it to your home
-screen from the browser's share/menu button).
+featuring email/password signup and login, plus a small business-management
+module — clients, quotes, invoices, payments/receipts, and financials —
+with PDF generation and emailing of quotes/invoices/reminders/receipts.
+Responsive on phone, tablet, and desktop, and installable as a PWA on iOS
+and Android (add it to your home screen from the browser's share/menu
+button).
+
+To actually send quote/invoice/reminder emails, set the `SMTP_*` variables
+in `backend/.env` (see `backend/.env.example`) — without them, everything
+else works and email-sending routes fail with a clear "not configured"
+error instead of crashing.
 
 ## Structure
 

@@ -1,0 +1,330 @@
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { api } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+import StatusBadge from '../../components/StatusBadge';
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const METHODS = ['bank_transfer', 'cash', 'card', 'cheque', 'other'];
+
+export default function InvoiceDetail() {
+  const { token } = useAuth();
+  const { id } = useParams();
+  const navigate = useNavigate();
+
+  const [data, setData] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [payment, setPayment] = useState({ amount: '', method: 'bank_transfer', reference: '', notes: '', paid_at: todayStr() });
+
+  function load() {
+    api.invoices
+      .get(id, token)
+      .then(setData)
+      .catch((err) => setError(err.message));
+  }
+
+  useEffect(load, [id, token]);
+  useEffect(() => {
+    api.settings.get(token).then(({ settings }) => setSettings(settings));
+  }, [token]);
+
+  async function handleDownload() {
+    setError('');
+    try {
+      await api.invoices.openPdf(id, token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleSend() {
+    setError('');
+    setNotice('');
+    setBusy(true);
+    try {
+      await api.invoices.send(id, token);
+      setNotice('Invoice emailed to client.');
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemind() {
+    setError('');
+    setNotice('');
+    setBusy(true);
+    try {
+      await api.invoices.remind(id, token);
+      setNotice('Reminder emailed to client.');
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm('Delete this invoice?')) return;
+    try {
+      await api.invoices.remove(id, token);
+      navigate('/invoices');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleRecordPayment(e) {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      await api.invoices.recordPayment(id, { ...payment, amount: Number(payment.amount) }, token);
+      setShowPayment(false);
+      setPayment({ amount: '', method: 'bank_transfer', reference: '', notes: '', paid_at: todayStr() });
+      setNotice('Payment recorded.');
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDownloadReceipt(paymentId) {
+    setError('');
+    try {
+      await api.invoices.openReceiptPdf(id, paymentId, token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleSendReceipt(paymentId) {
+    setError('');
+    setNotice('');
+    setBusy(true);
+    try {
+      await api.invoices.sendReceipt(id, paymentId, token);
+      setNotice('Receipt emailed to client.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (error && !data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-red-600 sm:px-6">{error}</div>;
+  if (!data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">Loading…</div>;
+
+  const { invoice, items, client, payments } = data;
+  const symbol = settings?.currency_symbol || '$';
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">{invoice.number}</h1>
+          <div className="mt-1">
+            <StatusBadge status={invoice.is_overdue ? 'overdue' : invoice.status} />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link to={`/invoices/${id}/edit`} className="min-h-11 flex items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Edit
+          </Link>
+          <button onClick={handleDownload} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Download PDF
+          </button>
+          <button onClick={handleSend} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
+            Email to client
+          </button>
+          {invoice.balance_due > 0 && (
+            <button onClick={handleRemind} disabled={busy} className="min-h-11 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60">
+              Send reminder
+            </button>
+          )}
+          <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50">
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {notice && <p className="mt-4 text-sm text-emerald-600">{notice}</p>}
+      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {invoice.last_reminder_sent_at && (
+        <p className="mt-2 text-xs text-slate-500">Last reminder sent {invoice.last_reminder_sent_at}</p>
+      )}
+
+      <div className="mt-6 grid gap-6 sm:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xs font-semibold uppercase text-slate-500">Bill to</h2>
+          <p className="mt-2 font-medium text-slate-900">{client.company || client.name}</p>
+          <p className="text-sm text-slate-600">{client.company ? client.name : ''}</p>
+          <p className="text-sm text-slate-600">{client.email}</p>
+          <p className="text-sm text-slate-600">{client.phone}</p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xs font-semibold uppercase text-slate-500">Details</h2>
+          <dl className="mt-2 space-y-1 text-sm">
+            <div className="flex justify-between"><dt className="text-slate-500">Issue date</dt><dd className="text-slate-900">{invoice.issue_date}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Due date</dt><dd className="text-slate-900">{invoice.due_date}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Balance due</dt><dd className="text-slate-900">{symbol}{invoice.balance_due.toFixed(2)}</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+        <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <thead>
+            <tr className="text-left text-xs font-medium uppercase text-slate-500">
+              <th className="px-4 py-3">Description</th>
+              <th className="px-4 py-3 text-right">Qty</th>
+              <th className="px-4 py-3 text-right">Unit price</th>
+              <th className="px-4 py-3 text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td className="px-4 py-3">{item.description}</td>
+                <td className="px-4 py-3 text-right">{item.quantity}</td>
+                <td className="px-4 py-3 text-right">{symbol}{item.unit_price.toFixed(2)}</td>
+                <td className="px-4 py-3 text-right">{symbol}{item.amount.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="border-t border-slate-200 px-4 py-3 text-right text-sm">
+          <p className="text-slate-600">Subtotal: {symbol}{invoice.subtotal.toFixed(2)}</p>
+          {invoice.tax_rate > 0 && <p className="text-slate-600">Tax ({invoice.tax_rate}%): {symbol}{invoice.tax_amount.toFixed(2)}</p>}
+          <p className="text-slate-600">Total: {symbol}{invoice.total.toFixed(2)}</p>
+          <p className="text-slate-600">Paid: {symbol}{invoice.amount_paid.toFixed(2)}</p>
+          <p className="mt-1 text-base font-semibold text-slate-900">Balance due: {symbol}{invoice.balance_due.toFixed(2)}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between px-6 py-4">
+          <h2 className="text-sm font-semibold text-slate-900">Payments</h2>
+          {invoice.balance_due > 0 && (
+            <button
+              onClick={() => setShowPayment((v) => !v)}
+              className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500"
+            >
+              Record payment
+            </button>
+          )}
+        </div>
+
+        {showPayment && (
+          <form onSubmit={handleRecordPayment} className="grid gap-4 border-t border-slate-200 px-6 py-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Amount</span>
+              <input
+                type="number"
+                min="0.01"
+                max={invoice.balance_due}
+                step="0.01"
+                required
+                value={payment.amount}
+                onChange={(e) => setPayment((p) => ({ ...p, amount: e.target.value }))}
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Method</span>
+              <select
+                value={payment.method}
+                onChange={(e) => setPayment((p) => ({ ...p, method: e.target.value }))}
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              >
+                {METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m.replace('_', ' ')}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Date</span>
+              <input
+                type="date"
+                required
+                value={payment.paid_at}
+                onChange={(e) => setPayment((p) => ({ ...p, paid_at: e.target.value }))}
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Reference</span>
+              <input
+                type="text"
+                value={payment.reference}
+                onChange={(e) => setPayment((p) => ({ ...p, reference: e.target.value }))}
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              />
+            </label>
+            <div className="sm:col-span-2">
+              <button
+                type="submit"
+                disabled={busy}
+                className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+              >
+                {busy ? 'Recording…' : 'Record payment'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {payments.length === 0 ? (
+          <p className="border-t border-slate-200 px-6 py-4 text-sm text-slate-500">No payments recorded yet.</p>
+        ) : (
+          <table className="min-w-full divide-y divide-slate-200 border-t border-slate-200 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-4 py-3">Receipt</th>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Method</th>
+                <th className="px-4 py-3 text-right">Amount</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {payments.map((p) => (
+                <tr key={p.id}>
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{p.receipt_number}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{p.paid_at}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{p.method.replace('_', ' ')}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900">{symbol}{p.amount.toFixed(2)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                    <button onClick={() => handleDownloadReceipt(p.id)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                      Download
+                    </button>
+                    <button onClick={() => handleSendReceipt(p.id)} className="text-indigo-600 hover:text-indigo-500">
+                      Email
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {invoice.notes && (
+        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xs font-semibold uppercase text-slate-500">Notes</h2>
+          <p className="mt-2 whitespace-pre-line text-sm text-slate-600">{invoice.notes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
