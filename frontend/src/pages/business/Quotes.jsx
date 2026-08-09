@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../../components/StatusBadge';
+import SearchInput from '../../components/SearchInput';
+import FloatingActionButton from '../../components/FloatingActionButton';
 
 export default function Quotes() {
   const { token } = useAuth();
   const [quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     api.quotes
@@ -17,6 +20,16 @@ export default function Quotes() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [token]);
+
+  const filteredQuotes = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return quotes;
+    return quotes.filter((quote) =>
+      [quote.number, quote.client_name, quote.client_company, quote.status].some((field) =>
+        field?.toLowerCase().includes(q),
+      ),
+    );
+  }, [quotes, search]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -30,6 +43,10 @@ export default function Quotes() {
         </Link>
       </div>
 
+      <div className="mt-4 max-w-sm">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search quotes…" />
+      </div>
+
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -37,6 +54,8 @@ export default function Quotes() {
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : quotes.length === 0 ? (
           <p className="p-6 text-sm text-slate-500">No quotes yet.</p>
+        ) : filteredQuotes.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">No quotes match "{search}".</p>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -49,7 +68,7 @@ export default function Quotes() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {quotes.map((quote) => (
+              {filteredQuotes.map((quote) => (
                 <tr key={quote.id} className="hover:bg-slate-50">
                   <td className="whitespace-nowrap px-4 py-3">
                     <Link to={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
@@ -68,6 +87,8 @@ export default function Quotes() {
           </table>
         )}
       </div>
+
+      <FloatingActionButton to="/quotes/new" label="New quote" />
     </div>
   );
 }

@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../../components/StatusBadge';
+import SearchInput from '../../components/SearchInput';
+import FloatingActionButton from '../../components/FloatingActionButton';
 
 export default function Invoices() {
   const { token } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     api.invoices
@@ -17,6 +20,16 @@ export default function Invoices() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [token]);
+
+  const filteredInvoices = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return invoices;
+    return invoices.filter((invoice) =>
+      [invoice.number, invoice.client_name, invoice.client_company, invoice.status].some((field) =>
+        field?.toLowerCase().includes(q),
+      ),
+    );
+  }, [invoices, search]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -30,6 +43,10 @@ export default function Invoices() {
         </Link>
       </div>
 
+      <div className="mt-4 max-w-sm">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search invoices…" />
+      </div>
+
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -37,6 +54,8 @@ export default function Invoices() {
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : invoices.length === 0 ? (
           <p className="p-6 text-sm text-slate-500">No invoices yet.</p>
+        ) : filteredInvoices.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">No invoices match "{search}".</p>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -50,7 +69,7 @@ export default function Invoices() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {invoices.map((invoice) => (
+              {filteredInvoices.map((invoice) => (
                 <tr key={invoice.id} className="hover:bg-slate-50">
                   <td className="whitespace-nowrap px-4 py-3">
                     <Link to={`/invoices/${invoice.id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
@@ -70,6 +89,8 @@ export default function Invoices() {
           </table>
         )}
       </div>
+
+      <FloatingActionButton to="/invoices/new" label="New invoice" />
     </div>
   );
 }

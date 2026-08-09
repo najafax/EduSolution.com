@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import SearchInput from '../../components/SearchInput';
+import FloatingActionButton from '../../components/FloatingActionButton';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', company: '', address: '', notes: '' };
 
@@ -13,6 +15,15 @@ export default function Clients() {
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filteredClients = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter((c) =>
+      [c.name, c.email, c.company].some((field) => field?.toLowerCase().includes(q)),
+    );
+  }, [clients, search]);
 
   function load() {
     setLoading(true);
@@ -86,6 +97,10 @@ export default function Clients() {
         </button>
       </div>
 
+      <div className="mt-4 max-w-sm">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search clients…" />
+      </div>
+
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       {showForm && (
@@ -127,6 +142,8 @@ export default function Clients() {
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : clients.length === 0 ? (
           <p className="p-6 text-sm text-slate-500">No clients yet.</p>
+        ) : filteredClients.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">No clients match "{search}".</p>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -139,7 +156,7 @@ export default function Clients() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {clients.map((client) => (
+              {filteredClients.map((client) => (
                 <tr key={client.id}>
                   <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{client.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{client.company || '—'}</td>
@@ -159,6 +176,8 @@ export default function Clients() {
           </table>
         )}
       </div>
+
+      {!showForm && <FloatingActionButton onClick={startCreate} label="New client" />}
     </div>
   );
 }
