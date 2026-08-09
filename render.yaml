@@ -10,7 +10,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_ORIGIN
-        value: https://edusolution-frontend.onrender.com
+        value: https://www.edusolutionsmaldives.cm
 
   - type: web
     name: edusolution-frontend
@@ -20,7 +20,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://edusolution-backend.onrender.com
+        value: https://api.edusolutionsmaldives.cm
     routes:
       - type: rewrite
         source: /*
