@@ -20,6 +20,7 @@ import InvoiceForm from './pages/business/InvoiceForm';
 import InvoiceDetail from './pages/business/InvoiceDetail';
 import RecurringInvoices from './pages/business/RecurringInvoices';
 import Financials from './pages/business/Financials';
+import ActivityLog from './pages/business/ActivityLog';
 
 function Protected({ children }) {
   return <ProtectedRoute>{children}</ProtectedRoute>;
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/recurring-invoices" element={<Protected><RecurringInvoices /></Protected>} />
 
         <Route path="/financials" element={<Protected><Financials /></Protected>} />
+        <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
       </Routes>
     </div>
   );

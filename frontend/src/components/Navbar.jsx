@@ -10,6 +10,7 @@ const BUSINESS_LINKS = [
   { to: '/recurring-invoices', label: 'Recurring' },
   { to: '/expenses', label: 'Expenses' },
   { to: '/financials', label: 'Financials' },
+  { to: '/activity', label: 'Activity' },
   { to: '/settings', label: 'Settings' },
 ];
 

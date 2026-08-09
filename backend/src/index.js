@@ -10,6 +10,7 @@ const financialsRoutes = require('./routes/financials');
 const expensesRoutes = require('./routes/expenses');
 const recurringRoutes = require('./routes/recurring');
 const publicRoutes = require('./routes/public');
+const activityRoutes = require('./routes/activity');
 const { startScheduler } = require('./lib/scheduler');
 
 const app = express();
@@ -28,6 +29,7 @@ app.use('/api/financials', financialsRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/recurring-invoices', recurringRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/activity', activityRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
