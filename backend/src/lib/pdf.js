@@ -1,163 +1,258 @@
 const PDFDocument = require('pdfkit');
 
-function docToBuffer(doc) {
+const MARGIN = 50;
+const CONTENT_WIDTH = 495;
+const PAGE_BOTTOM = 770;
+
+const COLORS = {
+  brand: '#4f46e5',
+  heading: '#0f172a',
+  body: '#334155',
+  muted: '#94a3b8',
+  border: '#e2e8f0',
+  headerFill: '#eef2ff',
+  rowAlt: '#f8fafc',
+  positive: '#059669',
+  negative: '#dc2626',
+};
+
+const STATUS_COLORS = {
+  paid: COLORS.positive,
+  accepted: COLORS.positive,
+  overdue: COLORS.negative,
+  declined: COLORS.negative,
+  void: COLORS.negative,
+  sent: COLORS.brand,
+  draft: COLORS.muted,
+  expired: '#d97706',
+};
+
+function docToBuffer(doc, onBeforeEnd) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
+    if (onBeforeEnd) onBeforeEnd(doc);
     doc.end();
   });
 }
 
 function money(amount, symbol) {
-  return `${symbol}${Number(amount).toFixed(2)}`;
+  const formatted = Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${symbol}${formatted}`;
+}
+
+function newDoc() {
+  return new PDFDocument({ size: 'A4', margin: MARGIN, bufferPages: true });
+}
+
+// Adds "Page X of Y" to every page. Only meaningful once all content is
+// drawn, since page count isn't known until then — call right before
+// doc.end() via docToBuffer's onBeforeEnd hook. Temporarily zeroes the
+// bottom margin while drawing: pdfkit's auto page-break triggers whenever
+// a text call's y falls past (page height - margins.bottom), and a footer
+// living in that margin would otherwise silently spawn a blank extra page
+// on every switchToPage() call.
+function addPageNumbers(doc) {
+  const range = doc.bufferedPageRange();
+  if (range.count <= 1) return;
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    const bottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    doc
+      .fontSize(8)
+      .fillColor(COLORS.muted)
+      .text(`Page ${i - range.start + 1} of ${range.count}`, MARGIN, doc.page.height - 30, { width: CONTENT_WIDTH, align: 'center' });
+    doc.page.margins.bottom = bottomMargin;
+  }
 }
 
 function drawHeader(doc, { title, number, settings }) {
-  doc.fontSize(20).fillColor('#4f46e5').text(settings.business_name || 'Your Business', 50, 50);
-  doc
-    .fontSize(9)
-    .fillColor('#475569')
-    .text(
-      [settings.address, settings.email, settings.phone, settings.tax_id ? `Tax ID: ${settings.tax_id}` : '']
-        .filter(Boolean)
-        .join('\n'),
-      50,
-      75,
-    );
+  const nameWidth = 230;
+  const businessName = settings.business_name || 'Your Business';
+  doc.fontSize(20).fillColor(COLORS.brand).text(businessName, MARGIN, 50, { width: nameWidth });
+  const nameHeight = doc.heightOfString(businessName, { width: nameWidth });
 
-  doc.fontSize(24).fillColor('#0f172a').text(title, 300, 50, { width: 245, align: 'right' });
-  doc.fontSize(10).fillColor('#475569').text(number, 300, 80, { width: 245, align: 'right' });
+  const contactY = 50 + nameHeight + 6;
+  const contactLines = [settings.address, settings.email, settings.phone, settings.tax_id ? `Tax ID: ${settings.tax_id}` : '']
+    .filter(Boolean)
+    .join('\n');
+  doc.fontSize(9).fillColor(COLORS.body).text(contactLines, MARGIN, contactY, { width: 260 });
+
+  doc.fontSize(24).fillColor(COLORS.heading).text(title, 300, 50, { width: 245, align: 'right' });
+  doc.fontSize(10).fillColor(COLORS.body).text(number, 300, 80, { width: 245, align: 'right' });
+
+  const contactHeight = contactLines ? doc.heightOfString(contactLines, { width: 260 }) : 0;
+  const dividerY = Math.max(contactY + contactHeight, 100) + 12;
+  doc.moveTo(MARGIN, dividerY).lineTo(MARGIN + CONTENT_WIDTH, dividerY).strokeColor(COLORS.border).lineWidth(1).stroke();
+  return dividerY + 24;
 }
 
-function drawMeta(doc, rows, y) {
-  doc.fontSize(9).fillColor('#475569');
-  rows.forEach(([label, value], i) => {
-    doc.text(label, 300, y + i * 14, { width: 110, align: 'right' });
-    doc.fillColor('#0f172a').text(value, 415, y + i * 14, { width: 130, align: 'right' });
-    doc.fillColor('#475569');
-  });
-}
+// Bill-to details (left) and issue/due/status meta (right), side by side.
+// Heights are measured rather than assumed, so a long address or an extra
+// meta row can never overlap the items table below it.
+function drawInfoColumns(doc, { client, metaRows }, y) {
+  const leftX = MARGIN;
+  const leftWidth = 240;
+  const rightX = 320;
+  const rightLabelWidth = 100;
+  const rightValueWidth = 125;
 
-function drawClient(doc, client, y) {
-  doc.fontSize(9).fillColor('#94a3b8').text('BILL TO', 50, y);
-  doc
-    .fontSize(11)
-    .fillColor('#0f172a')
-    .text(client.company || client.name, 50, y + 14);
-  doc
-    .fontSize(9)
-    .fillColor('#475569')
-    .text([client.company ? client.name : null, client.email, client.phone, client.address].filter(Boolean).join('\n'), 50, y + 30);
-}
+  doc.fontSize(9).fillColor(COLORS.muted).text('BILL TO', leftX, y);
+  doc.fontSize(11).fillColor(COLORS.heading).text(client.company || client.name, leftX, y + 14, { width: leftWidth });
+  const clientDetail = [client.company ? client.name : null, client.email, client.phone, client.address]
+    .filter(Boolean)
+    .join('\n');
+  doc.fontSize(9).fillColor(COLORS.body).text(clientDetail, leftX, y + 30, { width: leftWidth });
+  const leftHeight = 30 + (clientDetail ? doc.heightOfString(clientDetail, { width: leftWidth }) : 0);
 
-function drawItemsTable(doc, items, y, symbol) {
-  const colX = { desc: 50, qty: 330, price: 390, amount: 470 };
-  doc.rect(50, y, 495, 20).fill('#f1f5f9');
-  doc.fontSize(9).fillColor('#475569');
-  doc.text('DESCRIPTION', colX.desc + 8, y + 6);
-  doc.text('QTY', colX.qty, y + 6, { width: 50, align: 'right' });
-  doc.text('UNIT PRICE', colX.price, y + 6, { width: 70, align: 'right' });
-  doc.text('AMOUNT', colX.amount, y + 6, { width: 65, align: 'right' });
-
-  let rowY = y + 28;
-  doc.fontSize(10).fillColor('#0f172a');
-  for (const item of items) {
-    const rowHeight = Math.max(16, doc.heightOfString(item.description, { width: 270 }));
-    doc.text(item.description, colX.desc + 8, rowY, { width: 270 });
-    doc.text(String(item.quantity), colX.qty, rowY, { width: 50, align: 'right' });
-    doc.text(money(item.unit_price, symbol), colX.price, rowY, { width: 70, align: 'right' });
-    doc.text(money(item.amount, symbol), colX.amount, rowY, { width: 65, align: 'right' });
-    rowY += rowHeight + 10;
+  let rowY = y;
+  for (const [label, value, color] of metaRows) {
+    doc.fontSize(9).fillColor(COLORS.muted).text(label, rightX, rowY, { width: rightLabelWidth });
+    doc
+      .fontSize(9)
+      .fillColor(color || COLORS.heading)
+      .text(value, rightX + rightLabelWidth, rowY, { width: rightValueWidth, align: 'right' });
+    rowY += 16;
   }
+  const rightHeight = rowY - y;
 
-  doc.moveTo(50, rowY).lineTo(545, rowY).strokeColor('#e2e8f0').stroke();
-  return rowY + 12;
+  return y + Math.max(leftHeight, rightHeight) + 24;
 }
 
+function drawTableHeader(doc, y) {
+  doc.rect(MARGIN, y, CONTENT_WIDTH, 22).fill(COLORS.headerFill);
+  doc.fontSize(9).fillColor(COLORS.body);
+  doc.text('DESCRIPTION', MARGIN + 10, y + 7);
+  doc.text('QTY', MARGIN + 280, y + 7, { width: 50, align: 'right' });
+  doc.text('UNIT PRICE', MARGIN + 340, y + 7, { width: 75, align: 'right' });
+  doc.text('AMOUNT', MARGIN + 420, y + 7, { width: 65, align: 'right' });
+  return y + 22;
+}
+
+// Paginates: if a row would run past PAGE_BOTTOM, starts a new page and
+// redraws the table header there, so long item lists never render off-page.
+function drawItemsTable(doc, items, startY, symbol) {
+  let y = drawTableHeader(doc, startY);
+
+  items.forEach((item, index) => {
+    const rowHeight = Math.max(20, doc.heightOfString(item.description, { width: 260 }) + 10);
+
+    if (y + rowHeight > PAGE_BOTTOM) {
+      doc.addPage();
+      y = drawTableHeader(doc, MARGIN);
+    }
+
+    if (index % 2 === 1) {
+      doc.rect(MARGIN, y, CONTENT_WIDTH, rowHeight).fill(COLORS.rowAlt);
+    }
+
+    doc.fontSize(10).fillColor(COLORS.heading);
+    doc.text(item.description, MARGIN + 10, y + 6, { width: 260 });
+    doc.text(String(item.quantity), MARGIN + 280, y + 6, { width: 50, align: 'right' });
+    doc.text(money(item.unit_price, symbol), MARGIN + 340, y + 6, { width: 75, align: 'right' });
+    doc.text(money(item.amount, symbol), MARGIN + 420, y + 6, { width: 65, align: 'right' });
+
+    y += rowHeight;
+  });
+
+  doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_WIDTH, y).strokeColor(COLORS.border).stroke();
+  return y + 16;
+}
+
+// Subtotal/tax as plain rows, then a highlighted box for the figure that
+// matters most: Total for quotes, Balance due (colored red/green) for
+// invoices. Breaks to a new page if it wouldn't fit under the table.
 function drawTotals(doc, { subtotal, taxRate, taxAmount, total, amountPaid, balanceDue }, y, symbol) {
+  const boxX = 300;
+  const boxWidth = 245;
+  const isInvoice = amountPaid !== undefined;
   const rows = [['Subtotal', money(subtotal, symbol)]];
   if (taxRate) rows.push([`Tax (${taxRate}%)`, money(taxAmount, symbol)]);
-  rows.push(['Total', money(total, symbol)]);
-  if (amountPaid !== undefined) {
+  if (isInvoice) {
+    rows.push(['Total', money(total, symbol)]);
     rows.push(['Paid', money(amountPaid, symbol)]);
-    rows.push(['Balance due', money(balanceDue, symbol)]);
+  }
+
+  const blockHeight = rows.length * 18 + 40;
+  if (y + blockHeight > PAGE_BOTTOM) {
+    doc.addPage();
+    y = MARGIN;
   }
 
   let rowY = y;
-  rows.forEach(([label, value], i) => {
-    const isLast = i === rows.length - 1;
-    doc
-      .fontSize(isLast ? 12 : 10)
-      .fillColor(isLast ? '#0f172a' : '#475569')
-      .text(label, 350, rowY, { width: 110, align: 'right' });
-    doc
-      .fontSize(isLast ? 12 : 10)
-      .fillColor(isLast ? '#0f172a' : '#475569')
-      .text(value, 470, rowY, { width: 65, align: 'right' });
-    rowY += isLast ? 20 : 16;
+  doc.fontSize(10);
+  rows.forEach(([label, value]) => {
+    doc.fillColor(COLORS.body).text(label, boxX, rowY, { width: 130 });
+    doc.fillColor(COLORS.heading).text(value, boxX + 130, rowY, { width: 115, align: 'right' });
+    rowY += 18;
   });
-  return rowY;
+
+  const finalLabel = isInvoice ? 'Balance due' : 'Total';
+  const finalValue = isInvoice ? balanceDue : total;
+  const finalColor = isInvoice ? (balanceDue > 0 ? COLORS.negative : COLORS.positive) : COLORS.heading;
+
+  doc.rect(boxX, rowY + 4, boxWidth, 32).fill(COLORS.headerFill);
+  doc.fontSize(12).fillColor(COLORS.heading).text(finalLabel, boxX + 12, rowY + 14, { width: 120 });
+  doc.fontSize(13).fillColor(finalColor).text(money(finalValue, symbol), boxX + 128, rowY + 13, { width: 105, align: 'right' });
+
+  return rowY + 48;
 }
 
 function drawFooter(doc, { notes, bankDetails }, y) {
+  if (y > PAGE_BOTTOM - 40) {
+    doc.addPage();
+    y = MARGIN;
+  }
   if (notes) {
-    doc.fontSize(9).fillColor('#94a3b8').text('NOTES', 50, y);
-    doc.fontSize(9).fillColor('#475569').text(notes, 50, y + 14, { width: 495 });
-    y += 14 + doc.heightOfString(notes, { width: 495 }) + 20;
+    doc.fontSize(9).fillColor(COLORS.muted).text('NOTES', MARGIN, y);
+    doc.fontSize(9).fillColor(COLORS.body).text(notes, MARGIN, y + 14, { width: CONTENT_WIDTH });
+    y += 14 + doc.heightOfString(notes, { width: CONTENT_WIDTH }) + 20;
   }
   if (bankDetails) {
-    doc.fontSize(9).fillColor('#94a3b8').text('PAYMENT DETAILS', 50, y);
-    doc.fontSize(9).fillColor('#475569').text(bankDetails, 50, y + 14, { width: 495 });
+    doc.fontSize(9).fillColor(COLORS.muted).text('PAYMENT DETAILS', MARGIN, y);
+    doc.fontSize(9).fillColor(COLORS.body).text(bankDetails, MARGIN, y + 14, { width: CONTENT_WIDTH });
   }
 }
 
 function renderQuotePdf({ quote, client, items, settings }) {
-  const doc = new PDFDocument({ size: 'A4', margin: 50 });
+  const doc = newDoc();
   const symbol = settings.currency_symbol || '$';
 
-  drawHeader(doc, { title: 'QUOTE', number: quote.number, settings });
-  drawMeta(
-    doc,
-    [
+  let y = drawHeader(doc, { title: 'QUOTE', number: quote.number, settings });
+  y = drawInfoColumns(doc, {
+    client,
+    metaRows: [
       ['Issue date', quote.issue_date],
       ['Expiry date', quote.expiry_date || '—'],
-      ['Status', quote.status.toUpperCase()],
+      ['Status', quote.status.toUpperCase(), STATUS_COLORS[quote.status]],
     ],
-    120,
-  );
-  drawClient(doc, client, 170);
-  const afterTable = drawItemsTable(doc, items, 240, symbol);
-  const afterTotals = drawTotals(
-    doc,
-    { subtotal: quote.subtotal, taxRate: quote.tax_rate, taxAmount: quote.tax_amount, total: quote.total },
-    afterTable,
-    symbol,
-  );
-  drawFooter(doc, { notes: quote.notes, bankDetails: '' }, afterTotals + 20);
+  }, y);
+  y = drawItemsTable(doc, items, y, symbol);
+  y = drawTotals(doc, { subtotal: quote.subtotal, taxRate: quote.tax_rate, taxAmount: quote.tax_amount, total: quote.total }, y, symbol);
+  drawFooter(doc, { notes: quote.notes, bankDetails: '' }, y);
 
-  return docToBuffer(doc);
+  return docToBuffer(doc, addPageNumbers);
 }
 
 function renderInvoicePdf({ invoice, client, items, settings }) {
-  const doc = new PDFDocument({ size: 'A4', margin: 50 });
+  const doc = newDoc();
   const symbol = settings.currency_symbol || '$';
   const balanceDue = invoice.total - invoice.amount_paid;
 
-  drawHeader(doc, { title: 'INVOICE', number: invoice.number, settings });
-  drawMeta(
-    doc,
-    [
+  let y = drawHeader(doc, { title: 'INVOICE', number: invoice.number, settings });
+  y = drawInfoColumns(doc, {
+    client,
+    metaRows: [
       ['Issue date', invoice.issue_date],
       ['Due date', invoice.due_date],
-      ['Status', invoice.status.toUpperCase()],
+      ['Status', invoice.status.toUpperCase(), STATUS_COLORS[invoice.status]],
     ],
-    120,
-  );
-  drawClient(doc, client, 170);
-  const afterTable = drawItemsTable(doc, items, 240, symbol);
-  const afterTotals = drawTotals(
+  }, y);
+  y = drawItemsTable(doc, items, y, symbol);
+  y = drawTotals(
     doc,
     {
       subtotal: invoice.subtotal,
@@ -167,43 +262,44 @@ function renderInvoicePdf({ invoice, client, items, settings }) {
       amountPaid: invoice.amount_paid,
       balanceDue,
     },
-    afterTable,
+    y,
     symbol,
   );
-  drawFooter(doc, { notes: invoice.notes, bankDetails: settings.bank_details }, afterTotals + 20);
+  drawFooter(doc, { notes: invoice.notes, bankDetails: settings.bank_details }, y);
 
-  return docToBuffer(doc);
+  return docToBuffer(doc, addPageNumbers);
 }
 
 function renderReceiptPdf({ payment, invoice, client, settings }) {
-  const doc = new PDFDocument({ size: 'A4', margin: 50 });
+  const doc = newDoc();
   const symbol = settings.currency_symbol || '$';
 
-  drawHeader(doc, { title: 'RECEIPT', number: payment.receipt_number, settings });
-  drawMeta(
-    doc,
-    [
+  let y = drawHeader(doc, { title: 'RECEIPT', number: payment.receipt_number, settings });
+  y = drawInfoColumns(doc, {
+    client,
+    metaRows: [
       ['Payment date', payment.paid_at],
       ['For invoice', invoice.number],
       ['Method', payment.method.replace('_', ' ').toUpperCase()],
     ],
-    120,
-  );
-  drawClient(doc, client, 170);
+  }, y);
 
-  doc.fontSize(9).fillColor('#94a3b8').text('AMOUNT RECEIVED', 50, 250);
-  doc.fontSize(22).fillColor('#0f172a').text(money(payment.amount, symbol), 50, 265);
+  doc.rect(MARGIN, y, CONTENT_WIDTH, 60).fill(COLORS.headerFill);
+  doc.fontSize(9).fillColor(COLORS.muted).text('AMOUNT RECEIVED', MARGIN + 16, y + 14);
+  doc.fontSize(24).fillColor(COLORS.positive).text(money(payment.amount, symbol), MARGIN + 16, y + 28);
+  y += 80;
 
   if (payment.reference) {
-    doc.fontSize(9).fillColor('#94a3b8').text('REFERENCE', 50, 310);
-    doc.fontSize(10).fillColor('#475569').text(payment.reference, 50, 324);
+    doc.fontSize(9).fillColor(COLORS.muted).text('REFERENCE', MARGIN, y);
+    doc.fontSize(10).fillColor(COLORS.body).text(payment.reference, MARGIN, y + 14);
+    y += 40;
   }
   if (payment.notes) {
-    doc.fontSize(9).fillColor('#94a3b8').text('NOTES', 50, 354);
-    doc.fontSize(10).fillColor('#475569').text(payment.notes, 50, 368, { width: 495 });
+    doc.fontSize(9).fillColor(COLORS.muted).text('NOTES', MARGIN, y);
+    doc.fontSize(10).fillColor(COLORS.body).text(payment.notes, MARGIN, y + 14, { width: CONTENT_WIDTH });
   }
 
-  return docToBuffer(doc);
+  return docToBuffer(doc, addPageNumbers);
 }
 
 module.exports = { renderQuotePdf, renderInvoicePdf, renderReceiptPdf };
