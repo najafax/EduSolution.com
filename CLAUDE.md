@@ -58,12 +58,15 @@ backend port in frontend code.
 - `index.js` — Express app entry point: CORS (restricted to `CLIENT_ORIGIN`
   from env), JSON body parsing, mounts routes under `/api`, 404 + error
   handlers.
-- `db/index.js` — opens `backend/data.sqlite3` via `better-sqlite3` (a
-  synchronous SQLite driver — no async/await needed for queries) and runs
-  `CREATE TABLE IF NOT EXISTS` on startup. This is the only place schema is
-  defined; there is no migration tool, so schema changes are made by editing
-  the `CREATE TABLE` statement directly (fine pre-launch; revisit once there's
-  production data).
+- `db/index.js` — opens the SQLite file via `better-sqlite3` (a synchronous
+  SQLite driver — no async/await needed for queries) and runs
+  `CREATE TABLE IF NOT EXISTS` on startup. Path is `DB_PATH` from env if
+  set, else `backend/data.sqlite3` — in production this should point at a
+  persistent disk mount (see `render.yaml`'s `disk`/`DB_PATH` for the
+  Render deployment) so the database survives restarts/redeploys. This is
+  the only place schema is defined; there is no migration tool, so schema
+  changes are made by editing the `CREATE TABLE` statement directly (fine
+  pre-launch; revisit once there's production data).
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
   <jwt>` header and attaches the decoded payload to `req.user`. Any new
   protected route should use this middleware rather than re-implementing
@@ -83,7 +86,8 @@ backend port in frontend code.
   an 8+ char password, and clears the token after use (single-use).
 
 Environment variables (see `backend/.env.example` for the full list with
-comments): `PORT`, `JWT_SECRET`, `CLIENT_ORIGIN`, and `SMTP_HOST`/`PORT`/
+comments): `PORT`, `JWT_SECRET`, `CLIENT_ORIGIN`, `DB_PATH` (optional,
+production-only — see `db/index.js` above), and `SMTP_HOST`/`PORT`/
 `USER`/`PASS`/`FROM`/`SECURE` for outgoing email. `backend/data.sqlite3`
 and `.env` are gitignored — they're local/per-environment state, not source.
 

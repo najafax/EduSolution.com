@@ -2,15 +2,21 @@ services:
   - type: web
     name: edusolution-backend
     runtime: node
-    plan: free
+    plan: starter
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
+    disk:
+      name: edusolution-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_ORIGIN
         value: https://www.edusolutionsmaldives.cm
+      - key: DB_PATH
+        value: /var/data/data.sqlite3
 
   - type: web
     name: edusolution-frontend

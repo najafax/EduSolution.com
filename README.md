@@ -62,15 +62,26 @@ as a static site — wired to talk to each other.
    `https://edusolution-backend.onrender.com`) — confirm both work before
    moving on to the custom domain below.
 
-**Note:** on Render's free plan the backend has no persistent disk, so the
-SQLite database resets whenever the service restarts or redeploys — fine
-for trying the app out, not for keeping real data. Attach a paid instance
-with a disk (or swap SQLite for a hosted Postgres) before relying on it
-long-term. The free plan also spins the backend down after 15 minutes of
-inactivity, which both delays the first request after idle *and* means the
-`node-cron` jobs in `lib/scheduler.js` (daily overdue reminders, daily
-recurring-invoice generation) won't fire reliably unless something is
-pinging the service, or unless you're on a paid instance that stays up.
+**Note on cost/reliability:** `render.yaml` provisions the backend on
+Render's **Starter** plan (~$7/mo) with a 1GB **persistent disk** mounted at
+`/var/data` — the backend reads `DB_PATH` (see `backend/src/db/index.js`)
+so `data.sqlite3` lives on that disk and survives restarts/redeploys. This
+is the minimum needed to hold real client/invoice data safely and to keep
+the `node-cron` jobs in `lib/scheduler.js` (daily overdue reminders, daily
+recurring-invoice generation) firing reliably — Render's **free** plan has
+no persistent disk (the database resets on every redeploy) and spins the
+service down after 15 minutes idle (cron jobs silently stop firing). The
+frontend stays on Render's free static-site tier regardless — only the
+backend needs to be paid. If you deploy this blueprint before upgrading,
+Render will still show `plan: free` as an option in the dashboard; switch
+the backend service to Starter before you rely on it for real data.
+
+**Backups:** a persistent disk protects against restarts/redeploys, but
+not against you fat-fingering a delete or Render having a bad day. Since
+this holds real financial data, periodically back up `data.sqlite3`
+somewhere off-platform — e.g. a small scheduled script that copies it to
+an object-storage bucket or emails it to yourself. Not set up yet; ask if
+you want this added.
 
 ### Custom domain (Namecheap)
 
