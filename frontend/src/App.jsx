@@ -16,6 +16,7 @@ import QuoteDetail from './pages/business/QuoteDetail';
 import Invoices from './pages/business/Invoices';
 import InvoiceForm from './pages/business/InvoiceForm';
 import InvoiceDetail from './pages/business/InvoiceDetail';
+import RecurringInvoices from './pages/business/RecurringInvoices';
 import Financials from './pages/business/Financials';
 
 function Protected({ children }) {
@@ -47,6 +48,8 @@ export default function App() {
         <Route path="/invoices/new" element={<Protected><InvoiceForm /></Protected>} />
         <Route path="/invoices/:id" element={<Protected><InvoiceDetail /></Protected>} />
         <Route path="/invoices/:id/edit" element={<Protected><InvoiceForm /></Protected>} />
+
+        <Route path="/recurring-invoices" element={<Protected><RecurringInvoices /></Protected>} />
 
         <Route path="/financials" element={<Protected><Financials /></Protected>} />
       </Routes>
