@@ -6,6 +6,8 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import PublicQuote from './pages/PublicQuote';
+import PublicInvoice from './pages/PublicInvoice';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/business/Clients';
 import Expenses from './pages/business/Expenses';
@@ -33,6 +35,8 @@ export default function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/q/:token" element={<PublicQuote />} />
+        <Route path="/i/:token" element={<PublicInvoice />} />
         <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
 
         <Route path="/clients" element={<Protected><Clients /></Protected>} />

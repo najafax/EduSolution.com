@@ -1,0 +1,118 @@
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { api } from '../lib/api';
+import StatusBadge from '../components/StatusBadge';
+
+export default function PublicInvoice() {
+  const { token } = useParams();
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.public
+      .getInvoice(token)
+      .then(setData)
+      .catch((err) => setError(err.message));
+  }, [token]);
+
+  async function handleViewPdf() {
+    setError('');
+    try {
+      await api.public.openInvoicePdf(token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  if (error && !data) return <div className="mx-auto max-w-2xl px-4 py-16 text-center text-sm text-red-600 sm:px-6">{error}</div>;
+  if (!data) return <div className="mx-auto max-w-2xl px-4 py-16 text-center text-sm text-slate-500 sm:px-6">Loading…</div>;
+
+  const { invoice, items, client, settings } = data;
+  const symbol = settings?.currency_symbol || '$';
+
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-slate-500">{settings?.business_name}</p>
+            <h1 className="mt-1 text-2xl font-bold text-slate-900">Invoice {invoice.number}</h1>
+          </div>
+          <StatusBadge status={invoice.status} />
+        </div>
+
+        <div className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
+          <div>
+            <p className="font-medium text-slate-500">Billed to</p>
+            <p className="text-slate-900">{client.company || client.name}</p>
+            {client.company && <p className="text-slate-600">{client.name}</p>}
+          </div>
+          <div>
+            <p className="font-medium text-slate-500">Issue date</p>
+            <p className="text-slate-900">{invoice.issue_date}</p>
+            <p className="mt-2 font-medium text-slate-500">Due date</p>
+            <p className="text-slate-900">{invoice.due_date}</p>
+          </div>
+        </div>
+
+        <div className="mt-6 -mx-6 overflow-x-auto sm:-mx-8">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-6 py-3 sm:px-8">Description</th>
+                <th className="px-4 py-3 text-right">Qty</th>
+                <th className="px-4 py-3 text-right">Unit price</th>
+                <th className="px-4 py-3 text-right sm:pr-8">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {items.map((item) => (
+                <tr key={item.id}>
+                  <td className="px-6 py-3 sm:px-8">{item.description}</td>
+                  <td className="px-4 py-3 text-right">{item.quantity}</td>
+                  <td className="px-4 py-3 text-right">{symbol}{item.unit_price.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right sm:pr-8">{symbol}{item.amount.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="border-t border-slate-200 px-6 py-3 text-right text-sm sm:px-8">
+            <p className="text-slate-600">Subtotal: {symbol}{invoice.subtotal.toFixed(2)}</p>
+            {invoice.discount_amount > 0 && (
+              <p className="text-slate-600">
+                Discount {invoice.discount_type === 'percentage' ? `(${invoice.discount_value}%)` : ''}: -{symbol}
+                {invoice.discount_amount.toFixed(2)}
+              </p>
+            )}
+            {invoice.tax_rate > 0 && <p className="text-slate-600">Tax ({invoice.tax_rate}%): {symbol}{invoice.tax_amount.toFixed(2)}</p>}
+            <p className="mt-1 text-base font-semibold text-slate-900">Total: {symbol}{invoice.total.toFixed(2)}</p>
+            {invoice.amount_paid > 0 && (
+              <>
+                <p className="mt-1 text-slate-600">Paid: {symbol}{invoice.amount_paid.toFixed(2)}</p>
+                <p className="font-semibold text-slate-900">Balance due: {symbol}{invoice.balance_due.toFixed(2)}</p>
+              </>
+            )}
+          </div>
+        </div>
+
+        {invoice.notes && (
+          <div className="mt-6 border-t border-slate-200 pt-4 text-sm">
+            <p className="font-medium text-slate-500">Notes</p>
+            <p className="mt-1 whitespace-pre-line text-slate-600">{invoice.notes}</p>
+          </div>
+        )}
+
+        {error && <p className="mt-6 text-sm text-red-600">{error}</p>}
+
+        <div className="mt-8">
+          <button
+            onClick={handleViewPdf}
+            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Download PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
