@@ -30,7 +30,7 @@ export default function Login() {
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col px-6 py-20">
+    <div className="mx-auto flex max-w-md flex-col px-4 py-12 sm:px-6 sm:py-20">
       <h1 className="text-2xl font-bold text-slate-900">Log in</h1>
       <p className="mt-2 text-sm text-slate-600">
         Don&apos;t have an account?{' '}
@@ -48,10 +48,11 @@ export default function Login() {
             id="email"
             name="email"
             type="email"
+            autoComplete="email"
             required
             value={form.email}
             onChange={handleChange}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
           />
         </div>
 
@@ -63,10 +64,11 @@ export default function Login() {
             id="password"
             name="password"
             type="password"
+            autoComplete="current-password"
             required
             value={form.password}
             onChange={handleChange}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
           />
         </div>
 
@@ -75,7 +77,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="mt-2 min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
         >
           {submitting ? 'Logging in…' : 'Log in'}
         </button>

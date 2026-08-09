@@ -94,6 +94,35 @@ local/per-environment state, not source.
   setup exists or is needed for v4's Vite integration. Utility classes are
   used directly in JSX; there's no separate component-style layer.
 
+### Responsive / PWA
+
+The app is a responsive installable PWA (installable on iOS/Android home
+screens), configured via `vite-plugin-pwa` in `vite.config.js`:
+
+- The manifest (name, icons, `theme_color`, `display: standalone`) is
+  generated from the `manifest` option at build time — don't hand-edit a
+  `manifest.webmanifest` file, it doesn't exist in source, only in `dist/`.
+- Icon source files live in `frontend/public/` (`favicon.svg`,
+  `pwa-192x192.png`, `pwa-512x512.png`, `maskable-icon-512x512.png`,
+  `apple-touch-icon.png`). The two `.svg` files are the design source; the
+  PNGs were rasterized from them (there's no build step that regenerates
+  PNGs from the SVGs — if the design changes, re-rasterize by hand and
+  replace the PNGs).
+- iOS Safari doesn't read the manifest for install metadata, so
+  `index.html` carries iOS-specific tags directly (`apple-touch-icon` link,
+  `apple-mobile-web-app-capable`, etc.) — keep these in sync with the
+  manifest's icons/name if either changes.
+- All form inputs use `text-base` (16px), not `text-sm` — iOS Safari
+  auto-zooms the page on focus for inputs under 16px, so this isn't just a
+  style choice.
+- Touch targets (`Navbar` links/buttons, form inputs/buttons) use
+  `min-h-11` (44px) to meet Apple's minimum tap-target guidance.
+- `npm run build` also emits a generated service worker (`sw.js`) that
+  precaches the built assets; `workbox.navigateFallbackDenylist` excludes
+  `/api/*` so navigation fallback never intercepts API routes. There is no
+  offline-data story beyond asset precaching — API calls always hit the
+  network.
+
 ### Auth flow end-to-end
 
 1. `Signup`/`Login` pages submit to `api.signup`/`api.login`.

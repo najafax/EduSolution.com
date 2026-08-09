@@ -30,7 +30,7 @@ export default function Signup() {
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col px-6 py-20">
+    <div className="mx-auto flex max-w-md flex-col px-4 py-12 sm:px-6 sm:py-20">
       <h1 className="text-2xl font-bold text-slate-900">Create your account</h1>
       <p className="mt-2 text-sm text-slate-600">
         Already have an account?{' '}
@@ -48,10 +48,11 @@ export default function Signup() {
             id="name"
             name="name"
             type="text"
+            autoComplete="name"
             required
             value={form.name}
             onChange={handleChange}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
           />
         </div>
 
@@ -63,10 +64,11 @@ export default function Signup() {
             id="email"
             name="email"
             type="email"
+            autoComplete="email"
             required
             value={form.email}
             onChange={handleChange}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
           />
         </div>
 
@@ -78,11 +80,12 @@ export default function Signup() {
             id="password"
             name="password"
             type="password"
+            autoComplete="new-password"
             required
             minLength={8}
             value={form.password}
             onChange={handleChange}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
           />
           <p className="mt-1 text-xs text-slate-500">At least 8 characters.</p>
         </div>
@@ -92,7 +95,7 @@ export default function Signup() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="mt-2 min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
         >
           {submitting ? 'Creating account…' : 'Sign up'}
         </button>

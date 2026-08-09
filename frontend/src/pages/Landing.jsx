@@ -21,14 +21,14 @@ export default function Landing() {
 
   return (
     <div>
-      <section className="mx-auto max-w-6xl px-6 py-24 text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl">
+      <section className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 sm:py-24">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-6xl">
           Learning, simplified.
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-600">
+        <p className="mx-auto mt-6 max-w-2xl text-base text-slate-600 sm:text-lg">
           EduSolution.com brings your courses, progress, and resources together in one place.
         </p>
-        <div className="mt-10 flex justify-center gap-4">
+        <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">
           {user ? (
             <Link
               to="/dashboard"
@@ -56,7 +56,7 @@ export default function Landing() {
       </section>
 
       <section className="border-t border-slate-200 bg-slate-50">
-        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-20 sm:grid-cols-3">
+        <div className="mx-auto grid max-w-6xl gap-6 px-4 py-14 sm:gap-8 sm:px-6 sm:py-20 sm:grid-cols-3">
           {FEATURES.map((feature) => (
             <div key={feature.title} className="rounded-lg bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-slate-900">{feature.title}</h2>

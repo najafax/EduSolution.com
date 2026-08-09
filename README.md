@@ -1,7 +1,9 @@
 # EduSolution.com
 
 A web application with a React frontend and a Node/Express + SQLite backend,
-featuring email/password signup and login.
+featuring email/password signup and login. Responsive on phone, tablet, and
+desktop, and installable as a PWA on iOS and Android (add it to your home
+screen from the browser's share/menu button).
 
 ## Structure
 
