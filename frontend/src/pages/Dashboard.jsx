@@ -10,6 +10,7 @@ const SHORTCUTS = [
   { to: '/clients', label: 'Clients' },
   { to: '/quotes', label: 'Quotes' },
   { to: '/invoices', label: 'Invoices' },
+  { to: '/expenses', label: 'Expenses' },
   { to: '/financials', label: 'Financials' },
   { to: '/settings', label: 'Settings' },
 ];
@@ -40,6 +41,7 @@ export default function Dashboard() {
           sub: `${summary.overdueCount} invoice${summary.overdueCount === 1 ? '' : 's'}`,
           warn: summary.overdueCount > 0,
         },
+        { label: 'Net profit', value: summary.netProfit, isMoney: true, warn: summary.netProfit < 0 },
       ]
     : [];
 

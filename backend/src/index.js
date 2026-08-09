@@ -7,6 +7,8 @@ const settingsRoutes = require('./routes/settings');
 const quotesRoutes = require('./routes/quotes');
 const invoicesRoutes = require('./routes/invoices');
 const financialsRoutes = require('./routes/financials');
+const expensesRoutes = require('./routes/expenses');
+const { startScheduler } = require('./lib/scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -21,6 +23,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/quotes', quotesRoutes);
 app.use('/api/invoices', invoicesRoutes);
 app.use('/api/financials', financialsRoutes);
+app.use('/api/expenses', expensesRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
@@ -33,4 +36,5 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
+  startScheduler();
 });

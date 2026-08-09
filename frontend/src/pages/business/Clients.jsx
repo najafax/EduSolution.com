@@ -85,16 +85,33 @@ export default function Clients() {
     }
   }
 
+  async function handleExport() {
+    setError('');
+    try {
+      await api.clients.exportCsv(token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Clients</h1>
-        <button
-          onClick={startCreate}
-          className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
-        >
-          New client
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExport}
+            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={startCreate}
+            className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+          >
+            New client
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 max-w-sm">

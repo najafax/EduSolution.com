@@ -70,6 +70,18 @@ export default function QuoteDetail() {
     }
   }
 
+  async function handleDuplicate() {
+    setError('');
+    setBusy(true);
+    try {
+      const { quote } = await api.quotes.duplicate(id, token);
+      navigate(`/quotes/${quote.id}`);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
   async function handleConvert(e) {
     e.preventDefault();
     setError('');
@@ -113,6 +125,9 @@ export default function QuoteDetail() {
               Convert to invoice
             </button>
           )}
+          <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            Duplicate
+          </button>
           <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50">
             Delete
           </button>
@@ -190,6 +205,12 @@ export default function QuoteDetail() {
             </table>
             <div className="border-t border-slate-200 px-6 py-3 text-right text-sm">
               <p className="text-slate-600">Subtotal: {symbol}{quote.subtotal.toFixed(2)}</p>
+              {quote.discount_amount > 0 && (
+                <p className="text-slate-600">
+                  Discount {quote.discount_type === 'percentage' ? `(${quote.discount_value}%)` : ''}: -{symbol}
+                  {quote.discount_amount.toFixed(2)}
+                </p>
+              )}
               {quote.tax_rate > 0 && <p className="text-slate-600">Tax ({quote.tax_rate}%): {symbol}{quote.tax_amount.toFixed(2)}</p>}
               <p className="mt-1 text-base font-semibold text-slate-900">Total: {symbol}{quote.total.toFixed(2)}</p>
             </div>

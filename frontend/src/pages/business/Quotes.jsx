@@ -31,16 +31,33 @@ export default function Quotes() {
     );
   }, [quotes, search]);
 
+  async function handleExport() {
+    setError('');
+    try {
+      await api.quotes.exportCsv(token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Quotes</h1>
-        <Link
-          to="/quotes/new"
-          className="flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
-        >
-          New quote
-        </Link>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExport}
+            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Export CSV
+          </button>
+          <Link
+            to="/quotes/new"
+            className="flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+          >
+            New quote
+          </Link>
+        </div>
       </div>
 
       <div className="mt-4 max-w-sm">

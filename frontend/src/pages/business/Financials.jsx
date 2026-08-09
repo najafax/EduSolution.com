@@ -25,6 +25,8 @@ export default function Financials() {
     { label: 'Total paid', value: summary.totalPaid },
     { label: 'Outstanding', value: summary.totalOutstanding },
     { label: 'Overdue', value: summary.overdueAmount, sub: `${summary.overdueCount} invoice${summary.overdueCount === 1 ? '' : 's'}`, warn: summary.overdueCount > 0 },
+    { label: 'Expenses', value: summary.totalExpenses },
+    { label: 'Net profit', value: summary.netProfit, warn: summary.netProfit < 0 },
   ];
 
   return (

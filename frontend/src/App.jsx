@@ -4,8 +4,11 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/business/Clients';
+import Expenses from './pages/business/Expenses';
 import Settings from './pages/business/Settings';
 import Quotes from './pages/business/Quotes';
 import QuoteForm from './pages/business/QuoteForm';
@@ -27,9 +30,12 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
 
         <Route path="/clients" element={<Protected><Clients /></Protected>} />
+        <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
         <Route path="/settings" element={<Protected><Settings /></Protected>} />
 
         <Route path="/quotes" element={<Protected><Quotes /></Protected>} />

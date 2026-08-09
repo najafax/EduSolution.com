@@ -23,6 +23,8 @@ export default function InvoiceForm() {
   const [issueDate, setIssueDate] = useState(todayStr());
   const [dueDate, setDueDate] = useState(todayPlus(14));
   const [taxRate, setTaxRate] = useState(0);
+  const [discountType, setDiscountType] = useState('percentage');
+  const [discountValue, setDiscountValue] = useState(0);
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: 0 }]);
   const [loading, setLoading] = useState(isEditing);
@@ -43,6 +45,8 @@ export default function InvoiceForm() {
         setIssueDate(invoice.issue_date);
         setDueDate(invoice.due_date);
         setTaxRate(invoice.tax_rate);
+        setDiscountType(invoice.discount_type);
+        setDiscountValue(invoice.discount_value);
         setNotes(invoice.notes);
         setItems(items.map((i) => ({ description: i.description, quantity: i.quantity, unit_price: i.unit_price })));
       })
@@ -54,7 +58,16 @@ export default function InvoiceForm() {
     e.preventDefault();
     setError('');
     setSubmitting(true);
-    const payload = { client_id: Number(clientId), issue_date: issueDate, due_date: dueDate, tax_rate: Number(taxRate), notes, items };
+    const payload = {
+      client_id: Number(clientId),
+      issue_date: issueDate,
+      due_date: dueDate,
+      tax_rate: Number(taxRate),
+      discount_type: discountType,
+      discount_value: Number(discountValue),
+      notes,
+      items,
+    };
     try {
       if (isEditing) {
         await api.invoices.update(id, payload, token);
@@ -112,6 +125,33 @@ export default function InvoiceForm() {
               step="0.01"
               value={taxRate}
               onChange={(e) => setTaxRate(e.target.value)}
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Discount type</span>
+            <select
+              value={discountType}
+              onChange={(e) => setDiscountType(e.target.value)}
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="percentage">Percentage</option>
+              <option value="fixed">Fixed amount</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">
+              Discount value {discountType === 'percentage' ? '(%)' : ''}
+            </span>
+            <input
+              type="number"
+              min="0"
+              max={discountType === 'percentage' ? 100 : undefined}
+              step="0.01"
+              value={discountValue}
+              onChange={(e) => setDiscountValue(e.target.value)}
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
             />
           </label>

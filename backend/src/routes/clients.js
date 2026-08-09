@@ -1,6 +1,8 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { logActivity } = require('../lib/activity');
+const { toCsv } = require('../lib/csv');
 
 const router = Router();
 router.use(requireAuth);
@@ -17,6 +19,20 @@ router.get('/', (req, res) => {
   res.json({ clients });
 });
 
+router.get('/export.csv', (req, res) => {
+  const rows = db.prepare('SELECT * FROM clients ORDER BY name').all();
+  const csv = toCsv(rows, [
+    { label: 'Name', key: 'name' },
+    { label: 'Company', key: 'company' },
+    { label: 'Email', key: 'email' },
+    { label: 'Phone', key: 'phone' },
+    { label: 'Address', key: 'address' },
+    { label: 'Notes', key: 'notes' },
+  ]);
+  res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="clients.csv"' });
+  res.send(csv);
+});
+
 router.post('/', (req, res) => {
   const { name, email, phone = '', company = '', address = '', notes = '' } = req.body || {};
   if (!name || !email) {
@@ -28,6 +44,7 @@ router.post('/', (req, res) => {
     )
     .run(name.trim(), email.trim(), phone, company, address, notes);
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid);
+  logActivity({ userName: req.user.name, action: 'created', entityType: 'client', entityId: client.id, entityLabel: client.name });
   res.status(201).json({ client });
 });
 
@@ -52,6 +69,7 @@ router.put('/:id', (req, res) => {
   ).run(name.trim(), email.trim(), phone, company, address, notes, req.params.id);
 
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
+  logActivity({ userName: req.user.name, action: 'updated', entityType: 'client', entityId: client.id, entityLabel: client.name });
   res.json({ client });
 });
 
@@ -66,6 +84,7 @@ router.delete('/:id', (req, res) => {
   }
 
   db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
+  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'client', entityId: existing.id, entityLabel: existing.name });
   res.status(204).end();
 });
 

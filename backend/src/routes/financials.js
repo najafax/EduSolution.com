@@ -45,6 +45,9 @@ router.get('/summary', (req, res) => {
 
   const clientCount = db.prepare('SELECT COUNT(*) AS c FROM clients').get().c;
 
+  const totalExpenses = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses').get().total;
+  const netProfit = Math.round((totalPaid - totalExpenses) * 100) / 100;
+
   const months = recentMonths(6);
   const invoicedByMonth = Object.fromEntries(months.map((m) => [m, 0]));
   for (const inv of invoices) {
@@ -82,6 +85,8 @@ router.get('/summary', (req, res) => {
     overdueAmount,
     invoiceCount: invoices.length,
     clientCount,
+    totalExpenses: Math.round(totalExpenses * 100) / 100,
+    netProfit,
     quoteCounts,
     invoiceCounts,
     monthlyTrend,

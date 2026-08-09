@@ -1,10 +1,13 @@
 const { Router } = require('express');
+const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { computeTotals } = require('../lib/totals');
 const { nextInvoiceNumber, nextReceiptNumber } = require('../lib/numbering');
 const { renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
 const { sendMail } = require('../lib/mailer');
+const { logActivity } = require('../lib/activity');
+const { toCsv } = require('../lib/csv');
 
 const router = Router();
 router.use(requireAuth);
@@ -60,8 +63,43 @@ router.get('/', (req, res) => {
   res.json({ invoices: rows.map(withComputed) });
 });
 
+router.get('/export.csv', (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT invoices.*, clients.name AS client_name
+       FROM invoices JOIN clients ON clients.id = invoices.client_id
+       ORDER BY invoices.issue_date DESC, invoices.id DESC`,
+    )
+    .all()
+    .map(withComputed);
+  const csv = toCsv(rows, [
+    { label: 'Number', key: 'number' },
+    { label: 'Client', key: 'client_name' },
+    { label: 'Status', key: 'status' },
+    { label: 'Issue date', key: 'issue_date' },
+    { label: 'Due date', key: 'due_date' },
+    { label: 'Subtotal', key: 'subtotal' },
+    { label: 'Discount', key: 'discount_amount' },
+    { label: 'Tax', key: 'tax_amount' },
+    { label: 'Total', key: 'total' },
+    { label: 'Amount paid', key: 'amount_paid' },
+    { label: 'Balance due', key: 'balance_due' },
+  ]);
+  res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="invoices.csv"' });
+  res.send(csv);
+});
+
 router.post('/', (req, res) => {
-  const { client_id, issue_date, due_date, notes = '', tax_rate = 0, items } = req.body || {};
+  const {
+    client_id,
+    issue_date,
+    due_date,
+    notes = '',
+    tax_rate = 0,
+    discount_type = 'percentage',
+    discount_value = 0,
+    items,
+  } = req.body || {};
 
   if (!client_id || !issue_date || !due_date) {
     return res.status(400).json({ error: 'client_id, issue_date and due_date are required' });
@@ -71,20 +109,37 @@ router.post('/', (req, res) => {
 
   let totals;
   try {
-    totals = computeTotals(items, tax_rate);
+    totals = computeTotals(items, tax_rate, discount_type, discount_value);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
 
   const number = nextInvoiceNumber();
+  const publicToken = crypto.randomBytes(16).toString('hex');
   const result = db
     .prepare(
-      `INSERT INTO invoices (number, client_id, status, issue_date, due_date, notes, tax_rate, subtotal, tax_amount, total)
-       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO invoices (number, client_id, status, issue_date, due_date, notes, discount_type, discount_value,
+         subtotal, discount_amount, tax_rate, tax_amount, total, public_token)
+       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(number, client_id, issue_date, due_date, notes, totals.taxRate, totals.subtotal, totals.taxAmount, totals.total);
+    .run(
+      number,
+      client_id,
+      issue_date,
+      due_date,
+      notes,
+      totals.discountType,
+      totals.discountValue,
+      totals.subtotal,
+      totals.discountAmount,
+      totals.taxRate,
+      totals.taxAmount,
+      totals.total,
+      publicToken,
+    );
 
   saveItems(result.lastInsertRowid, totals.items);
+  logActivity({ userName: req.user.name, action: 'created', entityType: 'invoice', entityId: result.lastInsertRowid, entityLabel: number });
 
   res.status(201).json(getInvoiceWithItems(result.lastInsertRowid));
 });
@@ -99,7 +154,17 @@ router.put('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Invoice not found' });
 
-  const { client_id, issue_date, due_date, notes = '', tax_rate = 0, status, items } = req.body || {};
+  const {
+    client_id,
+    issue_date,
+    due_date,
+    notes = '',
+    tax_rate = 0,
+    discount_type = 'percentage',
+    discount_value = 0,
+    status,
+    items,
+  } = req.body || {};
   if (!client_id || !issue_date || !due_date) {
     return res.status(400).json({ error: 'client_id, issue_date and due_date are required' });
   }
@@ -108,7 +173,7 @@ router.put('/:id', (req, res) => {
 
   let totals;
   try {
-    totals = computeTotals(items, tax_rate);
+    totals = computeTotals(items, tax_rate, discount_type, discount_value);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -122,11 +187,27 @@ router.put('/:id', (req, res) => {
 
   db.prepare(
     `UPDATE invoices SET client_id = ?, status = ?, issue_date = ?, due_date = ?, notes = ?,
-       tax_rate = ?, subtotal = ?, tax_amount = ?, total = ?, updated_at = datetime('now')
+       discount_type = ?, discount_value = ?, subtotal = ?, discount_amount = ?, tax_rate = ?, tax_amount = ?, total = ?,
+       updated_at = datetime('now')
      WHERE id = ?`,
-  ).run(client_id, nextStatus, issue_date, due_date, notes, totals.taxRate, totals.subtotal, totals.taxAmount, totals.total, req.params.id);
+  ).run(
+    client_id,
+    nextStatus,
+    issue_date,
+    due_date,
+    notes,
+    totals.discountType,
+    totals.discountValue,
+    totals.subtotal,
+    totals.discountAmount,
+    totals.taxRate,
+    totals.taxAmount,
+    totals.total,
+    req.params.id,
+  );
 
   saveItems(req.params.id, totals.items);
+  logActivity({ userName: req.user.name, action: 'updated', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: existing.number });
 
   res.json(getInvoiceWithItems(req.params.id));
 });
@@ -141,6 +222,7 @@ router.delete('/:id', (req, res) => {
   }
 
   db.prepare('DELETE FROM invoices WHERE id = ?').run(req.params.id);
+  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'invoice', entityId: existing.id, entityLabel: existing.number });
   res.status(204).end();
 });
 
@@ -162,12 +244,15 @@ router.post('/:id/send', async (req, res) => {
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
 
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const publicUrl = `${clientOrigin}/i/${data.invoice.public_token}`;
+
   try {
     const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings });
     await sendMail({
       to: data.client.email,
       subject: `Invoice ${data.invoice.number} from ${settings.business_name || 'us'}`,
-      html: `<p>Hi ${data.client.name},</p><p>Please find attached invoice ${data.invoice.number}, due ${data.invoice.due_date}.</p>`,
+      html: `<p>Hi ${data.client.name},</p><p>Please find attached invoice ${data.invoice.number}, due ${data.invoice.due_date}.</p><p>You can also view it online here: <a href="${publicUrl}">${publicUrl}</a></p>`,
       attachments: [{ filename: `${data.invoice.number}.pdf`, content: buffer }],
     });
   } catch (err) {
@@ -178,6 +263,7 @@ router.post('/:id/send', async (req, res) => {
   if (data.invoice.status === 'draft') {
     db.prepare(`UPDATE invoices SET status = 'sent', updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
   }
+  logActivity({ userName: req.user.name, action: 'sent', entityType: 'invoice', entityId: data.invoice.id, entityLabel: data.invoice.number });
   res.json(getInvoiceWithItems(req.params.id));
 });
 
@@ -203,7 +289,51 @@ router.post('/:id/remind', async (req, res) => {
   }
 
   db.prepare(`UPDATE invoices SET last_reminder_sent_at = datetime('now') WHERE id = ?`).run(req.params.id);
+  logActivity({ userName: req.user.name, action: 'sent reminder for', entityType: 'invoice', entityId: data.invoice.id, entityLabel: data.invoice.number });
   res.json(getInvoiceWithItems(req.params.id));
+});
+
+router.post('/:id/duplicate', (req, res) => {
+  const data = getInvoiceWithItems(req.params.id);
+  if (!data) return res.status(404).json({ error: 'Invoice not found' });
+
+  const number = nextInvoiceNumber();
+  const publicToken = crypto.randomBytes(16).toString('hex');
+  const issueDate = new Date().toISOString().slice(0, 10);
+  const dueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const result = db
+    .prepare(
+      `INSERT INTO invoices (number, client_id, status, issue_date, due_date, notes, discount_type, discount_value,
+         subtotal, discount_amount, tax_rate, tax_amount, total, public_token)
+       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      number,
+      data.invoice.client_id,
+      issueDate,
+      dueDate,
+      data.invoice.notes,
+      data.invoice.discount_type,
+      data.invoice.discount_value,
+      data.invoice.subtotal,
+      data.invoice.discount_amount,
+      data.invoice.tax_rate,
+      data.invoice.tax_amount,
+      data.invoice.total,
+      publicToken,
+    );
+
+  const insertItem = db.prepare(
+    'INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+  );
+  for (const item of data.items) {
+    insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order);
+  }
+
+  logActivity({ userName: req.user.name, action: 'duplicated', entityType: 'invoice', entityId: result.lastInsertRowid, entityLabel: `${number} (from ${data.invoice.number})` });
+
+  res.status(201).json(getInvoiceWithItems(result.lastInsertRowid));
 });
 
 router.post('/:id/payments', (req, res) => {
@@ -242,6 +372,7 @@ router.post('/:id/payments', (req, res) => {
   );
 
   const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(result.lastInsertRowid);
+  logActivity({ userName: req.user.name, action: 'recorded payment for', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: `${data.invoice.number} (${receiptNumber})` });
   res.status(201).json({ payment, invoice: getInvoiceWithItems(req.params.id).invoice });
 });
 

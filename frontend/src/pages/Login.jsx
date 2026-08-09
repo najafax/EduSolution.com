@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [notice] = useState(location.state?.message || '');
 
   function handleChange(e) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -38,6 +40,8 @@ export default function Login() {
           Sign up
         </Link>
       </p>
+
+      {notice && <p className="mt-4 rounded-md bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</p>}
 
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
         <div>
@@ -70,6 +74,11 @@ export default function Login() {
             onChange={handleChange}
             className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
           />
+          <p className="mt-1 text-right">
+            <Link to="/forgot-password" className="text-xs font-medium text-indigo-600 hover:text-indigo-500">
+              Forgot password?
+            </Link>
+          </p>
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

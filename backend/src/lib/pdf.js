@@ -188,11 +188,20 @@ function drawItemsTable(doc, items, startY, symbol) {
 // Subtotal/tax as plain rows, then a highlighted box for the figure that
 // matters most: Total for quotes, Balance due (colored red/green) for
 // invoices. Breaks to a new page if it wouldn't fit under the table.
-function drawTotals(doc, { subtotal, taxRate, taxAmount, total, amountPaid, balanceDue }, y, symbol) {
+function drawTotals(
+  doc,
+  { subtotal, discountType, discountValue, discountAmount, taxRate, taxAmount, total, amountPaid, balanceDue },
+  y,
+  symbol,
+) {
   const boxX = 300;
   const boxWidth = 245;
   const isInvoice = amountPaid !== undefined;
   const rows = [['Subtotal', money(subtotal, symbol)]];
+  if (discountAmount > 0) {
+    const discountLabel = discountType === 'percentage' ? `Discount (${discountValue}%)` : 'Discount';
+    rows.push([discountLabel, `-${money(discountAmount, symbol)}`]);
+  }
   if (taxRate) rows.push([`Tax (${taxRate}%)`, money(taxAmount, symbol)]);
   if (isInvoice) {
     rows.push(['Total', money(total, symbol)]);
@@ -254,7 +263,20 @@ function renderQuotePdf({ quote, client, items, settings }) {
     ],
   }, y);
   y = drawItemsTable(doc, items, y, symbol);
-  y = drawTotals(doc, { subtotal: quote.subtotal, taxRate: quote.tax_rate, taxAmount: quote.tax_amount, total: quote.total }, y, symbol);
+  y = drawTotals(
+    doc,
+    {
+      subtotal: quote.subtotal,
+      discountType: quote.discount_type,
+      discountValue: quote.discount_value,
+      discountAmount: quote.discount_amount,
+      taxRate: quote.tax_rate,
+      taxAmount: quote.tax_amount,
+      total: quote.total,
+    },
+    y,
+    symbol,
+  );
   drawFooter(doc, { notes: quote.notes, bankDetails: '' }, y);
 
   return docToBuffer(doc, addPageNumbers);
@@ -279,6 +301,9 @@ function renderInvoicePdf({ invoice, client, items, settings }) {
     doc,
     {
       subtotal: invoice.subtotal,
+      discountType: invoice.discount_type,
+      discountValue: invoice.discount_value,
+      discountAmount: invoice.discount_amount,
       taxRate: invoice.tax_rate,
       taxAmount: invoice.tax_amount,
       total: invoice.total,

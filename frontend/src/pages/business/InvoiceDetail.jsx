@@ -82,6 +82,18 @@ export default function InvoiceDetail() {
     }
   }
 
+  async function handleDuplicate() {
+    setError('');
+    setBusy(true);
+    try {
+      const { invoice } = await api.invoices.duplicate(id, token);
+      navigate(`/invoices/${invoice.id}`);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
   async function handleRecordPayment(e) {
     e.preventDefault();
     setError('');
@@ -152,6 +164,9 @@ export default function InvoiceDetail() {
               Send reminder
             </button>
           )}
+          <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            Duplicate
+          </button>
           <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50">
             Delete
           </button>
@@ -205,6 +220,12 @@ export default function InvoiceDetail() {
             </table>
             <div className="border-t border-slate-200 px-6 py-3 text-right text-sm">
               <p className="text-slate-600">Subtotal: {symbol}{invoice.subtotal.toFixed(2)}</p>
+              {invoice.discount_amount > 0 && (
+                <p className="text-slate-600">
+                  Discount {invoice.discount_type === 'percentage' ? `(${invoice.discount_value}%)` : ''}: -{symbol}
+                  {invoice.discount_amount.toFixed(2)}
+                </p>
+              )}
               {invoice.tax_rate > 0 && <p className="text-slate-600">Tax ({invoice.tax_rate}%): {symbol}{invoice.tax_amount.toFixed(2)}</p>}
               <p className="text-slate-600">Total: {symbol}{invoice.total.toFixed(2)}</p>
               <p className="text-slate-600">Paid: {symbol}{invoice.amount_paid.toFixed(2)}</p>
