@@ -69,6 +69,29 @@ function addPageNumbers(doc) {
   }
 }
 
+// Large translucent diagonal "PAID" watermark across the page center —
+// low opacity so it never obscures the content underneath, drawn on every
+// buffered page (via addPaidStamp) so it survives pagination too.
+function drawPaidStamp(doc) {
+  const cx = doc.page.width / 2;
+  const cy = doc.page.height / 2;
+
+  doc.save();
+  doc.rotate(-30, { origin: [cx, cy] });
+  doc.opacity(0.15);
+  doc.lineWidth(4).strokeColor(COLORS.positive).rect(cx - 160, cy - 45, 320, 90).stroke();
+  doc.fontSize(56).fillColor(COLORS.positive).text('PAID', cx - 160, cy - 32, { width: 320, align: 'center' });
+  doc.restore();
+}
+
+function addPaidStamp(doc) {
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    drawPaidStamp(doc);
+  }
+}
+
 function drawHeader(doc, { title, number, settings }) {
   const nameWidth = 230;
   const businessName = settings.business_name || 'Your Business';
@@ -267,7 +290,10 @@ function renderInvoicePdf({ invoice, client, items, settings }) {
   );
   drawFooter(doc, { notes: invoice.notes, bankDetails: settings.bank_details }, y);
 
-  return docToBuffer(doc, addPageNumbers);
+  return docToBuffer(doc, (d) => {
+    if (invoice.status === 'paid') addPaidStamp(d);
+    addPageNumbers(d);
+  });
 }
 
 function renderReceiptPdf({ payment, invoice, client, settings }) {
@@ -299,7 +325,10 @@ function renderReceiptPdf({ payment, invoice, client, settings }) {
     doc.fontSize(10).fillColor(COLORS.body).text(payment.notes, MARGIN, y + 14, { width: CONTENT_WIDTH });
   }
 
-  return docToBuffer(doc, addPageNumbers);
+  return docToBuffer(doc, (d) => {
+    addPaidStamp(d);
+    addPageNumbers(d);
+  });
 }
 
 module.exports = { renderQuotePdf, renderInvoicePdf, renderReceiptPdf };
