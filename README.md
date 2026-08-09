@@ -78,10 +78,30 @@ the backend service to Starter before you rely on it for real data.
 
 **Backups:** a persistent disk protects against restarts/redeploys, but
 not against you fat-fingering a delete or Render having a bad day. Since
-this holds real financial data, periodically back up `data.sqlite3`
-somewhere off-platform — e.g. a small scheduled script that copies it to
-an object-storage bucket or emails it to yourself. Not set up yet; ask if
-you want this added.
+this holds real financial data, `backend/src/lib/backup.js` runs daily
+(03:00 server time, via `lib/scheduler.js`) — it snapshots the database
+with SQLite's `VACUUM INTO` (safe against a live WAL-mode write, unlike
+copying the raw file), gzips it, and uploads it to any S3-compatible
+bucket, keeping the last 7 daily + 4 weekly backups and pruning older ones.
+It's off by default — set the `BACKUP_S3_*` vars (see `.env.example`) to
+turn it on:
+
+1. Create a bucket on **Cloudflare R2** (cheapest option — no egress fees,
+   effectively $0/mo for a database this small) or any other S3-compatible
+   provider. In R2: Cloudflare dashboard → R2 → Create bucket, then
+   R2 → Manage API Tokens → create a token scoped to that bucket only.
+2. Set on the `edusolution-backend` Render service (Settings → Environment):
+   `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT` (R2 gives you this, looks like
+   `https://<account_id>.r2.cloudflarestorage.com`), `BACKUP_S3_REGION=auto`,
+   `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY`.
+3. Redeploy. From then on, backups run automatically; `npm run backup` (run
+   from `backend/`, with the same env vars set locally or via Render's
+   shell) triggers one on demand.
+
+To see what's backed up: `npm run backup:list`. To restore: `npm run
+backup:restore -- <key> [dest-path]` downloads a backup to a **separate**
+file (it refuses to overwrite the live database) — verify it, then stop
+the backend, swap the file in at `DB_PATH`, and restart.
 
 ### Custom domain (Namecheap)
 

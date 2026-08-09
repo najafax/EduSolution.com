@@ -5,6 +5,7 @@ const { renderInvoicePdf } = require('./pdf');
 const { sendMail } = require('./mailer');
 const { computeTotals } = require('./totals');
 const { nextInvoiceNumber } = require('./numbering');
+const { runBackup } = require('./backup');
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -139,6 +140,10 @@ function startScheduler() {
   cron.schedule('0 8 * * *', () => {
     runOverdueReminders().catch((err) => console.error('[reminders] job failed:', err));
   });
+  // Daily at 03:00 server time, ahead of the other jobs — see lib/backup.js.
+  cron.schedule('0 3 * * *', () => {
+    runBackup().catch((err) => console.error('[backup] job failed:', err));
+  });
 }
 
-module.exports = { startScheduler, runOverdueReminders, generateDueRecurringInvoices };
+module.exports = { startScheduler, runOverdueReminders, generateDueRecurringInvoices, runBackup };

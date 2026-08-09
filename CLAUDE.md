@@ -87,8 +87,11 @@ backend port in frontend code.
 
 Environment variables (see `backend/.env.example` for the full list with
 comments): `PORT`, `JWT_SECRET`, `CLIENT_ORIGIN`, `DB_PATH` (optional,
-production-only — see `db/index.js` above), and `SMTP_HOST`/`PORT`/
-`USER`/`PASS`/`FROM`/`SECURE` for outgoing email. `backend/data.sqlite3`
+production-only — see `db/index.js` above), `SMTP_HOST`/`PORT`/
+`USER`/`PASS`/`FROM`/`SECURE` for outgoing email, and `BACKUP_S3_BUCKET`/
+`ENDPOINT`/`REGION`/`ACCESS_KEY_ID`/`SECRET_ACCESS_KEY`/
+`BACKUP_RETENTION_DAILY`/`_WEEKLY` for automated backups (see
+`lib/backup.js` below). `backend/data.sqlite3`
 and `.env` are gitignored — they're local/per-environment state, not source.
 
 ### Business module (`backend/src/`)
@@ -188,8 +191,27 @@ column anywhere in this module.
   serializer (`columns` is `{ label, key }` or `{ label, value: fn }`).
   Backs every `GET /export.csv` route; not a general-purpose library, just
   enough quoting/escaping for this app's exports.
+- `lib/backup.js` — `runBackup()`: skips entirely if `BACKUP_S3_BUCKET`
+  isn't set. Otherwise runs `VACUUM INTO` to write a consistent snapshot of
+  the live database (safe against catching a WAL-mode write mid-flight,
+  unlike copying `data.sqlite3`'s bytes directly), gzips it, and uploads it
+  to `backups/daily/<timestamp>.sqlite3.gz` in any S3-compatible bucket
+  (Cloudflare R2, Backblaze B2, or real S3 — configured via
+  `BACKUP_S3_ENDPOINT`/`REGION`/`ACCESS_KEY_ID`/`SECRET_ACCESS_KEY`). Also
+  writes to `backups/weekly/` on Sundays (UTC). After upload, prunes each
+  prefix down to `BACKUP_RETENTION_DAILY`/`_WEEKLY` (default 7/4) oldest-first
+  by listing objects and deleting the excess — keys embed an ISO timestamp so
+  lexical sort is chronological sort. `backend/scripts/backup.js`,
+  `list-backups.js`, and `restore.js` (`npm run backup`/`backup:list`/
+  `backup:restore`) wrap this for manual use outside the cron schedule;
+  `restore.js` always downloads to a separate file and refuses to write
+  directly over the live `DB_PATH` — swapping a restored file in is a
+  deliberate manual step (stop the backend, replace the file, restart).
 - `lib/scheduler.js` — `startScheduler()` (called once from `index.js`'s
-  `app.listen` callback) registers two `node-cron` jobs, both server-time:
+  `app.listen` callback) registers three `node-cron` jobs, all server-time:
+  - `0 3 * * *` — `runBackup()` (see `lib/backup.js` above), scheduled
+    ahead of the other two jobs so a backup reflects state from before
+    the day's automated invoice/reminder mutations.
   - `0 7 * * *` — `generateDueRecurringInvoices()`: for every
     `recurring_invoices` row with `active=1` and `next_run_date <= today`,
     recomputes totals from the template's current line items via
@@ -208,9 +230,9 @@ column anywhere in this module.
     sending a manual reminder, or a previous automated one, suppresses
     re-nagging for a week). Emails the invoice PDF and updates
     `last_reminder_sent_at`.
-  Both jobs are also exported directly (`generateDueRecurringInvoices`,
-  `runOverdueReminders`) so they can be invoked outside the cron schedule
-  (tests, or a future manual "run now" action).
+  All three jobs are also exported directly (`runBackup`,
+  `generateDueRecurringInvoices`, `runOverdueReminders`) so they can be
+  invoked outside the cron schedule (tests, or a manual "run now" action).
 
 Status/derived-field conventions worth knowing before touching this code:
 - Quote `status`: `draft | sent | accepted | declined | expired`, set
