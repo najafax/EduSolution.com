@@ -3,16 +3,16 @@ import { useAuth } from '../context/AuthContext';
 
 const FEATURES = [
   {
-    title: 'Track your progress',
-    description: 'See exactly where you left off and what to tackle next.',
+    title: 'Quotes & invoices',
+    description: 'Create, send, and track quotes and invoices, with PDF generation built in.',
   },
   {
-    title: 'Learn at your pace',
-    description: 'Structured content you can revisit any time, on any device.',
+    title: 'Payments & financials',
+    description: 'Record payments, monitor overdue balances, and see revenue and profit at a glance.',
   },
   {
-    title: 'Secure by default',
-    description: 'Your account and data are protected with modern authentication.',
+    title: 'Automated & organized',
+    description: 'Recurring invoices, payment reminders, and an activity log — all handled for you.',
   },
 ];
 
@@ -23,10 +23,10 @@ export default function Landing() {
     <div>
       <section className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 sm:py-24">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-6xl">
-          Learning, simplified.
+          Business, simplified.
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-base text-slate-600 sm:text-lg">
-          EduSolution.com brings your courses, progress, and resources together in one place.
+          EduSolution.com brings your clients, quotes, invoices, and payments together in one place.
         </p>
         <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">
           {user ? (
