@@ -72,12 +72,14 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   if (args.list) {
-    const users = db.prepare('SELECT id, name, email, created_at FROM users ORDER BY id').all();
+    const users = db.prepare('SELECT id, name, email, role, active, created_at FROM users ORDER BY id').all();
     if (users.length === 0) {
       console.log('No user accounts exist yet. Run this script without --list to create one.');
     } else {
       console.log(`${users.length} user account(s):`);
-      users.forEach((u) => console.log(`  #${u.id}  ${u.name} <${u.email}>  (created ${u.created_at})`));
+      users.forEach((u) =>
+        console.log(`  #${u.id}  ${u.name} <${u.email}>  ${u.role}${u.active ? '' : ' (deactivated)'}  (created ${u.created_at})`),
+      );
     }
     return;
   }
@@ -113,17 +115,20 @@ async function main() {
   const passwordHash = await bcrypt.hash(password, 10);
 
   if (existing) {
-    db.prepare('UPDATE users SET name = ?, password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?').run(
-      name.trim(),
-      passwordHash,
-      existing.id,
-    );
+    db.prepare(
+      `UPDATE users SET name = ?, password_hash = ?, active = 1, reset_token = NULL, reset_token_expires = NULL WHERE id = ?`,
+    ).run(name.trim(), passwordHash, existing.id);
     console.log(`\nPassword reset for ${name.trim()} <${email}> (user #${existing.id}).`);
   } else {
+    // Shell access to run this script is already a higher trust level than
+    // anything the in-app permission system could restrict, so CLI-created
+    // accounts are always admin — this is the bootstrap/recovery path.
+    // Day-to-day staff accounts with granular permissions are created by an
+    // admin from the app's Users page instead.
     const result = db
-      .prepare('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)')
+      .prepare(`INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'admin')`)
       .run(name.trim(), email, passwordHash);
-    console.log(`\nCreated user ${name.trim()} <${email}> (user #${result.lastInsertRowid}).`);
+    console.log(`\nCreated admin user ${name.trim()} <${email}> (user #${result.lastInsertRowid}).`);
   }
 
   console.log('They can now sign in at the app\'s /login page.');

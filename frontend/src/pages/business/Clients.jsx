@@ -7,7 +7,8 @@ import FloatingActionButton from '../../components/FloatingActionButton';
 const EMPTY_FORM = { name: '', email: '', phone: '', company: '', address: '', notes: '' };
 
 export default function Clients() {
-  const { token } = useAuth();
+  const { token, can } = useAuth();
+  const canManage = can('clients', 'manage');
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -105,12 +106,14 @@ export default function Clients() {
           >
             Export CSV
           </button>
-          <button
-            onClick={startCreate}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
-          >
-            New client
-          </button>
+          {canManage && (
+            <button
+              onClick={startCreate}
+              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+            >
+              New client
+            </button>
+          )}
         </div>
       </div>
 
@@ -169,7 +172,7 @@ export default function Clients() {
                 <th className="px-4 py-3">Company</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Phone</th>
-                <th className="px-4 py-3" />
+                {canManage && <th className="px-4 py-3" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -179,14 +182,16 @@ export default function Clients() {
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{client.company || '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{client.email}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{client.phone || '—'}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
-                    <button onClick={() => startEdit(client)} className="mr-3 text-indigo-600 hover:text-indigo-500">
-                      Edit
-                    </button>
-                    <button onClick={() => handleDelete(client.id)} className="text-red-600 hover:text-red-500">
-                      Delete
-                    </button>
-                  </td>
+                  {canManage && (
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <button onClick={() => startEdit(client)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(client.id)} className="text-red-600 hover:text-red-500">
+                        Delete
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -194,7 +199,7 @@ export default function Clients() {
         )}
       </div>
 
-      {!showForm && <FloatingActionButton onClick={startCreate} label="New client" />}
+      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New client" />}
     </div>
   );
 }

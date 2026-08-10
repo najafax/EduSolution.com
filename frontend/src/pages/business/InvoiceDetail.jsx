@@ -9,7 +9,8 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 const METHODS = ['bank_transfer', 'cash', 'card', 'cheque', 'other'];
 
 export default function InvoiceDetail() {
-  const { token } = useAuth();
+  const { token, can } = useAuth();
+  const canManage = can('invoices', 'manage');
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -30,7 +31,7 @@ export default function InvoiceDetail() {
 
   useEffect(load, [id, token]);
   useEffect(() => {
-    api.settings.get(token).then(({ settings }) => setSettings(settings));
+    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
 
   async function handleDownload() {
@@ -150,26 +151,34 @@ export default function InvoiceDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to={`/invoices/${id}/edit`} className="min-h-11 flex items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            Edit
-          </Link>
+          {canManage && (
+            <Link to={`/invoices/${id}/edit`} className="min-h-11 flex items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Edit
+            </Link>
+          )}
           <button onClick={handleDownload} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
             Download PDF
           </button>
-          <button onClick={handleSend} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
-            Email to client
-          </button>
-          {invoice.balance_due > 0 && (
+          {canManage && (
+            <button onClick={handleSend} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
+              Email to client
+            </button>
+          )}
+          {canManage && invoice.balance_due > 0 && (
             <button onClick={handleRemind} disabled={busy} className="min-h-11 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60">
               Send reminder
             </button>
           )}
-          <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-            Duplicate
-          </button>
-          <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50">
-            Delete
-          </button>
+          {canManage && (
+            <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+              Duplicate
+            </button>
+          )}
+          {canManage && (
+            <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50">
+              Delete
+            </button>
+          )}
         </div>
       </div>
 
@@ -239,6 +248,7 @@ export default function InvoiceDetail() {
         <Accordion
           title="Payments"
           action={
+            canManage &&
             invoice.balance_due > 0 && (
               <button
                 onClick={() => setShowPayment((v) => !v)}
@@ -334,9 +344,11 @@ export default function InvoiceDetail() {
                         <button onClick={() => handleDownloadReceipt(p.id)} className="mr-3 text-indigo-600 hover:text-indigo-500">
                           Download
                         </button>
-                        <button onClick={() => handleSendReceipt(p.id)} className="text-indigo-600 hover:text-indigo-500">
-                          Email
-                        </button>
+                        {canManage && (
+                          <button onClick={() => handleSendReceipt(p.id)} className="text-indigo-600 hover:text-indigo-500">
+                            Email
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

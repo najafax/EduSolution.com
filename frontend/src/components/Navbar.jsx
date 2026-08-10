@@ -3,23 +3,30 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
 
+// `module: null` means always visible to any logged-in user regardless of
+// permissions (Dashboard). Everything else is filtered by that module's
+// view permission so a restricted user never sees a link leading to a 403
+// — enforcement itself still happens server-side; this is just UX.
 const BUSINESS_LINKS = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/clients', label: 'Clients' },
-  { to: '/quotes', label: 'Quotes' },
-  { to: '/invoices', label: 'Invoices' },
-  { to: '/recurring-invoices', label: 'Recurring' },
-  { to: '/expenses', label: 'Expenses' },
-  { to: '/financials', label: 'Financials' },
-  { to: '/activity', label: 'Activity' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/dashboard', label: 'Dashboard', module: null },
+  { to: '/clients', label: 'Clients', module: 'clients' },
+  { to: '/quotes', label: 'Quotes', module: 'quotes' },
+  { to: '/invoices', label: 'Invoices', module: 'invoices' },
+  { to: '/recurring-invoices', label: 'Recurring', module: 'recurring_invoices' },
+  { to: '/expenses', label: 'Expenses', module: 'expenses' },
+  { to: '/financials', label: 'Financials', module: 'financials' },
+  { to: '/activity', label: 'Activity', module: 'activity' },
+  { to: '/users', label: 'Users', module: 'users' },
+  { to: '/settings', label: 'Settings', module: 'settings' },
 ];
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, logout, can } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const visibleLinks = BUSINESS_LINKS.filter((link) => !link.module || can(link.module, 'view'));
 
   function handleLogout() {
     setMenuOpen(false);
@@ -46,7 +53,7 @@ export default function Navbar() {
             {/* Desktop links */}
             <div className="hidden items-center gap-5 lg:flex">
               <GlobalSearch className="max-w-[180px] xl:max-w-[220px]" />
-              {BUSINESS_LINKS.map((link) => (
+              {visibleLinks.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
@@ -55,6 +62,12 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              <Link
+                to="/account"
+                className={`text-sm font-medium hover:text-slate-900 ${isActive('/account') ? 'text-indigo-600' : 'text-slate-700'}`}
+              >
+                My account
+              </Link>
               <button
                 onClick={handleLogout}
                 className="min-h-11 shrink-0 whitespace-nowrap rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700"
@@ -98,7 +111,7 @@ export default function Navbar() {
           <div className="py-2">
             <GlobalSearch onNavigate={() => setMenuOpen(false)} />
           </div>
-          {BUSINESS_LINKS.map((link) => (
+          {visibleLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
@@ -108,6 +121,13 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
+          <Link
+            to="/account"
+            onClick={() => setMenuOpen(false)}
+            className={`flex min-h-11 items-center text-sm font-medium ${isActive('/account') ? 'text-indigo-600' : 'text-slate-700'}`}
+          >
+            My account
+          </Link>
           <button
             onClick={handleLogout}
             className="flex min-h-11 w-full items-center text-sm font-medium text-red-600"

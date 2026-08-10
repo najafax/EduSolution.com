@@ -21,6 +21,8 @@ import RecurringInvoices from './pages/business/RecurringInvoices';
 import Financials from './pages/business/Financials';
 import ActivityLog from './pages/business/ActivityLog';
 import Import from './pages/business/Import';
+import Users from './pages/Users';
+import MyAccount from './pages/MyAccount';
 
 function Protected({ children }) {
   return <ProtectedRoute>{children}</ProtectedRoute>;
@@ -58,6 +60,8 @@ export default function App() {
 
         <Route path="/financials" element={<Protected><Financials /></Protected>} />
         <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
+        <Route path="/users" element={<Protected><Users /></Protected>} />
+        <Route path="/account" element={<Protected><MyAccount /></Protected>} />
       </Routes>
     </div>
   );

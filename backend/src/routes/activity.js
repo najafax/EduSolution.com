@@ -1,13 +1,13 @@
 const { Router } = require('express');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requirePermission } = require('../middleware/auth');
 
 const router = Router();
 router.use(requireAuth);
 
 const PAGE_SIZE = 30;
 
-router.get('/', (req, res) => {
+router.get('/', requirePermission('activity', 'view'), (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const offset = (page - 1) * PAGE_SIZE;
 

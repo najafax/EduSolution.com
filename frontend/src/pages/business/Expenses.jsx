@@ -8,7 +8,8 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 const EMPTY_FORM = { category: 'other', description: '', amount: '', expense_date: todayStr(), notes: '' };
 
 export default function Expenses() {
-  const { token } = useAuth();
+  const { token, can } = useAuth();
+  const canManage = can('expenses', 'manage');
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,12 +110,14 @@ export default function Expenses() {
           >
             Export CSV
           </button>
-          <button
-            onClick={startCreate}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
-          >
-            New expense
-          </button>
+          {canManage && (
+            <button
+              onClick={startCreate}
+              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+            >
+              New expense
+            </button>
+          )}
         </div>
       </div>
 
@@ -222,7 +225,7 @@ export default function Expenses() {
                 <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3 text-right">Amount</th>
-                <th className="px-4 py-3" />
+                {canManage && <th className="px-4 py-3" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -232,14 +235,16 @@ export default function Expenses() {
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600 capitalize">{expense.category}</td>
                   <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{expense.description}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900">{expense.amount.toFixed(2)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
-                    <button onClick={() => startEdit(expense)} className="mr-3 text-indigo-600 hover:text-indigo-500">
-                      Edit
-                    </button>
-                    <button onClick={() => handleDelete(expense.id)} className="text-red-600 hover:text-red-500">
-                      Delete
-                    </button>
-                  </td>
+                  {canManage && (
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <button onClick={() => startEdit(expense)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(expense.id)} className="text-red-600 hover:text-red-500">
+                        Delete
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -256,7 +261,7 @@ export default function Expenses() {
         )}
       </div>
 
-      {!showForm && <FloatingActionButton onClick={startCreate} label="New expense" />}
+      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New expense" />}
     </div>
   );
 }

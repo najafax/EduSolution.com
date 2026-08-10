@@ -6,8 +6,11 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { loginLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rateLimit');
 const { sendMail } = require('../lib/mailer');
+const { effectivePermissions } = require('../lib/permissions');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 8;
 
 const router = Router();
 
@@ -17,8 +20,17 @@ function signToken(user) {
   });
 }
 
+// The single place that shapes what a user record ever sends to the client
+// — never return a raw DB row (it carries password_hash, reset_token, etc).
 function publicUser(user) {
-  return { id: user.id, name: user.name, email: user.email, createdAt: user.created_at };
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    notifyOverdue: Boolean(user.notify_overdue),
+    createdAt: user.created_at,
+  };
 }
 
 // There is deliberately no public signup route. Every logged-in user sees
@@ -44,9 +56,12 @@ router.post('/login', loginLimiter, async (req, res) => {
   if (!valid) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
+  if (!user.active) {
+    return res.status(401).json({ error: 'This account has been deactivated' });
+  }
 
   const token = signToken(user);
-  res.json({ token, user: publicUser(user) });
+  res.json({ token, user: publicUser(user), permissions: effectivePermissions(user) });
 });
 
 router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
@@ -112,6 +127,51 @@ router.get('/me', requireAuth, (req, res) => {
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
+  res.json({ user: publicUser(user), permissions: effectivePermissions(user) });
+});
+
+// Every logged-in user can edit their own profile — this is not gated by
+// the 'users' permission, which is about managing *other* accounts.
+router.put('/me', requireAuth, (req, res) => {
+  const { name, email: emailInput } = req.body || {};
+  if (!name || !emailInput) {
+    return res.status(400).json({ error: 'name and email are required' });
+  }
+  const email = String(emailInput).trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Invalid email address' });
+
+  const taken = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email, req.user.id);
+  if (taken) return res.status(409).json({ error: 'An account with this email already exists' });
+
+  db.prepare('UPDATE users SET name = ?, email = ? WHERE id = ?').run(name.trim(), email, req.user.id);
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  res.json({ user: publicUser(user) });
+});
+
+router.post('/change-password', requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+  }
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  const valid = await bcrypt.compare(currentPassword, user.password_hash);
+  if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, req.user.id);
+  res.json({ message: 'Password updated.' });
+});
+
+// The only personal preference for now: opt in to a daily digest email
+// when the overdue-reminder job actually sends reminders (see lib/scheduler.js).
+router.put('/preferences', requireAuth, (req, res) => {
+  const { notifyOverdue } = req.body || {};
+  db.prepare('UPDATE users SET notify_overdue = ? WHERE id = ?').run(notifyOverdue ? 1 : 0, req.user.id);
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   res.json({ user: publicUser(user) });
 });
 

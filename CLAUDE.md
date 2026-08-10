@@ -11,10 +11,12 @@ JWT-based auth flow (login/dashboard). There is no root package.json
 
 Beyond auth, the backend/frontend implement a small business-management
 module — clients, quotes, invoices, payments/receipts, expenses, recurring
-invoices, a financials summary, an activity log, and global search —
-shared across every logged-in user (single-business model, not
-multi-tenant). Quotes and invoices also have unauthenticated client-facing
-views via a `public_token` link. See "Business module" below.
+invoices, a financials summary, an activity log, and global search — all
+sharing the same underlying data (single-business model, not multi-tenant).
+Within that shared data, access is role/permission-gated per user (admin vs.
+staff, with granular per-module view/manage grants for staff) — see "Roles
+and permissions" below. Quotes and invoices also have unauthenticated
+client-facing views via a `public_token` link. See "Business module" below.
 
 ## Commands
 
@@ -66,23 +68,77 @@ backend port in frontend code.
   Render deployment) so the database survives restarts/redeploys. This is
   the only place schema is defined; there is no migration tool, so schema
   changes are made by editing the `CREATE TABLE` statement directly (fine
-  pre-launch; revisit once there's production data).
+  pre-launch; revisit once there's production data). One exception: adding
+  `users.role`/`active`/`notify_overdue` and the `user_permissions` table
+  (see "Roles and permissions" below) had to run against an already-live
+  production database with real accounts, so that change is a one-time,
+  idempotent `ALTER TABLE ... ADD COLUMN` block (gated by a
+  `PRAGMA table_info(users)` check, so it's a no-op on every run after the
+  first) rather than an edit to the `CREATE TABLE` statement — the
+  `CREATE TABLE` still reflects the final shape for fresh databases, the
+  `ALTER TABLE` block only exists to carry existing databases forward.
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
-  <jwt>` header and attaches the decoded payload to `req.user`. Any new
-  protected route should use this middleware rather than re-implementing
-  token checks.
-- `routes/auth.js` — `POST /api/auth/login`, `GET /api/auth/me`, plus
-  `POST /api/auth/forgot-password` and `POST /api/auth/reset-password`.
-  **There is deliberately no signup route.** Every logged-in user can see
-  and edit all business data (single-business model, no per-user ownership),
-  so open registration would give anyone who found the URL full read/write
-  access to real financial records. Accounts are created out-of-band with
-  `npm run create-user` (see `scripts/create-user.js`) — don't add a public
-  signup endpoint back without also adding per-user authorization. Passwords
-  are hashed with bcryptjs before storage; JWTs are signed with `JWT_SECRET`
-  from env and expire after 7 days. `publicUser()` is the single place that
-  shapes what user data is ever sent to the client — extend it rather than
-  returning raw DB rows elsewhere.
+  <jwt>` header, then **re-fetches the live user row from the DB** (by the
+  id in the JWT payload) rather than trusting the token's claims, and
+  attaches `{ id, name, email, role, active, notify_overdue }` to `req.user`
+  — rejects with 401 if the user no longer exists or `active` is now 0. This
+  is deliberate: a JWT is valid for 7 days, and re-fetching on every request
+  means a role change, a permission grant, or deactivating someone takes
+  effect on their *next* request instead of waiting out the token's
+  lifetime. `requirePermission(module, level = 'view')` (from
+  `lib/permissions.js`) is a second middleware, chained after `requireAuth`,
+  for routes that need a specific module grant rather than just "logged in"
+  — returns 403 with a human-readable message on denial. Any new protected
+  route should use `requireAuth` (and `requirePermission` if it touches a
+  gated module) rather than re-implementing token/permission checks.
+- `lib/permissions.js` — the single source of truth for the permission
+  model. `MODULES` is the fixed list of gatable modules (`clients`,
+  `quotes`, `invoices`, `expenses`, `recurring_invoices`, `financials`,
+  `activity`, `settings`, `users`, `import`) — kept as a hardcoded list
+  (rather than derived from route files) so a typo'd module name in a route
+  fails closed instead of silently creating a new, ungrantable slot.
+  `hasPermission(user, module, level)` short-circuits to `true` for
+  `role === 'admin'` (admins never consult `user_permissions` at all);
+  for staff it looks up that user's row and requires `can_manage` for
+  `level: 'manage'` or either flag for `level: 'view'` (**manage implies
+  view**) — a module with no row at all is default-deny
+  (`{can_view: false, can_manage: false}`), never falls back to "allowed".
+  `setPermissions(userId, permissionsMap)` upserts `user_permissions` rows
+  in a transaction and — critically — forces `can_view = 1` in storage
+  whenever `can_manage = 1` is being set, so the "manage implies view"
+  invariant holds even for code that reads the raw table instead of calling
+  `hasPermission()`. `effectivePermissions(user)` is what login/`/me` return
+  to the frontend: admins get every module at `{can_view: true, can_manage:
+  true}`, staff get their real `getPermissions()` map — the frontend never
+  re-implements the "admin bypasses everything" rule itself.
+- `routes/auth.js` — `POST /api/auth/login`, `GET /api/auth/me`, `PUT
+  /api/auth/me`, `POST /api/auth/change-password`, `PUT
+  /api/auth/preferences`, plus `POST /api/auth/forgot-password` and `POST
+  /api/auth/reset-password`. **There is deliberately no signup route.**
+  Every account can potentially see and edit all business data
+  (single-business model, no per-user ownership column), so open
+  registration would give anyone who found the URL a route to real
+  financial records — access is instead controlled after the fact by role/
+  permissions (see "Roles and permissions" below), not by gating who can
+  get an account in the first place. Accounts are created out-of-band with
+  `npm run create-user` for the bootstrap/recovery path, or in-app via
+  `routes/users.js` for ongoing staff accounts — don't add a public signup
+  endpoint back without preserving that distinction. Passwords are hashed
+  with bcryptjs before storage; JWTs are signed with `JWT_SECRET` from env
+  and expire after 7 days. `login` rejects with 401 if `active` is 0 (in
+  addition to the usual bad-credentials check) and, on success, returns
+  `{ token, user, permissions }` — `permissions` is
+  `effectivePermissions(user)`, so the frontend has everything it needs to
+  render without a second round-trip; `/me` returns the same shape minus
+  the token, re-derived from the live row every time (see `requireAuth`
+  above). `publicUser()` is the single place that shapes what user data is
+  ever sent to the client — extend it rather than returning raw DB rows
+  elsewhere. `PUT /me`/`POST /change-password`/`PUT /preferences` are
+  gated by `requireAuth` only, **never** by the `users` permission — every
+  account, admin or staff, can always edit its own name/email, change its
+  own password (`change-password` verifies `currentPassword` via
+  `bcrypt.compare` first), and toggle `notify_overdue` (see
+  `lib/scheduler.js` below), regardless of what module grants it has.
 - `middleware/rateLimit.js` — `express-rate-limit` instances applied to the
   unauthenticated auth routes: `loginLimiter` (10 per 15min, brute-force
   protection), `forgotPasswordLimiter` (5/hour — tighter because each
@@ -95,10 +151,20 @@ backend port in frontend code.
   rate-limit bucket.
 - `scripts/create-user.js` (`npm run create-user`) — interactive by default
   (hidden password entry, with a visible-input fallback when stdin isn't a
-  TTY, e.g. over `render ssh`). `--list` shows existing accounts; `--name`/
+  TTY, e.g. over `render ssh`). `--list` shows existing accounts (now also
+  `role` and an `(deactivated)` suffix when `active = 0`); `--name`/
   `--email`/`--password` (or `CREATE_USER_PASSWORD`) allow non-interactive
   use. Re-running for an existing email offers to reset that user's password
-  instead, which doubles as account recovery before SMTP is configured. `forgot-password` always returns the same generic response
+  (and reactivates the account) instead, which doubles as account recovery
+  before SMTP is configured, or for un-deactivating someone without going
+  through the Users page. **New accounts created here are always
+  `role: 'admin'`** — this script requires shell access to the server,
+  which is already a higher trust level than anything the in-app permission
+  system controls, so it's kept as the bootstrap/recovery path rather than
+  a general-purpose account creator. Ongoing staff accounts with granular
+  permissions are created in-app via the Users page
+  (`routes/users.js`/`pages/Users.jsx`) by an existing admin instead.
+  `forgot-password` always returns the same generic response
   regardless of whether the email exists (prevents account enumeration);
   it stores a random token + 1-hour expiry on `users.reset_token`/
   `reset_token_expires` and emails a `${CLIENT_ORIGIN}/reset-password?token=`
@@ -285,7 +351,16 @@ column anywhere in this module.
     `last_reminder_sent_at` is either null or over 7 days old (so a human
     sending a manual reminder, or a previous automated one, suppresses
     re-nagging for a week). Emails the invoice PDF and updates
-    `last_reminder_sent_at`.
+    `last_reminder_sent_at`. After the loop, if any reminders actually went
+    out, calls `notifyStaffOfReminders(reminded, settings)` — queries
+    `users` for `active = 1 AND notify_overdue = 1` and emails each an HTML
+    digest listing every invoice that was just reminded (number/client/
+    balance/due date). This is opt-in per-user (see `PUT
+    /api/auth/preferences` above) and best-effort: each recipient send is
+    its own try/catch so one bad address never blocks the others, and since
+    it only runs after the SMTP-configured check above, it's naturally
+    dormant (never even reached) when SMTP isn't set — no separate gate
+    needed.
   All three jobs are also exported directly (`runBackup`,
   `generateDueRecurringInvoices`, `runOverdueReminders`) so they can be
   invoked outside the cron schedule (tests, or a manual "run now" action).
@@ -310,14 +385,63 @@ Status/derived-field conventions worth knowing before touching this code:
   — never reused across documents, and never exposed anywhere except the
   document it belongs to.
 
+### Roles and permissions (`backend/src/`)
+
+- Two roles: `admin` (bypasses `user_permissions` entirely — see
+  `hasPermission()` in `lib/permissions.js` above) and `staff` (subject to
+  granular per-module `can_view`/`can_manage` grants, default-deny). New
+  rows default to `role: 'staff'`, but the migration that introduced this
+  column (see `db/index.js` above) one-time-promoted every pre-existing
+  user to `admin` so shipping this feature could never silently strip
+  access from someone already using the app.
+- `routes/users.js` (mounted at `/api/users`, `requireAuth` +
+  `requirePermission('users', 'view'|'manage')` per route) — the in-app
+  admin user-management API: `GET /` (list), `GET /:id` (user +
+  `getPermissions()`), `POST /` (create — name/email/password/role,
+  optional `permissions` map applied via `setPermissions()`), `PUT /:id`
+  (update name/email/role/active/permissions), `POST /:id/reset-password`
+  (admin sets a new password directly, no current-password check), `DELETE
+  /:id`, and `GET /meta/modules` (returns `MODULES`, for building the
+  permissions checkbox grid client-side). Two safety guards, both checked
+  via `activeAdminCount(excludingUserId)`: you can't demote/deactivate/
+  delete the last active admin (409), and `DELETE /:id` also blocks
+  deleting your own account (400) — both prevent a click from locking
+  everyone out. `publicUser()` here (separate from `routes/auth.js`'s) is
+  the shape sent for user-management views:
+  `{id, name, email, role, active, notify_overdue, created_at}`.
+- `routes/search.js` doesn't use `requirePermission` as route middleware
+  the way every other business route does — instead each of its four
+  per-entity queries (clients/quotes/invoices/expenses) is independently
+  wrapped in a `hasPermission(req.user, module, 'view') ? query() : []`
+  check, so a partial-access user gets partial results back rather than a
+  blanket 403 for the whole search.
+- Every other business route file (`clients.js`, `quotes.js`, `invoices.js`,
+  `expenses.js`, `recurring.js`, `financials.js`, `activity.js`,
+  `settings.js`, `import.js`) applies `requirePermission(module, 'view')`
+  to its `GET`s and `requirePermission(module, 'manage')` to everything
+  that mutates, chained after the shared `requireAuth`. One route needs two
+  grants: `quotes.js`'s `POST /:id/convert-to-invoice` requires both
+  `quotes:manage` (it's mutating the quote) and `invoices:manage` (it's
+  also creating a new invoice), chained as two middlewares in sequence.
+  `import.js` applies `requirePermission('import', 'manage')` once via
+  `router.use()` right after `router.use(requireAuth)`, since every route
+  in that file is a mutation (there's no read-only CSV-import action).
+
 ### Frontend (`frontend/src/`)
 
 - `context/AuthContext.jsx` — the single source of truth for auth state.
-  Holds the JWT (persisted in `localStorage`) and the current user, fetched
-  via `GET /api/auth/me` on load to validate the stored token. Exposes
-  `login(token, user)` / `logout()`. Any component that needs to know if
-  someone is signed in should read `useAuth()`, not touch `localStorage`
-  directly.
+  Holds the JWT (persisted in `localStorage`), the current user, and the
+  current `permissions` map, fetched via `GET /api/auth/me` on load to
+  validate the stored token. Exposes `login(token, user, permissions)` /
+  `logout()` / `updateUser(nextUser)` (for pages that edit the current
+  user's own profile, to update in-memory state without a full `/me`
+  round-trip) and `can(module, level = 'view')`, which reads the
+  `permissions` map the same way the backend's `hasPermission()` does — no
+  separate admin special-case needed here since the backend's
+  `effectivePermissions()` already sends admins an all-true map. Any
+  component that needs to know if someone is signed in, or whether they
+  can see/do something, should read `useAuth()`, not touch `localStorage`
+  or re-derive permission logic directly.
 - `components/ProtectedRoute.jsx` — wraps route elements that require auth;
   redirects to `/login` when there's no valid token. Wrap new authenticated
   pages with this rather than checking auth state ad hoc.
@@ -335,10 +459,28 @@ Status/derived-field conventions worth knowing before touching this code:
   `openQuotePdf`, `openInvoicePdf`) hits `/api/public/...` and is the one
   set of calls that never passes a token.
 - `pages/` — one component per route (`Landing`, `Login`, `ForgotPassword`,
-  `ResetPassword`, `Dashboard`), wired up in `App.jsx` via
-  `react-router-dom`. There is no `Signup` page or `/signup` route — see
-  `routes/auth.js` above for why. `ForgotPassword`/`ResetPassword` are
-  public routes;
+  `ResetPassword`, `Dashboard`, `Users`, `MyAccount`), wired up in
+  `App.jsx` via `react-router-dom`. There is no `Signup` page or `/signup`
+  route — see `routes/auth.js` above for why. `Users.jsx` (route `/users`)
+  is the admin user-management UI: lists users, and (behind
+  `can('users', 'manage')`) a create/edit form with a module × view/manage
+  checkbox grid built from `api.users.modules()`, reset-password and
+  delete actions, and the row-level "(you)" tag / self-delete guard on the
+  frontend that mirrors the backend's own last-admin/self-delete guards
+  (`routes/users.js` above) — those guards are enforced server-side
+  regardless, the frontend copy is just so the error surfaces as expected
+  UI rather than a raw 409. `MyAccount.jsx` (route `/account`) is the
+  personal-settings page every logged-in user gets, admin or staff alike:
+  profile (name/email via `api.updateMe`), change password
+  (`api.changePassword`), and the `notify_overdue` toggle
+  (`api.updatePreferences`) — deliberately separate from the shared
+  `Settings.jsx` (business name/address/tax ID/etc.), which is
+  organization-wide config, not a personal preference. Both pages guard
+  themselves at the top of the component (`if (!can(module, 'view'))
+  return <...not authorized...>`) for the case of someone reaching the
+  route directly by URL rather than through a nav link — same pattern
+  `Dashboard.jsx` already used for its financials-gated view before this
+  feature existed. `ForgotPassword`/`ResetPassword` are public routes;
   `ResetPassword` reads its token from `useSearchParams()` and, on success,
   navigates to `/login` passing a message via router state (shown as a
   banner on the login page). `PublicQuote`/`PublicInvoice` (routes `/q/:token`
@@ -349,6 +491,22 @@ Status/derived-field conventions worth knowing before touching this code:
   `AuthContext`/`localStorage`.
 - `pages/business/` — the client/quote/invoice/payment/settings/financials/
   expenses/recurring-invoices/activity pages (see "Business module" below).
+  Every page in this directory reads `can(module, 'manage')` from
+  `useAuth()` and conditionally renders its New/Edit/Delete/Send/Duplicate/
+  Record-payment/etc. buttons and table-action columns on it — a view-only
+  user still sees the list/detail data (gated separately by `can(module,
+  'view')`, enforced by `ProtectedRoute` + the page load itself 403ing) but
+  never sees a button that would just 403 on click; this is UX polish only,
+  the real enforcement is the backend's `requirePermission` on each route.
+  The `/new` and `/:id/edit` form pages (`InvoiceForm.jsx`, `QuoteForm.jsx`)
+  additionally guard themselves at the top of the component (same
+  `if (!canManage) return <...not authorized...>` pattern as `Users.jsx`/
+  `MyAccount.jsx` above) since those routes are reachable directly by URL
+  even when no link to them is rendered. Any page that calls
+  `api.settings.get()` for the currency-symbol fallback does so with a
+  trailing `.catch(() => {})` — `settings` is its own gated module now, so
+  a staff user without `settings:view` would otherwise leave an unhandled
+  promise rejection on every page load; the page just falls back to `$`.
   `components/LineItemsEditor.jsx` and `components/StatusBadge.jsx` are
   shared between the quote and invoice form/detail pages — extend those
   rather than duplicating item-row or status-color logic per page.
@@ -371,6 +529,22 @@ Status/derived-field conventions worth knowing before touching this code:
   once inside the mobile slide-down menu — both instances exist in the DOM
   simultaneously, so anything that queries this input in tests must scope
   to the visible one.
+- `components/Navbar.jsx` — `BUSINESS_LINKS` entries each carry a `module`
+  (`null` for Dashboard, which is always visible); the rendered link list
+  is filtered through `can(link.module, 'view')` so a restricted user never
+  sees a nav link leading to a page that would just reject them — same
+  UX-only caveat as the business-page button gating above, not a security
+  boundary on its own. "My account" is appended after the filtered links,
+  unconditionally visible to any logged-in user (admin or staff) since it's
+  never permission-gated.
+- `pages/Dashboard.jsx` — `SHORTCUTS` (the quick-link tiles) each carry a
+  `module` and are filtered through `can(s.module, 'view')` the same way as
+  `Navbar.jsx`'s links. The whole KPI/chart view additionally requires
+  `can('financials', 'view')`; a staff user without it sees just the
+  filtered shortcut tiles instead (with a "nothing to show yet" message if
+  even those are empty), never a loading spinner that never resolves — the
+  financials API call itself is skipped entirely rather than made and
+  403ing.
 - `pages/Dashboard.jsx` and `pages/business/Financials.jsx` charts
   (`components/RevenueTrendChart.jsx`, `components/StatusBreakdownChart.jsx`)
   are hand-rolled SVG/CSS, no charting library. Status colors there are
@@ -422,15 +596,26 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
 
 ### Auth flow end-to-end
 
-1. An operator creates the account out-of-band with `npm run create-user`
-   (there is no self-serve signup); the `Login` page submits to `api.login`.
-2. On success, the returned `{ token, user }` is passed to
-   `AuthContext.login()`, which persists the token and updates state.
-3. `ProtectedRoute` (used for `/dashboard`) checks `AuthContext` and
-   redirects unauthenticated visitors to `/login`.
+1. An admin creates the account — out-of-band with `npm run create-user`
+   for the bootstrap/recovery path (always `role: 'admin'`), or in-app via
+   the Users page for ongoing staff accounts with granular permissions (see
+   "Roles and permissions" above); there is no self-serve signup. The
+   `Login` page submits to `api.login`.
+2. On success, the returned `{ token, user, permissions }` is passed to
+   `AuthContext.login()`, which persists the token and updates state,
+   including the `permissions` map `can()` reads from.
+3. `ProtectedRoute` (used for every authenticated route, including
+   `/dashboard`, `/users`, and `/account`) checks `AuthContext` and
+   redirects unauthenticated visitors to `/login`; it only checks that
+   *someone* is logged in — per-module authorization is a separate check
+   each page does itself via `can()` (see "Roles and permissions"/frontend
+   sections above), not something `ProtectedRoute` is aware of.
 4. Every subsequent authenticated request (e.g. the `/auth/me` check on
    page load) sends the token as `Authorization: Bearer <token>`, verified
-   server-side by `requireAuth`.
+   server-side by `requireAuth`, which re-fetches the live user row on
+   every call — so a role/permission change or deactivation made by an
+   admin takes effect on that user's very next request, not after their
+   JWT eventually expires.
 5. Forgotten passwords: `ForgotPassword` submits an email to
    `api.forgotPassword`, which always shows the same generic success
    message (see `routes/auth.js` above). The emailed link

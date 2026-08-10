@@ -1,11 +1,13 @@
 const { Router } = require('express');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requirePermission } = require('../middleware/auth');
 const { computeTotals } = require('../lib/totals');
 const { logActivity } = require('../lib/activity');
 
 const router = Router();
 router.use(requireAuth);
+const view = requirePermission('recurring_invoices', 'view');
+const manage = requirePermission('recurring_invoices', 'manage');
 
 const FREQUENCIES = ['weekly', 'monthly', 'yearly'];
 
@@ -37,7 +39,7 @@ function validateAndComputePreview(body) {
   return computeTotals(items, tax_rate, discount_type, discount_value);
 }
 
-router.get('/', (req, res) => {
+router.get('/', view, (req, res) => {
   const rows = db
     .prepare(
       `SELECT recurring_invoices.*, clients.name AS client_name, clients.company AS client_company
@@ -48,13 +50,13 @@ router.get('/', (req, res) => {
   res.json({ recurringInvoices: rows });
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', view, (req, res) => {
   const data = getWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Recurring invoice not found' });
   res.json(data);
 });
 
-router.post('/', (req, res) => {
+router.post('/', manage, (req, res) => {
   const {
     client_id,
     frequency = 'monthly',
@@ -102,7 +104,7 @@ router.post('/', (req, res) => {
   res.status(201).json(getWithItems(result.lastInsertRowid));
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM recurring_invoices WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Recurring invoice not found' });
 
@@ -158,7 +160,7 @@ router.put('/:id', (req, res) => {
   res.json(getWithItems(req.params.id));
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM recurring_invoices WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Recurring invoice not found' });
 

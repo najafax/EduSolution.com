@@ -1,12 +1,12 @@
 # EduSolution.com
 
 A web application with a React frontend and a Node/Express + SQLite backend,
-featuring email/password login, plus a small business-management
-module — clients, quotes, invoices, payments/receipts, and financials —
-with PDF generation and emailing of quotes/invoices/reminders/receipts.
-Responsive on phone, tablet, and desktop, and installable as a PWA on iOS
-and Android (add it to your home screen from the browser's share/menu
-button).
+featuring email/password login with role-based access control, plus a
+small business-management module — clients, quotes, invoices,
+payments/receipts, and financials — with PDF generation and emailing of
+quotes/invoices/reminders/receipts. Responsive on phone, tablet, and
+desktop, and installable as a PWA on iOS and Android (add it to your home
+screen from the browser's share/menu button).
 
 To actually send quote/invoice/reminder emails, set the `SMTP_*` variables
 in `backend/.env` (see `backend/.env.example`) — without them, everything
@@ -33,8 +33,8 @@ The API runs on `http://localhost:4000`.
 
 ### Creating user accounts
 
-There is **no public signup** — every logged-in user can see and edit all
-business data, so accounts are created deliberately by an operator:
+There is **no public signup** — accounts are always created deliberately,
+either by an operator with server access or by an existing admin in-app:
 
 ```bash
 cd backend
@@ -42,10 +42,24 @@ npm run create-user              # interactive; password entry is hidden
 npm run create-user -- --list    # show existing accounts
 ```
 
-Re-running it for an email that already exists offers to reset that user's
-password, which is also how you recover a locked-out account before SMTP is
+This CLI path always creates an **admin** account (full access to
+everything, no restrictions) — it's meant for bootstrapping the first
+account or account recovery, since it already requires server shell
+access. Re-running it for an email that already exists offers to reset
+that user's password (and reactivate the account if it was deactivated),
+which is also how you recover a locked-out account before SMTP is
 configured. In production, run the same command from Render's shell on the
 `edusolution-backend` service.
+
+For ongoing staff accounts, log in as an admin and use the **Users** page
+in the app instead — it lets you create a `staff` account and grant it
+view and/or manage access on a per-module basis (Clients, Quotes,
+Invoices, Expenses, Recurring invoices, Financials, Activity, Settings,
+Users, Import), rather than all-or-nothing access. A staff member without
+a grant for a module simply doesn't see it; granting "manage" always
+implies "view" too. Every account — admin or staff — can edit its own
+name/email/password and an overdue-reminder email-digest preference from
+the **My account** page, regardless of what else it's allowed to touch.
 
 ### Frontend
 
@@ -198,7 +212,10 @@ Ordered so nothing depends on a step that hasn't happened yet.
    disk the database is wiped on every redeploy. Verify `DB_PATH` is set to
    `/var/data/data.sqlite3` on the service.
 3. **Create your account**: `npm run create-user` from Render's shell, then
-   confirm you can log in. (No public signup exists — see above.)
+   confirm you can log in. (No public signup exists — see above.) This
+   first account is always an admin; create any staff accounts afterward
+   from the in-app **Users** page, with only the module access each person
+   actually needs.
 4. **Custom domain + DNS**, then confirm HTTPS works on both `www` and `api`.
 5. **SMTP** — set the `SMTP_*` vars. Until this is done, sending quotes and
    invoices, overdue reminders, and password reset all fail (with a clear

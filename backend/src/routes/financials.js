@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requirePermission } = require('../middleware/auth');
 
 const router = Router();
 router.use(requireAuth);
@@ -19,7 +19,7 @@ function recentMonths(count) {
   return months;
 }
 
-router.get('/summary', (req, res) => {
+router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
   const invoices = db.prepare("SELECT * FROM invoices WHERE status != 'void'").all();
 
   const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);

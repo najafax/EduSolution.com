@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { Router } = require('express');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requirePermission } = require('../middleware/auth');
 const { parseCsv } = require('../lib/csv');
 const { computeTotals } = require('../lib/totals');
 const { invoiceNumberForYear, receiptNumberForYear } = require('../lib/numbering');
@@ -9,6 +9,7 @@ const { logActivity } = require('../lib/activity');
 
 const router = Router();
 router.use(requireAuth);
+router.use(requirePermission('import', 'manage'));
 
 const MAX_ROWS = 5000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

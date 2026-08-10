@@ -31,6 +31,7 @@ async function runOverdueReminders() {
     .all(today(), sevenDaysAgo);
 
   let sent = 0;
+  const reminded = [];
   for (const invoice of candidates) {
     try {
       const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(invoice.client_id);
@@ -47,13 +48,37 @@ async function runOverdueReminders() {
 
       db.prepare(`UPDATE invoices SET last_reminder_sent_at = datetime('now') WHERE id = ?`).run(invoice.id);
       sent += 1;
+      reminded.push({ number: invoice.number, clientName: client.name, balanceDue, dueDate: invoice.due_date });
     } catch (err) {
       console.error(`[reminders] Failed to send reminder for invoice ${invoice.number}:`, err.message);
     }
   }
 
   console.log(`[reminders] Sent ${sent} automated overdue reminder(s)`);
+  if (reminded.length > 0) await notifyStaffOfReminders(reminded, settings);
   return { sent, skipped: false };
+}
+
+// Optional per-user preference (Settings → My account): email a short daily
+// digest to anyone who opted in, whenever the job above actually reminded at
+// least one client. Best-effort — one recipient's send failing doesn't stop
+// the others, and this never blocks or fails the reminder job itself.
+async function notifyStaffOfReminders(reminded, settings) {
+  const recipients = db.prepare('SELECT name, email FROM users WHERE active = 1 AND notify_overdue = 1').all();
+  if (recipients.length === 0) return;
+
+  const rows = reminded
+    .map((r) => `<li>${r.number} — ${r.clientName} — ${settings.currency_symbol}${r.balanceDue.toFixed(2)} (due ${r.dueDate})</li>`)
+    .join('');
+  const html = `<p>The automated overdue-reminder job just emailed ${reminded.length} client${reminded.length === 1 ? '' : 's'}:</p><ul>${rows}</ul>`;
+
+  for (const recipient of recipients) {
+    try {
+      await sendMail({ to: recipient.email, subject: `${reminded.length} overdue reminder(s) sent today`, html });
+    } catch (err) {
+      console.error(`[reminders] Failed to send staff digest to ${recipient.email}:`, err.message);
+    }
+  }
 }
 
 function advanceDate(dateStr, frequency) {

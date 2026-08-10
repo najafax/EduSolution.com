@@ -64,6 +64,9 @@ export const api = {
   me: (token) => request('/auth/me', { token }),
   forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: { email } }),
   resetPassword: (token, password) => request('/auth/reset-password', { method: 'POST', body: { token, password } }),
+  updateMe: (payload, token) => request('/auth/me', { method: 'PUT', body: payload, token }),
+  changePassword: (payload, token) => request('/auth/change-password', { method: 'POST', body: payload, token }),
+  updatePreferences: (payload, token) => request('/auth/preferences', { method: 'PUT', body: payload, token }),
 
   settings: {
     get: (token) => request('/settings', { token }),
@@ -141,6 +144,17 @@ export const api = {
 
   import: {
     run: (type, csv, commit, token) => request(`/import/${type}`, { method: 'POST', body: { csv, commit }, token }),
+  },
+
+  users: {
+    list: (token) => request('/users', { token }),
+    get: (id, token) => request(`/users/${id}`, { token }),
+    create: (payload, token) => request('/users', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/users/${id}`, { method: 'PUT', body: payload, token }),
+    resetPassword: (id, password, token) =>
+      request(`/users/${id}/reset-password`, { method: 'POST', body: { password }, token }),
+    remove: (id, token) => request(`/users/${id}`, { method: 'DELETE', token }),
+    modules: (token) => request('/users/meta/modules', { token }),
   },
 
   // Unauthenticated — client-facing quote/invoice links, no bearer token.

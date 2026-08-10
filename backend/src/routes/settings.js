@@ -1,16 +1,16 @@
 const { Router } = require('express');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requirePermission } = require('../middleware/auth');
 
 const router = Router();
 router.use(requireAuth);
 
-router.get('/', (req, res) => {
+router.get('/', requirePermission('settings', 'view'), (req, res) => {
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   res.json({ settings });
 });
 
-router.put('/', (req, res) => {
+router.put('/', requirePermission('settings', 'manage'), (req, res) => {
   const {
     business_name = '',
     email = '',

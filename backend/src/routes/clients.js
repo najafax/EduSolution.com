@@ -1,13 +1,15 @@
 const { Router } = require('express');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
 
 const router = Router();
 router.use(requireAuth);
+const view = requirePermission('clients', 'view');
+const manage = requirePermission('clients', 'manage');
 
-router.get('/', (req, res) => {
+router.get('/', view, (req, res) => {
   const { q } = req.query;
   const clients = q
     ? db
@@ -19,7 +21,7 @@ router.get('/', (req, res) => {
   res.json({ clients });
 });
 
-router.get('/export.csv', (req, res) => {
+router.get('/export.csv', view, (req, res) => {
   const rows = db.prepare('SELECT * FROM clients ORDER BY name').all();
   const csv = toCsv(rows, [
     { label: 'Name', key: 'name' },
@@ -33,7 +35,7 @@ router.get('/export.csv', (req, res) => {
   res.send(csv);
 });
 
-router.post('/', (req, res) => {
+router.post('/', manage, (req, res) => {
   const { name, email, phone = '', company = '', address = '', notes = '' } = req.body || {};
   if (!name || !email) {
     return res.status(400).json({ error: 'name and email are required' });
@@ -48,13 +50,13 @@ router.post('/', (req, res) => {
   res.status(201).json({ client });
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', view, (req, res) => {
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
   if (!client) return res.status(404).json({ error: 'Client not found' });
   res.json({ client });
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Client not found' });
 
@@ -73,7 +75,7 @@ router.put('/:id', (req, res) => {
   res.json({ client });
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Client not found' });
 

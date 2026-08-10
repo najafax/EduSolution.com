@@ -1,15 +1,17 @@
 const { Router } = require('express');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
 
 const router = Router();
 router.use(requireAuth);
+const view = requirePermission('expenses', 'view');
+const manage = requirePermission('expenses', 'manage');
 
 const CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'marketing', 'software', 'travel', 'other'];
 
-router.get('/', (req, res) => {
+router.get('/', view, (req, res) => {
   const { q } = req.query;
   const rows = q
     ? db
@@ -19,7 +21,7 @@ router.get('/', (req, res) => {
   res.json({ expenses: rows, categories: CATEGORIES });
 });
 
-router.get('/export.csv', (req, res) => {
+router.get('/export.csv', view, (req, res) => {
   const rows = db.prepare('SELECT * FROM expenses ORDER BY expense_date DESC, id DESC').all();
   const csv = toCsv(rows, [
     { label: 'Date', key: 'expense_date' },
@@ -47,7 +49,7 @@ function validate(body) {
   return null;
 }
 
-router.post('/', (req, res) => {
+router.post('/', manage, (req, res) => {
   const error = validate(req.body);
   if (error) return res.status(400).json({ error });
 
@@ -61,7 +63,7 @@ router.post('/', (req, res) => {
   res.status(201).json({ expense });
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM expenses WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Expense not found' });
 
@@ -78,7 +80,7 @@ router.put('/:id', (req, res) => {
   res.json({ expense });
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM expenses WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Expense not found' });
 

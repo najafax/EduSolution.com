@@ -21,8 +21,8 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const { token, user } = await api.login(form);
-      login(token, user);
+      const { token, user, permissions } = await api.login(form);
+      login(token, user, permissions);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message);

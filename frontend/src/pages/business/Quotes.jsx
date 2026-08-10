@@ -7,7 +7,8 @@ import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 
 export default function Quotes() {
-  const { token } = useAuth();
+  const { token, can } = useAuth();
+  const canManage = can('quotes', 'manage');
   const [quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,12 +52,14 @@ export default function Quotes() {
           >
             Export CSV
           </button>
-          <Link
-            to="/quotes/new"
-            className="flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
-          >
-            New quote
-          </Link>
+          {canManage && (
+            <Link
+              to="/quotes/new"
+              className="flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+            >
+              New quote
+            </Link>
+          )}
         </div>
       </div>
 
@@ -105,7 +108,7 @@ export default function Quotes() {
         )}
       </div>
 
-      <FloatingActionButton to="/quotes/new" label="New quote" />
+      {canManage && <FloatingActionButton to="/quotes/new" label="New quote" />}
     </div>
   );
 }

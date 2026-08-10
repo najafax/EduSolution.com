@@ -14,27 +14,32 @@ function money(symbol, value) {
 }
 
 const SHORTCUTS = [
-  { to: '/clients', label: 'Clients' },
-  { to: '/quotes', label: 'Quotes' },
-  { to: '/invoices', label: 'Invoices' },
-  { to: '/recurring-invoices', label: 'Recurring' },
-  { to: '/expenses', label: 'Expenses' },
-  { to: '/financials', label: 'Financials' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/clients', label: 'Clients', module: 'clients' },
+  { to: '/quotes', label: 'Quotes', module: 'quotes' },
+  { to: '/invoices', label: 'Invoices', module: 'invoices' },
+  { to: '/recurring-invoices', label: 'Recurring', module: 'recurring_invoices' },
+  { to: '/expenses', label: 'Expenses', module: 'expenses' },
+  { to: '/financials', label: 'Financials', module: 'financials' },
+  { to: '/settings', label: 'Settings', module: 'settings' },
 ];
 
 export default function Dashboard() {
-  const { user, token } = useAuth();
+  const { user, token, can } = useAuth();
   const [summary, setSummary] = useState(null);
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState('');
 
+  const canViewFinancials = can('financials', 'view');
+
   useEffect(() => {
-    api.financials.summary(token).then(setSummary).catch((err) => setError(err.message));
-    api.settings.get(token).then(({ settings }) => setSettings(settings));
-  }, [token]);
+    if (canViewFinancials) {
+      api.financials.summary(token).then(setSummary).catch((err) => setError(err.message));
+    }
+    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
+  }, [token, canViewFinancials]);
 
   const symbol = settings?.currency_symbol || '$';
+  const visibleShortcuts = SHORTCUTS.filter((s) => can(s.module, 'view'));
 
   const isProfitable = summary && summary.netProfit >= 0;
   const kpis = summary
@@ -68,7 +73,24 @@ export default function Dashboard() {
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      {!summary ? (
+      {!canViewFinancials ? (
+        <div className="mt-8 flex flex-wrap gap-2">
+          {visibleShortcuts.map((s) => (
+            <Link
+              key={s.to}
+              to={s.to}
+              className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              {s.label}
+            </Link>
+          ))}
+          {visibleShortcuts.length === 0 && (
+            <p className="text-sm text-slate-500">
+              Nothing to show yet — ask an admin to grant you access to what you need.
+            </p>
+          )}
+        </div>
+      ) : !summary ? (
         <p className="mt-8 text-sm text-slate-500">Loading…</p>
       ) : (
         <>
@@ -119,7 +141,7 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">
-            {SHORTCUTS.map((s) => (
+            {visibleShortcuts.map((s) => (
               <Link
                 key={s.to}
                 to={s.to}

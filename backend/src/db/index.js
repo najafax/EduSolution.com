@@ -14,7 +14,19 @@ db.exec(`
     password_hash TEXT NOT NULL,
     reset_token TEXT,
     reset_token_expires TEXT,
+    role TEXT NOT NULL DEFAULT 'staff',
+    active INTEGER NOT NULL DEFAULT 1,
+    notify_overdue INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS user_permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    module TEXT NOT NULL,
+    can_view INTEGER NOT NULL DEFAULT 0,
+    can_manage INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(user_id, module)
   );
 
   CREATE TABLE IF NOT EXISTS business_settings (
@@ -174,6 +186,27 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_recurring_items ON recurring_invoice_items(recurring_invoice_id);
   CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at);
 `);
+
+// Lightweight migration for columns added to `users` after this table
+// already existed in production. CREATE TABLE IF NOT EXISTS above is a
+// no-op against a live database, so new columns have to be added by hand —
+// there's no migration tool (see CLAUDE.md). Guarded by checking
+// PRAGMA table_info first so this is safe to run on every startup,
+// including against a brand-new DB where the columns are already present
+// from the CREATE TABLE above (the ALTERs are simply skipped).
+const userColumns = new Set(db.prepare('PRAGMA table_info(users)').all().map((c) => c.name));
+if (!userColumns.has('role')) {
+  db.exec(`
+    ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'staff';
+    ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE users ADD COLUMN notify_overdue INTEGER NOT NULL DEFAULT 0;
+  `);
+  // Every account created before roles existed had full, unrestricted
+  // access — promote them all to admin so this migration can never
+  // silently strip access from someone already using the app. Only
+  // accounts created after this point default to 'staff'.
+  db.prepare(`UPDATE users SET role = 'admin'`).run();
+}
 
 db.pragma('foreign_keys = ON');
 

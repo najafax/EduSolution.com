@@ -7,7 +7,8 @@ import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 
 export default function Invoices() {
-  const { token } = useAuth();
+  const { token, can } = useAuth();
+  const canManage = can('invoices', 'manage');
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,12 +52,14 @@ export default function Invoices() {
           >
             Export CSV
           </button>
-          <Link
-            to="/invoices/new"
-            className="flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
-          >
-            New invoice
-          </Link>
+          {canManage && (
+            <Link
+              to="/invoices/new"
+              className="flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+            >
+              New invoice
+            </Link>
+          )}
         </div>
       </div>
 
@@ -107,7 +110,7 @@ export default function Invoices() {
         )}
       </div>
 
-      <FloatingActionButton to="/invoices/new" label="New invoice" />
+      {canManage && <FloatingActionButton to="/invoices/new" label="New invoice" />}
     </div>
   );
 }

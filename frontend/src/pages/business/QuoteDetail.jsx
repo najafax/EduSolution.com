@@ -12,7 +12,9 @@ const todayPlus = (days) => {
 };
 
 export default function QuoteDetail() {
-  const { token } = useAuth();
+  const { token, can } = useAuth();
+  const canManage = can('quotes', 'manage');
+  const canManageInvoices = can('invoices', 'manage');
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -33,7 +35,7 @@ export default function QuoteDetail() {
 
   useEffect(load, [id, token]);
   useEffect(() => {
-    api.settings.get(token).then(({ settings }) => setSettings(settings));
+    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
 
   async function handleDownload() {
@@ -111,26 +113,34 @@ export default function QuoteDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to={`/quotes/${id}/edit`} className="min-h-11 flex items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            Edit
-          </Link>
+          {canManage && (
+            <Link to={`/quotes/${id}/edit`} className="min-h-11 flex items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Edit
+            </Link>
+          )}
           <button onClick={handleDownload} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
             Download PDF
           </button>
-          <button onClick={handleSend} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
-            Email to client
-          </button>
-          {!quote.converted_invoice_id && (
+          {canManage && (
+            <button onClick={handleSend} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
+              Email to client
+            </button>
+          )}
+          {canManage && canManageInvoices && !quote.converted_invoice_id && (
             <button onClick={() => setShowConvert((v) => !v)} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
               Convert to invoice
             </button>
           )}
-          <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-            Duplicate
-          </button>
-          <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50">
-            Delete
-          </button>
+          {canManage && (
+            <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+              Duplicate
+            </button>
+          )}
+          {canManage && (
+            <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50">
+              Delete
+            </button>
+          )}
         </div>
       </div>
 

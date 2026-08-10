@@ -12,10 +12,11 @@ const todayPlus = (days) => {
 };
 
 export default function InvoiceForm() {
-  const { token } = useAuth();
+  const { token, can } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const isEditing = Boolean(id);
+  const canManage = can('invoices', 'manage');
 
   const [clients, setClients] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -33,7 +34,7 @@ export default function InvoiceForm() {
 
   useEffect(() => {
     api.clients.list(token).then(({ clients }) => setClients(clients));
-    api.settings.get(token).then(({ settings }) => setSettings(settings));
+    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
 
   useEffect(() => {
@@ -84,6 +85,9 @@ export default function InvoiceForm() {
   }
 
   if (loading) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">Loading…</div>;
+  if (!canManage) {
+    return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">You don't have permission to view this page.</div>;
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">

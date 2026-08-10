@@ -20,7 +20,8 @@ const EMPTY_FORM = {
 };
 
 export default function RecurringInvoices() {
-  const { token } = useAuth();
+  const { token, can } = useAuth();
+  const canManage = can('recurring_invoices', 'manage');
   const [recurring, setRecurring] = useState([]);
   const [clients, setClients] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -44,7 +45,7 @@ export default function RecurringInvoices() {
   useEffect(load, [token]);
   useEffect(() => {
     api.clients.list(token).then(({ clients }) => setClients(clients));
-    api.settings.get(token).then(({ settings }) => setSettings(settings));
+    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
 
   function startCreate() {
@@ -125,12 +126,14 @@ export default function RecurringInvoices() {
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Recurring invoices</h1>
-        <button
-          onClick={startCreate}
-          className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
-        >
-          New template
-        </button>
+        {canManage && (
+          <button
+            onClick={startCreate}
+            className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+          >
+            New template
+          </button>
+        )}
       </div>
       <p className="mt-2 text-sm text-slate-600">
         Each template automatically creates a draft invoice on its next run date — review and send it from the{' '}
@@ -303,7 +306,7 @@ export default function RecurringInvoices() {
                 <th className="px-4 py-3">Frequency</th>
                 <th className="px-4 py-3">Next run</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3" />
+                {canManage && <th className="px-4 py-3" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -321,14 +324,16 @@ export default function RecurringInvoices() {
                       {row.active ? 'Active' : 'Paused'}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
-                    <button onClick={() => startEdit(row)} className="mr-3 text-indigo-600 hover:text-indigo-500">
-                      Edit
-                    </button>
-                    <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-500">
-                      Delete
-                    </button>
-                  </td>
+                  {canManage && (
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <button onClick={() => startEdit(row)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-500">
+                        Delete
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -336,7 +341,7 @@ export default function RecurringInvoices() {
         )}
       </div>
 
-      {!showForm && <FloatingActionButton onClick={startCreate} label="New recurring invoice" />}
+      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New recurring invoice" />}
     </div>
   );
 }

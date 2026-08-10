@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const crypto = require('crypto');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requirePermission } = require('../middleware/auth');
 const { computeTotals } = require('../lib/totals');
 const { nextInvoiceNumber, nextReceiptNumber } = require('../lib/numbering');
 const { renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
@@ -11,6 +11,8 @@ const { toCsv } = require('../lib/csv');
 
 const router = Router();
 router.use(requireAuth);
+const view = requirePermission('invoices', 'view');
+const manage = requirePermission('invoices', 'manage');
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -43,7 +45,7 @@ function saveItems(invoiceId, items) {
   }
 }
 
-router.get('/', (req, res) => {
+router.get('/', view, (req, res) => {
   const { status } = req.query;
   const rows = status
     ? db
@@ -63,7 +65,7 @@ router.get('/', (req, res) => {
   res.json({ invoices: rows.map(withComputed) });
 });
 
-router.get('/export.csv', (req, res) => {
+router.get('/export.csv', view, (req, res) => {
   const rows = db
     .prepare(
       `SELECT invoices.*, clients.name AS client_name
@@ -89,7 +91,7 @@ router.get('/export.csv', (req, res) => {
   res.send(csv);
 });
 
-router.post('/', (req, res) => {
+router.post('/', manage, (req, res) => {
   const {
     client_id,
     issue_date,
@@ -144,13 +146,13 @@ router.post('/', (req, res) => {
   res.status(201).json(getInvoiceWithItems(result.lastInsertRowid));
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', view, (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   res.json(data);
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Invoice not found' });
 
@@ -212,7 +214,7 @@ router.put('/:id', (req, res) => {
   res.json(getInvoiceWithItems(req.params.id));
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Invoice not found' });
 
@@ -226,7 +228,7 @@ router.delete('/:id', (req, res) => {
   res.status(204).end();
 });
 
-router.get('/:id/pdf', async (req, res) => {
+router.get('/:id/pdf', view, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
@@ -239,7 +241,7 @@ router.get('/:id/pdf', async (req, res) => {
   res.send(buffer);
 });
 
-router.post('/:id/send', async (req, res) => {
+router.post('/:id/send', manage, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
@@ -267,7 +269,7 @@ router.post('/:id/send', async (req, res) => {
   res.json(getInvoiceWithItems(req.params.id));
 });
 
-router.post('/:id/remind', async (req, res) => {
+router.post('/:id/remind', manage, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   if (data.invoice.balance_due <= 0) {
@@ -293,7 +295,7 @@ router.post('/:id/remind', async (req, res) => {
   res.json(getInvoiceWithItems(req.params.id));
 });
 
-router.post('/:id/duplicate', (req, res) => {
+router.post('/:id/duplicate', manage, (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
 
@@ -336,7 +338,7 @@ router.post('/:id/duplicate', (req, res) => {
   res.status(201).json(getInvoiceWithItems(result.lastInsertRowid));
 });
 
-router.post('/:id/payments', (req, res) => {
+router.post('/:id/payments', manage, (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
 
@@ -376,7 +378,7 @@ router.post('/:id/payments', (req, res) => {
   res.status(201).json({ payment, invoice: getInvoiceWithItems(req.params.id).invoice });
 });
 
-router.get('/:id/payments/:paymentId/pdf', async (req, res) => {
+router.get('/:id/payments/:paymentId/pdf', view, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   const payment = db
@@ -393,7 +395,7 @@ router.get('/:id/payments/:paymentId/pdf', async (req, res) => {
   res.send(buffer);
 });
 
-router.post('/:id/payments/:paymentId/send-receipt', async (req, res) => {
+router.post('/:id/payments/:paymentId/send-receipt', manage, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   const payment = db

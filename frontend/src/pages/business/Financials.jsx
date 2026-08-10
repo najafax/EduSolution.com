@@ -22,7 +22,7 @@ export default function Financials() {
 
   useEffect(() => {
     api.financials.summary(token).then(setSummary).catch((err) => setError(err.message));
-    api.settings.get(token).then(({ settings }) => setSettings(settings));
+    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
 
   if (error) return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-red-600 sm:px-6">{error}</div>;

@@ -70,7 +70,8 @@ function ResultsTable({ results }) {
 }
 
 export default function Import() {
-  const { token } = useAuth();
+  const { token, can } = useAuth();
+  const canManage = can('import', 'manage');
   const [type, setType] = useState('clients');
   const [fileName, setFileName] = useState('');
   const [csvText, setCsvText] = useState('');
@@ -132,6 +133,10 @@ export default function Import() {
   }
 
   const current = TYPES.find((t) => t.value === type);
+
+  if (!canManage) {
+    return <div className="mx-auto max-w-4xl px-4 py-10 text-sm text-slate-500 sm:px-6">You don't have permission to view this page.</div>;
+  }
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
