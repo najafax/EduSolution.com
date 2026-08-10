@@ -192,6 +192,11 @@ column anywhere in this module.
   receipts). Relies on `better-sqlite3` being synchronous (no `await`
   between the count and the insert that consumes it) to avoid a race — if
   any of this code becomes async, this numbering scheme needs a real lock.
+  `invoiceNumberForYear(year)`/`quoteNumberForYear(year)`/
+  `receiptNumberForYear(year)` are the same scheme for an arbitrary
+  (possibly past) year rather than always "now" — used only by
+  `routes/import.js` so a historical invoice gets numbered under its own
+  issue year instead of the current one.
 - `lib/pdf.js` — renders quote/invoice/receipt PDFs with `pdfkit` (pure JS,
   no headless browser). One shared header/items-table/totals layout, reused
   by `renderQuotePdf`/`renderInvoicePdf`/`renderReceiptPdf`, and by both the
@@ -211,7 +216,37 @@ column anywhere in this module.
 - `lib/csv.js` — `toCsv(rows, columns)`, a minimal hand-rolled RFC-4180-ish
   serializer (`columns` is `{ label, key }` or `{ label, value: fn }`).
   Backs every `GET /export.csv` route; not a general-purpose library, just
-  enough quoting/escaping for this app's exports.
+  enough quoting/escaping for this app's exports. `parseCsv(text)` is the
+  counterpart — a small state-machine parser (handles quoted fields with
+  embedded commas/newlines/escaped quotes, \r\n or \n line endings) that
+  backs `routes/import.js`.
+- `routes/import.js` — `POST /api/import/:type` (`type` is `clients`,
+  `expenses`, or `invoices`) bulk-imports historical data from CSV text in
+  the request body. Always validates every row first; `commit: false`
+  (the default) is a dry-run that reports what *would* happen with no DB
+  writes, `commit: true` actually inserts the valid rows and skips the
+  invalid ones — the frontend always previews before offering to commit.
+  Each row gets a `{ row, status: 'ok'|'error', message, preview }` result,
+  so partial success is normal, not a failure state. Invoices are matched
+  to an existing client by email (import clients first) and require a
+  single `amount` rather than itemized line items — it's run through the
+  same `computeTotals()` every other invoice uses, just with one synthetic
+  line item. An optional `amount_paid`/`paid_date` creates a real `payments`
+  row too (not just a number on the invoice), so imported history shows up
+  correctly in `recentPayments`/`monthlyTrend` on the financials endpoint,
+  not just in the invoice's own totals. Invoice numbers default to the same
+  `INV-<year>-####` scheme as live invoices — but year-of-issue-date, not
+  year-of-import, via `numbering.js`'s `invoiceNumberForYear()` — or you can
+  supply your own `number` column to preserve original historical numbers.
+  Within one import batch, auto-generated numbers are handed out from an
+  in-memory per-year counter (`makeSequencer()`) seeded from the real DB
+  count, rather than re-querying per row — needed because preview mode
+  never writes anything, so two same-year rows calling the DB-backed
+  numbering function directly would collide on the same "next" number.
+  Whole commit runs in one `db.transaction()` since an invoice import
+  writes to three tables (`invoices`, `invoice_items`, `payments`) per row.
+  Logs one summary `activity_log` entry per import ("bulk imported 42
+  clients from CSV"), not one per row.
 - `lib/backup.js` — `runBackup()`: skips entirely if `BACKUP_S3_BUCKET`
   isn't set. Otherwise runs `VACUUM INTO` to write a consistent snapshot of
   the live database (safe against catching a WAL-mode write mid-flight,
@@ -320,7 +355,15 @@ Status/derived-field conventions worth knowing before touching this code:
   `Expenses.jsx` and `RecurringInvoices.jsx` follow the same
   list+inline-form+FAB pattern as `Clients.jsx` (no separate detail page —
   edit happens inline in the list). `ActivityLog.jsx` is a simple paginated
-  read-only list.
+  read-only list. `Import.jsx` (linked from `Settings.jsx`, not a top-level
+  Navbar item — it's a rare-use admin tool) reads a chosen CSV file
+  client-side via `FileReader`, calls `api.import.run(type, csv, commit,
+  token)` first with `commit: false` to preview, then again with `commit:
+  true` after the user reviews the row-by-row results and confirms —
+  mirrors the two-phase `POST /api/import/:type` contract exactly, the
+  frontend does no CSV parsing of its own. Per-type CSV templates are
+  generated client-side as static strings and downloaded via a blob URL,
+  the same throwaway-`<a>` pattern as `downloadFile()` in `lib/api.js`.
 - `components/GlobalSearch.jsx` — a debounced (250ms) search box that calls
   `api.search.query()` and renders a grouped dropdown (clients/quotes/
   invoices/expenses); clicking a result navigates there. Mounted twice in

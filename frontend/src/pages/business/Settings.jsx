@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -71,6 +72,19 @@ export default function Settings() {
           {submitting ? 'Saving…' : 'Save'}
         </button>
       </form>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Historical data</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Bring in existing clients, expenses, or invoices (with payment history) from a CSV file.
+        </p>
+        <Link
+          to="/import"
+          className="mt-3 inline-flex min-h-11 items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Import historical data →
+        </Link>
+      </div>
     </div>
   );
 }

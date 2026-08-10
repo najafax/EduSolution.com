@@ -139,6 +139,10 @@ export const api = {
     summary: (token) => request('/financials/summary', { token }),
   },
 
+  import: {
+    run: (type, csv, commit, token) => request(`/import/${type}`, { method: 'POST', body: { csv, commit }, token }),
+  },
+
   // Unauthenticated — client-facing quote/invoice links, no bearer token.
   public: {
     getQuote: (publicToken) => request(`/public/quotes/${publicToken}`),

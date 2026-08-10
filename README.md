@@ -161,6 +161,34 @@ DNS changes can take anywhere from a few minutes up to 24–48 hours to
 propagate fully, though Namecheap's own records are usually fast (well
 under an hour).
 
+## Importing historical data
+
+Settings → **Import historical data**, or go directly to `/import`. Brings
+in existing **clients**, **expenses**, or **invoices with payment history**
+from a CSV file — useful for backfilling records from before you started
+using the app, rather than starting from zero.
+
+- **Order matters**: import clients first if you're also importing
+  invoices — each invoice row is matched to a client by email, so the
+  client has to already exist.
+- Every import previews first (nothing is saved) and shows a row-by-row
+  report of what would happen; only after you review it and click confirm
+  does anything get written. A file with some bad rows is fine — valid
+  rows still import, invalid ones are skipped with a reason shown.
+- Each type has a **Download template** button showing the exact expected
+  columns; required columns are required, everything else can be left
+  blank.
+- For invoices, `amount` is a single total (not itemized line items) —
+  fine for historical backfill where you have summary figures, not the
+  original quote breakdown. If you include `amount_paid` and `paid_date`,
+  a real payment record is created too, so historical revenue shows up
+  correctly in Financials, not just as a number on the invoice.
+- Invoice numbers are auto-generated using the invoice's own **issue
+  year**, not the year you're importing in — a 2023 invoice gets an
+  `INV-2023-####` number, so it doesn't collide with this year's real
+  numbering. Or supply your own `number` column to keep original invoice
+  numbers from your previous system.
+
 ## Going live with real data — checklist
 
 Ordered so nothing depends on a step that hasn't happened yet.

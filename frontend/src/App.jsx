@@ -20,6 +20,7 @@ import InvoiceDetail from './pages/business/InvoiceDetail';
 import RecurringInvoices from './pages/business/RecurringInvoices';
 import Financials from './pages/business/Financials';
 import ActivityLog from './pages/business/ActivityLog';
+import Import from './pages/business/Import';
 
 function Protected({ children }) {
   return <ProtectedRoute>{children}</ProtectedRoute>;
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/clients" element={<Protected><Clients /></Protected>} />
         <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
         <Route path="/settings" element={<Protected><Settings /></Protected>} />
+        <Route path="/import" element={<Protected><Import /></Protected>} />
 
         <Route path="/quotes" element={<Protected><Quotes /></Protected>} />
         <Route path="/quotes/new" element={<Protected><QuoteForm /></Protected>} />
