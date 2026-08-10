@@ -371,12 +371,21 @@ Status/derived-field conventions worth knowing before touching this code:
   once inside the mobile slide-down menu — both instances exist in the DOM
   simultaneously, so anything that queries this input in tests must scope
   to the visible one.
-- `pages/Dashboard.jsx` charts (`components/RevenueTrendChart.jsx`,
-  `components/StatusBreakdownChart.jsx`) are hand-rolled SVG/CSS, no
-  charting library. Status colors there are pinned to match
-  `StatusBadge`/`lib/pdf.js` (draft=slate, sent=indigo, paid=emerald,
-  void=red) rather than a generic categorical palette — status is state,
-  not series identity, so don't reassign those colors when adding a chart.
+- `pages/Dashboard.jsx` and `pages/business/Financials.jsx` charts
+  (`components/RevenueTrendChart.jsx`, `components/StatusBreakdownChart.jsx`)
+  are hand-rolled SVG/CSS, no charting library. Status colors there are
+  pinned to match `StatusBadge`/`lib/pdf.js` (draft=slate, sent=indigo,
+  paid=emerald, void=red) rather than a generic categorical palette —
+  status is state, not series identity, so don't reassign those colors when
+  adding a chart. Both pages also share `components/KpiCard.jsx` (icon +
+  label + value + optional `sub` context line, `tone` picks the icon-circle
+  and value color from a fixed neutral/positive/negative/warning set) and
+  `components/MeterBar.jsx` (a labeled progress bar — fill color and its
+  fixed-lighter-step track color come from the same `tone`-style palette) so
+  a KPI or a rate means the same thing everywhere it's used, rather than
+  each page inventing its own ad hoc card styling. `components/icons.jsx`
+  is a small set of hand-rolled 20×20 outline icons (no icon-library
+  dependency) used inside `KpiCard`'s tinted circle.
 - Styling is Tailwind CSS v4 via the `@tailwindcss/vite` plugin (see
   `vite.config.js` and `src/index.css`) — no `tailwind.config.js`/PostCSS
   setup exists or is needed for v4's Vite integration. Utility classes are

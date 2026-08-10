@@ -5,6 +5,13 @@ import { api } from '../lib/api';
 import RevenueTrendChart from '../components/RevenueTrendChart';
 import StatusBreakdownChart from '../components/StatusBreakdownChart';
 import Accordion from '../components/Accordion';
+import KpiCard from '../components/KpiCard';
+import { UsersIcon, InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, TrendUpIcon, TrendDownIcon } from '../components/icons';
+
+function money(symbol, value) {
+  const sign = value < 0 ? '-' : '';
+  return `${sign}${symbol}${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 const SHORTCUTS = [
   { to: '/clients', label: 'Clients' },
@@ -29,20 +36,28 @@ export default function Dashboard() {
 
   const symbol = settings?.currency_symbol || '$';
 
+  const isProfitable = summary && summary.netProfit >= 0;
   const kpis = summary
     ? [
-        { label: 'Clients', value: summary.clientCount, isMoney: false },
-        { label: 'Total invoiced', value: summary.totalInvoiced, isMoney: true },
-        { label: 'Total paid', value: summary.totalPaid, isMoney: true },
-        { label: 'Outstanding', value: summary.totalOutstanding, isMoney: true },
+        { key: 'clients', label: 'Clients', value: summary.clientCount, icon: <UsersIcon />, tone: 'neutral' },
+        { key: 'invoiced', label: 'Invoiced', value: money(symbol, summary.totalInvoiced), icon: <InvoiceIcon />, tone: 'neutral' },
+        { key: 'paid', label: 'Paid', value: money(symbol, summary.totalPaid), icon: <CheckCircleIcon />, tone: 'positive' },
+        { key: 'outstanding', label: 'Outstanding', value: money(symbol, summary.totalOutstanding), icon: <ClockIcon />, tone: 'neutral' },
         {
+          key: 'overdue',
           label: 'Overdue',
-          value: summary.overdueAmount,
-          isMoney: true,
+          value: money(symbol, summary.overdueAmount),
           sub: `${summary.overdueCount} invoice${summary.overdueCount === 1 ? '' : 's'}`,
-          warn: summary.overdueCount > 0,
+          icon: <AlertTriangleIcon />,
+          tone: summary.overdueCount > 0 ? 'negative' : 'neutral',
         },
-        { label: 'Net profit', value: summary.netProfit, isMoney: true, warn: summary.netProfit < 0 },
+        {
+          key: 'profit',
+          label: 'Net profit',
+          value: money(symbol, summary.netProfit),
+          icon: isProfitable ? <TrendUpIcon /> : <TrendDownIcon />,
+          tone: isProfitable ? 'positive' : 'negative',
+        },
       ]
     : [];
 
@@ -57,15 +72,9 @@ export default function Dashboard() {
         <p className="mt-8 text-sm text-slate-500">Loading…</p>
       ) : (
         <>
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {kpis.map((kpi) => (
-              <div key={kpi.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-medium uppercase text-slate-500">{kpi.label}</p>
-                <p className={`mt-1 text-xl font-semibold ${kpi.warn ? 'text-red-600' : 'text-slate-900'}`}>
-                  {kpi.isMoney ? `${symbol}${kpi.value.toFixed(2)}` : kpi.value}
-                </p>
-                {kpi.sub && <p className="mt-0.5 text-xs text-slate-500">{kpi.sub}</p>}
-              </div>
+              <KpiCard key={kpi.key} label={kpi.label} value={kpi.value} sub={kpi.sub} icon={kpi.icon} tone={kpi.tone} />
             ))}
           </div>
 
