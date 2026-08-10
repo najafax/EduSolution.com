@@ -37,14 +37,14 @@ export default function Financials() {
   const cards = [
     {
       key: 'invoiced',
-      label: 'Total invoiced',
+      label: 'Invoiced',
       value: money(symbol, summary.totalInvoiced),
       icon: <InvoiceIcon />,
       tone: 'neutral',
     },
     {
       key: 'paid',
-      label: 'Total paid',
+      label: 'Paid',
       value: money(symbol, summary.totalPaid),
       sub: summary.totalInvoiced > 0 ? `${collectedPct.toFixed(0)}% collected` : null,
       icon: <CheckCircleIcon />,
@@ -88,7 +88,7 @@ export default function Financials() {
       <h1 className="text-2xl font-bold text-slate-900">Financials</h1>
       <p className="mt-1 text-sm text-slate-600">A live view of what's owed, what's been paid, and where you stand.</p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
         {cards.map((card) => (
           <KpiCard key={card.key} label={card.label} value={card.value} sub={card.sub} icon={card.icon} tone={card.tone} />
         ))}
