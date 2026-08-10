@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../../components/StatusBadge';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
+import Modal from '../../components/Modal';
+import QuoteForm from './QuoteForm';
 
 export default function Quotes() {
   const { token, can } = useAuth();
+  const navigate = useNavigate();
   const canManage = can('quotes', 'manage');
   const [quotes, setQuotes] = useState([]);
   const [pageInfo, setPageInfo] = useState(null);
@@ -16,6 +19,7 @@ export default function Quotes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [showNewForm, setShowNewForm] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -53,12 +57,12 @@ export default function Quotes() {
             Export CSV
           </button>
           {canManage && (
-            <Link
-              to="/quotes/new"
+            <button
+              onClick={() => setShowNewForm(true)}
               className="flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
             >
               New quote
-            </Link>
+            </button>
           )}
         </div>
       </div>
@@ -110,7 +114,19 @@ export default function Quotes() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
-      {canManage && <FloatingActionButton to="/quotes/new" label="New quote" />}
+      <Modal open={showNewForm} onClose={() => setShowNewForm(false)} title="New quote" maxWidthClass="max-w-3xl">
+        <QuoteForm
+          embedded
+          idOverride={null}
+          onSuccess={(quote) => {
+            setShowNewForm(false);
+            navigate(`/quotes/${quote.id}`);
+          }}
+          onCancel={() => setShowNewForm(false)}
+        />
+      </Modal>
+
+      {canManage && !showNewForm && <FloatingActionButton onClick={() => setShowNewForm(true)} label="New quote" />}
     </div>
   );
 }

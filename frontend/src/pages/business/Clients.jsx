@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
+import Modal from '../../components/Modal';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', address: '', notes: '' };
 
@@ -121,13 +122,13 @@ export default function Clients() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search clients…" />
       </div>
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && !showForm && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="mt-6 grid gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <h2 className="text-sm font-semibold text-slate-900">{editingId ? 'Edit client' : 'New client'}</h2>
-          </div>
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit client' : 'New client'} maxWidthClass="max-w-2xl">
+        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+          {error && (
+            <p className="text-sm text-red-600 sm:col-span-2">{error}</p>
+          )}
           <Field label="Client name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} required />
           <Field label="Email" type="email" value={form.email} onChange={(v) => setForm((f) => ({ ...f, email: v }))} required />
           <Field label="Phone" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} />
@@ -154,7 +155,7 @@ export default function Clients() {
             </button>
           </div>
         </form>
-      )}
+      </Modal>
 
       <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         {loading ? (

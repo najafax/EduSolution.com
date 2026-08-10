@@ -12,9 +12,16 @@ const todayPlus = (days) => {
   return d.toISOString().slice(0, 10);
 };
 
-export default function QuoteForm() {
+// Renders standalone as the routed `/quotes/new` and `/quotes/:id/edit`
+// pages (the default), or `embedded` inside a Modal when opened from the
+// Quotes list page's "New quote" button — same form either way, just
+// without its own page chrome (outer container/heading) and reporting
+// success/cancellation via callbacks instead of navigating directly, so
+// the modal's caller decides what happens next.
+export default function QuoteForm({ embedded = false, idOverride, onSuccess, onCancel }) {
   const { token, can } = useAuth();
-  const { id } = useParams();
+  const params = useParams();
+  const id = embedded ? idOverride : params.id;
   const navigate = useNavigate();
   const isEditing = Boolean(id);
   const canManage = can('quotes', 'manage');
@@ -82,11 +89,13 @@ export default function QuoteForm() {
     };
     try {
       if (isEditing) {
-        await api.quotes.update(id, payload, token);
-        navigate(`/quotes/${id}`);
+        const { quote } = await api.quotes.update(id, payload, token);
+        if (onSuccess) onSuccess(quote);
+        else navigate(`/quotes/${id}`);
       } else {
         const { quote } = await api.quotes.create(payload, token);
-        navigate(`/quotes/${quote.id}`);
+        if (onSuccess) onSuccess(quote);
+        else navigate(`/quotes/${quote.id}`);
       }
     } catch (err) {
       setError(err.message);
@@ -95,16 +104,17 @@ export default function QuoteForm() {
     }
   }
 
-  if (loading) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">Loading…</div>;
+  if (loading) {
+    const loadingEl = <p className="text-sm text-slate-500">Loading…</p>;
+    return embedded ? loadingEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{loadingEl}</div>;
+  }
   if (!canManage) {
-    return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">You don't have permission to view this page.</div>;
+    const deniedEl = <p className="text-sm text-slate-500">You don't have permission to view this page.</p>;
+    return embedded ? deniedEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{deniedEl}</div>;
   }
 
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900">{isEditing ? 'Edit quote' : 'New quote'}</h1>
-
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+  const formEl = (
+      <form onSubmit={handleSubmit} className={embedded ? 'flex flex-col gap-4' : 'mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm'}>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Client</span>
@@ -217,8 +227,25 @@ export default function QuoteForm() {
           >
             {submitting ? 'Saving…' : 'Save quote'}
           </button>
+          {embedded && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </form>
+  );
+
+  if (embedded) return formEl;
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <h1 className="text-2xl font-bold text-slate-900">{isEditing ? 'Edit quote' : 'New quote'}</h1>
+      {formEl}
     </div>
   );
 }

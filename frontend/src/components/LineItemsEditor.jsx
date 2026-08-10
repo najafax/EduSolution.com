@@ -73,7 +73,7 @@ function ProductPicker({ products, currencySymbol, onPick, placeholder }) {
           setOpen(true);
         }}
         onKeyDown={handleKeyDown}
-        className="min-h-11 w-full min-w-56 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
+        className="min-h-11 w-full min-w-56 rounded-md border border-slate-300 px-3 py-2 text-base text-slate-700 focus:border-indigo-500 focus:outline-none"
       />
       {open && (
         <ul className="absolute z-10 mt-1 max-h-60 w-full min-w-56 overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
@@ -108,6 +108,29 @@ function ProductPicker({ products, currencySymbol, onPick, placeholder }) {
   );
 }
 
+// Each catalog-sourced line item's description is exactly its product's
+// name (readOnly in catalogOnly mode — see below), so a product's tax rate
+// can always be recovered by matching on it, whether the item was just
+// picked or loaded from an existing saved quote/invoice being edited.
+function taxRateForItem(item, products) {
+  const product = products.find((p) => p.name === item.description);
+  return product ? product.tax_rate || 0 : 0;
+}
+
+// The document's single tax-rate field is a weighted average of every line
+// item's originating product tax rate (weighted by that item's amount), so
+// it stays accurate as items are added, removed, or their qty/price edited
+// — not just a snapshot of whichever product was picked last.
+function weightedTaxRate(items, products) {
+  const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0), 0);
+  if (subtotal <= 0) return 0;
+  const weighted = items.reduce(
+    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * taxRateForItem(item, products),
+    0,
+  );
+  return Math.round((weighted / subtotal) * 100) / 100;
+}
+
 export default function LineItemsEditor({
   items,
   onChange,
@@ -116,21 +139,25 @@ export default function LineItemsEditor({
   catalogOnly = false,
   onProductTaxRate,
 }) {
+  function applyChange(nextItems) {
+    onChange(nextItems);
+    onProductTaxRate?.(weightedTaxRate(nextItems, products));
+  }
+
   function updateItem(index, patch) {
-    onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+    applyChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   }
 
   function addItem() {
-    onChange([...items, { description: '', quantity: 1, unit_price: 0 }]);
+    applyChange([...items, { description: '', quantity: 1, unit_price: 0 }]);
   }
 
   function addProductItem(product) {
-    onChange([...items, { description: product.name, quantity: 1, unit_price: product.unit_price }]);
-    onProductTaxRate?.(product.tax_rate || 0);
+    applyChange([...items, { description: product.name, quantity: 1, unit_price: product.unit_price }]);
   }
 
   function removeItem(index) {
-    onChange(items.filter((_, i) => i !== index));
+    applyChange(items.filter((_, i) => i !== index));
   }
 
   const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0), 0);

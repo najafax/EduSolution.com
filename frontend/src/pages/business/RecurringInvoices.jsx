@@ -7,6 +7,7 @@ import FloatingActionButton from '../../components/FloatingActionButton';
 import SearchableSelect from '../../components/SearchableSelect';
 import SearchInput from '../../components/SearchInput';
 import Pagination from '../../components/Pagination';
+import Modal from '../../components/Modal';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -165,11 +166,11 @@ export default function RecurringInvoices() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search recurring invoices…" />
       </div>
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && !showForm && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">{editingId ? 'Edit template' : 'New template'}</h2>
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit template' : 'New template'} maxWidthClass="max-w-3xl">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Client</span>
@@ -303,7 +304,7 @@ export default function RecurringInvoices() {
             </button>
           </div>
         </form>
-      )}
+      </Modal>
 
       <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         {loading ? (

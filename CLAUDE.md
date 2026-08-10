@@ -685,14 +685,25 @@ frontend stops holding/sending it.
   line item pre-filled with that product's `name`/`unit_price` — a one-time
   copy, not a live link, so the row is still freely editable afterward and
   never references the product again (see `routes/products.js` above for
-  why). An optional `onProductTaxRate(rate)` callback fires every time a
-  product is picked, passed the product's `tax_rate` (0 if unset) —
-  `QuoteForm.jsx`/`InvoiceForm.jsx` wire this straight to their own
-  `setTaxRate`, so picking a product auto-fills the document's single
-  tax-rate field to match (see `routes/products.js` above for why this is
-  document-level, not per-line-item); the *last* product picked wins if
-  more than one is added with different rates, since there's nowhere else
-  for a second rate to go. A `catalogOnly` boolean prop (set by
+  why). An optional `onProductTaxRate(rate)` callback fires every time the
+  item list changes (add, remove, or a qty/price edit), passed a *weighted
+  average* of every current line item's originating product tax rate
+  (weighted by that item's amount, via `weightedTaxRate()`/
+  `taxRateForItem()` in the same file) — `QuoteForm.jsx`/`InvoiceForm.jsx`
+  wire this straight to their own `setTaxRate`, so the document's single
+  tax-rate field (see `routes/products.js` above for why this is
+  document-level, not per-line-item) always reflects the current cart
+  rather than a snapshot of whichever product was picked last. Since a
+  catalog-sourced item's `description` is always exactly its product's
+  `name` (readOnly in `catalogOnly` mode — see below), `taxRateForItem()`
+  recovers each item's rate by matching on that name against the current
+  `products` list rather than needing a separate field on the item — this
+  also makes an *existing* quote/invoice being edited fully dynamic again
+  the moment any item is added/removed/edited, with no extra state to load.
+  Manually editing the Tax rate field directly still works, but the next
+  item add/remove/edit recomputes and overwrites it — that's the intended
+  trade-off of making the field derived from the cart. A `catalogOnly`
+  boolean prop (set by
   `QuoteForm.jsx`/`InvoiceForm.jsx` only, **not** by `RecurringInvoices.jsx`
   — recurring templates still allow free-text manual entry) hides the
   "+ Add item" manual-entry button entirely and makes each item's
@@ -756,6 +767,41 @@ frontend stops holding/sending it.
   `pageInfo`) so `<Pagination>` only renders once a paginated response has
   actually come back (i.e. `pageInfo` stays `null` until a `page` param was
   sent and `totalPages` was present in the response).
+- `components/Modal.jsx` — the shared popup styling for every "New X" (and
+  reused "Edit X") entry form: the same dimmed backdrop + centered white
+  card treatment as `IdleTimeoutMonitor`'s "Still there?" warning, just
+  wider/scrollable (`maxWidthClass`, default `max-w-lg`) to hold a form
+  instead of a couple lines of text. Takes `{ open, onClose, title,
+  children, maxWidthClass }`; closes on Escape or a click on the dimmed
+  backdrop (via `document.body.style.overflow = 'hidden'` while open, so the
+  page behind can't scroll), in addition to whatever the caller wires up
+  inside (a Cancel button, a successful save). `Clients.jsx`, `Products.jsx`,
+  `Expenses.jsx`, `RecurringInvoices.jsx`, and `Users.jsx` (both its
+  create/edit form and its separate reset-password form) each wrap their
+  existing inline `{showForm && (<form>...)}` block in `<Modal>` instead of
+  a plain `<div>` — the toggle state (`showForm`/`editingId`) is unchanged,
+  only the presentation moved off the page flow and into the popup, and the
+  submit-error `<p>` moved inside the modal (with a lighter one still at
+  page level for load/delete/export errors, since those can happen while no
+  modal is open). `QuoteForm.jsx`/`InvoiceForm.jsx` are the more involved
+  case, since `/quotes/new`/`/quotes/:id/edit` (and the invoice equivalents)
+  are routed pages, not inline toggles: both components now accept optional
+  `{ embedded, idOverride, onSuccess, onCancel }` props. Rendered with no
+  props (the default, from `App.jsx`'s routes) they behave exactly as
+  before — full page chrome (outer container + `<h1>`), `id` from
+  `useParams()`, and `navigate()` on save. Rendered with `embedded` (from
+  `Quotes.jsx`/`Invoices.jsx`'s own "New quote"/"New invoice" buttons, which
+  now open a `<Modal>` instead of linking to `/quotes/new`) they skip that
+  page chrome and render just the `<form>`, take `id` from `idOverride`
+  instead of the route, gain a Cancel button that calls `onCancel`, and call
+  `onSuccess(quote)`/`onSuccess(invoice)` instead of navigating internally —
+  the list page's `onSuccess` closes the modal and navigates to the new
+  document's detail page itself, and `onCancel` just closes the modal. The
+  routed `/quotes/:id/edit`/`/invoices/:id/edit` pages are deliberately
+  **not** converted to open in a modal from the list — only the "New X" flow
+  is — so editing still gets the full page (with its own URL, refresh-safe,
+  bookmarkable) and `InvoiceForm.jsx`'s locked-status guard (see below)
+  keeps working unmodified.
 - `components/Navbar.jsx` — `BUSINESS_LINKS` entries each carry a `module`
   (`null` for Dashboard, which is always visible); the rendered link list
   is filtered through `can(link.module, 'view')` so a restricted user never

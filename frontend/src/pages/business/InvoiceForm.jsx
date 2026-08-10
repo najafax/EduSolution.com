@@ -12,9 +12,14 @@ const todayPlus = (days) => {
   return d.toISOString().slice(0, 10);
 };
 
-export default function InvoiceForm() {
+// Renders standalone as the routed `/invoices/new` and `/invoices/:id/edit`
+// pages (the default), or `embedded` inside a Modal when opened from the
+// Invoices list page's "New invoice" button — see QuoteForm.jsx for the
+// same pattern.
+export default function InvoiceForm({ embedded = false, idOverride, onSuccess, onCancel }) {
   const { token, can } = useAuth();
-  const { id } = useParams();
+  const params = useParams();
+  const id = embedded ? idOverride : params.id;
   const navigate = useNavigate();
   const isEditing = Boolean(id);
   const canManage = can('invoices', 'manage');
@@ -87,11 +92,13 @@ export default function InvoiceForm() {
     };
     try {
       if (isEditing) {
-        await api.invoices.update(id, payload, token);
-        navigate(`/invoices/${id}`);
+        const { invoice } = await api.invoices.update(id, payload, token);
+        if (onSuccess) onSuccess(invoice);
+        else navigate(`/invoices/${id}`);
       } else {
         const { invoice } = await api.invoices.create(payload, token);
-        navigate(`/invoices/${invoice.id}`);
+        if (onSuccess) onSuccess(invoice);
+        else navigate(`/invoices/${invoice.id}`);
       }
     } catch (err) {
       setError(err.message);
@@ -100,27 +107,29 @@ export default function InvoiceForm() {
     }
   }
 
-  if (loading) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">Loading…</div>;
+  if (loading) {
+    const loadingEl = <p className="text-sm text-slate-500">Loading…</p>;
+    return embedded ? loadingEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{loadingEl}</div>;
+  }
   if (!canManage) {
-    return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">You don't have permission to view this page.</div>;
+    const deniedEl = <p className="text-sm text-slate-500">You don't have permission to view this page.</p>;
+    return embedded ? deniedEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{deniedEl}</div>;
   }
   if (lockedStatus) {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">
+    const lockedEl = (
+      <p className="text-sm text-slate-500">
         This invoice has been {lockedStatus === 'paid' ? 'paid' : 'sent to the client'} and can no longer be edited.{' '}
         <Link to={`/invoices/${id}`} className="text-indigo-600 hover:text-indigo-500">
           View invoice
         </Link>
         .
-      </div>
+      </p>
     );
+    return embedded ? lockedEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{lockedEl}</div>;
   }
 
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900">{isEditing ? 'Edit invoice' : 'New invoice'}</h1>
-
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+  const formEl = (
+      <form onSubmit={handleSubmit} className={embedded ? 'flex flex-col gap-4' : 'mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm'}>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Client</span>
@@ -234,8 +243,25 @@ export default function InvoiceForm() {
           >
             {submitting ? 'Saving…' : 'Save invoice'}
           </button>
+          {embedded && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </form>
+  );
+
+  if (embedded) return formEl;
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <h1 className="text-2xl font-bold text-slate-900">{isEditing ? 'Edit invoice' : 'New invoice'}</h1>
+      {formEl}
     </div>
   );
 }

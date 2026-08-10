@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../../components/StatusBadge';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
+import Modal from '../../components/Modal';
+import InvoiceForm from './InvoiceForm';
 
 export default function Invoices() {
   const { token, can } = useAuth();
+  const navigate = useNavigate();
   const canManage = can('invoices', 'manage');
   const [invoices, setInvoices] = useState([]);
   const [pageInfo, setPageInfo] = useState(null);
@@ -16,6 +19,7 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [showNewForm, setShowNewForm] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -53,12 +57,12 @@ export default function Invoices() {
             Export CSV
           </button>
           {canManage && (
-            <Link
-              to="/invoices/new"
+            <button
+              onClick={() => setShowNewForm(true)}
               className="flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
             >
               New invoice
-            </Link>
+            </button>
           )}
         </div>
       </div>
@@ -112,7 +116,19 @@ export default function Invoices() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
-      {canManage && <FloatingActionButton to="/invoices/new" label="New invoice" />}
+      <Modal open={showNewForm} onClose={() => setShowNewForm(false)} title="New invoice" maxWidthClass="max-w-3xl">
+        <InvoiceForm
+          embedded
+          idOverride={null}
+          onSuccess={(invoice) => {
+            setShowNewForm(false);
+            navigate(`/invoices/${invoice.id}`);
+          }}
+          onCancel={() => setShowNewForm(false)}
+        />
+      </Modal>
+
+      {canManage && !showNewForm && <FloatingActionButton onClick={() => setShowNewForm(true)} label="New invoice" />}
     </div>
   );
 }

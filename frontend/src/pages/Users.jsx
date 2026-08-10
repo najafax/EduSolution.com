@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import FloatingActionButton from '../components/FloatingActionButton';
 import SearchInput from '../components/SearchInput';
 import Pagination from '../components/Pagination';
+import Modal from '../components/Modal';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', active: true };
 
@@ -173,13 +174,13 @@ export default function Users() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search users…" />
       </div>
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && !showForm && resetTargetId === null && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">{editingId ? 'Edit user' : 'New user'}</h2>
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit user' : 'New user'} maxWidthClass="max-w-3xl">
+        <form onSubmit={handleSubmit}>
+          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Name</span>
               <input
@@ -295,13 +296,18 @@ export default function Users() {
             </button>
           </div>
         </form>
-      )}
+      </Modal>
 
-      {resetTargetId && (
-        <form
-          onSubmit={handleResetPassword}
-          className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
-        >
+      <Modal
+        open={resetTargetId !== null}
+        onClose={() => {
+          setResetTargetId(null);
+          setResetPassword('');
+        }}
+        title="Reset password"
+      >
+        <form onSubmit={handleResetPassword} className="flex flex-col gap-4">
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <label className="block">
             <span className="text-sm font-medium text-slate-700">New password</span>
             <input
@@ -313,25 +319,27 @@ export default function Users() {
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
             />
           </label>
-          <button
-            type="submit"
-            disabled={resetSubmitting}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-          >
-            {resetSubmitting ? 'Saving…' : 'Set password'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setResetTargetId(null);
-              setResetPassword('');
-            }}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Cancel
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={resetSubmitting}
+              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            >
+              {resetSubmitting ? 'Saving…' : 'Set password'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setResetTargetId(null);
+                setResetPassword('');
+              }}
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+          </div>
         </form>
-      )}
+      </Modal>
 
       <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         {loading ? (
