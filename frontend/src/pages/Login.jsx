@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { IDLE_LOGOUT_MESSAGE_KEY } from '../components/IdleTimeoutMonitor';
 
 export default function Login() {
   const { login } = useAuth();
@@ -10,7 +11,14 @@ export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [notice] = useState(location.state?.message || '');
+  const [notice] = useState(() => {
+    const idleMessage = sessionStorage.getItem(IDLE_LOGOUT_MESSAGE_KEY);
+    if (idleMessage) {
+      sessionStorage.removeItem(IDLE_LOGOUT_MESSAGE_KEY);
+      return idleMessage;
+    }
+    return location.state?.message || '';
+  });
 
   function handleChange(e) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -21,8 +29,8 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const { token, user, permissions } = await api.login(form);
-      login(token, user, permissions);
+      const { token, user, permissions, sessionTimeoutMinutes } = await api.login(form);
+      login(token, user, permissions, sessionTimeoutMinutes);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message);

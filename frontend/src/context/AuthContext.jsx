@@ -8,6 +8,10 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [user, setUser] = useState(null);
   const [permissions, setPermissions] = useState({});
+  // Minutes of inactivity before the idle-logout warning fires (see
+  // components/IdleTimeoutMonitor.jsx) — null until the first /me or login
+  // response loads it, so the monitor knows not to start counting yet.
+  const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(null);
   const [loading, setLoading] = useState(Boolean(token));
 
   useEffect(() => {
@@ -17,24 +21,27 @@ export function AuthProvider({ children }) {
     }
     api
       .me(token)
-      .then(({ user, permissions }) => {
+      .then(({ user, permissions, sessionTimeoutMinutes }) => {
         setUser(user);
         setPermissions(permissions || {});
+        setSessionTimeoutMinutes(sessionTimeoutMinutes ?? null);
       })
       .catch(() => {
         localStorage.removeItem(TOKEN_KEY);
         setToken(null);
         setUser(null);
         setPermissions({});
+        setSessionTimeoutMinutes(null);
       })
       .finally(() => setLoading(false));
   }, [token]);
 
-  function login(nextToken, nextUser, nextPermissions) {
+  function login(nextToken, nextUser, nextPermissions, nextSessionTimeoutMinutes) {
     localStorage.setItem(TOKEN_KEY, nextToken);
     setToken(nextToken);
     setUser(nextUser);
     setPermissions(nextPermissions || {});
+    setSessionTimeoutMinutes(nextSessionTimeoutMinutes ?? null);
   }
 
   function logout() {
@@ -42,6 +49,7 @@ export function AuthProvider({ children }) {
     setToken(null);
     setUser(null);
     setPermissions({});
+    setSessionTimeoutMinutes(null);
   }
 
   // For pages that edit the current user's own profile — updates the
@@ -60,7 +68,9 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ token, user, permissions, loading, login, logout, updateUser, can }}>
+    <AuthContext.Provider
+      value={{ token, user, permissions, sessionTimeoutMinutes, loading, login, logout, updateUser, can }}
+    >
       {children}
     </AuthContext.Provider>
   );

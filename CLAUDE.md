@@ -76,7 +76,10 @@ backend port in frontend code.
   `PRAGMA table_info(users)` check, so it's a no-op on every run after the
   first) rather than an edit to the `CREATE TABLE` statement — the
   `CREATE TABLE` still reflects the final shape for fresh databases, the
-  `ALTER TABLE` block only exists to carry existing databases forward.
+  `ALTER TABLE` block only exists to carry existing databases forward. Same
+  pattern, same reason, for `business_settings.session_timeout_minutes`
+  (see "Idle session timeout" below) — that table's single row already
+  existed in production too.
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
   <jwt>` header, then **re-fetches the live user row from the DB** (by the
   id in the JWT payload) rather than trusting the token's claims, and
@@ -190,9 +193,12 @@ column anywhere in this module.
 
 - `routes/clients.js`, `routes/settings.js` — plain CRUD for `clients`, and
   GET/PUT for the single-row `business_settings` table (business name,
-  address, tax ID, currency symbol, bank details — this is what prints on
-  every PDF's header/footer). `clients.js` also has `GET /export.csv`
-  (registered before `GET /:id` so it isn't shadowed by the `:id` param).
+  address, tax ID, currency symbol, bank details, `session_timeout_minutes`
+  — see "Idle session timeout" below — this is what prints on every PDF's
+  header/footer, plus the one security policy value). `clients.js` also has
+  `GET /export.csv` (registered before `GET /:id` so it isn't shadowed by
+  the `:id` param). `PUT /` validates `session_timeout_minutes` is a whole
+  number between 1 and 480.
 - `routes/products.js` — plain CRUD for `products` (name/description/
   unit_price), `GET /` supports `?q=` search. This is a standalone reusable
   catalog, not a source of truth referenced by anything else: `invoice_items`/
@@ -444,6 +450,54 @@ Status/derived-field conventions worth knowing before touching this code:
   `import.js` applies `requirePermission('import', 'manage')` once via
   `router.use()` right after `router.use(requireAuth)`, since every route
   in that file is a mutation (there's no read-only CSV-import action).
+
+### Idle session timeout
+
+Separate from the JWT's fixed 7-day expiry (see `middleware/auth.js` above),
+the frontend auto-logs-out anyone idle for too long — this is purely a
+client-side UX/security layer, not a server-side session: the JWT itself
+stays valid until it expires either way, "logging out" just means the
+frontend stops holding/sending it.
+
+- `business_settings.session_timeout_minutes` (default 30, admin-editable
+  1–480 via the Settings page) is the single policy value, and it applies
+  to **every** logged-in user regardless of their own permission grants —
+  unlike the rest of `business_settings`, it's returned as a top-level
+  `sessionTimeoutMinutes` field on `POST /api/auth/login` and `GET
+  /api/auth/me` (see `routes/auth.js`'s `getSessionTimeoutMinutes()`)
+  rather than gated behind `GET /api/settings`'s `settings:view`
+  permission — a staff member with no settings access still needs to be
+  timed out on the same policy as everyone else.
+- `context/AuthContext.jsx` stores `sessionTimeoutMinutes` alongside
+  `permissions`, set by both `login()` and the `/me` bootstrap effect.
+- `components/IdleTimeoutMonitor.jsx` (mounted once in `App.jsx`, always
+  present regardless of route) does the actual tracking: a ref holds the
+  last-activity timestamp, updated by `mousemove`/`mousedown`/`keydown`/
+  `touchstart`/`scroll` listeners, checked every second against
+  `sessionTimeoutMinutes * 60_000`. At `min(60s, half the total timeout)`
+  before expiry it shows a "Still there?" modal with a live countdown and
+  two actions — "Stay signed in" resets the clock, "Log out now" ends the
+  session immediately. If neither happens before the countdown reaches
+  zero, it logs out automatically. Once the modal is showing, background
+  mouse/keyboard activity deliberately stops resetting the clock (a
+  `warningActiveRef` guards this) — only an explicit "Stay signed in"
+  click does, so a stray cursor twitch can't silently dismiss a warning
+  nobody consciously acknowledged.
+- The auto-logout redirect hands its banner message
+  ("You've been logged out due to inactivity.") to `Login.jsx` via
+  `sessionStorage` (`IDLE_LOGOUT_MESSAGE_KEY`, exported from
+  `IdleTimeoutMonitor.jsx`), **not** `navigate(..., { state })` like
+  `ResetPassword.jsx` uses for its own post-redirect banner. That pattern
+  doesn't survive here: clearing the token triggers `ProtectedRoute` to
+  independently redirect to `/login` too as soon as it re-renders with
+  `token` now falsy, and whichever of the two redirects' history entries
+  wins silently drops the other's `state` — regardless of which call
+  happens first in source order, since both are part of the same render
+  batch. `sessionStorage` sidesteps the race entirely since it isn't
+  routing state; `Login.jsx` reads and immediately clears the key on mount
+  (falling back to `location.state?.message` for other callers like
+  `ResetPassword.jsx`, which redirect from a public route with no
+  competing `ProtectedRoute` redirect to race against).
 
 ### Frontend (`frontend/src/`)
 

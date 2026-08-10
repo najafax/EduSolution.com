@@ -20,6 +20,15 @@ function signToken(user) {
   });
 }
 
+// The idle-logout timeout applies to every logged-in user regardless of
+// their `settings` permission grant (it's a security policy, not business
+// data), so it's sent alongside login/me rather than gated behind
+// GET /api/settings like the rest of business_settings.
+function getSessionTimeoutMinutes() {
+  const row = db.prepare('SELECT session_timeout_minutes FROM business_settings WHERE id = 1').get();
+  return row ? row.session_timeout_minutes : 30;
+}
+
 // The single place that shapes what a user record ever sends to the client
 // — never return a raw DB row (it carries password_hash, reset_token, etc).
 function publicUser(user) {
@@ -61,7 +70,12 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 
   const token = signToken(user);
-  res.json({ token, user: publicUser(user), permissions: effectivePermissions(user) });
+  res.json({
+    token,
+    user: publicUser(user),
+    permissions: effectivePermissions(user),
+    sessionTimeoutMinutes: getSessionTimeoutMinutes(),
+  });
 });
 
 router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
@@ -127,7 +141,11 @@ router.get('/me', requireAuth, (req, res) => {
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
-  res.json({ user: publicUser(user), permissions: effectivePermissions(user) });
+  res.json({
+    user: publicUser(user),
+    permissions: effectivePermissions(user),
+    sessionTimeoutMinutes: getSessionTimeoutMinutes(),
+  });
 });
 
 // Every logged-in user can edit their own profile — this is not gated by

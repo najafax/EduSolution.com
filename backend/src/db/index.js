@@ -38,6 +38,7 @@ db.exec(`
     tax_id TEXT NOT NULL DEFAULT '',
     currency_symbol TEXT NOT NULL DEFAULT '$',
     bank_details TEXT NOT NULL DEFAULT '',
+    session_timeout_minutes INTEGER NOT NULL DEFAULT 30,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -215,6 +216,14 @@ if (!userColumns.has('role')) {
   // silently strip access from someone already using the app. Only
   // accounts created after this point default to 'staff'.
   db.prepare(`UPDATE users SET role = 'admin'`).run();
+}
+
+// Same pattern as above, for the session-timeout column added to
+// `business_settings` after that table's single row already existed in
+// production.
+const settingsColumns = new Set(db.prepare('PRAGMA table_info(business_settings)').all().map((c) => c.name));
+if (!settingsColumns.has('session_timeout_minutes')) {
+  db.exec(`ALTER TABLE business_settings ADD COLUMN session_timeout_minutes INTEGER NOT NULL DEFAULT 30;`);
 }
 
 db.pragma('foreign_keys = ON');

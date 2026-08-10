@@ -63,6 +63,21 @@ export default function Settings() {
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
             />
           </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Session timeout (minutes)</span>
+            <input
+              type="number"
+              min="1"
+              max="480"
+              step="1"
+              value={form.session_timeout_minutes}
+              onChange={(e) => setForm((f) => ({ ...f, session_timeout_minutes: e.target.value }))}
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
+            />
+            <span className="mt-1 block text-xs text-slate-500">
+              Everyone is warned and then automatically logged out after this many minutes of inactivity.
+            </span>
+          </label>
         </fieldset>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
