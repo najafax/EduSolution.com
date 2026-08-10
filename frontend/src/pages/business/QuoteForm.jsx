@@ -29,7 +29,7 @@ export default function QuoteForm() {
   const [discountType, setDiscountType] = useState('percentage');
   const [discountValue, setDiscountValue] = useState(0);
   const [notes, setNotes] = useState('');
-  const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: 0 }]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(isEditing);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -63,6 +63,10 @@ export default function QuoteForm() {
     setError('');
     if (!clientId) {
       setError('Please select a client');
+      return;
+    }
+    if (items.length === 0) {
+      setError('Please add at least one item from the product catalog');
       return;
     }
     setSubmitting(true);
@@ -182,7 +186,14 @@ export default function QuoteForm() {
         <div>
           <span className="text-sm font-medium text-slate-700">Line items</span>
           <div className="mt-1">
-            <LineItemsEditor items={items} onChange={setItems} currencySymbol={settings?.currency_symbol} products={products} />
+            <LineItemsEditor
+              items={items}
+              onChange={setItems}
+              currencySymbol={settings?.currency_symbol}
+              products={products}
+              catalogOnly
+              onProductTaxRate={setTaxRate}
+            />
           </div>
         </div>
 

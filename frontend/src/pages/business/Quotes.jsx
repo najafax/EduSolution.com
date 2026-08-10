@@ -1,34 +1,36 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../../components/StatusBadge';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
+import Pagination from '../../components/Pagination';
 
 export default function Quotes() {
   const { token, can } = useAuth();
   const canManage = can('quotes', 'manage');
   const [quotes, setQuotes] = useState([]);
+  const [pageInfo, setPageInfo] = useState(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
+    setLoading(true);
     api.quotes
-      .list(token)
-      .then(({ quotes }) => setQuotes(quotes))
+      .list(token, { q: search, page })
+      .then(({ quotes, ...rest }) => {
+        setQuotes(quotes);
+        setPageInfo(rest.totalPages ? rest : null);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [token]);
-
-  const filteredQuotes = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return quotes;
-    return quotes.filter((quote) =>
-      [quote.number, quote.client_name, quote.status].some((field) => field?.toLowerCase().includes(q)),
-    );
-  }, [quotes, search]);
+  }, [token, search, page]);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   async function handleExport() {
     setError('');
@@ -71,9 +73,9 @@ export default function Quotes() {
         {loading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : quotes.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No quotes yet.</p>
-        ) : filteredQuotes.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No quotes match "{search}".</p>
+          <p className="p-6 text-sm text-slate-500">
+            {search ? `No quotes match "${search}".` : 'No quotes yet.'}
+          </p>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -86,7 +88,7 @@ export default function Quotes() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredQuotes.map((quote) => (
+              {quotes.map((quote) => (
                 <tr key={quote.id} className="hover:bg-slate-50">
                   <td className="whitespace-nowrap px-4 py-3">
                     <Link to={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
@@ -105,6 +107,8 @@ export default function Quotes() {
           </table>
         )}
       </div>
+
+      {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && <FloatingActionButton to="/quotes/new" label="New quote" />}
     </div>

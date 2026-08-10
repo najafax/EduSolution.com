@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
+import Pagination from '../../components/Pagination';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', address: '', notes: '' };
 
@@ -10,6 +11,8 @@ export default function Clients() {
   const { token, can } = useAuth();
   const canManage = can('clients', 'manage');
   const [clients, setClients] = useState([]);
+  const [pageInfo, setPageInfo] = useState(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
@@ -18,22 +21,22 @@ export default function Clients() {
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
 
-  const filteredClients = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return clients;
-    return clients.filter((c) => [c.name, c.email].some((field) => field?.toLowerCase().includes(q)));
-  }, [clients, search]);
-
   function load() {
     setLoading(true);
     api.clients
-      .list(token)
-      .then(({ clients }) => setClients(clients))
+      .list(token, { q: search, page })
+      .then(({ clients, ...rest }) => {
+        setClients(clients);
+        setPageInfo(rest.totalPages ? rest : null);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token]);
+  useEffect(load, [token, search, page]);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -157,9 +160,9 @@ export default function Clients() {
         {loading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : clients.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No clients yet.</p>
-        ) : filteredClients.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No clients match "{search}".</p>
+          <p className="p-6 text-sm text-slate-500">
+            {search ? `No clients match "${search}".` : 'No clients yet.'}
+          </p>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -171,7 +174,7 @@ export default function Clients() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredClients.map((client) => (
+              {clients.map((client) => (
                 <tr key={client.id}>
                   <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{client.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{client.email}</td>
@@ -192,6 +195,8 @@ export default function Clients() {
           </table>
         )}
       </div>
+
+      {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New client" />}
     </div>

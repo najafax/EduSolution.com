@@ -39,15 +39,37 @@ function validateAndComputePreview(body) {
   return computeTotals(items, tax_rate, discount_type, discount_value);
 }
 
+const PAGE_SIZE = 20;
+
 router.get('/', view, (req, res) => {
+  const { q, page: pageParam } = req.query;
+  const where = q ? 'WHERE clients.name LIKE ? OR recurring_invoices.frequency LIKE ?' : '';
+  const params = q ? [`%${q}%`, `%${q}%`] : [];
+  const baseFrom = 'FROM recurring_invoices JOIN clients ON clients.id = recurring_invoices.client_id';
+
+  if (!pageParam) {
+    const rows = db
+      .prepare(`SELECT recurring_invoices.*, clients.name AS client_name ${baseFrom} ${where} ORDER BY recurring_invoices.next_run_date`)
+      .all(...params);
+    return res.json({ recurringInvoices: rows });
+  }
+
+  const page = Math.max(1, Number(pageParam) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+  const { total } = db.prepare(`SELECT COUNT(*) AS total ${baseFrom} ${where}`).get(...params);
   const rows = db
     .prepare(
-      `SELECT recurring_invoices.*, clients.name AS client_name
-       FROM recurring_invoices JOIN clients ON clients.id = recurring_invoices.client_id
-       ORDER BY recurring_invoices.next_run_date`,
+      `SELECT recurring_invoices.*, clients.name AS client_name ${baseFrom} ${where}
+       ORDER BY recurring_invoices.next_run_date LIMIT ? OFFSET ?`,
     )
-    .all();
-  res.json({ recurringInvoices: rows });
+    .all(...params, PAGE_SIZE, offset);
+  res.json({
+    recurringInvoices: rows,
+    page,
+    pageSize: PAGE_SIZE,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+  });
 });
 
 router.get('/:id', view, (req, res) => {

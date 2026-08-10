@@ -38,6 +38,18 @@ async function openPdf(path, token) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+// Builds a `?a=1&b=2` query string from a params object, skipping
+// null/undefined/empty-string values — shared by every paginated/searchable
+// list endpoint so each one doesn't hand-roll its own conditional string.
+function qs(params) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, value);
+  }
+  const str = search.toString();
+  return str ? `?${str}` : '';
+}
+
 // CSV (and similar) exports: force a real download via a throwaway <a>,
 // rather than opening in a tab like PDFs do.
 async function downloadFile(path, token, filename) {
@@ -74,7 +86,7 @@ export const api = {
   },
 
   clients: {
-    list: (token, q) => request(`/clients${q ? `?q=${encodeURIComponent(q)}` : ''}`, { token }),
+    list: (token, { q, page } = {}) => request(`/clients${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/clients/${id}`, { token }),
     create: (payload, token) => request('/clients', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/clients/${id}`, { method: 'PUT', body: payload, token }),
@@ -83,14 +95,14 @@ export const api = {
   },
 
   products: {
-    list: (token, q) => request(`/products${q ? `?q=${encodeURIComponent(q)}` : ''}`, { token }),
+    list: (token, { q, page } = {}) => request(`/products${qs({ q, page })}`, { token }),
     create: (payload, token) => request('/products', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/products/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/products/${id}`, { method: 'DELETE', token }),
   },
 
   quotes: {
-    list: (token, status) => request(`/quotes${status ? `?status=${status}` : ''}`, { token }),
+    list: (token, { status, q, page } = {}) => request(`/quotes${qs({ status, q, page })}`, { token }),
     get: (id, token) => request(`/quotes/${id}`, { token }),
     create: (payload, token) => request('/quotes', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/quotes/${id}`, { method: 'PUT', body: payload, token }),
@@ -104,7 +116,7 @@ export const api = {
   },
 
   invoices: {
-    list: (token, status) => request(`/invoices${status ? `?status=${status}` : ''}`, { token }),
+    list: (token, { status, q, page } = {}) => request(`/invoices${qs({ status, q, page })}`, { token }),
     get: (id, token) => request(`/invoices/${id}`, { token }),
     create: (payload, token) => request('/invoices', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/invoices/${id}`, { method: 'PUT', body: payload, token }),
@@ -122,7 +134,7 @@ export const api = {
   },
 
   expenses: {
-    list: (token, q) => request(`/expenses${q ? `?q=${encodeURIComponent(q)}` : ''}`, { token }),
+    list: (token, { q, page } = {}) => request(`/expenses${qs({ q, page })}`, { token }),
     create: (payload, token) => request('/expenses', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/expenses/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/expenses/${id}`, { method: 'DELETE', token }),
@@ -130,7 +142,7 @@ export const api = {
   },
 
   recurringInvoices: {
-    list: (token) => request('/recurring-invoices', { token }),
+    list: (token, { q, page } = {}) => request(`/recurring-invoices${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/recurring-invoices/${id}`, { token }),
     create: (payload, token) => request('/recurring-invoices', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/recurring-invoices/${id}`, { method: 'PUT', body: payload, token }),
@@ -154,7 +166,7 @@ export const api = {
   },
 
   users: {
-    list: (token) => request('/users', { token }),
+    list: (token, { q, page } = {}) => request(`/users${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/users/${id}`, { token }),
     create: (payload, token) => request('/users', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/users/${id}`, { method: 'PUT', body: payload, token }),

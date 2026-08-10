@@ -9,14 +9,25 @@ router.use(requireAuth);
 const view = requirePermission('clients', 'view');
 const manage = requirePermission('clients', 'manage');
 
+const PAGE_SIZE = 20;
+
 router.get('/', view, (req, res) => {
-  const { q } = req.query;
-  const clients = q
-    ? db
-        .prepare(`SELECT * FROM clients WHERE name LIKE ? OR email LIKE ? ORDER BY name`)
-        .all(`%${q}%`, `%${q}%`)
-    : db.prepare('SELECT * FROM clients ORDER BY name').all();
-  res.json({ clients });
+  const { q, page: pageParam } = req.query;
+  const where = q ? 'WHERE name LIKE ? OR email LIKE ?' : '';
+  const params = q ? [`%${q}%`, `%${q}%`] : [];
+
+  if (!pageParam) {
+    const clients = db.prepare(`SELECT * FROM clients ${where} ORDER BY name`).all(...params);
+    return res.json({ clients });
+  }
+
+  const page = Math.max(1, Number(pageParam) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+  const { total } = db.prepare(`SELECT COUNT(*) AS total FROM clients ${where}`).get(...params);
+  const clients = db
+    .prepare(`SELECT * FROM clients ${where} ORDER BY name LIMIT ? OFFSET ?`)
+    .all(...params, PAGE_SIZE, offset);
+  res.json({ clients, page, pageSize: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) });
 });
 
 router.get('/export.csv', view, (req, res) => {

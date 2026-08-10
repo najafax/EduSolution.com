@@ -5,6 +5,8 @@ import { useAuth } from '../../context/AuthContext';
 import LineItemsEditor from '../../components/LineItemsEditor';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import SearchableSelect from '../../components/SearchableSelect';
+import SearchInput from '../../components/SearchInput';
+import Pagination from '../../components/Pagination';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -24,6 +26,9 @@ export default function RecurringInvoices() {
   const { token, can } = useAuth();
   const canManage = can('recurring_invoices', 'manage');
   const [recurring, setRecurring] = useState([]);
+  const [pageInfo, setPageInfo] = useState(null);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -38,13 +43,19 @@ export default function RecurringInvoices() {
   function load() {
     setLoading(true);
     api.recurringInvoices
-      .list(token)
-      .then(({ recurringInvoices }) => setRecurring(recurringInvoices))
+      .list(token, { q: search, page })
+      .then(({ recurringInvoices, ...rest }) => {
+        setRecurring(recurringInvoices);
+        setPageInfo(rest.totalPages ? rest : null);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token]);
+  useEffect(load, [token, search, page]);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
   useEffect(() => {
     api.clients.list(token).then(({ clients }) => setClients(clients));
     api.products.list(token).then(({ products }) => setProducts(products)).catch(() => {});
@@ -149,6 +160,10 @@ export default function RecurringInvoices() {
         </Link>{' '}
         page like any other.
       </p>
+
+      <div className="mt-4 max-w-sm">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search recurring invoices…" />
+      </div>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
@@ -294,7 +309,9 @@ export default function RecurringInvoices() {
         {loading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : recurring.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No recurring invoices yet.</p>
+          <p className="p-6 text-sm text-slate-500">
+            {search ? `No recurring invoices match "${search}".` : 'No recurring invoices yet.'}
+          </p>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -337,6 +354,8 @@ export default function RecurringInvoices() {
           </table>
         )}
       </div>
+
+      {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New recurring invoice" />}
     </div>

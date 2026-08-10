@@ -89,7 +89,11 @@ backend port in frontend code.
   drops the `company` column outright, rather than just adding one; this
   is safe because SQLite (3.35+, well within what `better-sqlite3` bundles)
   supports `ALTER TABLE ... DROP COLUMN` directly, no legacy
-  recreate-the-table dance needed.
+  recreate-the-table dance needed. Same pattern once more for
+  `products.tax_rate` (see `routes/products.js` below), added after
+  `products` already had real catalog rows in production — a plain
+  `ALTER TABLE products ADD COLUMN tax_rate REAL NOT NULL DEFAULT 0`,
+  guarded by a `PRAGMA table_info(products)` check.
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
   <jwt>` header, then **re-fetches the live user row from the DB** (by the
   id in the JWT payload) rather than trusting the token's claims, and
@@ -201,6 +205,28 @@ All routes below are mounted under `/api` and protected by `requireAuth` —
 data is shared across every logged-in user, there's no per-user ownership
 column anywhere in this module.
 
+**Pagination convention**: every list route below (`clients.js`,
+`products.js`, `expenses.js`, `quotes.js`, `invoices.js`, `recurring.js`,
+`users.js`) follows the same opt-in pattern as `routes/activity.js`'s
+original `PAGE_SIZE`/`LIMIT ?  OFFSET ?` approach, but **only paginates when
+the request includes `?page=`** — with no `page` param, `GET /` still
+returns the full unfiltered/unpaginated array under its usual key (e.g.
+`{ clients }`), exactly as before pagination existed. This matters because
+`SearchableSelect`-based pickers (the client picker in the Quote/Invoice/
+RecurringInvoices forms, the product picker in `LineItemsEditor`) call
+`api.clients.list()`/`api.products.list()` with no `page` and expect the
+complete list back for local typeahead filtering — making pagination
+opt-in rather than always-on keeps those pickers working unmodified. When
+`page` *is* present, the response additionally carries
+`{ page, pageSize: 20, total, totalPages }` (`PAGE_SIZE = 20` in each of
+these files, vs. `activity.js`'s own `PAGE_SIZE = 30`), the same shape
+`frontend/src/components/Pagination.jsx` (see below) expects. Each of these
+routes also accepts `?q=` (already existed on `clients`/`products`/
+`expenses`; added for this feature on `quotes`/`invoices`/`recurring`, which
+previously had zero backend search and did 100% client-side filtering) —
+`q` and `page` compose freely, and CSV export routes (`GET /export.csv`)
+are deliberately untouched by either, always returning every row.
+
 - `routes/clients.js`, `routes/settings.js` — plain CRUD for `clients`, and
   GET/PUT for the single-row `business_settings` table (business name,
   address, tax ID, currency symbol, bank details, `session_timeout_minutes`
@@ -208,9 +234,19 @@ column anywhere in this module.
   header/footer, plus the one security policy value). `clients.js` also has
   `GET /export.csv` (registered before `GET /:id` so it isn't shadowed by
   the `:id` param). `PUT /` validates `session_timeout_minutes` is a whole
-  number between 1 and 480.
+  number between 1 and 480. `GET /` supports `?q=` (name/email) and
+  `?page=` (see "Pagination convention" above).
 - `routes/products.js` — plain CRUD for `products` (name/description/
-  unit_price), `GET /` supports `?q=` search. This is a standalone reusable
+  unit_price/`tax_rate`), `GET /` supports `?q=` search and `?page=` (see
+  "Pagination convention" above). `tax_rate` (percent, 0–100, validated on
+  create/update) is optional per product and defaults to 0 — it exists so a
+  product's tax can auto-fill the quote/invoice's single document-level
+  `tax_rate` field the moment it's picked from the catalog (see
+  `components/LineItemsEditor.jsx` below); there's no per-line-item tax
+  anywhere in the data model, only the one document-level rate
+  `lib/totals.js` already computes against, so "add a product's tax" always
+  means "set the whole document's tax rate to that product's rate," not a
+  new field on the line item itself. This is a standalone reusable
   catalog, not a source of truth referenced by anything else: `invoice_items`/
   `quote_items`/`recurring_invoice_items` still store `description`/
   `unit_price` as plain denormalized values, not a `product_id` foreign key
@@ -222,7 +258,14 @@ column anywhere in this module.
   (`GET /:id/pdf`), email send (`POST /:id/send`), `POST /:id/duplicate`
   (copies client/items/discount/tax/notes into a new `draft` with a fresh
   number, `public_token`, and today's date — invoice duplicate also resets
-  `due_date` to +14 days), and `GET /export.csv`. Invoices only:
+  `due_date` to +14 days), and `GET /export.csv`. `GET /` supports
+  `?status=`, plus `?q=` (matching document number, joined client name, and
+  status — the same fields the frontend used to filter client-side before
+  this route grew server-side search) and `?page=` (see "Pagination
+  convention" above); `status`/`q` compose (both narrow the same query), and
+  `?status=` predates this feature — it's not currently driven by any
+  frontend UI on the list pages, but stays available for other callers.
+  Invoices only:
   `POST /:id/remind` and `POST /:id/payments`. `quotes.js` also has
   `POST /:id/convert-to-invoice`, which copies the quote's line items into
   a new invoice and stamps `quotes.converted_invoice_id`. Both accept
@@ -238,13 +281,21 @@ column anywhere in this module.
   are unaffected, and deletion is still governed separately by the
   existing "has recorded payments" guard below.
 - `routes/expenses.js` — CRUD for `expenses` (category/description/amount/
-  expense_date/notes) plus `GET /` (`?q=` search) and `GET /export.csv`.
-  `CATEGORIES` is a fixed list (`rent, utilities, supplies, salaries,
-  marketing, software, travel, other`) served to the frontend for the
-  category `<select>`.
+  expense_date/notes) plus `GET /` (`?q=` search, `?page=` — see
+  "Pagination convention" above) and `GET /export.csv`. `GET /` also always
+  returns `totalAmount` (`SUM(amount)` over every row matching the current
+  `?q=` filter, computed independently of `LIMIT`/`OFFSET`) alongside
+  `expenses` — `Expenses.jsx`'s "Total" row reads this rather than summing
+  the current page's `expenses` array, so the total stays the true
+  search-filtered grand total once pagination means that array is no longer
+  the complete result set. `CATEGORIES` is a fixed list (`rent, utilities,
+  supplies, salaries, marketing, software, travel, other`) served to the
+  frontend for the category `<select>`.
 - `routes/recurring.js` — CRUD for `recurring_invoices` (+ their
   `recurring_invoice_items` template line items) mounted at
-  `/api/recurring-invoices`. Frequency is `weekly|monthly|yearly`. Creating/
+  `/api/recurring-invoices`. Frequency is `weekly|monthly|yearly`. `GET /`
+  supports `?q=` (client name or frequency) and `?page=` (see "Pagination
+  convention" above). Creating/
   updating a template validates line items and discount/tax via
   `computeTotals()` for feedback only — the real totals are recomputed fresh
   from current unit prices every time an invoice is actually generated (see
@@ -436,7 +487,8 @@ Status/derived-field conventions worth knowing before touching this code:
   (update name/email/role/active/permissions), `POST /:id/reset-password`
   (admin sets a new password directly, no current-password check), `DELETE
   /:id`, and `GET /meta/modules` (returns `MODULES`, for building the
-  permissions checkbox grid client-side). Two safety guards, both checked
+  permissions checkbox grid client-side). `GET /` supports `?q=` (name or
+  email) and `?page=` (see "Pagination convention" above). Two safety guards, both checked
   via `activeAdminCount(excludingUserId)`: you can't demote/deactivate/
   delete the last active admin (409), and `DELETE /:id` also blocks
   deleting your own account (400) — both prevent a click from locking
@@ -620,13 +672,46 @@ frontend stops holding/sending it.
   shared between the quote and invoice form/detail pages — extend those
   rather than duplicating item-row or status-color logic per page.
   `LineItemsEditor` also takes an optional `products` array prop (each
-  form fetches `api.products.list()` alongside clients/settings and passes
-  it down); when non-empty it renders a "+ Add from product catalog…"
-  `<select>` next to "+ Add item" that appends a new line item pre-filled
-  with that product's `name`/`unit_price` — a one-time copy, not a live
-  link, so the row is still freely editable afterward and never references
-  the product again (see `routes/products.js` above for why). `Products.jsx`
-  itself follows the same list+inline-form+FAB pattern as `Clients.jsx`.
+  form fetches `api.products.list()` — with no `q`/`page` args, so it gets
+  the full catalog for local typeahead rather than a paginated slice, per
+  the "Pagination convention" note above — alongside clients/settings and
+  passes it down); when non-empty it renders a searchable product picker
+  (an inline `ProductPicker` sub-component defined in the same file — a
+  type-to-filter combobox modeled on `SearchableSelect.jsx`, but that never
+  "holds" a selected value: every pick immediately appends a new line item
+  and resets back to an empty search box, matching the old plain
+  `<select>`'s one-shot `e.target.value = ''` reset behavior rather than
+  `SearchableSelect`'s persistent-selection behavior) that appends a new
+  line item pre-filled with that product's `name`/`unit_price` — a one-time
+  copy, not a live link, so the row is still freely editable afterward and
+  never references the product again (see `routes/products.js` above for
+  why). An optional `onProductTaxRate(rate)` callback fires every time a
+  product is picked, passed the product's `tax_rate` (0 if unset) —
+  `QuoteForm.jsx`/`InvoiceForm.jsx` wire this straight to their own
+  `setTaxRate`, so picking a product auto-fills the document's single
+  tax-rate field to match (see `routes/products.js` above for why this is
+  document-level, not per-line-item); the *last* product picked wins if
+  more than one is added with different rates, since there's nowhere else
+  for a second rate to go. A `catalogOnly` boolean prop (set by
+  `QuoteForm.jsx`/`InvoiceForm.jsx` only, **not** by `RecurringInvoices.jsx`
+  — recurring templates still allow free-text manual entry) hides the
+  "+ Add item" manual-entry button entirely and makes each item's
+  description input `readOnly` (grayed out), so a line item on those two
+  forms can only be created by picking from the catalog — quantity and unit
+  price stay freely editable either way, only the *entry method* is
+  restricted, and pre-existing manually-typed items on an invoice/quote
+  being edited still display and remain editable, they just can't be
+  created fresh that way going forward. Because `catalogOnly` forms start
+  with an empty `items` array (there's no default blank row to fill in
+  manually anymore), both forms check `items.length === 0` in
+  `handleSubmit` and show the same inline `error` state the rest of the
+  form uses ("Please add at least one item from the product catalog") —
+  mirroring `lib/totals.js`'s own "at least one line item is required"
+  guard so the failure surfaces before the request round-trip rather than
+  only as a 400 from the backend. `Products.jsx`
+  itself follows the same list+inline-form+FAB pattern as `Clients.jsx`,
+  plus a "Tax rate (%)" field (0–100) in the create/edit form and a "Tax"
+  column in the list table.
   `Expenses.jsx` and `RecurringInvoices.jsx` also follow that pattern (no
   separate detail page — edit happens inline in the list).
   `ActivityLog.jsx` is a simple paginated read-only list. `Import.jsx` (linked from `Settings.jsx`, not a top-level
@@ -644,7 +729,33 @@ frontend stops holding/sending it.
   `Navbar.jsx` — once in the desktop nav (narrower, `hidden lg:flex`) and
   once inside the mobile slide-down menu — both instances exist in the DOM
   simultaneously, so anything that queries this input in tests must scope
-  to the visible one.
+  to the visible one. Has its own inline `×` clear button (same
+  `aria-label="Clear search"` pattern as `SearchInput.jsx`, but hand-rolled
+  since this component doesn't use `SearchInput` — it needs the dropdown-open
+  behavior `SearchInput` doesn't have) that appears whenever `query` is
+  non-empty and resets it to `''`.
+- `components/SearchInput.jsx` — the search box used by every business list
+  page (Clients/Products/Expenses/Quotes/Invoices/RecurringInvoices/Users).
+  Renders a leading search icon and, whenever `value` is non-empty, a
+  trailing `×` clear button (`aria-label="Clear search"`) that calls
+  `onChange('')` — the one place this behavior is implemented, so every
+  page using `SearchInput` gets it for free rather than each page wiring up
+  its own clear button.
+- `components/Pagination.jsx` — the shared Previous/Next pager for every
+  server-paginated list page, extracted from the pattern
+  `pages/business/ActivityLog.jsx` established first. Takes
+  `{ page, totalPages, onChange }` — the same `{ page, totalPages }` shape
+  every paginated list endpoint's response carries (see "Pagination
+  convention" above) — and renders nothing when `totalPages <= 1`. Every
+  list page that fetches with a `page` state variable follows the same
+  shape: `useEffect` re-fetches on `[token, search, page]` change, a
+  separate `useEffect` resets `page` back to `1` whenever `search` changes
+  (so a new search always starts from page 1 instead of potentially landing
+  past the end of the filtered result set), and the response's pagination
+  fields are stored separately from the list itself (e.g.
+  `pageInfo`) so `<Pagination>` only renders once a paginated response has
+  actually come back (i.e. `pageInfo` stays `null` until a `page` param was
+  sent and `totalPages` was present in the response).
 - `components/Navbar.jsx` — `BUSINESS_LINKS` entries each carry a `module`
   (`null` for Dashboard, which is always visible); the rendered link list
   is filtered through `can(link.module, 'view')` so a restricted user never

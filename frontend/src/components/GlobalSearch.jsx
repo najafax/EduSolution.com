@@ -57,8 +57,20 @@ export default function GlobalSearch({ onNavigate, className = 'max-w-xs' }) {
         }}
         onFocus={() => setOpen(true)}
         placeholder="Search everything…"
-        className="min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+        className="min-h-11 w-full rounded-md border border-slate-300 py-2 pl-3 pr-9 text-base focus:border-indigo-500 focus:outline-none"
       />
+      {query && (
+        <button
+          type="button"
+          onClick={() => setQuery('')}
+          aria-label="Clear search"
+          className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
 
       {open && query.trim() && (
         <div className="absolute left-0 right-0 z-20 mt-1 max-h-96 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">

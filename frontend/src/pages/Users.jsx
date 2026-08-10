@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import FloatingActionButton from '../components/FloatingActionButton';
+import SearchInput from '../components/SearchInput';
+import Pagination from '../components/Pagination';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', active: true };
 
@@ -22,6 +24,9 @@ export default function Users() {
 
   const [users, setUsers] = useState([]);
   const [modules, setModules] = useState([]);
+  const [pageInfo, setPageInfo] = useState(null);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -38,16 +43,20 @@ export default function Users() {
   function load() {
     if (!canView) return;
     setLoading(true);
-    Promise.all([api.users.list(token), api.users.modules(token)])
-      .then(([{ users }, { modules }]) => {
+    Promise.all([api.users.list(token, { q: search, page }), api.users.modules(token)])
+      .then(([{ users, ...rest }, { modules }]) => {
         setUsers(users);
+        setPageInfo(rest.totalPages ? rest : null);
         setModules(modules);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token, canView]);
+  useEffect(load, [token, canView, search, page]);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -159,6 +168,10 @@ export default function Users() {
         Everyone with an account can see and edit shared business data unless restricted below. Admins always have
         full access.
       </p>
+
+      <div className="mt-4 max-w-sm">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search users…" />
+      </div>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
@@ -324,7 +337,7 @@ export default function Users() {
         {loading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : users.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No users yet.</p>
+          <p className="p-6 text-sm text-slate-500">{search ? `No users match "${search}".` : 'No users yet.'}</p>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -378,6 +391,8 @@ export default function Users() {
           </table>
         )}
       </div>
+
+      {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New user" />}
     </div>

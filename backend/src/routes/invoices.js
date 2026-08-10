@@ -45,24 +45,48 @@ function saveItems(invoiceId, items) {
   }
 }
 
+const PAGE_SIZE = 20;
+
 router.get('/', view, (req, res) => {
-  const { status } = req.query;
-  const rows = status
-    ? db
-        .prepare(
-          `SELECT invoices.*, clients.name AS client_name
-           FROM invoices JOIN clients ON clients.id = invoices.client_id
-           WHERE invoices.status = ? ORDER BY invoices.issue_date DESC, invoices.id DESC`,
-        )
-        .all(status)
-    : db
-        .prepare(
-          `SELECT invoices.*, clients.name AS client_name
-           FROM invoices JOIN clients ON clients.id = invoices.client_id
-           ORDER BY invoices.issue_date DESC, invoices.id DESC`,
-        )
-        .all();
-  res.json({ invoices: rows.map(withComputed) });
+  const { status, q, page: pageParam } = req.query;
+  const conditions = [];
+  const params = [];
+  if (status) {
+    conditions.push('invoices.status = ?');
+    params.push(status);
+  }
+  if (q) {
+    conditions.push('(invoices.number LIKE ? OR clients.name LIKE ? OR invoices.status LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const baseFrom = 'FROM invoices JOIN clients ON clients.id = invoices.client_id';
+
+  if (!pageParam) {
+    const rows = db
+      .prepare(
+        `SELECT invoices.*, clients.name AS client_name ${baseFrom} ${where} ORDER BY invoices.issue_date DESC, invoices.id DESC`,
+      )
+      .all(...params);
+    return res.json({ invoices: rows.map(withComputed) });
+  }
+
+  const page = Math.max(1, Number(pageParam) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+  const { total } = db.prepare(`SELECT COUNT(*) AS total ${baseFrom} ${where}`).get(...params);
+  const rows = db
+    .prepare(
+      `SELECT invoices.*, clients.name AS client_name ${baseFrom} ${where}
+       ORDER BY invoices.issue_date DESC, invoices.id DESC LIMIT ? OFFSET ?`,
+    )
+    .all(...params, PAGE_SIZE, offset);
+  res.json({
+    invoices: rows.map(withComputed),
+    page,
+    pageSize: PAGE_SIZE,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+  });
 });
 
 router.get('/export.csv', view, (req, res) => {

@@ -1,34 +1,36 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../../components/StatusBadge';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
+import Pagination from '../../components/Pagination';
 
 export default function Invoices() {
   const { token, can } = useAuth();
   const canManage = can('invoices', 'manage');
   const [invoices, setInvoices] = useState([]);
+  const [pageInfo, setPageInfo] = useState(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
+    setLoading(true);
     api.invoices
-      .list(token)
-      .then(({ invoices }) => setInvoices(invoices))
+      .list(token, { q: search, page })
+      .then(({ invoices, ...rest }) => {
+        setInvoices(invoices);
+        setPageInfo(rest.totalPages ? rest : null);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [token]);
-
-  const filteredInvoices = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return invoices;
-    return invoices.filter((invoice) =>
-      [invoice.number, invoice.client_name, invoice.status].some((field) => field?.toLowerCase().includes(q)),
-    );
-  }, [invoices, search]);
+  }, [token, search, page]);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   async function handleExport() {
     setError('');
@@ -71,9 +73,9 @@ export default function Invoices() {
         {loading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : invoices.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No invoices yet.</p>
-        ) : filteredInvoices.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No invoices match "{search}".</p>
+          <p className="p-6 text-sm text-slate-500">
+            {search ? `No invoices match "${search}".` : 'No invoices yet.'}
+          </p>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -87,7 +89,7 @@ export default function Invoices() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredInvoices.map((invoice) => (
+              {invoices.map((invoice) => (
                 <tr key={invoice.id} className="hover:bg-slate-50">
                   <td className="whitespace-nowrap px-4 py-3">
                     <Link to={`/invoices/${invoice.id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
@@ -107,6 +109,8 @@ export default function Invoices() {
           </table>
         )}
       </div>
+
+      {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && <FloatingActionButton to="/invoices/new" label="New invoice" />}
     </div>

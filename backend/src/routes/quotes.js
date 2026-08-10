@@ -32,24 +32,42 @@ function saveItems(quoteId, items) {
   }
 }
 
+const PAGE_SIZE = 20;
+
 router.get('/', view, (req, res) => {
-  const { status } = req.query;
-  const rows = status
-    ? db
-        .prepare(
-          `SELECT quotes.*, clients.name AS client_name
-           FROM quotes JOIN clients ON clients.id = quotes.client_id
-           WHERE quotes.status = ? ORDER BY quotes.issue_date DESC, quotes.id DESC`,
-        )
-        .all(status)
-    : db
-        .prepare(
-          `SELECT quotes.*, clients.name AS client_name
-           FROM quotes JOIN clients ON clients.id = quotes.client_id
-           ORDER BY quotes.issue_date DESC, quotes.id DESC`,
-        )
-        .all();
-  res.json({ quotes: rows });
+  const { status, q, page: pageParam } = req.query;
+  const conditions = [];
+  const params = [];
+  if (status) {
+    conditions.push('quotes.status = ?');
+    params.push(status);
+  }
+  if (q) {
+    conditions.push('(quotes.number LIKE ? OR clients.name LIKE ? OR quotes.status LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const baseFrom = 'FROM quotes JOIN clients ON clients.id = quotes.client_id';
+
+  if (!pageParam) {
+    const rows = db
+      .prepare(
+        `SELECT quotes.*, clients.name AS client_name ${baseFrom} ${where} ORDER BY quotes.issue_date DESC, quotes.id DESC`,
+      )
+      .all(...params);
+    return res.json({ quotes: rows });
+  }
+
+  const page = Math.max(1, Number(pageParam) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+  const { total } = db.prepare(`SELECT COUNT(*) AS total ${baseFrom} ${where}`).get(...params);
+  const rows = db
+    .prepare(
+      `SELECT quotes.*, clients.name AS client_name ${baseFrom} ${where}
+       ORDER BY quotes.issue_date DESC, quotes.id DESC LIMIT ? OFFSET ?`,
+    )
+    .all(...params, PAGE_SIZE, offset);
+  res.json({ quotes: rows, page, pageSize: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) });
 });
 
 router.get('/export.csv', view, (req, res) => {

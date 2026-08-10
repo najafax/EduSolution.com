@@ -11,14 +11,37 @@ const manage = requirePermission('expenses', 'manage');
 
 const CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'marketing', 'software', 'travel', 'other'];
 
+const PAGE_SIZE = 20;
+
 router.get('/', view, (req, res) => {
-  const { q } = req.query;
-  const rows = q
-    ? db
-        .prepare('SELECT * FROM expenses WHERE description LIKE ? OR category LIKE ? ORDER BY expense_date DESC, id DESC')
-        .all(`%${q}%`, `%${q}%`)
-    : db.prepare('SELECT * FROM expenses ORDER BY expense_date DESC, id DESC').all();
-  res.json({ expenses: rows, categories: CATEGORIES });
+  const { q, page: pageParam } = req.query;
+  const where = q ? 'WHERE description LIKE ? OR category LIKE ?' : '';
+  const params = q ? [`%${q}%`, `%${q}%`] : [];
+  // Sum reflects every matching row, not just the current page, so the
+  // "Total" row on the Expenses page stays accurate once pagination hides
+  // rows from the client-side array it used to sum directly.
+  const { totalAmount } = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS totalAmount FROM expenses ${where}`).get(...params);
+
+  if (!pageParam) {
+    const rows = db.prepare(`SELECT * FROM expenses ${where} ORDER BY expense_date DESC, id DESC`).all(...params);
+    return res.json({ expenses: rows, categories: CATEGORIES, totalAmount });
+  }
+
+  const page = Math.max(1, Number(pageParam) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+  const { total } = db.prepare(`SELECT COUNT(*) AS total FROM expenses ${where}`).get(...params);
+  const rows = db
+    .prepare(`SELECT * FROM expenses ${where} ORDER BY expense_date DESC, id DESC LIMIT ? OFFSET ?`)
+    .all(...params, PAGE_SIZE, offset);
+  res.json({
+    expenses: rows,
+    categories: CATEGORIES,
+    totalAmount,
+    page,
+    pageSize: PAGE_SIZE,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+  });
 });
 
 router.get('/export.csv', view, (req, res) => {

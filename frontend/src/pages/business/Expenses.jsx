@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
+import Pagination from '../../components/Pagination';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const EMPTY_FORM = { category: 'other', description: '', amount: '', expense_date: todayStr(), notes: '' };
@@ -12,6 +13,9 @@ export default function Expenses() {
   const canManage = can('expenses', 'manage');
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [pageInfo, setPageInfo] = useState(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
@@ -20,27 +24,24 @@ export default function Expenses() {
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
 
-  const filteredExpenses = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return expenses;
-    return expenses.filter((e) => [e.description, e.category].some((field) => field?.toLowerCase().includes(q)));
-  }, [expenses, search]);
-
-  const total = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-
   function load() {
     setLoading(true);
     api.expenses
-      .list(token)
-      .then(({ expenses, categories }) => {
+      .list(token, { q: search, page })
+      .then(({ expenses, categories, totalAmount, ...rest }) => {
         setExpenses(expenses);
         setCategories(categories);
+        setTotal(totalAmount);
+        setPageInfo(rest.totalPages ? rest : null);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token]);
+  useEffect(load, [token, search, page]);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -214,9 +215,9 @@ export default function Expenses() {
         {loading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : expenses.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No expenses yet.</p>
-        ) : filteredExpenses.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No expenses match "{search}".</p>
+          <p className="p-6 text-sm text-slate-500">
+            {search ? `No expenses match "${search}".` : 'No expenses yet.'}
+          </p>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -229,7 +230,7 @@ export default function Expenses() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredExpenses.map((expense) => (
+              {expenses.map((expense) => (
                 <tr key={expense.id}>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{expense.expense_date}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600 capitalize">{expense.category}</td>
@@ -260,6 +261,8 @@ export default function Expenses() {
           </table>
         )}
       </div>
+
+      {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New expense" />}
     </div>

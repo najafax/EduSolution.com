@@ -137,6 +137,7 @@ db.exec(`
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     unit_price REAL NOT NULL DEFAULT 0,
+    tax_rate REAL NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -235,6 +236,13 @@ const clientColumns = new Set(db.prepare('PRAGMA table_info(clients)').all().map
 if (clientColumns.has('company')) {
   db.exec(`UPDATE clients SET name = company WHERE TRIM(COALESCE(company, '')) != '';`);
   db.exec(`ALTER TABLE clients DROP COLUMN company;`);
+}
+
+// Same pattern again: `tax_rate` added to `products` after that table
+// already existed in production with real catalog rows.
+const productColumns = new Set(db.prepare('PRAGMA table_info(products)').all().map((c) => c.name));
+if (!productColumns.has('tax_rate')) {
+  db.exec(`ALTER TABLE products ADD COLUMN tax_rate REAL NOT NULL DEFAULT 0;`);
 }
 
 db.pragma('foreign_keys = ON');

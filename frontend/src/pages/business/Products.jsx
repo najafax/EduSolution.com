@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
+import Pagination from '../../components/Pagination';
 
-const EMPTY_FORM = { name: '', description: '', unit_price: '' };
+const EMPTY_FORM = { name: '', description: '', unit_price: '', tax_rate: '' };
 
 export default function Products() {
   const { token, can } = useAuth();
   const canManage = can('products', 'manage');
 
   const [products, setProducts] = useState([]);
+  const [pageInfo, setPageInfo] = useState(null);
+  const [page, setPage] = useState(1);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -22,22 +25,22 @@ export default function Products() {
 
   const symbol = settings?.currency_symbol || '$';
 
-  const filteredProducts = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter((p) => [p.name, p.description].some((field) => field?.toLowerCase().includes(q)));
-  }, [products, search]);
-
   function load() {
     setLoading(true);
     api.products
-      .list(token)
-      .then(({ products }) => setProducts(products))
+      .list(token, { q: search, page })
+      .then(({ products, ...rest }) => {
+        setProducts(products);
+        setPageInfo(rest.totalPages ? rest : null);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token]);
+  useEffect(load, [token, search, page]);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
   useEffect(() => {
     api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
@@ -49,7 +52,12 @@ export default function Products() {
   }
 
   function startEdit(product) {
-    setForm({ name: product.name, description: product.description, unit_price: product.unit_price });
+    setForm({
+      name: product.name,
+      description: product.description,
+      unit_price: product.unit_price,
+      tax_rate: product.tax_rate,
+    });
     setEditingId(product.id);
     setShowForm(true);
   }
@@ -99,7 +107,7 @@ export default function Products() {
       </div>
       <p className="mt-1 text-sm text-slate-600">
         A reusable catalog of products and services — pick one when building a quote or invoice to autofill its
-        description and price instead of typing it from scratch each time.
+        description, price, and tax instead of typing it from scratch each time.
       </p>
 
       <div className="mt-4 max-w-sm">
@@ -132,6 +140,19 @@ export default function Products() {
               required
               value={form.unit_price}
               onChange={(e) => setForm((f) => ({ ...f, unit_price: e.target.value }))}
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Tax rate (%)</span>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={form.tax_rate}
+              onChange={(e) => setForm((f) => ({ ...f, tax_rate: e.target.value }))}
+              placeholder="0"
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
             />
           </label>
@@ -169,9 +190,9 @@ export default function Products() {
         {loading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : products.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No products yet.</p>
-        ) : filteredProducts.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No products match "{search}".</p>
+          <p className="p-6 text-sm text-slate-500">
+            {search ? `No products match "${search}".` : 'No products yet.'}
+          </p>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -179,17 +200,21 @@ export default function Products() {
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3 text-right">Unit price</th>
+                <th className="px-4 py-3 text-right">Tax</th>
                 {canManage && <th className="px-4 py-3" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <tr key={product.id}>
                   <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{product.name}</td>
                   <td className="px-4 py-3 text-slate-600">{product.description || '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900">
                     {symbol}
                     {product.unit_price.toFixed(2)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
+                    {product.tax_rate ? `${product.tax_rate}%` : '—'}
                   </td>
                   {canManage && (
                     <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -207,6 +232,8 @@ export default function Products() {
           </table>
         )}
       </div>
+
+      {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New product" />}
     </div>

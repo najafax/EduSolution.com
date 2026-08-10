@@ -33,9 +33,29 @@ function activeAdminCount(excludingUserId) {
   return row.c;
 }
 
+const PAGE_SIZE = 20;
+
 router.get('/', view, (req, res) => {
-  const users = db.prepare('SELECT * FROM users ORDER BY id').all();
-  res.json({ users: users.map(publicUser) });
+  const { q, page: pageParam } = req.query;
+  const where = q ? 'WHERE name LIKE ? OR email LIKE ?' : '';
+  const params = q ? [`%${q}%`, `%${q}%`] : [];
+
+  if (!pageParam) {
+    const users = db.prepare(`SELECT * FROM users ${where} ORDER BY id`).all(...params);
+    return res.json({ users: users.map(publicUser) });
+  }
+
+  const page = Math.max(1, Number(pageParam) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+  const { total } = db.prepare(`SELECT COUNT(*) AS total FROM users ${where}`).get(...params);
+  const users = db.prepare(`SELECT * FROM users ${where} ORDER BY id LIMIT ? OFFSET ?`).all(...params, PAGE_SIZE, offset);
+  res.json({
+    users: users.map(publicUser),
+    page,
+    pageSize: PAGE_SIZE,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+  });
 });
 
 router.get('/:id', view, (req, res) => {
