@@ -121,7 +121,7 @@ export default function InvoiceForm() {
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Client</span>
             <SearchableSelect
-              options={clients.map((c) => ({ value: c.id, label: c.name, sublabel: c.company }))}
+              options={clients.map((c) => ({ value: c.id, label: c.name }))}
               value={clientId}
               onChange={setClientId}
               placeholder="Search clients…"

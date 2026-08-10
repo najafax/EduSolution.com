@@ -63,8 +63,7 @@ export default function PublicQuote() {
         <div className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
           <div>
             <p className="font-medium text-slate-500">Prepared for</p>
-            <p className="text-slate-900">{client.company || client.name}</p>
-            {client.company && <p className="text-slate-600">{client.name}</p>}
+            <p className="text-slate-900">{client.name}</p>
           </div>
           <div>
             <p className="font-medium text-slate-500">Issue date</p>

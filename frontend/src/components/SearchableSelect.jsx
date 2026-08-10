@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 // A type-to-filter combobox for choosing one option from a list — used
 // wherever a plain <select> would otherwise dump every client/etc. into an
 // unscrollable-feeling dropdown. Options are `{ value, label, sublabel? }`;
-// sublabel is matched by search but rendered smaller/muted (e.g. a client's
-// company name next to their contact name).
+// sublabel is matched by search but rendered smaller/muted, for callers that
+// want a secondary line under the main label.
 export default function SearchableSelect({ options, value, onChange, placeholder = 'Search…', disabled = false }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');

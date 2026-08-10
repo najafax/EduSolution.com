@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 
 const TYPES = [
-  { value: 'clients', label: 'Clients', columns: 'name*, email*, phone, company, address, notes' },
+  { value: 'clients', label: 'Clients', columns: 'name*, email*, phone, address, notes' },
   { value: 'expenses', label: 'Expenses', columns: 'category*, description*, amount*, expense_date*, notes' },
   {
     value: 'invoices',
@@ -14,7 +14,7 @@ const TYPES = [
 ];
 
 const TEMPLATES = {
-  clients: 'name,email,phone,company,address,notes\nJane Doe,jane@example.com,+960 7000000,Example Pvt Ltd,"Male, Maldives",Sample notes\n',
+  clients: 'name,email,phone,address,notes\nAcme School,jane@example.com,+960 7000000,"Male, Maldives",Sample notes\n',
   expenses: 'category,description,amount,expense_date,notes\nrent,Office rent for March,15000,2026-03-01,\n',
   invoices:
     'client_email,number,issue_date,due_date,description,amount,tax_rate,amount_paid,paid_date,payment_method,status,notes\n' +

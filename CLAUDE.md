@@ -79,7 +79,17 @@ backend port in frontend code.
   `ALTER TABLE` block only exists to carry existing databases forward. Same
   pattern, same reason, for `business_settings.session_timeout_minutes`
   (see "Idle session timeout" below) — that table's single row already
-  existed in production too.
+  existed in production too. `clients` got a similar migration in the other
+  direction: it used to have separate `name` (contact person) and `company`
+  columns, which was just a confusing way to ask the same question twice
+  — a client here always means the organization being billed, not an
+  individual. The one-time migration folds `company` into `name` (company
+  wins wherever both were set — `UPDATE clients SET name = company WHERE
+  company != ''`, guarded by checking the column still exists) and then
+  drops the `company` column outright, rather than just adding one; this
+  is safe because SQLite (3.35+, well within what `better-sqlite3` bundles)
+  supports `ALTER TABLE ... DROP COLUMN` directly, no legacy
+  recreate-the-table dance needed.
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
   <jwt>` header, then **re-fetches the live user row from the DB** (by the
   id in the JWT payload) rather than trusting the token's claims, and

@@ -76,7 +76,6 @@ export default function GlobalSearch({ onNavigate, className = 'max-w-xs' }) {
                       className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50"
                     >
                       <span className="font-medium text-slate-900">{c.name}</span>
-                      {c.company ? <span className="text-slate-500"> — {c.company}</span> : null}
                     </button>
                   ))}
                 </div>

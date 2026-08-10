@@ -26,9 +26,7 @@ export default function Quotes() {
     const q = search.trim().toLowerCase();
     if (!q) return quotes;
     return quotes.filter((quote) =>
-      [quote.number, quote.client_name, quote.client_company, quote.status].some((field) =>
-        field?.toLowerCase().includes(q),
-      ),
+      [quote.number, quote.client_name, quote.status].some((field) => field?.toLowerCase().includes(q)),
     );
   }, [quotes, search]);
 

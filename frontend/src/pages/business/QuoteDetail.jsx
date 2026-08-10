@@ -177,8 +177,7 @@ export default function QuoteDetail() {
 
       <div className="mt-6 grid gap-6 sm:grid-cols-2">
         <Accordion title="Bill to">
-          <p className="font-medium text-slate-900">{client.company || client.name}</p>
-          <p className="text-sm text-slate-600">{client.company ? client.name : ''}</p>
+          <p className="font-medium text-slate-900">{client.name}</p>
           <p className="text-sm text-slate-600">{client.email}</p>
           <p className="text-sm text-slate-600">{client.phone}</p>
         </Accordion>

@@ -47,7 +47,6 @@ db.exec(`
     name TEXT NOT NULL,
     email TEXT NOT NULL,
     phone TEXT NOT NULL DEFAULT '',
-    company TEXT NOT NULL DEFAULT '',
     address TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -224,6 +223,18 @@ if (!userColumns.has('role')) {
 const settingsColumns = new Set(db.prepare('PRAGMA table_info(business_settings)').all().map((c) => c.name));
 if (!settingsColumns.has('session_timeout_minutes')) {
   db.exec(`ALTER TABLE business_settings ADD COLUMN session_timeout_minutes INTEGER NOT NULL DEFAULT 30;`);
+}
+
+// Same pattern again: `clients` used to have separate `name` (contact
+// person) and `company` fields, which in practice was just a confusing
+// way to ask the same question twice — a client here always means the
+// organization being billed, not an individual contact. Fold `company`
+// into `name` (company wins where both were set, since that's the value
+// that actually identifies the client) and drop the now-redundant column.
+const clientColumns = new Set(db.prepare('PRAGMA table_info(clients)').all().map((c) => c.name));
+if (clientColumns.has('company')) {
+  db.exec(`UPDATE clients SET name = company WHERE TRIM(COALESCE(company, '')) != '';`);
+  db.exec(`ALTER TABLE clients DROP COLUMN company;`);
 }
 
 db.pragma('foreign_keys = ON');

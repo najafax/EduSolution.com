@@ -159,7 +159,7 @@ export default function RecurringInvoices() {
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Client</span>
               <SearchableSelect
-                options={clients.map((c) => ({ value: c.id, label: c.name, sublabel: c.company }))}
+                options={clients.map((c) => ({ value: c.id, label: c.name }))}
                 value={form.client_id}
                 onChange={(value) => setForm((f) => ({ ...f, client_id: value }))}
                 placeholder="Search clients…"

@@ -50,14 +50,14 @@ router.get('/', view, (req, res) => {
   const rows = status
     ? db
         .prepare(
-          `SELECT invoices.*, clients.name AS client_name, clients.company AS client_company
+          `SELECT invoices.*, clients.name AS client_name
            FROM invoices JOIN clients ON clients.id = invoices.client_id
            WHERE invoices.status = ? ORDER BY invoices.issue_date DESC, invoices.id DESC`,
         )
         .all(status)
     : db
         .prepare(
-          `SELECT invoices.*, clients.name AS client_name, clients.company AS client_company
+          `SELECT invoices.*, clients.name AS client_name
            FROM invoices JOIN clients ON clients.id = invoices.client_id
            ORDER BY invoices.issue_date DESC, invoices.id DESC`,
         )

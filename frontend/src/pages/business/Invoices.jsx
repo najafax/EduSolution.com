@@ -26,9 +26,7 @@ export default function Invoices() {
     const q = search.trim().toLowerCase();
     if (!q) return invoices;
     return invoices.filter((invoice) =>
-      [invoice.number, invoice.client_name, invoice.client_company, invoice.status].some((field) =>
-        field?.toLowerCase().includes(q),
-      ),
+      [invoice.number, invoice.client_name, invoice.status].some((field) => field?.toLowerCase().includes(q)),
     );
   }, [invoices, search]);
 

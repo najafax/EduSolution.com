@@ -58,7 +58,6 @@ function validateClientRow(row, seenEmails, existingEmails) {
       name,
       email,
       phone: (row.phone || '').trim(),
-      company: (row.company || '').trim(),
       address: (row.address || '').trim(),
       notes: (row.notes || '').trim(),
     },
@@ -71,9 +70,7 @@ function processClients(rows, commit) {
   const results = [];
   let imported = 0;
 
-  const insert = db.prepare(
-    'INSERT INTO clients (name, email, phone, company, address, notes) VALUES (?, ?, ?, ?, ?, ?)',
-  );
+  const insert = db.prepare('INSERT INTO clients (name, email, phone, address, notes) VALUES (?, ?, ?, ?, ?)');
 
   rows.forEach((row, index) => {
     const outcome = validateClientRow(row, seenEmails, existingEmails);
@@ -85,7 +82,7 @@ function processClients(rows, commit) {
     seenEmails.add(outcome.values.email);
     const v = outcome.values;
     if (commit) {
-      const result = insert.run(v.name, v.email, v.phone, v.company, v.address, v.notes);
+      const result = insert.run(v.name, v.email, v.phone, v.address, v.notes);
       imported += 1;
       results.push({ row: rowNumber, status: 'ok', message: 'imported', preview: v.name, id: result.lastInsertRowid });
     } else {

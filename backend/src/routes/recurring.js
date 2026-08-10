@@ -42,7 +42,7 @@ function validateAndComputePreview(body) {
 router.get('/', view, (req, res) => {
   const rows = db
     .prepare(
-      `SELECT recurring_invoices.*, clients.name AS client_name, clients.company AS client_company
+      `SELECT recurring_invoices.*, clients.name AS client_name
        FROM recurring_invoices JOIN clients ON clients.id = recurring_invoices.client_id
        ORDER BY recurring_invoices.next_run_date`,
     )

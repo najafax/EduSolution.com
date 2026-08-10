@@ -22,11 +22,11 @@ router.get('/', (req, res) => {
   const clients = hasPermission(req.user, 'clients', 'view')
     ? db
         .prepare(
-          `SELECT id, name, company, email FROM clients
-           WHERE name LIKE ? OR company LIKE ? OR email LIKE ? OR phone LIKE ?
+          `SELECT id, name, email FROM clients
+           WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?
            ORDER BY name LIMIT ?`,
         )
-        .all(like, like, like, like, RESULT_LIMIT)
+        .all(like, like, like, RESULT_LIMIT)
     : [];
 
   const quotes = hasPermission(req.user, 'quotes', 'view')

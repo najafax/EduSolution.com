@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 
-const EMPTY_FORM = { name: '', email: '', phone: '', company: '', address: '', notes: '' };
+const EMPTY_FORM = { name: '', email: '', phone: '', address: '', notes: '' };
 
 export default function Clients() {
   const { token, can } = useAuth();
@@ -21,9 +21,7 @@ export default function Clients() {
   const filteredClients = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return clients;
-    return clients.filter((c) =>
-      [c.name, c.email, c.company].some((field) => field?.toLowerCase().includes(q)),
-    );
+    return clients.filter((c) => [c.name, c.email].some((field) => field?.toLowerCase().includes(q)));
   }, [clients, search]);
 
   function load() {
@@ -48,7 +46,6 @@ export default function Clients() {
       name: client.name,
       email: client.email,
       phone: client.phone,
-      company: client.company,
       address: client.address,
       notes: client.notes,
     });
@@ -128,10 +125,9 @@ export default function Clients() {
           <div className="sm:col-span-2">
             <h2 className="text-sm font-semibold text-slate-900">{editingId ? 'Edit client' : 'New client'}</h2>
           </div>
-          <Field label="Name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} required />
+          <Field label="Client name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} required />
           <Field label="Email" type="email" value={form.email} onChange={(v) => setForm((f) => ({ ...f, email: v }))} required />
           <Field label="Phone" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} />
-          <Field label="Company" value={form.company} onChange={(v) => setForm((f) => ({ ...f, company: v }))} />
           <div className="sm:col-span-2">
             <Field label="Address" value={form.address} onChange={(v) => setForm((f) => ({ ...f, address: v }))} />
           </div>
@@ -168,8 +164,7 @@ export default function Clients() {
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
               <tr className="text-left text-xs font-medium uppercase text-slate-500">
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Company</th>
+                <th className="px-4 py-3">Client</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Phone</th>
                 {canManage && <th className="px-4 py-3" />}
@@ -179,7 +174,6 @@ export default function Clients() {
               {filteredClients.map((client) => (
                 <tr key={client.id}>
                   <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{client.name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{client.company || '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{client.email}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{client.phone || '—'}</td>
                   {canManage && (

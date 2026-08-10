@@ -37,14 +37,14 @@ router.get('/', view, (req, res) => {
   const rows = status
     ? db
         .prepare(
-          `SELECT quotes.*, clients.name AS client_name, clients.company AS client_company
+          `SELECT quotes.*, clients.name AS client_name
            FROM quotes JOIN clients ON clients.id = quotes.client_id
            WHERE quotes.status = ? ORDER BY quotes.issue_date DESC, quotes.id DESC`,
         )
         .all(status)
     : db
         .prepare(
-          `SELECT quotes.*, clients.name AS client_name, clients.company AS client_company
+          `SELECT quotes.*, clients.name AS client_name
            FROM quotes JOIN clients ON clients.id = quotes.client_id
            ORDER BY quotes.issue_date DESC, quotes.id DESC`,
         )

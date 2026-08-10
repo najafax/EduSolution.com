@@ -124,10 +124,8 @@ function drawInfoColumns(doc, { client, metaRows }, y) {
   const rightValueWidth = 125;
 
   doc.fontSize(9).fillColor(COLORS.muted).text('BILL TO', leftX, y);
-  doc.fontSize(11).fillColor(COLORS.heading).text(client.company || client.name, leftX, y + 14, { width: leftWidth });
-  const clientDetail = [client.company ? client.name : null, client.email, client.phone, client.address]
-    .filter(Boolean)
-    .join('\n');
+  doc.fontSize(11).fillColor(COLORS.heading).text(client.name, leftX, y + 14, { width: leftWidth });
+  const clientDetail = [client.email, client.phone, client.address].filter(Boolean).join('\n');
   doc.fontSize(9).fillColor(COLORS.body).text(clientDetail, leftX, y + 30, { width: leftWidth });
   const leftHeight = 30 + (clientDetail ? doc.heightOfString(clientDetail, { width: leftWidth }) : 0);
 
