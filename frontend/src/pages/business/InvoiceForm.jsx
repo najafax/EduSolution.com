@@ -19,6 +19,7 @@ export default function InvoiceForm() {
   const canManage = can('invoices', 'manage');
 
   const [clients, setClients] = useState([]);
+  const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState(null);
   const [clientId, setClientId] = useState('');
   const [issueDate, setIssueDate] = useState(todayStr());
@@ -31,9 +32,11 @@ export default function InvoiceForm() {
   const [loading, setLoading] = useState(isEditing);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [lockedStatus, setLockedStatus] = useState(null);
 
   useEffect(() => {
     api.clients.list(token).then(({ clients }) => setClients(clients));
+    api.products.list(token).then(({ products }) => setProducts(products)).catch(() => {});
     api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
 
@@ -42,6 +45,10 @@ export default function InvoiceForm() {
     api.invoices
       .get(id, token)
       .then(({ invoice, items }) => {
+        if (invoice.status === 'sent' || invoice.status === 'paid') {
+          setLockedStatus(invoice.status);
+          return;
+        }
         setClientId(String(invoice.client_id));
         setIssueDate(invoice.issue_date);
         setDueDate(invoice.due_date);
@@ -87,6 +94,17 @@ export default function InvoiceForm() {
   if (loading) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">Loading…</div>;
   if (!canManage) {
     return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">You don't have permission to view this page.</div>;
+  }
+  if (lockedStatus) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">
+        This invoice has been {lockedStatus === 'paid' ? 'paid' : 'sent to the client'} and can no longer be edited.{' '}
+        <Link to={`/invoices/${id}`} className="text-indigo-600 hover:text-indigo-500">
+          View invoice
+        </Link>
+        .
+      </div>
+    );
   }
 
   return (
@@ -186,7 +204,7 @@ export default function InvoiceForm() {
         <div>
           <span className="text-sm font-medium text-slate-700">Line items</span>
           <div className="mt-1">
-            <LineItemsEditor items={items} onChange={setItems} currencySymbol={settings?.currency_symbol} />
+            <LineItemsEditor items={items} onChange={setItems} currencySymbol={settings?.currency_symbol} products={products} />
           </div>
         </div>
 

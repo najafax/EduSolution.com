@@ -93,8 +93,9 @@ backend port in frontend code.
   gated module) rather than re-implementing token/permission checks.
 - `lib/permissions.js` — the single source of truth for the permission
   model. `MODULES` is the fixed list of gatable modules (`clients`,
-  `quotes`, `invoices`, `expenses`, `recurring_invoices`, `financials`,
-  `activity`, `settings`, `users`, `import`) — kept as a hardcoded list
+  `products`, `quotes`, `invoices`, `expenses`, `recurring_invoices`,
+  `financials`, `activity`, `settings`, `users`, `import`) — kept as a
+  hardcoded list
   (rather than derived from route files) so a typo'd module name in a route
   fails closed instead of silently creating a new, ungrantable slot.
   `hasPermission(user, module, level)` short-circuits to `true` for
@@ -192,6 +193,15 @@ column anywhere in this module.
   address, tax ID, currency symbol, bank details — this is what prints on
   every PDF's header/footer). `clients.js` also has `GET /export.csv`
   (registered before `GET /:id` so it isn't shadowed by the `:id` param).
+- `routes/products.js` — plain CRUD for `products` (name/description/
+  unit_price), `GET /` supports `?q=` search. This is a standalone reusable
+  catalog, not a source of truth referenced by anything else: `invoice_items`/
+  `quote_items`/`recurring_invoice_items` still store `description`/
+  `unit_price` as plain denormalized values, not a `product_id` foreign key
+  — a product is a convenience the frontend copies from once when a line
+  item is added (see `components/LineItemsEditor.jsx` below), not a live
+  link, so editing or deleting a product never touches historical
+  quotes/invoices. No delete guard is needed for the same reason.
 - `routes/quotes.js`, `routes/invoices.js` — CRUD plus PDF download
   (`GET /:id/pdf`), email send (`POST /:id/send`), `POST /:id/duplicate`
   (copies client/items/discount/tax/notes into a new `draft` with a fresh
@@ -203,6 +213,14 @@ column anywhere in this module.
   `discount_type` (`percentage|fixed`) and `discount_value` on create/update,
   computed via `lib/totals.js`. Every mutation (create/update/delete/send/
   duplicate/convert/payment) calls `lib/activity.js`'s `logActivity()`.
+  **Invoices only** (not quotes): `PUT /:id` rejects with 409 once
+  `status` is `sent` or `paid` — "This invoice has already been sent or
+  paid and can no longer be edited." A `void` invoice stays editable (it's
+  still a correctable mistake, not a delivered/settled document), and
+  `draft` is always editable. This only blocks the edit route itself —
+  `/duplicate` (which creates a fresh draft copy) and recording a payment
+  are unaffected, and deletion is still governed separately by the
+  existing "has recorded payments" guard below.
 - `routes/expenses.js` — CRUD for `expenses` (category/description/amount/
   expense_date/notes) plus `GET /` (`?q=` search) and `GET /export.csv`.
   `CATEGORIES` is a fixed list (`rent, utilities, supplies, salaries,
@@ -502,7 +520,19 @@ Status/derived-field conventions worth knowing before touching this code:
   additionally guard themselves at the top of the component (same
   `if (!canManage) return <...not authorized...>` pattern as `Users.jsx`/
   `MyAccount.jsx` above) since those routes are reachable directly by URL
-  even when no link to them is rendered. Any page that calls
+  even when no link to them is rendered. `InvoiceForm.jsx` has a second,
+  independent guard on top of that one: after fetching the invoice being
+  edited, if its `status` is `sent` or `paid` it sets `lockedStatus` and
+  renders a "can no longer be edited" message with a link back to the
+  detail page instead of the form — this mirrors the backend's `PUT /:id`
+  409 (see `routes/invoices.js` above) so a locked invoice never even shows
+  editable fields, rather than letting someone fill out the form and only
+  finding out it's rejected on submit. `InvoiceDetail.jsx` computes the
+  same `isLocked` check to hide the "Edit" link and show a one-line notice
+  ("This invoice has been sent to the client / paid and can no longer be
+  edited") — `Delete` is intentionally *not* gated by this, since deleting
+  a sent-but-unpaid invoice is still allowed (governed separately by the
+  backend's "has recorded payments" guard). Any page that calls
   `api.settings.get()` for the currency-symbol fallback does so with a
   trailing `.catch(() => {})` — `settings` is its own gated module now, so
   a staff user without `settings:view` would otherwise leave an unhandled
@@ -510,10 +540,17 @@ Status/derived-field conventions worth knowing before touching this code:
   `components/LineItemsEditor.jsx` and `components/StatusBadge.jsx` are
   shared between the quote and invoice form/detail pages — extend those
   rather than duplicating item-row or status-color logic per page.
-  `Expenses.jsx` and `RecurringInvoices.jsx` follow the same
-  list+inline-form+FAB pattern as `Clients.jsx` (no separate detail page —
-  edit happens inline in the list). `ActivityLog.jsx` is a simple paginated
-  read-only list. `Import.jsx` (linked from `Settings.jsx`, not a top-level
+  `LineItemsEditor` also takes an optional `products` array prop (each
+  form fetches `api.products.list()` alongside clients/settings and passes
+  it down); when non-empty it renders a "+ Add from product catalog…"
+  `<select>` next to "+ Add item" that appends a new line item pre-filled
+  with that product's `name`/`unit_price` — a one-time copy, not a live
+  link, so the row is still freely editable afterward and never references
+  the product again (see `routes/products.js` above for why). `Products.jsx`
+  itself follows the same list+inline-form+FAB pattern as `Clients.jsx`.
+  `Expenses.jsx` and `RecurringInvoices.jsx` also follow that pattern (no
+  separate detail page — edit happens inline in the list).
+  `ActivityLog.jsx` is a simple paginated read-only list. `Import.jsx` (linked from `Settings.jsx`, not a top-level
   Navbar item — it's a rare-use admin tool) reads a chosen CSV file
   client-side via `FileReader`, calls `api.import.run(type, csv, commit,
   token)` first with `commit: false` to preview, then again with `commit:

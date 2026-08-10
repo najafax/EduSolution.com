@@ -140,6 +140,7 @@ export default function InvoiceDetail() {
 
   const { invoice, items, client, payments } = data;
   const symbol = settings?.currency_symbol || '$';
+  const isLocked = invoice.status === 'sent' || invoice.status === 'paid';
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -151,7 +152,7 @@ export default function InvoiceDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canManage && (
+          {canManage && !isLocked && (
             <Link to={`/invoices/${id}/edit`} className="min-h-11 flex items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
               Edit
             </Link>
@@ -184,6 +185,12 @@ export default function InvoiceDetail() {
 
       {notice && <p className="mt-4 text-sm text-emerald-600">{notice}</p>}
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {isLocked && (
+        <p className="mt-4 text-sm text-slate-500">
+          This invoice has been {invoice.status === 'paid' ? 'paid' : 'sent to the client'} and can no longer be
+          edited.
+        </p>
+      )}
       {invoice.last_reminder_sent_at && (
         <p className="mt-2 text-xs text-slate-500">Last reminder sent {invoice.last_reminder_sent_at}</p>
       )}

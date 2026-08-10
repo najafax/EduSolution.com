@@ -82,6 +82,13 @@ export const api = {
     exportCsv: (token) => downloadFile('/clients/export.csv', token, 'clients.csv'),
   },
 
+  products: {
+    list: (token, q) => request(`/products${q ? `?q=${encodeURIComponent(q)}` : ''}`, { token }),
+    create: (payload, token) => request('/products', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/products/${id}`, { method: 'PUT', body: payload, token }),
+    remove: (id, token) => request(`/products/${id}`, { method: 'DELETE', token }),
+  },
+
   quotes: {
     list: (token, status) => request(`/quotes${status ? `?status=${status}` : ''}`, { token }),
     get: (id, token) => request(`/quotes/${id}`, { token }),

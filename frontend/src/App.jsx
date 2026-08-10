@@ -9,6 +9,7 @@ import PublicQuote from './pages/PublicQuote';
 import PublicInvoice from './pages/PublicInvoice';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/business/Clients';
+import Products from './pages/business/Products';
 import Expenses from './pages/business/Expenses';
 import Settings from './pages/business/Settings';
 import Quotes from './pages/business/Quotes';
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
 
         <Route path="/clients" element={<Protected><Clients /></Protected>} />
+        <Route path="/products" element={<Protected><Products /></Protected>} />
         <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
         <Route path="/settings" element={<Protected><Settings /></Protected>} />
         <Route path="/import" element={<Protected><Import /></Protected>} />

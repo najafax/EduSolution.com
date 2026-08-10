@@ -155,6 +155,9 @@ router.get('/:id', view, (req, res) => {
 router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Invoice not found' });
+  if (existing.status === 'sent' || existing.status === 'paid') {
+    return res.status(409).json({ error: 'This invoice has already been sent or paid and can no longer be edited' });
+  }
 
   const {
     client_id,

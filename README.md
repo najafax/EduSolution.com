@@ -2,11 +2,13 @@
 
 A web application with a React frontend and a Node/Express + SQLite backend,
 featuring email/password login with role-based access control, plus a
-small business-management module — clients, quotes, invoices,
-payments/receipts, and financials — with PDF generation and emailing of
-quotes/invoices/reminders/receipts. Responsive on phone, tablet, and
-desktop, and installable as a PWA on iOS and Android (add it to your home
-screen from the browser's share/menu button).
+small business-management module — clients, a product catalog, quotes,
+invoices, payments/receipts, and financials — with PDF generation and
+emailing of quotes/invoices/reminders/receipts. Once an invoice has been
+sent to a client or paid, it's locked from further edits so the record
+stays fixed. Responsive on phone, tablet, and desktop, and installable as
+a PWA on iOS and Android (add it to your home screen from the browser's
+share/menu button).
 
 To actually send quote/invoice/reminder emails, set the `SMTP_*` variables
 in `backend/.env` (see `backend/.env.example`) — without them, everything

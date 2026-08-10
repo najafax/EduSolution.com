@@ -7,6 +7,7 @@ const db = require('../db');
 // ungrantable permission slot.
 const MODULES = [
   'clients',
+  'products',
   'quotes',
   'invoices',
   'expenses',

@@ -24,6 +24,7 @@ export default function RecurringInvoices() {
   const canManage = can('recurring_invoices', 'manage');
   const [recurring, setRecurring] = useState([]);
   const [clients, setClients] = useState([]);
+  const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -45,6 +46,7 @@ export default function RecurringInvoices() {
   useEffect(load, [token]);
   useEffect(() => {
     api.clients.list(token).then(({ clients }) => setClients(clients));
+    api.products.list(token).then(({ products }) => setProducts(products)).catch(() => {});
     api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
 
@@ -260,7 +262,7 @@ export default function RecurringInvoices() {
           <div>
             <span className="text-sm font-medium text-slate-700">Line items</span>
             <div className="mt-1">
-              <LineItemsEditor items={items} onChange={setItems} currencySymbol={symbol} />
+              <LineItemsEditor items={items} onChange={setItems} currencySymbol={symbol} products={products} />
             </div>
           </div>
 

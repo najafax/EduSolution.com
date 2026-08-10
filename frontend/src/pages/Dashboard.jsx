@@ -15,6 +15,7 @@ function money(symbol, value) {
 
 const SHORTCUTS = [
   { to: '/clients', label: 'Clients', module: 'clients' },
+  { to: '/products', label: 'Products', module: 'products' },
   { to: '/quotes', label: 'Quotes', module: 'quotes' },
   { to: '/invoices', label: 'Invoices', module: 'invoices' },
   { to: '/recurring-invoices', label: 'Recurring', module: 'recurring_invoices' },
