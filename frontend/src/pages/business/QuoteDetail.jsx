@@ -179,7 +179,7 @@ export default function QuoteDetail() {
         <Accordion title="Bill to">
           <p className="font-medium text-slate-900">{client.name}</p>
           <p className="text-sm text-slate-600">{client.email}</p>
-          <p className="text-sm text-slate-600">{client.phone}</p>
+          <p className="text-sm text-slate-600">{client.address}</p>
         </Accordion>
         <Accordion title="Details">
           <dl className="space-y-1 text-sm">
