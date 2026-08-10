@@ -591,6 +591,21 @@ frontend stops holding/sending it.
   trailing `.catch(() => {})` — `settings` is its own gated module now, so
   a staff user without `settings:view` would otherwise leave an unhandled
   promise rejection on every page load; the page just falls back to `$`.
+  `InvoiceForm.jsx`'s `dueDate` and `QuoteForm.jsx`'s `expiryDate` default
+  to `todayPlus(14)`/`todayPlus(30)` respectively on create (only
+  overwritten by the real stored value when editing) — a still-usable
+  placeholder rather than an empty date input someone has to fill in
+  themselves every time. The Client field on `InvoiceForm.jsx`,
+  `QuoteForm.jsx`, and `RecurringInvoices.jsx` uses
+  `components/SearchableSelect.jsx` (a type-to-filter combobox: text input
+  + a matching dropdown list, keyboard nav, click-outside-to-close) instead
+  of a plain `<select>` — the same component in all three places so the
+  client field behaves identically everywhere it appears. Because it's a
+  custom widget rather than a native form control, it can't carry an HTML
+  `required` attribute, so each of those three forms checks
+  `if (!clientId)` itself in `handleSubmit` and sets the same `error` state
+  the rest of the form already displays on, rather than relying on
+  browser-native validation for just this one field.
   `components/LineItemsEditor.jsx` and `components/StatusBadge.jsx` are
   shared between the quote and invoice form/detail pages — extend those
   rather than duplicating item-row or status-color logic per page.

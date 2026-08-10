@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import LineItemsEditor from '../../components/LineItemsEditor';
+import SearchableSelect from '../../components/SearchableSelect';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const todayPlus = (days) => {
@@ -65,6 +66,10 @@ export default function InvoiceForm() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    if (!clientId) {
+      setError('Please select a client');
+      return;
+    }
     setSubmitting(true);
     const payload = {
       client_id: Number(clientId),
@@ -115,22 +120,12 @@ export default function InvoiceForm() {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Client</span>
-            <select
-              required
+            <SearchableSelect
+              options={clients.map((c) => ({ value: c.id, label: c.name, sublabel: c.company }))}
               value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
-            >
-              <option value="" disabled>
-                Select a client
-              </option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.company ? ` (${c.company})` : ''}
-                </option>
-              ))}
-            </select>
+              onChange={setClientId}
+              placeholder="Search clients…"
+            />
             {clients.length === 0 && (
               <span className="mt-1 block text-xs text-slate-500">
                 No clients yet — <Link to="/clients" className="text-indigo-600">add one first</Link>.

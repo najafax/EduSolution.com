@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import LineItemsEditor from '../../components/LineItemsEditor';
 import FloatingActionButton from '../../components/FloatingActionButton';
+import SearchableSelect from '../../components/SearchableSelect';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -83,6 +84,10 @@ export default function RecurringInvoices() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    if (!form.client_id) {
+      setError('Please select a client');
+      return;
+    }
     setSubmitting(true);
     const payload = {
       client_id: Number(form.client_id),
@@ -153,22 +158,12 @@ export default function RecurringInvoices() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Client</span>
-              <select
-                required
+              <SearchableSelect
+                options={clients.map((c) => ({ value: c.id, label: c.name, sublabel: c.company }))}
                 value={form.client_id}
-                onChange={(e) => setForm((f) => ({ ...f, client_id: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
-              >
-                <option value="" disabled>
-                  Select a client
-                </option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                    {c.company ? ` (${c.company})` : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setForm((f) => ({ ...f, client_id: value }))}
+                placeholder="Search clients…"
+              />
             </label>
 
             <label className="block">
