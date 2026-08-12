@@ -202,7 +202,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
               required
               value={issueDate}
               onChange={(e) => setIssueDate(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
             />
           </label>
 
@@ -213,7 +213,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
               required
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
             />
           </label>
         </div>

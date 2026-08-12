@@ -202,7 +202,7 @@ export default function RecurringInvoices() {
                 required
                 value={form.next_run_date}
                 onChange={(e) => setForm((f) => ({ ...f, next_run_date: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
               />
             </label>
 

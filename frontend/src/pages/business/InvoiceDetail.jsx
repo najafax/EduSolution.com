@@ -301,7 +301,7 @@ export default function InvoiceDetail() {
                   required
                   value={payment.paid_at}
                   onChange={(e) => setPayment((p) => ({ ...p, paid_at: e.target.value }))}
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                  className="mt-1 h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
                 />
               </label>
               <label className="block">
