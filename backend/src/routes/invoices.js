@@ -38,10 +38,10 @@ function getInvoiceWithItems(id) {
 function saveItems(invoiceId, items) {
   db.prepare('DELETE FROM invoice_items WHERE invoice_id = ?').run(invoiceId);
   const insert = db.prepare(
-    'INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order, product_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
   );
   for (const item of items) {
-    insert.run(invoiceId, item.description, item.quantity, item.unit_price, item.amount, item.sort_order);
+    insert.run(invoiceId, item.description, item.quantity, item.unit_price, item.amount, item.sort_order, item.product_id ?? null);
   }
 }
 
@@ -354,10 +354,10 @@ router.post('/:id/duplicate', manage, (req, res) => {
     );
 
   const insertItem = db.prepare(
-    'INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order, product_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
   );
   for (const item of data.items) {
-    insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order);
+    insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order, item.product_id ?? null);
   }
 
   logActivity({ userName: req.user.name, action: 'duplicated', entityType: 'invoice', entityId: result.lastInsertRowid, entityLabel: `${number} (from ${data.invoice.number})` });

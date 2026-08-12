@@ -31,6 +31,12 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
   const [issueDate, setIssueDate] = useState(todayStr());
   const [dueDate, setDueDate] = useState(todayPlus(14));
   const [taxRate, setTaxRate] = useState(0);
+  // Tracks whether the tax rate should keep auto-recomputing as items change
+  // (a live weighted average of their product tax rates) or has been taken
+  // over by the user manually editing the field — otherwise every item edit
+  // would silently overwrite a deliberate override like "0% for this
+  // tax-exempt client" back to the catalog-derived rate.
+  const [taxRateAuto, setTaxRateAuto] = useState(true);
   const [discountType, setDiscountType] = useState('percentage');
   const [discountValue, setDiscountValue] = useState(0);
   const [notes, setNotes] = useState('');
@@ -62,7 +68,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
         setDiscountType(invoice.discount_type);
         setDiscountValue(invoice.discount_value);
         setNotes(invoice.notes);
-        setItems(items.map((i) => ({ description: i.description, quantity: i.quantity, unit_price: i.unit_price })));
+        setItems(items.map((i) => ({ description: i.description, quantity: i.quantity, unit_price: i.unit_price, product_id: i.product_id })));
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -154,7 +160,10 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
               max="100"
               step="0.01"
               value={taxRate}
-              onChange={(e) => setTaxRate(e.target.value)}
+              onChange={(e) => {
+                setTaxRate(e.target.value);
+                setTaxRateAuto(false);
+              }}
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
             />
           </label>
@@ -218,7 +227,9 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
               currencySymbol={settings?.currency_symbol}
               products={products}
               catalogOnly
-              onProductTaxRate={setTaxRate}
+              onProductTaxRate={(rate) => {
+                if (taxRateAuto) setTaxRate(rate);
+              }}
             />
           </div>
         </div>

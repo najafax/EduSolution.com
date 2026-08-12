@@ -16,7 +16,8 @@ function computeTotals(rawItems, taxRate, discountType = 'percentage', discountV
     if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error(`Item ${index + 1}: unit price must be a non-negative number`);
 
     const amount = Math.round(quantity * unitPrice * 100) / 100;
-    return { description, quantity, unit_price: unitPrice, amount, sort_order: index };
+    const productId = Number.isFinite(Number(item.product_id)) && item.product_id != null ? Number(item.product_id) : null;
+    return { description, quantity, unit_price: unitPrice, amount, sort_order: index, product_id: productId };
   });
 
   const rate = Number(taxRate) || 0;

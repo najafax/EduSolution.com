@@ -4,7 +4,13 @@
 function toCsv(rows, columns) {
   const escape = (val) => {
     const str = val === null || val === undefined ? '' : String(val);
-    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    // Guard against CSV/formula injection: a field starting with =, +, -, or @
+    // is interpreted as a formula by Excel/Sheets when the export is opened.
+    // Free-text fields (client/expense/quote/invoice names and notes) are
+    // attacker-controllable by any staff member with just that module's
+    // `manage` permission, so prefix with a leading quote to force text mode.
+    const guarded = /^[=+\-@]/.test(str) ? `'${str}` : str;
+    return /[",\n]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
   };
   const header = columns.map((c) => escape(c.label)).join(',');
   const lines = rows.map((row) =>

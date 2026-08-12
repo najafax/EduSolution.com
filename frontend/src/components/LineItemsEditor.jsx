@@ -108,11 +108,16 @@ function ProductPicker({ products, currencySymbol, onPick, placeholder }) {
   );
 }
 
-// Each catalog-sourced line item's description is exactly its product's
-// name (readOnly in catalogOnly mode — see below), so a product's tax rate
-// can always be recovered by matching on it, whether the item was just
-// picked or loaded from an existing saved quote/invoice being edited.
+// A catalog-sourced item carries the id of the product it was picked from,
+// so its tax rate can be recovered even if that product is later renamed.
+// Items saved before product_id was tracked fall back to matching by
+// description (the old behavior) — that only breaks if the product has
+// since been renamed, same as before this fix, rather than for every item.
 function taxRateForItem(item, products) {
+  if (item.product_id != null) {
+    const byId = products.find((p) => p.id === item.product_id);
+    if (byId) return byId.tax_rate || 0;
+  }
   const product = products.find((p) => p.name === item.description);
   return product ? product.tax_rate || 0 : 0;
 }
@@ -153,7 +158,7 @@ export default function LineItemsEditor({
   }
 
   function addProductItem(product) {
-    applyChange([...items, { description: product.name, quantity: 1, unit_price: product.unit_price }]);
+    applyChange([...items, { description: product.name, quantity: 1, unit_price: product.unit_price, product_id: product.id }]);
   }
 
   function removeItem(index) {

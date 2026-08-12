@@ -83,7 +83,8 @@ db.exec(`
     quantity REAL NOT NULL DEFAULT 1,
     unit_price REAL NOT NULL DEFAULT 0,
     amount REAL NOT NULL DEFAULT 0,
-    sort_order INTEGER NOT NULL DEFAULT 0
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    product_id INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS invoices (
@@ -117,7 +118,8 @@ db.exec(`
     quantity REAL NOT NULL DEFAULT 1,
     unit_price REAL NOT NULL DEFAULT 0,
     amount REAL NOT NULL DEFAULT 0,
-    sort_order INTEGER NOT NULL DEFAULT 0
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    product_id INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS payments (
@@ -243,6 +245,23 @@ if (clientColumns.has('company')) {
 const productColumns = new Set(db.prepare('PRAGMA table_info(products)').all().map((c) => c.name));
 if (!productColumns.has('tax_rate')) {
   db.exec(`ALTER TABLE products ADD COLUMN tax_rate REAL NOT NULL DEFAULT 0;`);
+}
+
+// Same pattern again: `product_id` added to `quote_items`/`invoice_items` so
+// a line item's originating product can be recovered by id instead of by
+// matching its description against the current product name — the latter
+// silently breaks (falls back to a 0% tax contribution) if the product is
+// renamed after the item was added. No REFERENCES constraint on purpose:
+// products.js allows deleting a product outright with no check for existing
+// references, and a FK here would turn that into a constraint-violation 500
+// instead of just leaving old items with a stale, best-effort id.
+const quoteItemColumns = new Set(db.prepare('PRAGMA table_info(quote_items)').all().map((c) => c.name));
+if (!quoteItemColumns.has('product_id')) {
+  db.exec(`ALTER TABLE quote_items ADD COLUMN product_id INTEGER;`);
+}
+const invoiceItemColumns = new Set(db.prepare('PRAGMA table_info(invoice_items)').all().map((c) => c.name));
+if (!invoiceItemColumns.has('product_id')) {
+  db.exec(`ALTER TABLE invoice_items ADD COLUMN product_id INTEGER;`);
 }
 
 db.pragma('foreign_keys = ON');
