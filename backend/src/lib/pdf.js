@@ -245,11 +245,16 @@ function decodeImageDataUri(dataUri) {
   return match ? Buffer.from(match[2], 'base64') : null;
 }
 
-// Company stamp (left) and an authorized-signature image over a signing
-// line (right) near the bottom of the document. Each is fully independent
-// and only drawn if its own business_settings field is set — a business
-// that's only uploaded a stamp doesn't get an empty signature line, and
-// vice versa. Draws nothing at all if neither is set.
+// An authorized-signature image over a signing line, and a company stamp,
+// near the bottom of the document. Each is fully independent and only
+// drawn if its own business_settings field is set — a business that's only
+// uploaded a stamp doesn't get an empty signature line, and vice versa.
+// Draws nothing at all if neither is set. When both are present, the stamp
+// is positioned half-overlapping the signature's left edge (drawn after it,
+// so it sits visually on top) rather than off in its own separate spot —
+// mirroring how a physical stamp is typically pressed partly over a
+// signature. With no signature to anchor against, the stamp falls back to
+// sitting alone at the left margin.
 function drawSignatureBlock(doc, settings, y) {
   if (!settings.signature_image && !settings.stamp_image) return;
 
@@ -259,13 +264,9 @@ function drawSignatureBlock(doc, settings, y) {
     y = MARGIN;
   }
 
-  if (settings.stamp_image) {
-    const buffer = decodeImageDataUri(settings.stamp_image);
-    if (buffer) doc.image(buffer, MARGIN, y, { fit: [STAMP_BOX_SIZE, STAMP_BOX_SIZE] });
-  }
+  const sigX = MARGIN + CONTENT_WIDTH - SIGNATURE_BOX_WIDTH;
 
   if (settings.signature_image) {
-    const sigX = MARGIN + CONTENT_WIDTH - SIGNATURE_BOX_WIDTH;
     const buffer = decodeImageDataUri(settings.signature_image);
     if (buffer) doc.image(buffer, sigX, y, { fit: [SIGNATURE_BOX_WIDTH, SIGNATURE_IMG_HEIGHT] });
     const lineY = y + SIGNATURE_IMG_HEIGHT + 6;
@@ -274,6 +275,15 @@ function drawSignatureBlock(doc, settings, y) {
       .fontSize(8)
       .fillColor(COLORS.muted)
       .text('Authorized Signature', sigX, lineY + 4, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
+  }
+
+  if (settings.stamp_image) {
+    const buffer = decodeImageDataUri(settings.stamp_image);
+    if (buffer) {
+      const stampX = settings.signature_image ? sigX - STAMP_BOX_SIZE / 2 : MARGIN;
+      const stampY = settings.signature_image ? y + SIGNATURE_IMG_HEIGHT / 2 - STAMP_BOX_SIZE / 2 : y;
+      doc.image(buffer, stampX, stampY, { fit: [STAMP_BOX_SIZE, STAMP_BOX_SIZE] });
+    }
   }
 }
 
