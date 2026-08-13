@@ -22,13 +22,25 @@ function requireAuth(req, res, next) {
   // deactivation, and profile edits all need to take effect on the very
   // next request, not after the token's 7-day expiry.
   const user = db
-    .prepare('SELECT id, name, email, role, active, notify_overdue FROM users WHERE id = ?')
+    .prepare('SELECT id, name, email, role, active, notify_overdue, password_changed_at FROM users WHERE id = ?')
     .get(payload.id);
   if (!user) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
   if (!user.active) {
     return res.status(401).json({ error: 'This account has been deactivated' });
+  }
+  // Tokens issued before the most recent password change/reset are stale —
+  // reject them so a token stolen pre-reset can't keep working for the rest
+  // of its 7-day lifetime. Compare as same-format UTC strings (not via
+  // `new Date(sqliteString)`, which V8 parses as local time for the
+  // space-separated `datetime('now')` format and would drift by the
+  // server's UTC offset).
+  if (payload.iat) {
+    const iatStr = new Date(payload.iat * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    if (iatStr < user.password_changed_at) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
   }
 
   req.user = user;

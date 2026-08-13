@@ -17,6 +17,7 @@ db.exec(`
     role TEXT NOT NULL DEFAULT 'staff',
     active INTEGER NOT NULL DEFAULT 1,
     notify_overdue INTEGER NOT NULL DEFAULT 0,
+    password_changed_at TEXT NOT NULL DEFAULT (datetime('now')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -245,6 +246,16 @@ if (clientColumns.has('company')) {
 const productColumns = new Set(db.prepare('PRAGMA table_info(products)').all().map((c) => c.name));
 if (!productColumns.has('tax_rate')) {
   db.exec(`ALTER TABLE products ADD COLUMN tax_rate REAL NOT NULL DEFAULT 0;`);
+}
+
+// Same pattern again: `password_changed_at` added to `users` so existing
+// JWTs (issued before this column existed) can be invalidated the moment a
+// user resets or changes their password — see middleware/auth.js. Backfill
+// to `created_at` rather than `datetime('now')` so no pre-existing token is
+// accidentally invalidated by the migration itself.
+if (!userColumns.has('password_changed_at')) {
+  db.exec(`ALTER TABLE users ADD COLUMN password_changed_at TEXT;`);
+  db.prepare(`UPDATE users SET password_changed_at = created_at WHERE password_changed_at IS NULL`).run();
 }
 
 // Same pattern again: `product_id` added to `quote_items`/`invoice_items` so

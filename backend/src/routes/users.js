@@ -136,7 +136,7 @@ router.post('/:id/reset-password', manage, async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
   db.prepare(
-    `UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?`,
+    `UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL, password_changed_at = datetime('now') WHERE id = ?`,
   ).run(passwordHash, existing.id);
 
   logActivity({ userName: req.user.name, action: 'reset password for', entityType: 'user', entityId: existing.id, entityLabel: existing.name });

@@ -58,6 +58,15 @@ export function AuthProvider({ children }) {
     setUser(nextUser);
   }
 
+  // Changing your own password invalidates every token issued before the
+  // change (see backend middleware/auth.js), including the one this session
+  // is currently using — swap in the fresh token the endpoint returns so the
+  // user isn't logged out by their own password change.
+  function updateToken(nextToken) {
+    localStorage.setItem(TOKEN_KEY, nextToken);
+    setToken(nextToken);
+  }
+
   // 'view' | 'manage'. Admins carry an all-true permissions map from the
   // backend (see lib/permissions.js effectivePermissions), so this needs no
   // separate admin special-case here — the map already reflects it.
@@ -69,7 +78,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ token, user, permissions, sessionTimeoutMinutes, loading, login, logout, updateUser, can }}
+      value={{ token, user, permissions, sessionTimeoutMinutes, loading, login, logout, updateUser, updateToken, can }}
     >
       {children}
     </AuthContext.Provider>

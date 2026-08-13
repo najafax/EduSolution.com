@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 
 export default function MyAccount() {
-  const { user, token, updateUser } = useAuth();
+  const { user, token, updateUser, updateToken } = useAuth();
 
   const [profileForm, setProfileForm] = useState({ name: user?.name || '', email: user?.email || '' });
   const [profileError, setProfileError] = useState('');
@@ -42,7 +42,8 @@ export default function MyAccount() {
     setPasswordSuccess('');
     setPasswordSubmitting(true);
     try {
-      await api.changePassword(passwordForm, token);
+      const { token: nextToken } = await api.changePassword(passwordForm, token);
+      updateToken(nextToken);
       setPasswordForm({ currentPassword: '', newPassword: '' });
       setPasswordSuccess('Password changed.');
     } catch (err) {

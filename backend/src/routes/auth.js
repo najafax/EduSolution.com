@@ -128,10 +128,9 @@ router.post('/reset-password', resetPasswordLimiter, async (req, res) => {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  db.prepare('UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?').run(
-    passwordHash,
-    user.id,
-  );
+  db.prepare(
+    `UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL, password_changed_at = datetime('now') WHERE id = ?`,
+  ).run(passwordHash, user.id);
 
   res.json({ message: 'Password updated. You can now log in.' });
 });
@@ -180,8 +179,15 @@ router.post('/change-password', requireAuth, async (req, res) => {
   if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, req.user.id);
-  res.json({ message: 'Password updated.' });
+  db.prepare(`UPDATE users SET password_hash = ?, password_changed_at = datetime('now') WHERE id = ?`).run(
+    passwordHash,
+    req.user.id,
+  );
+  // Bumping password_changed_at invalidates every token issued before now,
+  // including the one this request just authenticated with — issue a fresh
+  // one so the caller's own session doesn't get logged out by its own
+  // password change.
+  res.json({ message: 'Password updated.', token: signToken(user) });
 });
 
 // The only personal preference for now: opt in to a daily digest email
