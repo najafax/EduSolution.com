@@ -250,11 +250,13 @@ function decodeImageDataUri(dataUri) {
 // drawn if its own business_settings field is set — a business that's only
 // uploaded a stamp doesn't get an empty signature line, and vice versa.
 // Draws nothing at all if neither is set. When both are present, the stamp
-// is positioned half-overlapping the signature's left edge (drawn after it,
-// so it sits visually on top) rather than off in its own separate spot —
+// sits half-overlapping the signature's right edge (drawn after it, so it
+// sits visually on top) rather than off in its own separate spot —
 // mirroring how a physical stamp is typically pressed partly over a
-// signature. With no signature to anchor against, the stamp falls back to
-// sitting alone at the left margin.
+// signature. The signature itself shifts left by half the stamp's width so
+// the stamp's own right edge, not the signature's, lines up with the
+// document's right margin. With no signature to anchor against, the stamp
+// falls back to sitting alone at the left margin.
 function drawSignatureBlock(doc, settings, y) {
   if (!settings.signature_image && !settings.stamp_image) return;
 
@@ -264,7 +266,9 @@ function drawSignatureBlock(doc, settings, y) {
     y = MARGIN;
   }
 
-  const sigX = MARGIN + CONTENT_WIDTH - SIGNATURE_BOX_WIDTH;
+  const hasBoth = Boolean(settings.signature_image && settings.stamp_image);
+  const sigRight = MARGIN + CONTENT_WIDTH - (hasBoth ? STAMP_BOX_SIZE / 2 : 0);
+  const sigX = sigRight - SIGNATURE_BOX_WIDTH;
 
   if (settings.signature_image) {
     const buffer = decodeImageDataUri(settings.signature_image);
@@ -280,7 +284,7 @@ function drawSignatureBlock(doc, settings, y) {
   if (settings.stamp_image) {
     const buffer = decodeImageDataUri(settings.stamp_image);
     if (buffer) {
-      const stampX = settings.signature_image ? sigX - STAMP_BOX_SIZE / 2 : MARGIN;
+      const stampX = settings.signature_image ? MARGIN + CONTENT_WIDTH - STAMP_BOX_SIZE : MARGIN;
       const stampY = settings.signature_image ? y + SIGNATURE_IMG_HEIGHT / 2 - STAMP_BOX_SIZE / 2 : y;
       doc.image(buffer, stampX, stampY, { fit: [STAMP_BOX_SIZE, STAMP_BOX_SIZE] });
     }
