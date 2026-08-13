@@ -13,6 +13,7 @@ const COLORS = {
   headerFill: '#eef2ff',
   rowAlt: '#f8fafc',
   positive: '#059669',
+  negative: '#dc2626',
 };
 
 function docToBuffer(doc, onBeforeEnd) {
@@ -272,13 +273,12 @@ function drawItemsTable(doc, items, startY, symbol, taxRate) {
 }
 
 // Subtotal/discount/tax as plain rows, a divider, then the bold final
-// figure: "Balance Due" for invoices, "Total" for quotes — both in the
-// brand color rather than the old red/green paid-state coloring, matching
-// the flat single-color treatment of the reference design. "Total"/"Paid"
-// rows only appear on an invoice that's actually received a payment;
-// otherwise balance due already equals the total and a redundant pair of
-// rows saying so twice adds nothing. Breaks to a new page if it wouldn't
-// fit under the table.
+// figure: "Balance Due" for invoices (red while still owed, green once
+// fully paid), "Total" for quotes (brand color — quotes have no paid
+// state). "Total"/"Paid" rows only appear on an invoice that's actually
+// received a payment; otherwise balance due already equals the total and a
+// redundant pair of rows saying so twice adds nothing. Breaks to a new page
+// if it wouldn't fit under the table.
 function drawTotals(
   doc,
   { subtotal, discountType, discountValue, discountAmount, taxRate, taxAmount, total, amountPaid, balanceDue },
@@ -318,9 +318,10 @@ function drawTotals(
 
   const finalLabel = isInvoice ? 'Balance Due' : 'Total';
   const finalValue = isInvoice ? balanceDue : total;
+  const finalColor = isInvoice ? (balanceDue > 0 ? COLORS.negative : COLORS.positive) : COLORS.brand;
 
-  doc.font('Helvetica-Bold').fontSize(13).fillColor(COLORS.brand).text(finalLabel, boxX, rowY, { width: 130 });
-  doc.font('Helvetica-Bold').fontSize(13).fillColor(COLORS.brand).text(money(finalValue, symbol), boxX + 130, rowY, { width: 115, align: 'right' });
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(finalColor).text(finalLabel, boxX, rowY, { width: 130 });
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(finalColor).text(money(finalValue, symbol), boxX + 130, rowY, { width: 115, align: 'right' });
 
   return rowY + 34;
 }
@@ -373,6 +374,8 @@ function drawCommentsBox(doc, notes, y) {
 const SIGNATURE_BOX_WIDTH = 150;
 const SIGNATURE_IMG_HEIGHT = 46;
 const STAMP_BOX_SIZE = 70;
+const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.75;
+const STAMP_ROTATION_DEGREES = -20; // negative = anti-clockwise
 const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + 6 + 4 + 10 + 4 + 12;
 
 // An authorized-signature image over a signing line (with the signatory's
@@ -381,12 +384,13 @@ const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + 6 + 4 + 10 + 4 + 12;
 // (e.g. the right edge of a narrower left-hand column, or the page's own
 // right margin). Each image is fully independent and only drawn if its own
 // business_settings field is set. When both are present, the stamp sits
-// half-overlapping the signature's right edge (drawn after it, so it's
-// visually on top) rather than off in its own separate spot — mirroring how
-// a physical stamp is typically pressed partly over a signature.
+// rotated 20° anti-clockwise, overlapping most of the signature's right
+// portion (drawn after it, so it's visually on top) rather than off in its
+// own separate spot — mirroring how a physical stamp is typically pressed
+// partly over a signature.
 function drawSignatureBlock(doc, settings, y, rightBound) {
   const hasBoth = Boolean(settings.signature_image && settings.stamp_image);
-  const sigRight = rightBound - (hasBoth ? STAMP_BOX_SIZE / 2 : 0);
+  const sigRight = rightBound - (hasBoth ? STAMP_OVERLAP : 0);
   const sigX = sigRight - SIGNATURE_BOX_WIDTH;
 
   if (settings.signature_image) {
@@ -405,7 +409,12 @@ function drawSignatureBlock(doc, settings, y, rightBound) {
     if (buffer) {
       const stampX = rightBound - STAMP_BOX_SIZE;
       const stampY = settings.signature_image ? y + SIGNATURE_IMG_HEIGHT / 2 - STAMP_BOX_SIZE / 2 : y;
+      const centerX = stampX + STAMP_BOX_SIZE / 2;
+      const centerY = stampY + STAMP_BOX_SIZE / 2;
+      doc.save();
+      doc.rotate(STAMP_ROTATION_DEGREES, { origin: [centerX, centerY] });
       doc.image(buffer, stampX, stampY, { fit: [STAMP_BOX_SIZE, STAMP_BOX_SIZE] });
+      doc.restore();
     }
   }
 }
