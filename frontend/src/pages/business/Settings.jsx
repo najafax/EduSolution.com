@@ -78,6 +78,23 @@ export default function Settings() {
               Everyone is warned and then automatically logged out after this many minutes of inactivity.
             </span>
           </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ImageField
+              label="Authorized signature"
+              value={form.signature_image}
+              onChange={(v) => setForm((f) => ({ ...f, signature_image: v }))}
+              onError={setError}
+              hint="Printed on quote/invoice PDFs above an “Authorized Signature” line."
+            />
+            <ImageField
+              label="Company stamp"
+              value={form.stamp_image}
+              onChange={(v) => setForm((f) => ({ ...f, stamp_image: v }))}
+              onError={setError}
+              hint="Printed on quote/invoice PDFs next to the signature."
+            />
+          </div>
         </fieldset>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -123,5 +140,58 @@ function Field({ label, value, onChange, type = 'text' }) {
         className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
       />
     </label>
+  );
+}
+
+// Matches routes/settings.js's own limits — PNG/JPEG only (all PDFKit
+// supports), capped at 400KB so a business rarely uploads either of these
+// again and every future GET/PUT /api/settings response doesn't balloon.
+const MAX_IMAGE_BYTES = 400 * 1024;
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg'];
+
+function ImageField({ label, value, onChange, onError, hint }) {
+  function handleFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    onError('');
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      onError(`${label} must be a PNG or JPEG image`);
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      onError(`${label} must be smaller than 400KB`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => onChange(reader.result);
+    reader.onerror = () => onError(`Could not read the selected file for ${label}`);
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div className="block">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      {value ? (
+        <div className="mt-1 flex items-center gap-3">
+          <img src={value} alt={label} className="h-16 max-w-[160px] rounded-md border border-slate-200 object-contain" />
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <input
+          type="file"
+          accept="image/png,image/jpeg"
+          onChange={handleFile}
+          className="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:min-h-11 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-50"
+        />
+      )}
+      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
+    </div>
   );
 }

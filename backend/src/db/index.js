@@ -40,6 +40,8 @@ db.exec(`
     currency_symbol TEXT NOT NULL DEFAULT '$',
     bank_details TEXT NOT NULL DEFAULT '',
     session_timeout_minutes INTEGER NOT NULL DEFAULT 30,
+    signature_image TEXT NOT NULL DEFAULT '',
+    stamp_image TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -227,6 +229,16 @@ if (!userColumns.has('role')) {
 const settingsColumns = new Set(db.prepare('PRAGMA table_info(business_settings)').all().map((c) => c.name));
 if (!settingsColumns.has('session_timeout_minutes')) {
   db.exec(`ALTER TABLE business_settings ADD COLUMN session_timeout_minutes INTEGER NOT NULL DEFAULT 30;`);
+}
+
+// Same pattern again: `signature_image`/`stamp_image` (base64 data URIs,
+// see routes/settings.js) added to business_settings after that table's
+// single row already existed in production.
+if (!settingsColumns.has('signature_image')) {
+  db.exec(`
+    ALTER TABLE business_settings ADD COLUMN signature_image TEXT NOT NULL DEFAULT '';
+    ALTER TABLE business_settings ADD COLUMN stamp_image TEXT NOT NULL DEFAULT '';
+  `);
 }
 
 // Same pattern again: `clients` used to have separate `name` (contact

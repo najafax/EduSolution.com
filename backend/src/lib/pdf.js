@@ -231,7 +231,53 @@ function drawTotals(
   return rowY + 48;
 }
 
-function drawFooter(doc, { notes, bankDetails }, y) {
+const SIGNATURE_BOX_WIDTH = 180;
+const SIGNATURE_IMG_HEIGHT = 46;
+const STAMP_BOX_SIZE = 70;
+
+// signature_image/stamp_image (business_settings, see routes/settings.js)
+// are stored as data URIs — decode back to a Buffer PDFKit's doc.image()
+// can embed. Returns null on anything malformed rather than throwing, so a
+// stray bad value in storage degrades to "no image" instead of failing PDF
+// generation for every quote/invoice.
+function decodeImageDataUri(dataUri) {
+  const match = /^data:image\/(png|jpe?g);base64,([A-Za-z0-9+/]+=*)$/.exec(dataUri || '');
+  return match ? Buffer.from(match[2], 'base64') : null;
+}
+
+// Company stamp (left) and an authorized-signature image over a signing
+// line (right) near the bottom of the document. Each is fully independent
+// and only drawn if its own business_settings field is set — a business
+// that's only uploaded a stamp doesn't get an empty signature line, and
+// vice versa. Draws nothing at all if neither is set.
+function drawSignatureBlock(doc, settings, y) {
+  if (!settings.signature_image && !settings.stamp_image) return;
+
+  const blockHeight = Math.max(STAMP_BOX_SIZE, SIGNATURE_IMG_HEIGHT + 26);
+  if (y + blockHeight > PAGE_BOTTOM) {
+    doc.addPage();
+    y = MARGIN;
+  }
+
+  if (settings.stamp_image) {
+    const buffer = decodeImageDataUri(settings.stamp_image);
+    if (buffer) doc.image(buffer, MARGIN, y, { fit: [STAMP_BOX_SIZE, STAMP_BOX_SIZE] });
+  }
+
+  if (settings.signature_image) {
+    const sigX = MARGIN + CONTENT_WIDTH - SIGNATURE_BOX_WIDTH;
+    const buffer = decodeImageDataUri(settings.signature_image);
+    if (buffer) doc.image(buffer, sigX, y, { fit: [SIGNATURE_BOX_WIDTH, SIGNATURE_IMG_HEIGHT] });
+    const lineY = y + SIGNATURE_IMG_HEIGHT + 6;
+    doc.moveTo(sigX, lineY).lineTo(sigX + SIGNATURE_BOX_WIDTH, lineY).strokeColor(COLORS.border).lineWidth(1).stroke();
+    doc
+      .fontSize(8)
+      .fillColor(COLORS.muted)
+      .text('Authorized Signature', sigX, lineY + 4, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
+  }
+}
+
+function drawFooter(doc, { notes, bankDetails, settings }, y) {
   if (y > PAGE_BOTTOM - 40) {
     doc.addPage();
     y = MARGIN;
@@ -244,7 +290,9 @@ function drawFooter(doc, { notes, bankDetails }, y) {
   if (bankDetails) {
     doc.fontSize(9).fillColor(COLORS.muted).text('PAYMENT DETAILS', MARGIN, y);
     doc.fontSize(9).fillColor(COLORS.body).text(bankDetails, MARGIN, y + 14, { width: CONTENT_WIDTH });
+    y += 14 + doc.heightOfString(bankDetails, { width: CONTENT_WIDTH }) + 20;
   }
+  drawSignatureBlock(doc, settings, y);
 }
 
 function renderQuotePdf({ quote, client, items, settings }) {
@@ -275,7 +323,7 @@ function renderQuotePdf({ quote, client, items, settings }) {
     y,
     symbol,
   );
-  drawFooter(doc, { notes: quote.notes, bankDetails: '' }, y);
+  drawFooter(doc, { notes: quote.notes, bankDetails: '', settings }, y);
 
   return docToBuffer(doc, addPageNumbers);
 }
@@ -311,7 +359,7 @@ function renderInvoicePdf({ invoice, client, items, settings }) {
     y,
     symbol,
   );
-  drawFooter(doc, { notes: invoice.notes, bankDetails: settings.bank_details }, y);
+  drawFooter(doc, { notes: invoice.notes, bankDetails: settings.bank_details, settings }, y);
 
   return docToBuffer(doc, (d) => {
     if (invoice.status === 'paid') addPaidStamp(d);

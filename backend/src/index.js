@@ -26,7 +26,10 @@ const PORT = process.env.PORT || 4000;
 app.set('trust proxy', 1);
 
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
-app.use(express.json());
+// Default 100kb is too small for PUT /api/settings once it carries the
+// signature/stamp images (see routes/settings.js) — 2mb comfortably covers
+// two base64-encoded 400KB images plus the rest of the settings payload.
+app.use(express.json({ limit: '2mb' }));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
