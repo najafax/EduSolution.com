@@ -20,7 +20,9 @@ async function runOverdueReminders() {
   }
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  // Match SQLite's datetime('now') format ("YYYY-MM-DD HH:MM:SS", no "T"/ms/"Z")
+  // so the string comparison below actually reflects chronological order.
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
 
   const candidates = db
     .prepare(
@@ -83,9 +85,19 @@ async function notifyStaffOfReminders(reminded, settings) {
 
 function advanceDate(dateStr, frequency) {
   const d = new Date(`${dateStr}T00:00:00`);
-  if (frequency === 'weekly') d.setDate(d.getDate() + 7);
-  else if (frequency === 'yearly') d.setFullYear(d.getFullYear() + 1);
+  if (frequency === 'weekly') {
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  }
+
+  const originalDay = d.getDate();
+  if (frequency === 'yearly') d.setFullYear(d.getFullYear() + 1);
   else d.setMonth(d.getMonth() + 1); // monthly, the default
+
+  // setMonth/setFullYear roll over into the following month when the
+  // anchor day doesn't exist in the target month (e.g. Jan 31 -> Mar 3).
+  // Clamp back to the target month's last day instead of drifting forward.
+  if (d.getDate() !== originalDay) d.setDate(0);
   return d.toISOString().slice(0, 10);
 }
 
