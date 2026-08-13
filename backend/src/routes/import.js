@@ -191,6 +191,13 @@ function validateInvoiceRow(row, clientsByEmail) {
   }
   if (!status) status = amountPaid >= totals.total ? 'paid' : 'sent';
 
+  if (status === 'paid' && amountPaid < totals.total) {
+    return { ok: false, message: `status is "paid" but amount_paid (${amountPaid}) is less than the invoice total (${totals.total})` };
+  }
+  if ((status === 'void' || status === 'draft') && amountPaid > 0) {
+    return { ok: false, message: `status is "${status}" but amount_paid (${amountPaid}) is greater than 0` };
+  }
+
   return {
     ok: true,
     values: {
