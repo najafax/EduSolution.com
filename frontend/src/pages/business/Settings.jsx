@@ -48,11 +48,18 @@ export default function Settings() {
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <fieldset disabled={!canManageSettings} className="contents">
+          <ImageField
+            label="Logo"
+            value={form.logo_image}
+            onChange={(v) => setForm((f) => ({ ...f, logo_image: v }))}
+            onError={setError}
+            hint="Printed at the top-left of every quote/invoice/receipt PDF, next to the business name."
+          />
           <Field label="Business name" value={form.business_name} onChange={(v) => setForm((f) => ({ ...f, business_name: v }))} />
           <Field label="Email" type="email" value={form.email} onChange={(v) => setForm((f) => ({ ...f, email: v }))} />
           <Field label="Phone" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} />
           <Field label="Address" value={form.address} onChange={(v) => setForm((f) => ({ ...f, address: v }))} />
-          <Field label="Tax ID" value={form.tax_id} onChange={(v) => setForm((f) => ({ ...f, tax_id: v }))} />
+          <Field label="Tax ID (TIN)" value={form.tax_id} onChange={(v) => setForm((f) => ({ ...f, tax_id: v }))} />
           <Field label="Currency symbol" value={form.currency_symbol} onChange={(v) => setForm((f) => ({ ...f, currency_symbol: v }))} />
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Bank / payment details</span>
@@ -95,6 +102,11 @@ export default function Settings() {
               hint="Printed on quote/invoice PDFs next to the signature."
             />
           </div>
+          <Field
+            label="Authorized signatory's name"
+            value={form.signatory_name}
+            onChange={(v) => setForm((f) => ({ ...f, signatory_name: v }))}
+          />
         </fieldset>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
