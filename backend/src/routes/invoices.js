@@ -368,6 +368,9 @@ router.post('/:id/duplicate', manage, (req, res) => {
 router.post('/:id/payments', manage, (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  if (data.invoice.status === 'void' || data.invoice.status === 'draft') {
+    return res.status(400).json({ error: `cannot record a payment against a ${data.invoice.status} invoice` });
+  }
 
   const { amount, method = 'bank_transfer', reference = '', notes = '', paid_at } = req.body || {};
   const amountNum = Number(amount);
