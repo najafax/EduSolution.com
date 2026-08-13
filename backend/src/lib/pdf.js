@@ -457,9 +457,10 @@ function drawSignatureAndPayment(doc, { settings, bankDetails }, y) {
     y = MARGIN;
   }
 
-  // Center the signature+stamp pair within the left column as one unit,
-  // rather than pinning either edge to it.
-  const sigRightBound = MARGIN + (leftWidth + SIGNATURE_GROUP_WIDTH) / 2;
+  // Left-align the signature+stamp pair at the same margin as everything
+  // else on the page (BILL TO, the Comments box, etc.) rather than
+  // centering or right-aligning it within the column.
+  const sigRightBound = MARGIN + SIGNATURE_GROUP_WIDTH;
   if (hasSig) drawSignatureBlock(doc, settings, y, sigRightBound);
   if (hasBank) drawIconLabelBox(doc, { icon: 'bank', label: 'PAYMENTS PAYABLE TO', bodyText: bankDetails }, rightX, rightWidth, y);
 
