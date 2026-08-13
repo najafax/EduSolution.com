@@ -374,7 +374,11 @@ function drawCommentsBox(doc, notes, y) {
 const SIGNATURE_BOX_WIDTH = 150;
 const SIGNATURE_IMG_HEIGHT = 46;
 const STAMP_BOX_SIZE = 70;
-const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.5;
+// The stamp box always ends flush with `rightBound` (see stampX below); this
+// is how much of the *signature's* box width sits underneath the stamp box.
+// A bigger value pulls the signature further right, deeper under the stamp
+// — i.e. this is the overlap amount itself, not an offset that shrinks it.
+const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.6;
 const STAMP_ROTATION_DEGREES = -20; // negative = anti-clockwise
 const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + 6 + 4 + 10 + 4 + 12;
 
@@ -384,18 +388,25 @@ const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + 6 + 4 + 10 + 4 + 12;
 // (e.g. the right edge of a narrower left-hand column, or the page's own
 // right margin). Each image is fully independent and only drawn if its own
 // business_settings field is set. When both are present, the stamp sits
-// rotated 20° anti-clockwise, half-overlapping the signature's right edge
-// (drawn after it, so it's visually in front) rather than off in its own
-// separate spot — mirroring how a physical stamp is typically pressed
-// partly over a signature.
+// rotated 20° anti-clockwise, overlapping most of the signature's right
+// portion (drawn after it, so it's visually in front) rather than off in
+// its own separate spot — mirroring how a physical stamp is typically
+// pressed partly over a signature.
 function drawSignatureBlock(doc, settings, y, rightBound) {
   const hasBoth = Boolean(settings.signature_image && settings.stamp_image);
-  const sigRight = rightBound - (hasBoth ? STAMP_OVERLAP : 0);
+  const sigRight = rightBound - (hasBoth ? STAMP_BOX_SIZE - STAMP_OVERLAP : 0);
   const sigX = sigRight - SIGNATURE_BOX_WIDTH;
 
   if (settings.signature_image) {
     const buffer = decodeImageDataUri(settings.signature_image);
-    if (buffer) doc.image(buffer, sigX, y, { fit: [SIGNATURE_BOX_WIDTH, SIGNATURE_IMG_HEIGHT] });
+    // align: 'right' matters here: `fit` alone centers the scaled image in
+    // its box, and a signature much more square than this wide/short box
+    // (common — most signatures aren't 3:1) ends up small and centered with
+    // empty space on both sides, defeating the stamp overlap below (which
+    // only accounts for the *box's* edge, not wherever the actual ink
+    // happens to land inside it). Right-aligning puts the ink where the
+    // overlap math assumes it is: right up against the box's own edge.
+    if (buffer) doc.image(buffer, sigX, y, { fit: [SIGNATURE_BOX_WIDTH, SIGNATURE_IMG_HEIGHT], align: 'right', valign: 'center' });
     const lineY = y + SIGNATURE_IMG_HEIGHT + 6;
     doc.moveTo(sigX, lineY).lineTo(sigX + SIGNATURE_BOX_WIDTH, lineY).strokeColor(COLORS.border).lineWidth(1).stroke();
     doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted).text('Authorized Signature', sigX, lineY + 4, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
