@@ -374,7 +374,7 @@ function drawCommentsBox(doc, notes, y) {
 const SIGNATURE_BOX_WIDTH = 150;
 const SIGNATURE_IMG_HEIGHT = 46;
 const STAMP_BOX_SIZE = 70;
-const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.75;
+const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.8;
 const STAMP_ROTATION_DEGREES = -20; // negative = anti-clockwise
 const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + 6 + 4 + 10 + 4 + 12;
 
