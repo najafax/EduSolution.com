@@ -187,7 +187,7 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
               required
               value={issueDate}
               onChange={(e) => setIssueDate(e.target.value)}
-              className="mt-1 h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 h-11 w-full appearance-none rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
             />
           </label>
 
@@ -197,7 +197,7 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
               type="date"
               value={expiryDate}
               onChange={(e) => setExpiryDate(e.target.value)}
-              className="mt-1 h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 h-11 w-full appearance-none rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
             />
           </label>
         </div>
