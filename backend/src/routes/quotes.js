@@ -123,8 +123,8 @@ router.post('/', manage, (req, res) => {
   const result = db
     .prepare(
       `INSERT INTO quotes (number, client_id, status, issue_date, expiry_date, notes, discount_type, discount_value,
-         subtotal, discount_amount, tax_rate, tax_amount, total, public_token)
-       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name)
+       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       number,
@@ -140,6 +140,7 @@ router.post('/', manage, (req, res) => {
       totals.taxAmount,
       totals.total,
       publicToken,
+      req.user.name,
     );
 
   saveItems(result.lastInsertRowid, totals.items);
@@ -272,8 +273,8 @@ router.post('/:id/duplicate', manage, (req, res) => {
   const result = db
     .prepare(
       `INSERT INTO quotes (number, client_id, status, issue_date, expiry_date, notes, discount_type, discount_value,
-         subtotal, discount_amount, tax_rate, tax_amount, total, public_token)
-       VALUES (?, ?, 'draft', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name)
+       VALUES (?, ?, 'draft', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       number,
@@ -288,6 +289,7 @@ router.post('/:id/duplicate', manage, (req, res) => {
       data.quote.tax_amount,
       data.quote.total,
       publicToken,
+      req.user.name,
     );
 
   const insertItem = db.prepare(
@@ -320,8 +322,8 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
   const result = db
     .prepare(
       `INSERT INTO invoices (number, client_id, quote_id, status, issue_date, due_date, notes, discount_type, discount_value,
-         subtotal, discount_amount, tax_rate, tax_amount, total, public_token)
-       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name)
+       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       number,
@@ -338,6 +340,7 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
       data.quote.tax_amount,
       data.quote.total,
       publicToken,
+      req.user.name,
     );
 
   const insertItem = db.prepare(

@@ -44,6 +44,8 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     session_timeout_minutes = 30,
     signature_image = '',
     stamp_image = '',
+    logo_image = '',
+    signatory_name = '',
   } = req.body || {};
 
   const timeoutNum = Number(session_timeout_minutes);
@@ -51,10 +53,11 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     return res.status(400).json({ error: 'session_timeout_minutes must be a whole number between 1 and 480' });
   }
 
-  let signatureImage, stampImage;
+  let signatureImage, stampImage, logoImage;
   try {
     signatureImage = validateImageField(signature_image, 'Authorized signature');
     stampImage = validateImageField(stamp_image, 'Company stamp');
+    logoImage = validateImageField(logo_image, 'Logo');
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -62,9 +65,23 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
   db.prepare(
     `UPDATE business_settings
      SET business_name = ?, email = ?, phone = ?, address = ?, tax_id = ?, currency_symbol = ?, bank_details = ?,
-         session_timeout_minutes = ?, signature_image = ?, stamp_image = ?, updated_at = datetime('now')
+         session_timeout_minutes = ?, signature_image = ?, stamp_image = ?, logo_image = ?, signatory_name = ?,
+         updated_at = datetime('now')
      WHERE id = 1`,
-  ).run(business_name, email, phone, address, tax_id, currency_symbol, bank_details, timeoutNum, signatureImage, stampImage);
+  ).run(
+    business_name,
+    email,
+    phone,
+    address,
+    tax_id,
+    currency_symbol,
+    bank_details,
+    timeoutNum,
+    signatureImage,
+    stampImage,
+    logoImage,
+    signatory_name,
+  );
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   res.json({ settings });

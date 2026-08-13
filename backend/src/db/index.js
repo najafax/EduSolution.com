@@ -42,6 +42,8 @@ db.exec(`
     session_timeout_minutes INTEGER NOT NULL DEFAULT 30,
     signature_image TEXT NOT NULL DEFAULT '',
     stamp_image TEXT NOT NULL DEFAULT '',
+    logo_image TEXT NOT NULL DEFAULT '',
+    signatory_name TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -75,6 +77,7 @@ db.exec(`
     public_token TEXT UNIQUE,
     client_response TEXT,
     client_responded_at TEXT,
+    created_by_name TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -110,6 +113,7 @@ db.exec(`
     amount_paid REAL NOT NULL DEFAULT 0,
     last_reminder_sent_at TEXT,
     public_token TEXT UNIQUE,
+    created_by_name TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -241,6 +245,20 @@ if (!settingsColumns.has('signature_image')) {
   `);
 }
 
+// Same pattern again: `logo_image` (data URI, same shape as
+// signature_image/stamp_image) and `signatory_name` (the name printed
+// under "Authorized Signature" on quote/invoice PDFs — distinct from
+// quotes.created_by_name/invoices.created_by_name below, which is whoever
+// actually created that specific document, not the business's authorized
+// signer) added to business_settings after that table's single row already
+// existed in production.
+if (!settingsColumns.has('logo_image')) {
+  db.exec(`
+    ALTER TABLE business_settings ADD COLUMN logo_image TEXT NOT NULL DEFAULT '';
+    ALTER TABLE business_settings ADD COLUMN signatory_name TEXT NOT NULL DEFAULT '';
+  `);
+}
+
 // Same pattern again: `clients` used to have separate `name` (contact
 // person) and `company` fields, which in practice was just a confusing
 // way to ask the same question twice — a client here always means the
@@ -285,6 +303,24 @@ if (!quoteItemColumns.has('product_id')) {
 const invoiceItemColumns = new Set(db.prepare('PRAGMA table_info(invoice_items)').all().map((c) => c.name));
 if (!invoiceItemColumns.has('product_id')) {
   db.exec(`ALTER TABLE invoice_items ADD COLUMN product_id INTEGER;`);
+}
+
+// Same pattern again: `created_by_name` added to `quotes`/`invoices` so the
+// PDF can print a "Prepared By" line (see lib/pdf.js) — captured once at
+// creation time (routes/quotes.js, routes/invoices.js), same
+// denormalize-rather-than-join approach as invoice_items/quote_items
+// storing description/unit_price directly. Left blank on rows that predate
+// this column, and on invoices generated with no human in the loop
+// (recurring-invoice generation in lib/scheduler.js, bulk CSV import in
+// routes/import.js) — the PDF simply omits the row when it's blank, the
+// same "only if present" convention as NOTES/PAYMENT DETAILS already use.
+const quoteColumns = new Set(db.prepare('PRAGMA table_info(quotes)').all().map((c) => c.name));
+if (!quoteColumns.has('created_by_name')) {
+  db.exec(`ALTER TABLE quotes ADD COLUMN created_by_name TEXT NOT NULL DEFAULT '';`);
+}
+const invoiceColumns = new Set(db.prepare('PRAGMA table_info(invoices)').all().map((c) => c.name));
+if (!invoiceColumns.has('created_by_name')) {
+  db.exec(`ALTER TABLE invoices ADD COLUMN created_by_name TEXT NOT NULL DEFAULT '';`);
 }
 
 db.pragma('foreign_keys = ON');
