@@ -374,7 +374,7 @@ function drawCommentsBox(doc, notes, y) {
 const SIGNATURE_BOX_WIDTH = 150;
 const SIGNATURE_IMG_HEIGHT = 46;
 const STAMP_BOX_SIZE = 70;
-const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.8;
+const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.5;
 const STAMP_ROTATION_DEGREES = -20; // negative = anti-clockwise
 const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + 6 + 4 + 10 + 4 + 12;
 
@@ -384,9 +384,9 @@ const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + 6 + 4 + 10 + 4 + 12;
 // (e.g. the right edge of a narrower left-hand column, or the page's own
 // right margin). Each image is fully independent and only drawn if its own
 // business_settings field is set. When both are present, the stamp sits
-// rotated 20° anti-clockwise, overlapping most of the signature's right
-// portion (drawn after it, so it's visually on top) rather than off in its
-// own separate spot — mirroring how a physical stamp is typically pressed
+// rotated 20° anti-clockwise, half-overlapping the signature's right edge
+// (drawn after it, so it's visually in front) rather than off in its own
+// separate spot — mirroring how a physical stamp is typically pressed
 // partly over a signature.
 function drawSignatureBlock(doc, settings, y, rightBound) {
   const hasBoth = Boolean(settings.signature_image && settings.stamp_image);
