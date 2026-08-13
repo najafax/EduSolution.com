@@ -373,7 +373,7 @@ function drawCommentsBox(doc, notes, y) {
 
 const SIGNATURE_BOX_WIDTH = 150;
 const SIGNATURE_IMG_HEIGHT = 46;
-const STAMP_BOX_SIZE = 70;
+const STAMP_BOX_SIZE = 55;
 // The stamp box always ends flush with `rightBound` (see stampX below); this
 // is how much of the *signature's* box width sits underneath the stamp box.
 // A bigger value pulls the signature further right, deeper under the stamp
@@ -381,6 +381,9 @@ const STAMP_BOX_SIZE = 70;
 const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.6;
 const STAMP_ROTATION_DEGREES = -20; // negative = anti-clockwise
 const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + 6 + 4 + 10 + 4 + 12;
+// How wide the signature+stamp pair are together, so the caller can center
+// the whole pair as one unit rather than anchoring either edge.
+const SIGNATURE_GROUP_WIDTH = SIGNATURE_BOX_WIDTH + (STAMP_BOX_SIZE - STAMP_OVERLAP);
 
 // An authorized-signature image over a signing line (with the signatory's
 // printed name below it), and a company stamp, anchored so their combined
@@ -454,7 +457,10 @@ function drawSignatureAndPayment(doc, { settings, bankDetails }, y) {
     y = MARGIN;
   }
 
-  if (hasSig) drawSignatureBlock(doc, settings, y, MARGIN + leftWidth);
+  // Center the signature+stamp pair within the left column as one unit,
+  // rather than pinning either edge to it.
+  const sigRightBound = MARGIN + (leftWidth + SIGNATURE_GROUP_WIDTH) / 2;
+  if (hasSig) drawSignatureBlock(doc, settings, y, sigRightBound);
   if (hasBank) drawIconLabelBox(doc, { icon: 'bank', label: 'PAYMENTS PAYABLE TO', bodyText: bankDetails }, rightX, rightWidth, y);
 
   return y + rowHeight + 20;
