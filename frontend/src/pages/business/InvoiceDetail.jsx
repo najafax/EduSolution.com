@@ -296,13 +296,15 @@ export default function InvoiceDetail() {
               </label>
               <label className="block">
                 <span className="text-sm font-medium text-slate-700">Date</span>
-                <input
-                  type="date"
-                  required
-                  value={payment.paid_at}
-                  onChange={(e) => setPayment((p) => ({ ...p, paid_at: e.target.value }))}
-                  className="mt-1 h-11 w-full appearance-none rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
-                />
+                <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500">
+                  <input
+                    type="date"
+                    required
+                    value={payment.paid_at}
+                    onChange={(e) => setPayment((p) => ({ ...p, paid_at: e.target.value }))}
+                    className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none"
+                  />
+                </div>
               </label>
               <label className="block">
                 <span className="text-sm font-medium text-slate-700">Reference</span>

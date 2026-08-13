@@ -158,13 +158,15 @@ export default function QuoteDetail() {
         <form onSubmit={handleConvert} className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Invoice due date</span>
-            <input
-              type="date"
-              required
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="mt-1 h-11 w-full appearance-none rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
-            />
+            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500">
+              <input
+                type="date"
+                required
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none"
+              />
+            </div>
           </label>
           <button type="submit" disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
             Create invoice
