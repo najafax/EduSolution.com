@@ -67,7 +67,7 @@ function addPageNumbers(doc) {
 // obscures the content underneath. `target`, if given, centers the stamp
 // there (renderInvoicePdf uses this to overlap the Balance Due amount);
 // otherwise it falls back to the page center.
-const PAID_STAMP_SCALE = 2 / 3;
+const PAID_STAMP_SCALE = 0.55;
 
 function drawPaidStamp(doc, paidDate, target) {
   const s = PAID_STAMP_SCALE;
