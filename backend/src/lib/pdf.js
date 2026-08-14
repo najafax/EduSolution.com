@@ -66,11 +66,14 @@ function addPageNumbers(doc) {
 // stretched across the whole page. Semi-transparent so it never fully
 // obscures the content underneath. Drawn on every buffered page (via
 // addPaidStamp) so it survives pagination, centered on each page.
+const PAID_STAMP_SCALE = 2 / 3;
+
 function drawPaidStamp(doc, paidDate) {
+  const s = PAID_STAMP_SCALE;
   const cx = doc.page.width / 2;
   const cy = doc.page.height / 2;
-  const w = 200;
-  const h = 92;
+  const w = 200 * s;
+  const h = 92 * s;
   const x = cx - w / 2;
   const y = cy - h / 2;
 
@@ -78,22 +81,22 @@ function drawPaidStamp(doc, paidDate) {
   doc.rotate(-12, { origin: [cx, cy] });
   doc.opacity(0.4);
 
-  doc.lineWidth(3).strokeColor(COLORS.stampInk).roundedRect(x, y, w, h, 8).stroke();
-  doc.lineWidth(1).strokeColor(COLORS.stampInk).roundedRect(x + 6, y + 6, w - 12, h - 12, 5).stroke();
+  doc.lineWidth(3 * s).strokeColor(COLORS.stampInk).roundedRect(x, y, w, h, 8 * s).stroke();
+  doc.lineWidth(1).strokeColor(COLORS.stampInk).roundedRect(x + 6 * s, y + 6 * s, w - 12 * s, h - 12 * s, 5 * s).stroke();
 
   doc
     .font('Helvetica-Bold')
-    .fontSize(30)
+    .fontSize(30 * s)
     .fillColor(COLORS.stampInk)
-    .text('PAID', x, y + 16, { width: w, align: 'center', characterSpacing: 2 });
+    .text('PAID', x, y + 16 * s, { width: w, align: 'center', characterSpacing: 2 * s });
 
   if (paidDate) {
-    doc.moveTo(x + 28, y + 56).lineTo(x + w - 28, y + 56).lineWidth(1).strokeColor(COLORS.stampInk).stroke();
+    doc.moveTo(x + 28 * s, y + 56 * s).lineTo(x + w - 28 * s, y + 56 * s).lineWidth(1).strokeColor(COLORS.stampInk).stroke();
     doc
       .font('Helvetica-Bold')
-      .fontSize(11)
+      .fontSize(11 * s)
       .fillColor(COLORS.stampInk)
-      .text(paidDate, x, y + 63, { width: w, align: 'center', characterSpacing: 1 });
+      .text(paidDate, x, y + 63 * s, { width: w, align: 'center', characterSpacing: 1 * s });
   }
 
   doc.restore();
