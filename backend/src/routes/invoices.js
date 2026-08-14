@@ -261,7 +261,7 @@ router.get('/:id/pdf', view, async (req, res) => {
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
 
-  const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings });
+  const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings, payments: data.payments });
   res.set({
     'Content-Type': 'application/pdf',
     'Content-Disposition': `inline; filename="${data.invoice.number}.pdf"`,
@@ -278,7 +278,7 @@ router.post('/:id/send', manage, async (req, res) => {
   const publicUrl = `${clientOrigin}/i/${data.invoice.public_token}`;
 
   try {
-    const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings });
+    const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings, payments: data.payments });
     await sendMail({
       to: data.client.email,
       subject: `Invoice ${data.invoice.number} from ${settings.business_name || 'us'}`,
@@ -306,7 +306,7 @@ router.post('/:id/remind', manage, async (req, res) => {
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
 
   try {
-    const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings });
+    const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings, payments: data.payments });
     await sendMail({
       to: data.client.email,
       subject: `Payment reminder: invoice ${data.invoice.number}`,

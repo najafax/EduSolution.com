@@ -92,8 +92,12 @@ router.get('/invoices/:token/pdf', async (req, res) => {
   const data = getInvoiceByToken(req.params.token);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  // Fetched separately from getInvoiceByToken (rather than added to what it
+  // returns) so this stays PDF-only — the public JSON view's response shape
+  // is unaffected.
+  const payments = db.prepare('SELECT * FROM payments WHERE invoice_id = ? ORDER BY paid_at').all(data.invoice.id);
 
-  const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings });
+  const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings, payments });
   res.set({
     'Content-Type': 'application/pdf',
     'Content-Disposition': `inline; filename="${data.invoice.number}.pdf"`,

@@ -14,6 +14,7 @@ const COLORS = {
   rowAlt: '#f8fafc',
   positive: '#059669',
   negative: '#dc2626',
+  stampInk: '#b91c1c',
 };
 
 function docToBuffer(doc, onBeforeEnd) {
@@ -59,26 +60,50 @@ function addPageNumbers(doc) {
   }
 }
 
-// Large translucent diagonal "PAID" watermark across the page center —
-// low opacity so it never obscures the content underneath, drawn on every
-// buffered page (via addPaidStamp) so it survives pagination too.
-function drawPaidStamp(doc) {
+// A double-ring "PAID" ink stamp with the date it was actually paid —
+// styled to read as a genuine rubber-stamp impression (a bordered ring,
+// red ink, a modest hand-stamped tilt) rather than a huge diagonal banner
+// stretched across the whole page. Semi-transparent so it never fully
+// obscures the content underneath. Drawn on every buffered page (via
+// addPaidStamp) so it survives pagination, centered on each page.
+function drawPaidStamp(doc, paidDate) {
   const cx = doc.page.width / 2;
   const cy = doc.page.height / 2;
+  const w = 200;
+  const h = 92;
+  const x = cx - w / 2;
+  const y = cy - h / 2;
 
   doc.save();
-  doc.rotate(-30, { origin: [cx, cy] });
-  doc.opacity(0.15);
-  doc.lineWidth(4).strokeColor(COLORS.positive).rect(cx - 160, cy - 45, 320, 90).stroke();
-  doc.font('Helvetica-Bold').fontSize(56).fillColor(COLORS.positive).text('PAID', cx - 160, cy - 32, { width: 320, align: 'center' });
+  doc.rotate(-12, { origin: [cx, cy] });
+  doc.opacity(0.4);
+
+  doc.lineWidth(3).strokeColor(COLORS.stampInk).roundedRect(x, y, w, h, 8).stroke();
+  doc.lineWidth(1).strokeColor(COLORS.stampInk).roundedRect(x + 6, y + 6, w - 12, h - 12, 5).stroke();
+
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(30)
+    .fillColor(COLORS.stampInk)
+    .text('PAID', x, y + 16, { width: w, align: 'center', characterSpacing: 2 });
+
+  if (paidDate) {
+    doc.moveTo(x + 28, y + 56).lineTo(x + w - 28, y + 56).lineWidth(1).strokeColor(COLORS.stampInk).stroke();
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(11)
+      .fillColor(COLORS.stampInk)
+      .text(paidDate, x, y + 63, { width: w, align: 'center', characterSpacing: 1 });
+  }
+
   doc.restore();
 }
 
-function addPaidStamp(doc) {
+function addPaidStamp(doc, paidDate) {
   const range = doc.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
-    drawPaidStamp(doc);
+    drawPaidStamp(doc, paidDate);
   }
 }
 
@@ -535,10 +560,15 @@ function renderQuotePdf({ quote, client, items, settings }) {
   return docToBuffer(doc, addPageNumbers);
 }
 
-function renderInvoicePdf({ invoice, client, items, settings }) {
+function renderInvoicePdf({ invoice, client, items, settings, payments }) {
   const doc = newDoc();
   const symbol = settings.currency_symbol || '$';
   const balanceDue = invoice.total - invoice.amount_paid;
+  // payments is ordered oldest-first (see routes/invoices.js's
+  // getInvoiceWithItems), so the last entry is whichever payment most
+  // recently pushed this invoice's balance to zero — the date printed on
+  // the PAID stamp below.
+  const paidDate = payments && payments.length ? payments[payments.length - 1].paid_at : null;
 
   let y = drawHeader(doc, {
     title: 'INVOICE',
@@ -572,7 +602,7 @@ function renderInvoicePdf({ invoice, client, items, settings }) {
   drawThankYouFooter(doc, settings, y);
 
   return docToBuffer(doc, (d) => {
-    if (invoice.status === 'paid') addPaidStamp(d);
+    if (invoice.status === 'paid') addPaidStamp(d, paidDate);
     addPageNumbers(d);
   });
 }
@@ -618,7 +648,7 @@ function renderReceiptPdf({ payment, invoice, client, settings }) {
   drawThankYouFooter(doc, settings, y + 10);
 
   return docToBuffer(doc, (d) => {
-    addPaidStamp(d);
+    addPaidStamp(d, payment.paid_at);
     addPageNumbers(d);
   });
 }
