@@ -64,14 +64,15 @@ function addPageNumbers(doc) {
 // styled to read as a genuine rubber-stamp impression (a bordered ring,
 // red ink, a modest hand-stamped tilt) rather than a huge diagonal banner
 // stretched across the whole page. Semi-transparent so it never fully
-// obscures the content underneath. Drawn on every buffered page (via
-// addPaidStamp) so it survives pagination, centered on each page.
+// obscures the content underneath. `target`, if given, centers the stamp
+// there (renderInvoicePdf uses this to overlap the Balance Due amount);
+// otherwise it falls back to the page center.
 const PAID_STAMP_SCALE = 2 / 3;
 
-function drawPaidStamp(doc, paidDate) {
+function drawPaidStamp(doc, paidDate, target) {
   const s = PAID_STAMP_SCALE;
-  const cx = doc.page.width / 2;
-  const cy = doc.page.height / 2;
+  const cx = target ? target.x : doc.page.width / 2;
+  const cy = target ? target.y : doc.page.height / 2;
   const w = 200 * s;
   const h = 92 * s;
   const x = cx - w / 2;
@@ -102,7 +103,15 @@ function drawPaidStamp(doc, paidDate) {
   doc.restore();
 }
 
-function addPaidStamp(doc, paidDate) {
+function addPaidStamp(doc, paidDate, target) {
+  // A specific target position only makes sense on the one page the amount
+  // it's overlapping was actually drawn on — every-page placement (the
+  // page-center fallback) still stamps each page, same as before.
+  if (target && typeof target.pageIndex === 'number') {
+    doc.switchToPage(target.pageIndex);
+    drawPaidStamp(doc, paidDate, target);
+    return;
+  }
   const range = doc.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
@@ -307,11 +316,16 @@ function drawItemsTable(doc, items, startY, symbol, taxRate) {
 // received a payment; otherwise balance due already equals the total and a
 // redundant pair of rows saying so twice adds nothing. Breaks to a new page
 // if it wouldn't fit under the table.
+// `info`, if passed, gets the on-page position of the final Balance
+// Due/Total row written into it (info.balanceX/balanceY, plus the buffered
+// page index it landed on) — renderInvoicePdf uses this to place the PAID
+// stamp directly over the amount instead of at a fixed page-center spot.
 function drawTotals(
   doc,
   { subtotal, discountType, discountValue, discountAmount, taxRate, taxAmount, total, amountPaid, balanceDue },
   y,
   symbol,
+  info,
 ) {
   const boxX = 300;
   const boxWidth = 245;
@@ -350,6 +364,13 @@ function drawTotals(
 
   doc.font('Helvetica-Bold').fontSize(13).fillColor(finalColor).text(finalLabel, boxX, rowY, { width: 130 });
   doc.font('Helvetica-Bold').fontSize(13).fillColor(finalColor).text(money(finalValue, symbol), boxX + 130, rowY, { width: 115, align: 'right' });
+
+  if (info) {
+    info.balanceX = boxX + 130 + 115 / 2;
+    info.balanceY = rowY + 8;
+    const range = doc.bufferedPageRange();
+    info.pageIndex = range.start + range.count - 1;
+  }
 
   return rowY + 34;
 }
@@ -584,6 +605,7 @@ function renderInvoicePdf({ invoice, client, items, settings, payments }) {
   });
   y = drawBillTo(doc, { client, dueLabel: 'Due Date', dueValue: invoice.due_date }, y);
   y = drawItemsTable(doc, items, y, symbol, invoice.tax_rate);
+  const totalsInfo = {};
   y = drawTotals(
     doc,
     {
@@ -599,13 +621,16 @@ function renderInvoicePdf({ invoice, client, items, settings, payments }) {
     },
     y,
     symbol,
+    totalsInfo,
   );
   y = drawCommentsBox(doc, invoice.notes, y);
   y = drawSignatureAndPayment(doc, { settings, bankDetails: settings.bank_details }, y);
   drawThankYouFooter(doc, settings, y);
 
   return docToBuffer(doc, (d) => {
-    if (invoice.status === 'paid') addPaidStamp(d, paidDate);
+    if (invoice.status === 'paid') {
+      addPaidStamp(d, paidDate, { x: totalsInfo.balanceX, y: totalsInfo.balanceY, pageIndex: totalsInfo.pageIndex });
+    }
     addPageNumbers(d);
   });
 }
