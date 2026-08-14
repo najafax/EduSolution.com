@@ -44,18 +44,43 @@ function newDoc() {
 // a text call's y falls past (page height - margins.bottom), and a footer
 // living in that margin would otherwise silently spawn a blank extra page
 // on every switchToPage() call.
-function addPageNumbers(doc) {
+// A thin running footer on every buffered page: a divider line, then the
+// business's own name/address/phone/email (so a page is identifiable on
+// its own — useful once a document runs past one page and pages can get
+// separated) and, only when there's more than one page, "Page X of Y"
+// underneath it. Not to be confused with drawThankYouFooter, which draws
+// the "Thank You For Your Business!" line once inline in the document's
+// normal content flow, not pinned to the bottom of every page.
+function addPageFooter(doc, settings) {
   const range = doc.bufferedPageRange();
-  if (range.count <= 1) return;
+  const businessLine = [settings.business_name, settings.address, settings.phone, settings.email]
+    .filter(Boolean)
+    .join('   ·   ');
+  if (!businessLine && range.count <= 1) return;
+
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
     const bottomMargin = doc.page.margins.bottom;
     doc.page.margins.bottom = 0;
-    doc
-      .font('Helvetica')
-      .fontSize(8)
-      .fillColor(COLORS.muted)
-      .text(`Page ${i - range.start + 1} of ${range.count}`, MARGIN, doc.page.height - 30, { width: CONTENT_WIDTH, align: 'center' });
+
+    const footerY = doc.page.height - 42;
+    doc.moveTo(MARGIN, footerY).lineTo(MARGIN + CONTENT_WIDTH, footerY).strokeColor(COLORS.border).lineWidth(1).stroke();
+
+    if (businessLine) {
+      doc
+        .font('Helvetica')
+        .fontSize(7.5)
+        .fillColor(COLORS.muted)
+        .text(businessLine, MARGIN, footerY + 8, { width: CONTENT_WIDTH, align: 'center' });
+    }
+    if (range.count > 1) {
+      doc
+        .font('Helvetica')
+        .fontSize(7.5)
+        .fillColor(COLORS.muted)
+        .text(`Page ${i - range.start + 1} of ${range.count}`, MARGIN, footerY + (businessLine ? 19 : 8), { width: CONTENT_WIDTH, align: 'center' });
+    }
+
     doc.page.margins.bottom = bottomMargin;
   }
 }
@@ -581,7 +606,7 @@ function renderQuotePdf({ quote, client, items, settings }) {
   y = drawSignatureAndPayment(doc, { settings, bankDetails: '' }, y);
   drawThankYouFooter(doc, settings, y);
 
-  return docToBuffer(doc, addPageNumbers);
+  return docToBuffer(doc, (d) => addPageFooter(d, settings));
 }
 
 function renderInvoicePdf({ invoice, client, items, settings, payments }) {
@@ -631,7 +656,7 @@ function renderInvoicePdf({ invoice, client, items, settings, payments }) {
     if (invoice.status === 'paid') {
       addPaidStamp(d, paidDate, { x: totalsInfo.balanceX, y: totalsInfo.balanceY, pageIndex: totalsInfo.pageIndex });
     }
-    addPageNumbers(d);
+    addPageFooter(d, settings);
   });
 }
 
@@ -677,7 +702,7 @@ function renderReceiptPdf({ payment, invoice, client, settings }) {
 
   return docToBuffer(doc, (d) => {
     addPaidStamp(d, payment.paid_at);
-    addPageNumbers(d);
+    addPageFooter(d, settings);
   });
 }
 
