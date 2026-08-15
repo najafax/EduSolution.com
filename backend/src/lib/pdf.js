@@ -463,7 +463,31 @@ const STAMP_BOX_SIZE = 55;
 const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.6;
 const STAMP_OVERHANG = STAMP_BOX_SIZE - STAMP_OVERLAP; // how much of the stamp sticks out past the signature's right edge
 const STAMP_ROTATION_DEGREES = -20; // negative = anti-clockwise
-const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + 6 + 4 + 10 + 4 + 12;
+// Rotating a square inflates its axis-aligned bounding box by (|cos|+|sin|)
+// times its side — drawing the stamp at a plain STAMP_BOX_SIZE fit *before*
+// rotating (the naive approach) made its actual on-page footprint
+// noticeably bigger than STAMP_BOX_SIZE once rotated, tall enough to bleed
+// past the signing line drawn below it. Shrinking the pre-rotation fit size
+// by this factor makes the *rotated* bounding box come out to exactly
+// STAMP_BOX_SIZE, matching what the rest of the layout math assumes.
+const STAMP_ROTATION_RAD = (STAMP_ROTATION_DEGREES * Math.PI) / 180;
+const STAMP_ROTATED_INFLATION = Math.abs(Math.cos(STAMP_ROTATION_RAD)) + Math.abs(Math.sin(STAMP_ROTATION_RAD));
+const STAMP_FIT_SIZE = STAMP_BOX_SIZE / STAMP_ROTATED_INFLATION;
+// Fixed clearance between the bottom of the signature/stamp artwork and the
+// signing line — kept as its own constant (rather than derived from
+// centering the stamp against the signature image's height, which is what
+// left only ~1.5pt of margin before the rotation-footprint bug above) so
+// the gap is deliberate and doesn't shrink to nothing if either image's
+// box size changes later.
+const STAMP_LINE_CLEARANCE = 8;
+// Total downward extent of the block from `y`: signature image, the
+// STAMP_LINE_CLEARANCE gap, then the line/caption/name text beneath it —
+// used for page-break budgeting (drawSignatureAndPayment), so it only
+// needs to cover the *downward* reach; the stamp's rotated artwork can
+// extend a little above `y` too (it's drawn "stamped over" the signature),
+// but that eats into the ≥20pt gap already left above this block, not this
+// budget.
+const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + STAMP_LINE_CLEARANCE + 16 + 11 + 6;
 // Nudges the whole signature+stamp group (both anchored off the same
 // rightBound, see drawSignatureBlock below) further left than the page's
 // own MARGIN — roughly 1cm at 72pt/in — since the group otherwise sits
@@ -496,25 +520,36 @@ function drawSignatureBlock(doc, settings, y, rightBound) {
     // happens to land inside it). Right-aligning puts the ink where the
     // overlap math assumes it is: right up against the box's own edge.
     if (buffer) doc.image(buffer, sigX, y, { fit: [SIGNATURE_BOX_WIDTH, SIGNATURE_IMG_HEIGHT], align: 'right', valign: 'center' });
-    const lineY = y + SIGNATURE_IMG_HEIGHT + 6;
-    doc.moveTo(sigX, lineY).lineTo(sigX + SIGNATURE_BOX_WIDTH, lineY).strokeColor(COLORS.border).lineWidth(1).stroke();
-    doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted).text('Authorized Signature', sigX, lineY + 4, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
-    if (settings.signatory_name) {
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.heading).text(settings.signatory_name, sigX, lineY + 16, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
-    }
   }
+
+  // Fixed, deliberate gap below the signature image — not tied to the
+  // stamp at all, so the line's position never depends on the stamp's own
+  // (separately bottom-anchored, see below) placement.
+  const lineY = y + SIGNATURE_IMG_HEIGHT + STAMP_LINE_CLEARANCE;
 
   if (settings.stamp_image) {
     const buffer = decodeImageDataUri(settings.stamp_image);
     if (buffer) {
       const stampX = rightBound - STAMP_BOX_SIZE;
-      const stampY = settings.signature_image ? y + SIGNATURE_IMG_HEIGHT / 2 - STAMP_BOX_SIZE / 2 : y;
+      // Bottom-anchored STAMP_LINE_CLEARANCE above the line when there's a
+      // signature (and therefore a line) to sit above; otherwise flush at
+      // the top of the block, same as before.
+      const stampY = settings.signature_image ? lineY - STAMP_LINE_CLEARANCE - STAMP_BOX_SIZE : y;
       const centerX = stampX + STAMP_BOX_SIZE / 2;
       const centerY = stampY + STAMP_BOX_SIZE / 2;
+      const fitOffset = (STAMP_BOX_SIZE - STAMP_FIT_SIZE) / 2;
       doc.save();
       doc.rotate(STAMP_ROTATION_DEGREES, { origin: [centerX, centerY] });
-      doc.image(buffer, stampX, stampY, { fit: [STAMP_BOX_SIZE, STAMP_BOX_SIZE] });
+      doc.image(buffer, stampX + fitOffset, stampY + fitOffset, { fit: [STAMP_FIT_SIZE, STAMP_FIT_SIZE] });
       doc.restore();
+    }
+  }
+
+  if (settings.signature_image) {
+    doc.moveTo(sigX, lineY).lineTo(sigX + SIGNATURE_BOX_WIDTH, lineY).strokeColor(COLORS.border).lineWidth(1).stroke();
+    doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted).text('Authorized Signature', sigX, lineY + 4, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
+    if (settings.signatory_name) {
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.heading).text(settings.signatory_name, sigX, lineY + 16, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
     }
   }
 }
