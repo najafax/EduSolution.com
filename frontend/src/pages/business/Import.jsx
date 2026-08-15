@@ -137,11 +137,11 @@ export default function Import() {
   const current = TYPES.find((t) => t.value === type);
 
   if (!canManage) {
-    return <div className="mx-auto max-w-4xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">You don't have permission to view this page.</div>;
+    return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">You don't have permission to view this page.</div>;
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+    <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Import historical data</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
         Bring in existing clients, expenses, or invoices (with payment history) from a CSV file. Preview

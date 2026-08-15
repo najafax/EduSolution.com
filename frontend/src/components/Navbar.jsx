@@ -45,34 +45,41 @@ export default function Navbar() {
       className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10 dark:border-slate-800 dark:bg-slate-950/80"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+      <nav className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8 sm:py-4">
         <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
           EduSolution<span className="text-indigo-600">.com</span>
         </Link>
 
         {user ? (
           <>
-            {/* Desktop links */}
-            <div className="hidden items-center gap-5 lg:flex">
-              <GlobalSearch className="max-w-[180px] xl:max-w-[220px]" />
+            {/* Desktop links. min-w-0 lets this group shrink to fit whatever
+                room the nav row actually has instead of forcing the page
+                wider; the link list itself is the one segment that scrolls
+                internally (overflow-x-auto) if it still doesn't fit, so
+                search/account/theme/logout stay put and the page never
+                grows a horizontal scrollbar. */}
+            <div className="hidden min-w-0 flex-1 items-center justify-end gap-4 lg:flex">
+              <GlobalSearch className="max-w-[160px] shrink-0 xl:max-w-[220px]" />
               <kbd
                 className="hidden shrink-0 rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-400 xl:block dark:border-slate-600"
                 title="Press Cmd/Ctrl+K to open the command palette"
               >
                 ⌘K
               </kbd>
-              {visibleLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  className={`text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive(link.to) ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              <div className="flex min-w-0 items-center gap-4 overflow-x-auto">
+                {visibleLinks.map((link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className={`shrink-0 text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive(link.to) ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
               <Link
                 to="/account"
-                className={`text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive('/account') ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
+                className={`shrink-0 text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive('/account') ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
               >
                 My account
               </Link>

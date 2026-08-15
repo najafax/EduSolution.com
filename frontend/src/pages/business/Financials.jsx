@@ -25,8 +25,8 @@ export default function Financials() {
     api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
 
-  if (error) return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
-  if (!summary) return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
+  if (error) return <div className="px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6 lg:px-8">{error}</div>;
+  if (!summary) return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">Loading…</div>;
 
   const symbol = settings?.currency_symbol || '$';
   const collectedPct = summary.totalInvoiced > 0 ? (summary.totalPaid / summary.totalInvoiced) * 100 : 0;
@@ -84,7 +84,7 @@ export default function Financials() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Financials</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">A live view of what's owed, what's been paid, and where you stand.</p>
 

@@ -142,7 +142,7 @@ export default function RecurringInvoices() {
   const symbol = settings?.currency_symbol || '$';
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Recurring invoices</h1>
         {canManage && (

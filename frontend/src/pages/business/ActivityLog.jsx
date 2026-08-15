@@ -19,7 +19,7 @@ export default function ActivityLog() {
   }, [token, page]);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+    <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Activity log</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
         A running record of who created, updated, sent, or deleted things across clients, quotes, invoices,
