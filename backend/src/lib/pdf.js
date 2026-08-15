@@ -506,14 +506,15 @@ function drawSignatureBlock(doc, settings, y, rightBound) {
 
   if (settings.signature_image) {
     const buffer = decodeImageDataUri(settings.signature_image);
-    // align: 'right' matters here: `fit` alone centers the scaled image in
-    // its box, and a signature much more square than this wide/short box
-    // (common — most signatures aren't 3:1) ends up small and centered with
-    // empty space on both sides, defeating the stamp overlap below (which
-    // only accounts for the *box's* edge, not wherever the actual ink
-    // happens to land inside it). Right-aligning puts the ink where the
-    // overlap math assumes it is: right up against the box's own edge.
-    if (buffer) doc.image(buffer, sigX, y, { fit: [SIGNATURE_BOX_WIDTH, SIGNATURE_IMG_HEIGHT], align: 'right', valign: 'center' });
+    // Centered both ways within its box — a signature squarer than this
+    // wide/short box (common — most signatures aren't 3:1) shrinks to fit
+    // the height and leaves empty space on either side; centering splits
+    // that evenly rather than pushing all of it to one side. The tradeoff:
+    // when a stamp is also uploaded, its overlap (see STAMP_OVERLAP/
+    // STAMP_OVERHANG below) is positioned off the box's right edge, not
+    // wherever the now-centered ink actually lands, so it may sit partly
+    // over blank space instead of squarely over the signature.
+    if (buffer) doc.image(buffer, sigX, y, { fit: [SIGNATURE_BOX_WIDTH, SIGNATURE_IMG_HEIGHT], align: 'center', valign: 'center' });
   }
 
   // Fixed, deliberate gap below the signature image — not tied to the
