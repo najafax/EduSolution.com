@@ -372,38 +372,54 @@ are deliberately untouched by either, always returning every row.
   embedded commas/newlines/escaped quotes, \r\n or \n line endings) that
   backs `routes/import.js`.
 - `routes/import.js` — `POST /api/import/:type` (`type` is `clients`,
-  `expenses`, or `invoices`) bulk-imports historical data from CSV text in
-  the request body. Always validates every row first; `commit: false`
+  `expenses`, `invoices`, or `quotes`) bulk-imports historical data from CSV
+  text in the request body. Always validates every row first; `commit: false`
   (the default) is a dry-run that reports what *would* happen with no DB
   writes, `commit: true` actually inserts the valid rows and skips the
   invalid ones — the frontend always previews before offering to commit.
   Each row gets a `{ row, status: 'ok'|'error', message, preview }` result,
-  so partial success is normal, not a failure state. Invoices are matched
-  to an existing client by `client_email`, falling back to an exact
-  `client_name` match if `client_email` is blank (import clients first) —
-  the fallback exists so a row can still resolve when a legitimate client
-  simply wasn't given an email on that particular row, not as a way around
-  requiring a real email up front: the clients importer itself still
-  requires a valid, RFC-format email (same `EMAIL_RE` check as the rest of
-  this file), same as before. Invoices require a
-  single `amount` rather than itemized line items — it's run through the
-  same `computeTotals()` every other invoice uses, just with one synthetic
-  line item. An optional `amount_paid`/`paid_date` creates a real `payments`
-  row too (not just a number on the invoice), so imported history shows up
-  correctly in `recentPayments`/`monthlyTrend` on the financials endpoint,
-  not just in the invoice's own totals. Invoice numbers default to the same
-  `INV-<year>-####` scheme as live invoices — but year-of-issue-date, not
-  year-of-import, via `numbering.js`'s `invoiceNumberForYear()` — or you can
-  supply your own `number` column to preserve original historical numbers.
-  Within one import batch, auto-generated numbers are handed out from an
-  in-memory per-year counter (`makeSequencer()`) seeded from the real DB
-  count, rather than re-querying per row — needed because preview mode
-  never writes anything, so two same-year rows calling the DB-backed
+  so partial success is normal, not a failure state. Every date column
+  (`issue_date`, `due_date`/`expiry_date`, `paid_date`, `expense_date`) goes
+  through `normalizeDate()` rather than a strict `YYYY-MM-DD` regex —
+  spreadsheet exports routinely produce `DD/MM/YYYY` (tried before the
+  US-style `MM/DD/YYYY` reading, since this app's primary market is the
+  Maldives), `YYYY/MM/DD`, dot-separated dates, 2-digit years, and even raw
+  Excel serial-date numbers, and all of them normalize to the canonical
+  form before validation. `parseNumber()` similarly strips thousands-
+  separator commas and a leading currency symbol from `amount`/`tax_rate`/
+  `amount_paid` so `"2,500"`/`"$2,500.00"` parse the same as `"2500"`.
+  Invoices and quotes are both matched to an existing client via the shared
+  `resolveClient()`/`clientMaps()` helpers: by `client_email` first, falling
+  back to an exact `client_name` match if `client_email` is blank (import
+  clients first) — the fallback exists so a row can still resolve when a
+  legitimate client simply wasn't given an email on that particular row,
+  not as a way around requiring a real email up front: the clients importer
+  itself still requires a valid, RFC-format email (`EMAIL_RE`). Invoices and
+  quotes both require a single `amount` rather than itemized line items —
+  it's run through the same `computeTotals()` every invoice/quote uses,
+  just with one synthetic line item. An invoice's optional `amount_paid`/
+  `paid_date` creates a real `payments` row too (not just a number on the
+  invoice), so imported history shows up correctly in `recentPayments`/
+  `monthlyTrend` on the financials endpoint, not just in the invoice's own
+  totals; `status: 'paid'` with `amount_paid` left blank implies paid in
+  full (the total) rather than erroring, since a historical export often
+  only records the final status. Quotes have no payment concept — an
+  explicit `status` must be one of `draft|sent|accepted|declined|expired`
+  (blank defaults to `draft`), and `expiry_date` defaults to issue date +30
+  days (matching `QuoteForm.jsx`'s own default) when not given. Invoice/
+  quote numbers default to the same `INV-<year>-####`/`Q-<year>-####`
+  scheme as live documents — but year-of-issue-date, not year-of-import,
+  via `numbering.js`'s `invoiceNumberForYear()`/`quoteNumberForYear()` — or
+  you can supply your own `number` column to preserve original historical
+  numbers. Within one import batch, auto-generated numbers are handed out
+  from an in-memory per-year counter (`makeSequencer()`) seeded from the
+  real DB count, rather than re-querying per row — needed because preview
+  mode never writes anything, so two same-year rows calling the DB-backed
   numbering function directly would collide on the same "next" number.
   Whole commit runs in one `db.transaction()` since an invoice import
-  writes to three tables (`invoices`, `invoice_items`, `payments`) per row.
-  Logs one summary `activity_log` entry per import ("bulk imported 42
-  clients from CSV"), not one per row.
+  writes to three tables (`invoices`, `invoice_items`, `payments`) per row
+  (two for quotes, no `payments` row). Logs one summary `activity_log`
+  entry per import ("bulk imported 42 clients from CSV"), not one per row.
 - `lib/backup.js` — `runBackup()`: skips entirely if `BACKUP_S3_BUCKET`
   isn't set. Otherwise runs `VACUUM INTO` to write a consistent snapshot of
   the live database (safe against catching a WAL-mode write mid-flight,
