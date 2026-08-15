@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { useDashboardShortcuts } from '../lib/useDashboardShortcuts';
 import RevenueTrendChart from '../components/RevenueTrendChart';
 import StatusBreakdownChart from '../components/StatusBreakdownChart';
 import Accordion from '../components/Accordion';
 import KpiCard from '../components/KpiCard';
+import Modal from '../components/Modal';
+import DashboardShortcutsEditor from '../components/DashboardShortcutsEditor';
 import { UsersIcon, InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, TrendUpIcon, TrendDownIcon } from '../components/icons';
 
 function money(symbol, value) {
@@ -29,6 +32,7 @@ export default function Dashboard() {
   const [summary, setSummary] = useState(null);
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState('');
+  const [customizing, setCustomizing] = useState(false);
 
   const canViewFinancials = can('financials', 'view');
 
@@ -40,7 +44,9 @@ export default function Dashboard() {
   }, [token, canViewFinancials]);
 
   const symbol = settings?.currency_symbol || '$';
-  const visibleShortcuts = SHORTCUTS.filter((s) => can(s.module, 'view'));
+  const permittedShortcuts = SHORTCUTS.filter((s) => can(s.module, 'view'));
+  const { visible: visibleShortcuts, orderedAvailable, hiddenSet, toggleHidden, moveUp, moveDown, reset } =
+    useDashboardShortcuts(permittedShortcuts);
 
   const isProfitable = summary && summary.netProfit >= 0;
   const kpis = summary
@@ -75,21 +81,34 @@ export default function Dashboard() {
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       {!canViewFinancials ? (
-        <div className="mt-8 flex flex-wrap gap-2">
-          {visibleShortcuts.map((s) => (
-            <Link
-              key={s.to}
-              to={s.to}
-              className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        <div className="mt-8">
+          {permittedShortcuts.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setCustomizing(true)}
+              className="mb-2 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
             >
-              {s.label}
-            </Link>
-          ))}
-          {visibleShortcuts.length === 0 && (
-            <p className="text-sm text-slate-500">
-              Nothing to show yet — ask an admin to grant you access to what you need.
-            </p>
+              Customize shortcuts
+            </button>
           )}
+          <div className="flex flex-wrap gap-2">
+            {visibleShortcuts.map((s) => (
+              <Link
+                key={s.to}
+                to={s.to}
+                className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                {s.label}
+              </Link>
+            ))}
+            {visibleShortcuts.length === 0 && (
+              <p className="text-sm text-slate-500">
+                {permittedShortcuts.length === 0
+                  ? 'Nothing to show yet — ask an admin to grant you access to what you need.'
+                  : 'All shortcuts are hidden.'}
+              </p>
+            )}
+          </div>
         </div>
       ) : !summary ? (
         <p className="mt-8 text-sm text-slate-500">Loading…</p>
@@ -141,19 +160,41 @@ export default function Dashboard() {
             </Accordion>
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-2">
-            {visibleShortcuts.map((s) => (
-              <Link
-                key={s.to}
-                to={s.to}
-                className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          <div className="mt-6">
+            {permittedShortcuts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setCustomizing(true)}
+                className="mb-2 text-xs font-medium text-slate-500 hover:text-slate-700"
               >
-                {s.label}
-              </Link>
-            ))}
+                Customize shortcuts
+              </button>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {visibleShortcuts.map((s) => (
+                <Link
+                  key={s.to}
+                  to={s.to}
+                  className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  {s.label}
+                </Link>
+              ))}
+            </div>
           </div>
         </>
       )}
+
+      <Modal open={customizing} onClose={() => setCustomizing(false)} title="Customize shortcuts">
+        <DashboardShortcutsEditor
+          items={orderedAvailable}
+          hiddenSet={hiddenSet}
+          onToggle={toggleHidden}
+          onMoveUp={moveUp}
+          onMoveDown={moveDown}
+          onReset={reset}
+        />
+      </Modal>
     </div>
   );
 }
