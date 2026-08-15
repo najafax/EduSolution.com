@@ -479,10 +479,12 @@ const STAMP_LINE_CLEARANCE = 12;
 // into STAMP_LINE_CLEARANCE (leaving STAMP_LINE_CLEARANCE - STAMP_DOWN_OFFSET
 // pt of actual headroom above the line — currently 3pt), so keep the two in
 // proportion if either changes rather than letting the stamp creep back
-// down to the line. The rightward part is bounded by how much of
-// STAMP_BOX_SIZE still fits inside the SIGNATURE_BOX_WIDTH slot without
-// spilling past its edge (currently leaves ~2pt to spare).
-const STAMP_RIGHT_OFFSET = 18;
+// down to the line. The rightward part is free to spill past
+// SIGNATURE_BOX_WIDTH's own right edge (unlike the vertical offset, nothing
+// else sits immediately to the right of the signature slot until the
+// Payments Payable To box, ~140pt further over) — just keep it well short
+// of that box.
+const STAMP_RIGHT_OFFSET = 30;
 const STAMP_DOWN_OFFSET = 9;
 // Total downward extent of the block from `y`: signature image, the
 // STAMP_LINE_CLEARANCE gap, then the line/caption/name text beneath it —
