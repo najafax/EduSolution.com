@@ -3,15 +3,9 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard';
+import { todayStr, todayPlus } from '../../lib/date';
 import LineItemsEditor from '../../components/LineItemsEditor';
 import SearchableSelect from '../../components/SearchableSelect';
-
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const todayPlus = (days) => {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-};
 
 // Renders standalone as the routed `/invoices/new` and `/invoices/:id/edit`
 // pages (the default), or `embedded` inside a Modal when opened from the

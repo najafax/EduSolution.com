@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import { todayStr } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
 const METHODS = ['bank_transfer', 'cash', 'card', 'cheque', 'other'];
 
 export default function InvoiceDetail() {

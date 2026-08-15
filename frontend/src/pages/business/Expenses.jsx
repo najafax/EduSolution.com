@@ -3,6 +3,7 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useUndoableDelete } from '../../lib/useUndoableDelete';
+import { todayStr } from '../../lib/date';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
@@ -12,7 +13,6 @@ import EmptyState from '../../components/EmptyState';
 import BulkActionBar from '../../components/BulkActionBar';
 import { ExpenseIcon } from '../../components/icons';
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
 const EMPTY_FORM = { category: 'other', description: '', amount: '', expense_date: todayStr(), notes: '' };
 
 export default function Expenses() {

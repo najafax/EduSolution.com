@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import { todayStr } from '../../lib/date';
 import LineItemsEditor from '../../components/LineItemsEditor';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import SearchableSelect from '../../components/SearchableSelect';
 import SearchInput from '../../components/SearchInput';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
-
-const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const EMPTY_FORM = {
   client_id: '',
