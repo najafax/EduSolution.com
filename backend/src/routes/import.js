@@ -13,6 +13,7 @@ router.use(requirePermission('import', 'manage'));
 
 const MAX_ROWS = 5000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EXPENSE_CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'marketing', 'software', 'travel', 'other'];
 const PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'cheque', 'other'];
 const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'void'];
@@ -55,12 +56,7 @@ function validateClientRow(row, seenEmails, existingEmails) {
   const name = (row.name || '').trim();
   const email = (row.email || '').trim().toLowerCase();
   if (!name) return { ok: false, message: 'name is required' };
-  // Deliberately as lenient as the regular Clients page (routes/clients.js
-  // only requires this field to be non-empty, no format check) — some
-  // businesses use this field as a general client identifier (e.g. a
-  // school reference code) rather than a real, emailable address, and CSV
-  // import shouldn't reject data the rest of the app already accepts.
-  if (!email) return { ok: false, message: 'email is required' };
+  if (!email || !EMAIL_RE.test(email)) return { ok: false, message: 'a valid email is required' };
   if (existingEmails.has(email) || seenEmails.has(email)) {
     return { ok: false, message: `duplicate: a client with email "${email}" already exists or appears earlier in this file` };
   }

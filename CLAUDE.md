@@ -381,12 +381,11 @@ are deliberately untouched by either, always returning every row.
   so partial success is normal, not a failure state. Invoices are matched
   to an existing client by `client_email`, falling back to an exact
   `client_name` match if `client_email` is blank (import clients first) —
-  the fallback exists because not every business's historical "client"
-  identifier is a real, emailable address (e.g. a school reference code),
-  and the clients importer itself only requires that field to be
-  non-empty, not RFC-valid, matching the regular Clients page's own
-  leniency (`routes/clients.js`) rather than the stricter format check
-  this file used to apply only to CSV import. Invoices require a
+  the fallback exists so a row can still resolve when a legitimate client
+  simply wasn't given an email on that particular row, not as a way around
+  requiring a real email up front: the clients importer itself still
+  requires a valid, RFC-format email (same `EMAIL_RE` check as the rest of
+  this file), same as before. Invoices require a
   single `amount` rather than itemized line items — it's run through the
   same `computeTotals()` every other invoice uses, just with one synthetic
   line item. An optional `amount_paid`/`paid_date` creates a real `payments`
