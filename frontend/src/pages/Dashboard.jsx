@@ -75,8 +75,8 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900">Welcome, {user?.name}</h1>
-      <p className="mt-1 text-sm text-slate-600">{user?.email}</p>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Welcome, {user?.name}</h1>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{user?.email}</p>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
@@ -96,13 +96,13 @@ export default function Dashboard() {
               <Link
                 key={s.to}
                 to={s.to}
-                className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 {s.label}
               </Link>
             ))}
             {visibleShortcuts.length === 0 && (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 {permittedShortcuts.length === 0
                   ? 'Nothing to show yet — ask an admin to grant you access to what you need.'
                   : 'All shortcuts are hidden.'}
@@ -111,7 +111,7 @@ export default function Dashboard() {
           </div>
         </div>
       ) : !summary ? (
-        <p className="mt-8 text-sm text-slate-500">Loading…</p>
+        <p className="mt-8 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
       ) : (
         <>
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -135,20 +135,20 @@ export default function Dashboard() {
           <div className="mt-6">
             <Accordion title="Recent payments">
               {summary.recentPayments.length === 0 ? (
-                <p className="text-sm text-slate-500">No payments recorded yet.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">No payments recorded yet.</p>
               ) : (
-                <div className="-mx-6 divide-y divide-slate-100">
+                <div className="-mx-6 divide-y divide-slate-100 dark:divide-slate-800">
                   {summary.recentPayments.slice(0, 5).map((p) => (
                     <div key={p.id} className="flex flex-col gap-1 px-6 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <div>
                         <Link to={`/invoices/${p.invoice_id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
                           {p.invoice_number}
                         </Link>
-                        <span className="ml-2 text-slate-500">{p.client_name}</span>
+                        <span className="ml-2 text-slate-500 dark:text-slate-400">{p.client_name}</span>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className="text-slate-500">{p.paid_at}</span>
-                        <span className="font-medium text-slate-900">
+                        <span className="text-slate-500 dark:text-slate-400">{p.paid_at}</span>
+                        <span className="font-medium text-slate-900 dark:text-white">
                           {symbol}
                           {p.amount.toFixed(2)}
                         </span>
@@ -165,7 +165,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setCustomizing(true)}
-                className="mb-2 text-xs font-medium text-slate-500 hover:text-slate-700"
+                className="mb-2 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               >
                 Customize shortcuts
               </button>
@@ -175,7 +175,7 @@ export default function Dashboard() {
                 <Link
                   key={s.to}
                   to={s.to}
-                  className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   {s.label}
                 </Link>

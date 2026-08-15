@@ -2,15 +2,20 @@
 // track is a lighter step of the same ramp — never a neutral gray track
 // under a colored fill — so the bar reads as one state, not two.
 const FILL = { indigo: 'bg-indigo-600', emerald: 'bg-emerald-600', amber: 'bg-amber-500', red: 'bg-red-600' };
-const TRACK = { indigo: 'bg-indigo-100', emerald: 'bg-emerald-100', amber: 'bg-amber-100', red: 'bg-red-100' };
+const TRACK = {
+  indigo: 'bg-indigo-100 dark:bg-indigo-950',
+  emerald: 'bg-emerald-100 dark:bg-emerald-950',
+  amber: 'bg-amber-100 dark:bg-amber-950',
+  red: 'bg-red-100 dark:bg-red-950',
+};
 
 export default function MeterBar({ label, pct, sub, color = 'indigo' }) {
   const clamped = Math.max(0, Math.min(100, pct));
   return (
     <div>
       <div className="flex items-center justify-between text-sm">
-        <span className="font-medium text-slate-700">{label}</span>
-        <span className="font-semibold text-slate-900">{clamped.toFixed(0)}%</span>
+        <span className="font-medium text-slate-700 dark:text-slate-300">{label}</span>
+        <span className="font-semibold text-slate-900 dark:text-white">{clamped.toFixed(0)}%</span>
       </div>
       <div className={`mt-2 h-2.5 w-full overflow-hidden rounded-full ${TRACK[color] || TRACK.indigo}`}>
         <div
@@ -18,7 +23,7 @@ export default function MeterBar({ label, pct, sub, color = 'indigo' }) {
           style={{ width: `${clamped}%` }}
         />
       </div>
-      {sub && <p className="mt-1.5 text-xs text-slate-500">{sub}</p>}
+      {sub && <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">{sub}</p>}
     </div>
   );
 }

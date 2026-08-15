@@ -36,31 +36,33 @@ function downloadTemplate(type) {
 
 function ResultsTable({ results }) {
   return (
-    <div className="mt-4 max-h-96 overflow-y-auto rounded-md border border-slate-200">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="sticky top-0 bg-slate-50">
-          <tr className="text-left text-xs font-medium uppercase text-slate-500">
+    <div className="mt-4 max-h-96 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
+      <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+        <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800">
+          <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
             <th className="px-4 py-2">Row</th>
             <th className="px-4 py-2">Status</th>
             <th className="px-4 py-2">Item</th>
             <th className="px-4 py-2">Message</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
           {results.map((r) => (
             <tr key={r.row}>
-              <td className="whitespace-nowrap px-4 py-2 text-slate-500">{r.row}</td>
+              <td className="whitespace-nowrap px-4 py-2 text-slate-500 dark:text-slate-400">{r.row}</td>
               <td className="whitespace-nowrap px-4 py-2">
                 <span
                   className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    r.status === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                    r.status === 'ok'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                      : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
                   }`}
                 >
                   {r.status === 'ok' ? 'OK' : 'Error'}
                 </span>
               </td>
-              <td className="whitespace-nowrap px-4 py-2 text-slate-700">{r.preview}</td>
-              <td className="px-4 py-2 text-slate-600">{r.message}</td>
+              <td className="whitespace-nowrap px-4 py-2 text-slate-700 dark:text-slate-300">{r.preview}</td>
+              <td className="px-4 py-2 text-slate-600 dark:text-slate-400">{r.message}</td>
             </tr>
           ))}
         </tbody>
@@ -135,18 +137,18 @@ export default function Import() {
   const current = TYPES.find((t) => t.value === type);
 
   if (!canManage) {
-    return <div className="mx-auto max-w-4xl px-4 py-10 text-sm text-slate-500 sm:px-6">You don't have permission to view this page.</div>;
+    return <div className="mx-auto max-w-4xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">You don't have permission to view this page.</div>;
   }
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900">Import historical data</h1>
-      <p className="mt-2 text-sm text-slate-600">
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Import historical data</h1>
+      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
         Bring in existing clients, expenses, or invoices (with payment history) from a CSV file. Preview
         first to catch errors — nothing is saved until you confirm.
       </p>
       {type === 'invoices' && (
-        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
           Import clients first if you haven't already — each invoice row is matched to a client by email.
         </p>
       )}
@@ -157,7 +159,9 @@ export default function Import() {
             key={t.value}
             onClick={() => handleTypeChange(t.value)}
             className={`min-h-11 rounded-md px-4 text-sm font-medium ${
-              type === t.value ? 'bg-indigo-600 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+              type === t.value
+                ? 'bg-indigo-600 text-white'
+                : 'border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800'
             }`}
           >
             {t.label}
@@ -165,31 +169,31 @@ export default function Import() {
         ))}
       </div>
 
-      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-medium text-slate-700">Expected columns</p>
-        <p className="mt-1 break-words font-mono text-xs text-slate-600">{current.columns}</p>
-        <p className="mt-1 text-xs text-slate-400">* required</p>
+      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Expected columns</p>
+        <p className="mt-1 break-words font-mono text-xs text-slate-600 dark:text-slate-400">{current.columns}</p>
+        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">* required</p>
         <button
           onClick={() => downloadTemplate(type)}
-          className="mt-3 min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="mt-3 min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           Download {current.label} template
         </button>
 
         <div className="mt-6">
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">CSV file</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">CSV file</span>
             <input
               type="file"
               accept=".csv,text/csv"
               onChange={handleFile}
-              className="mt-1 block w-full text-sm text-slate-600 file:mr-4 file:min-h-11 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
+              className="mt-1 block w-full text-sm text-slate-600 file:mr-4 file:min-h-11 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 dark:text-slate-400 dark:file:bg-indigo-950 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900"
             />
           </label>
-          {fileName && <p className="mt-1 text-xs text-slate-500">Selected: {fileName}</p>}
+          {fileName && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Selected: {fileName}</p>}
         </div>
 
-        {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <div className="mt-4">
           <button
@@ -203,11 +207,11 @@ export default function Import() {
       </div>
 
       {preview && (
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-slate-900">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
               Preview: {preview.validCount} of {preview.total} row(s) ready to import
-              {preview.errorCount > 0 && <span className="text-red-600"> ({preview.errorCount} with errors)</span>}
+              {preview.errorCount > 0 && <span className="text-red-600 dark:text-red-400"> ({preview.errorCount} with errors)</span>}
             </h2>
             {preview.validCount > 0 && (
               <button
@@ -224,8 +228,8 @@ export default function Import() {
       )}
 
       {committed && (
-        <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-6">
-          <h2 className="text-sm font-semibold text-emerald-900">
+        <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-6 dark:border-emerald-800 dark:bg-emerald-950">
+          <h2 className="text-sm font-semibold text-emerald-900 dark:text-emerald-300">
             Imported {committed.imported} of {committed.total} row(s)
             {committed.errorCount > 0 && ` — ${committed.errorCount} skipped`}
           </h2>

@@ -130,16 +130,16 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
   }
 
   if (loading) {
-    const loadingEl = <p className="text-sm text-slate-500">Loading…</p>;
+    const loadingEl = <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>;
     return embedded ? loadingEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{loadingEl}</div>;
   }
   if (!canManage) {
-    const deniedEl = <p className="text-sm text-slate-500">You don't have permission to view this page.</p>;
+    const deniedEl = <p className="text-sm text-slate-500 dark:text-slate-400">You don't have permission to view this page.</p>;
     return embedded ? deniedEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{deniedEl}</div>;
   }
   if (lockedStatus) {
     const lockedEl = (
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-slate-500 dark:text-slate-400">
         This invoice has been {lockedStatus === 'paid' ? 'paid' : 'sent to the client'} and can no longer be edited.{' '}
         <Link to={`/invoices/${id}`} className="text-indigo-600 hover:text-indigo-500">
           View invoice
@@ -151,10 +151,10 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
   }
 
   const formEl = (
-      <form onSubmit={handleSubmit} className={embedded ? 'flex flex-col gap-4' : 'mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm'}>
+      <form onSubmit={handleSubmit} className={embedded ? 'flex flex-col gap-4' : 'mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900'}>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Client</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client</span>
             <SearchableSelect
               options={clients.map((c) => ({ value: c.id, label: c.name }))}
               value={clientId}
@@ -162,14 +162,14 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
               placeholder="Search clients…"
             />
             {clients.length === 0 && (
-              <span className="mt-1 block text-xs text-slate-500">
+              <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
                 No clients yet — <Link to="/clients" className="text-indigo-600">add one first</Link>.
               </span>
             )}
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Tax rate (%)</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Tax rate (%)</span>
             <input
               type="number"
               min="0"
@@ -180,16 +180,16 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
                 setTaxRate(e.target.value);
                 setTaxRateAuto(false);
               }}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Discount type</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Discount type</span>
             <select
               value={discountType}
               onChange={(e) => setDiscountType(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             >
               <option value="percentage">Percentage</option>
               <option value="fixed">Fixed amount</option>
@@ -197,7 +197,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Discount value {discountType === 'percentage' ? '(%)' : ''}
             </span>
             <input
@@ -207,39 +207,39 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
               step="0.01"
               value={discountValue}
               onChange={(e) => setDiscountValue(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Issue date</span>
-            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Issue date</span>
+            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500 dark:border-slate-600">
               <input
                 type="date"
                 required
                 value={issueDate}
                 onChange={(e) => setIssueDate(e.target.value)}
-                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none"
+                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
               />
             </div>
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Due date</span>
-            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Due date</span>
+            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500 dark:border-slate-600">
               <input
                 type="date"
                 required
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none"
+                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
               />
             </div>
           </label>
         </div>
 
         <div>
-          <span className="text-sm font-medium text-slate-700">Line items</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Line items</span>
           <div className="mt-1">
             <LineItemsEditor
               items={items}
@@ -255,7 +255,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
         </div>
 
         <label className="block">
-          <span className="text-sm font-medium text-slate-700">Notes</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -264,7 +264,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
           />
         </label>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <div className="flex gap-3">
           <button
@@ -280,7 +280,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
               onClick={() => {
                 if (confirmDiscard()) onCancel();
               }}
-              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -293,7 +293,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900">{isEditing ? 'Edit invoice' : 'New invoice'}</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{isEditing ? 'Edit invoice' : 'New invoice'}</h1>
       {formEl}
     </div>
   );

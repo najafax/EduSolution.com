@@ -33,7 +33,7 @@ export default function ResetPassword() {
   if (!token) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center sm:px-6">
-        <p className="text-sm text-red-600">This reset link is missing its token.</p>
+        <p className="text-sm text-red-600 dark:text-red-400">This reset link is missing its token.</p>
         <Link to="/forgot-password" className="mt-4 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-500">
           Request a new link
         </Link>
@@ -43,11 +43,11 @@ export default function ResetPassword() {
 
   return (
     <div className="mx-auto flex max-w-md flex-col px-4 py-12 sm:px-6 sm:py-20">
-      <h1 className="text-2xl font-bold text-slate-900">Choose a new password</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Choose a new password</h1>
 
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
             New password
           </label>
           <input
@@ -58,13 +58,13 @@ export default function ResetPassword() {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
           />
-          <p className="mt-1 text-xs text-slate-500">At least 8 characters.</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">At least 8 characters.</p>
         </div>
 
         <div>
-          <label htmlFor="confirm" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="confirm" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
             Confirm password
           </label>
           <input
@@ -74,11 +74,11 @@ export default function ResetPassword() {
             required
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
           />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <button
           type="submit"

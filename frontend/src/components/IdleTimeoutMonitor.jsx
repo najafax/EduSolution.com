@@ -94,10 +94,10 @@ export default function IdleTimeoutMonitor() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-slate-900">Still there?</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          You'll be logged out in <span className="font-semibold text-slate-900">{warningSecondsLeft}</span>{' '}
+      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-slate-900">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Still there?</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          You'll be logged out in <span className="font-semibold text-slate-900 dark:text-white">{warningSecondsLeft}</span>{' '}
           second{warningSecondsLeft === 1 ? '' : 's'} due to inactivity.
         </p>
         <div className="mt-5 flex gap-3">
@@ -111,7 +111,7 @@ export default function IdleTimeoutMonitor() {
           <button
             type="button"
             onClick={logOutNow}
-            className="min-h-11 flex-1 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="min-h-11 flex-1 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Log out now
           </button>

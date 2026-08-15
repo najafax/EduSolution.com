@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTheme } from '../context/ThemeContext';
 
 // Two series on one shared $ axis (never dual-axis) — Invoiced vs Paid,
 // same brand colors used for status elsewhere in the app (indigo = brand,
@@ -35,8 +36,22 @@ function formatMonth(monthStr) {
   return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short' });
 }
 
+// The SVG's own gridlines/axis text are drawn with `fill`/`stroke`
+// attributes, which Tailwind's `dark:` variant can't reach — resolved
+// against the app's theme instead, same light/dark palette as the rest of
+// the chart's surroundings.
+const GRID_COLORS = { light: '#e2e8f0', dark: '#334155' };
+const AXIS_TEXT_COLORS = { light: '#94a3b8', dark: '#64748b' };
+const MONTH_LABEL_COLORS = { light: '#64748b', dark: '#94a3b8' };
+const BASELINE_COLORS = { light: '#c3c2b7', dark: '#475569' };
+
 export default function RevenueTrendChart({ data, currencySymbol = '$' }) {
   const [hover, setHover] = useState(null);
+  const { resolvedTheme } = useTheme();
+  const gridColor = GRID_COLORS[resolvedTheme];
+  const axisTextColor = AXIS_TEXT_COLORS[resolvedTheme];
+  const monthLabelColor = MONTH_LABEL_COLORS[resolvedTheme];
+  const baselineColor = BASELINE_COLORS[resolvedTheme];
 
   const hasData = data.some((d) => d.invoiced > 0 || d.paid > 0);
   const maxValue = niceCeiling(Math.max(1, ...data.flatMap((d) => [d.invoiced, d.paid])));
@@ -49,7 +64,7 @@ export default function RevenueTrendChart({ data, currencySymbol = '$' }) {
 
   return (
     <div>
-      <div className="mb-3 flex items-center gap-4 text-xs text-slate-600">
+      <div className="mb-3 flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400">
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: INVOICED_COLOR }} />
           Invoiced
@@ -61,7 +76,7 @@ export default function RevenueTrendChart({ data, currencySymbol = '$' }) {
       </div>
 
       {!hasData ? (
-        <p className="flex h-48 items-center justify-center text-sm text-slate-400">No invoices in the last 6 months yet.</p>
+        <p className="flex h-48 items-center justify-center text-sm text-slate-400 dark:text-slate-500">No invoices in the last 6 months yet.</p>
       ) : (
         <div className="relative">
           <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Invoiced vs paid, last 6 months">
@@ -70,8 +85,8 @@ export default function RevenueTrendChart({ data, currencySymbol = '$' }) {
               const y = yFor(value);
               return (
                 <g key={i}>
-                  <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={y} y2={y} stroke="#e2e8f0" strokeWidth={1} />
-                  <text x={PAD_LEFT - 8} y={y + 3} textAnchor="end" fontSize={9} fill="#94a3b8">
+                  <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={y} y2={y} stroke={gridColor} strokeWidth={1} />
+                  <text x={PAD_LEFT - 8} y={y + 3} textAnchor="end" fontSize={9} fill={axisTextColor}>
                     {currencySymbol}
                     {formatCompact(value)}
                   </text>
@@ -110,14 +125,14 @@ export default function RevenueTrendChart({ data, currencySymbol = '$' }) {
                     onMouseEnter={() => setHover({ label: 'Paid', value: d.paid, x: paidX + barWidth / 2, y: paidY })}
                     onMouseLeave={() => setHover(null)}
                   />
-                  <text x={groupX + groupWidth / 2} y={HEIGHT - 10} textAnchor="middle" fontSize={10} fill="#64748b">
+                  <text x={groupX + groupWidth / 2} y={HEIGHT - 10} textAnchor="middle" fontSize={10} fill={monthLabelColor}>
                     {formatMonth(d.month)}
                   </text>
                 </g>
               );
             })}
 
-            <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={baseline} y2={baseline} stroke="#c3c2b7" strokeWidth={1} />
+            <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={baseline} y2={baseline} stroke={baselineColor} strokeWidth={1} />
           </svg>
 
           {hover && (

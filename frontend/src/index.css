@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Manual dark-mode toggle (see context/ThemeContext.jsx): with this
+   variant registered, `dark:` classes activate off a `.dark` class on
+   <html> instead of only `prefers-color-scheme` — the class is what lets a
+   user's explicit Light/Dark choice override their OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);

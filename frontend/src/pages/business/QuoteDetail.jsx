@@ -97,8 +97,8 @@ export default function QuoteDetail() {
     }
   }
 
-  if (error && !data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-red-600 sm:px-6">{error}</div>;
-  if (!data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 sm:px-6">Loading…</div>;
+  if (error && !data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
+  if (!data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
 
   const { quote, items, client } = data;
   const symbol = settings?.currency_symbol || '$';
@@ -107,18 +107,18 @@ export default function QuoteDetail() {
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{quote.number}</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{quote.number}</h1>
           <div className="mt-1">
             <StatusBadge status={quote.status} />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
           {canManage && (
-            <Link to={`/quotes/${id}/edit`} className="min-h-11 flex items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <Link to={`/quotes/${id}/edit`} className="min-h-11 flex items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
               Edit
             </Link>
           )}
-          <button onClick={handleDownload} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <button onClick={handleDownload} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
             Download PDF
           </button>
           {canManage && (
@@ -127,17 +127,17 @@ export default function QuoteDetail() {
             </button>
           )}
           {canManage && canManageInvoices && !quote.converted_invoice_id && (
-            <button onClick={() => setShowConvert((v) => !v)} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <button onClick={() => setShowConvert((v) => !v)} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
               Convert to invoice
             </button>
           )}
           {canManage && (
-            <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
               Duplicate
             </button>
           )}
           {canManage && (
-            <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50">
+            <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
               Delete
             </button>
           )}
@@ -145,7 +145,7 @@ export default function QuoteDetail() {
       </div>
 
       {quote.converted_invoice_id && (
-        <p className="mt-4 text-sm text-slate-600">
+        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
           Converted to invoice —{' '}
           <Link to={`/invoices/${quote.converted_invoice_id}`} className="text-indigo-600 hover:text-indigo-500">
             view invoice
@@ -155,16 +155,16 @@ export default function QuoteDetail() {
       )}
 
       {showConvert && !quote.converted_invoice_id && (
-        <form onSubmit={handleConvert} className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <form onSubmit={handleConvert} className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Invoice due date</span>
-            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Invoice due date</span>
+            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500 dark:border-slate-600">
               <input
                 type="date"
                 required
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none"
+                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
               />
             </div>
           </label>
@@ -174,19 +174,19 @@ export default function QuoteDetail() {
         </form>
       )}
 
-      {notice && <p className="mt-4 text-sm text-emerald-600">{notice}</p>}
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {notice && <p className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">{notice}</p>}
+      {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="mt-6 grid gap-6 sm:grid-cols-2">
         <Accordion title="Bill to">
-          <p className="font-medium text-slate-900">{client.name}</p>
-          <p className="text-sm text-slate-600">{client.email}</p>
-          <p className="text-sm text-slate-600">{client.address}</p>
+          <p className="font-medium text-slate-900 dark:text-white">{client.name}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{client.email}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{client.address}</p>
         </Accordion>
         <Accordion title="Details">
           <dl className="space-y-1 text-sm">
-            <div className="flex justify-between"><dt className="text-slate-500">Issue date</dt><dd className="text-slate-900">{quote.issue_date}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Expiry date</dt><dd className="text-slate-900">{quote.expiry_date || '—'}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500 dark:text-slate-400">Issue date</dt><dd className="text-slate-900 dark:text-white">{quote.issue_date}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500 dark:text-slate-400">Expiry date</dt><dd className="text-slate-900 dark:text-white">{quote.expiry_date || '—'}</dd></div>
           </dl>
         </Accordion>
       </div>
@@ -194,36 +194,36 @@ export default function QuoteDetail() {
       <div className="mt-6">
         <Accordion title="Items">
           <div className="-mx-6 overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
               <thead>
-                <tr className="text-left text-xs font-medium uppercase text-slate-500">
+                <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
                   <th className="px-6 py-3">Description</th>
                   <th className="px-4 py-3 text-right">Qty</th>
                   <th className="px-4 py-3 text-right">Unit price</th>
                   <th className="px-4 py-3 text-right">Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {items.map((item) => (
                   <tr key={item.id}>
-                    <td className="px-6 py-3">{item.description}</td>
-                    <td className="px-4 py-3 text-right">{item.quantity}</td>
-                    <td className="px-4 py-3 text-right">{symbol}{item.unit_price.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right">{symbol}{item.amount.toFixed(2)}</td>
+                    <td className="px-6 py-3 dark:text-white">{item.description}</td>
+                    <td className="px-4 py-3 text-right dark:text-white">{item.quantity}</td>
+                    <td className="px-4 py-3 text-right dark:text-white">{symbol}{item.unit_price.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right dark:text-white">{symbol}{item.amount.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="border-t border-slate-200 px-6 py-3 text-right text-sm">
-              <p className="text-slate-600">Subtotal: {symbol}{quote.subtotal.toFixed(2)}</p>
+            <div className="border-t border-slate-200 px-6 py-3 text-right text-sm dark:border-slate-700">
+              <p className="text-slate-600 dark:text-slate-400">Subtotal: {symbol}{quote.subtotal.toFixed(2)}</p>
               {quote.discount_amount > 0 && (
-                <p className="text-slate-600">
+                <p className="text-slate-600 dark:text-slate-400">
                   Discount {quote.discount_type === 'percentage' ? `(${quote.discount_value}%)` : ''}: -{symbol}
                   {quote.discount_amount.toFixed(2)}
                 </p>
               )}
-              {quote.tax_rate > 0 && <p className="text-slate-600">Tax ({quote.tax_rate}%): {symbol}{quote.tax_amount.toFixed(2)}</p>}
-              <p className="mt-1 text-base font-semibold text-slate-900">Total: {symbol}{quote.total.toFixed(2)}</p>
+              {quote.tax_rate > 0 && <p className="text-slate-600 dark:text-slate-400">Tax ({quote.tax_rate}%): {symbol}{quote.tax_amount.toFixed(2)}</p>}
+              <p className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Total: {symbol}{quote.total.toFixed(2)}</p>
             </div>
           </div>
         </Accordion>
@@ -232,7 +232,7 @@ export default function QuoteDetail() {
       {quote.notes && (
         <div className="mt-6">
           <Accordion title="Notes">
-            <p className="whitespace-pre-line text-sm text-slate-600">{quote.notes}</p>
+            <p className="whitespace-pre-line text-sm text-slate-600 dark:text-slate-400">{quote.notes}</p>
           </Accordion>
         </div>
       )}

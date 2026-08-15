@@ -14,18 +14,18 @@ export default function StatusBreakdownChart({ counts }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
 
   if (total === 0) {
-    return <p className="flex h-40 items-center justify-center text-sm text-slate-400">No invoices yet.</p>;
+    return <p className="flex h-40 items-center justify-center text-sm text-slate-400 dark:text-slate-500">No invoices yet.</p>;
   }
 
   return (
     <div className="flex flex-col gap-3">
       {rows.map((r) => (
         <div key={r.key} className="flex items-center gap-3">
-          <span className="w-12 shrink-0 text-xs font-medium text-slate-600">{r.label}</span>
-          <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100">
+          <span className="w-12 shrink-0 text-xs font-medium text-slate-600 dark:text-slate-400">{r.label}</span>
+          <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div className="h-full rounded-full" style={{ width: `${(r.value / max) * 100}%`, background: r.color }} />
           </div>
-          <span className="w-6 shrink-0 text-right text-xs font-semibold text-slate-900">{r.value}</span>
+          <span className="w-6 shrink-0 text-right text-xs font-semibold text-slate-900 dark:text-white">{r.value}</span>
         </div>
       ))}
     </div>

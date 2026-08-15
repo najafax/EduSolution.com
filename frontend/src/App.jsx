@@ -33,7 +33,7 @@ function Protected({ children }) {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white dark:bg-slate-950">
       <Navbar />
       <IdleTimeoutMonitor />
       <CommandPalette />

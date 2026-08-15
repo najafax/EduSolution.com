@@ -71,38 +71,38 @@ export default function MyAccount() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900">My account</h1>
-      <p className="mt-1 text-sm text-slate-600">
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My account</h1>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         {user?.role === 'admin' ? 'Administrator' : 'Staff'} account. Contact an admin to change your role or module
         permissions.
       </p>
 
-      <form onSubmit={handleProfileSubmit} className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Profile</h2>
+      <form onSubmit={handleProfileSubmit} className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Profile</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Name</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Name</span>
             <input
               type="text"
               required
               value={profileForm.name}
               onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Email</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
             <input
               type="email"
               required
               value={profileForm.email}
               onChange={(e) => setProfileForm((f) => ({ ...f, email: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
         </div>
         {profileError && <p className="mt-3 text-sm text-red-600">{profileError}</p>}
-        {profileSuccess && <p className="mt-3 text-sm text-emerald-600">{profileSuccess}</p>}
+        {profileSuccess && <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{profileSuccess}</p>}
         <button
           type="submit"
           disabled={profileSubmitting}
@@ -112,22 +112,22 @@ export default function MyAccount() {
         </button>
       </form>
 
-      <form onSubmit={handlePasswordSubmit} className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Change password</h2>
+      <form onSubmit={handlePasswordSubmit} className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Change password</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Current password</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Current password</span>
             <input
               type="password"
               required
               autoComplete="current-password"
               value={passwordForm.currentPassword}
               onChange={(e) => setPasswordForm((f) => ({ ...f, currentPassword: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">New password</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">New password</span>
             <input
               type="password"
               required
@@ -135,12 +135,12 @@ export default function MyAccount() {
               autoComplete="new-password"
               value={passwordForm.newPassword}
               onChange={(e) => setPasswordForm((f) => ({ ...f, newPassword: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
         </div>
         {passwordError && <p className="mt-3 text-sm text-red-600">{passwordError}</p>}
-        {passwordSuccess && <p className="mt-3 text-sm text-emerald-600">{passwordSuccess}</p>}
+        {passwordSuccess && <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{passwordSuccess}</p>}
         <button
           type="submit"
           disabled={passwordSubmitting}
@@ -150,8 +150,8 @@ export default function MyAccount() {
         </button>
       </form>
 
-      <form onSubmit={handlePrefsSubmit} className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Notifications</h2>
+      <form onSubmit={handlePrefsSubmit} className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</h2>
         <label className="mt-4 flex min-h-11 items-center gap-2">
           <input
             type="checkbox"
@@ -159,10 +159,10 @@ export default function MyAccount() {
             onChange={(e) => setNotifyOverdue(e.target.checked)}
             className="h-4 w-4 rounded border-slate-300"
           />
-          <span className="text-sm text-slate-700">Email me a daily digest when overdue reminders are sent</span>
+          <span className="text-sm text-slate-700 dark:text-slate-300">Email me a daily digest when overdue reminders are sent</span>
         </label>
         {prefsError && <p className="mt-3 text-sm text-red-600">{prefsError}</p>}
-        {prefsSuccess && <p className="mt-3 text-sm text-emerald-600">{prefsSuccess}</p>}
+        {prefsSuccess && <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{prefsSuccess}</p>}
         <button
           type="submit"
           disabled={prefsSubmitting}

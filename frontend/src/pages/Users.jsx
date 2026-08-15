@@ -147,7 +147,7 @@ export default function Users() {
   if (!canView) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-        <p className="text-sm text-slate-500">You don't have permission to view this page.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">You don't have permission to view this page.</p>
       </div>
     );
   }
@@ -155,7 +155,7 @@ export default function Users() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">Users</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Users</h1>
         {canManage && (
           <button
             onClick={startCreate}
@@ -165,7 +165,7 @@ export default function Users() {
           </button>
         )}
       </div>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         Everyone with an account can see and edit shared business data unless restricted below. Admins always have
         full access.
       </p>
@@ -182,44 +182,44 @@ export default function Users() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Name</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Name</span>
               <input
                 type="text"
                 required
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Email</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
               <input
                 type="email"
                 required
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
             {!editingId && (
               <label className="block">
-                <span className="text-sm font-medium text-slate-700">Password</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Password</span>
                 <input
                   type="password"
                   required
                   minLength={8}
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 />
               </label>
             )}
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Role</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Role</span>
               <select
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               >
                 <option value="staff">Staff</option>
                 <option value="admin">Admin</option>
@@ -233,27 +233,27 @@ export default function Users() {
                   onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
                   className="h-4 w-4 rounded border-slate-300"
                 />
-                <span className="text-sm font-medium text-slate-700">Active</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Active</span>
               </label>
             )}
           </div>
 
           {form.role === 'staff' && (
             <div className="mt-6">
-              <h3 className="text-sm font-semibold text-slate-900">Module permissions</h3>
-              <div className="mt-2 overflow-x-auto rounded-md border border-slate-200">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Module permissions</h3>
+              <div className="mt-2 overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
+                <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                   <thead>
-                    <tr className="text-left text-xs font-medium uppercase text-slate-500">
+                    <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
                       <th className="px-4 py-2">Module</th>
                       <th className="px-4 py-2 text-center">View</th>
                       <th className="px-4 py-2 text-center">Manage</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {modules.map((m) => (
                       <tr key={m}>
-                        <td className="px-4 py-2 text-slate-900">{moduleLabel(m)}</td>
+                        <td className="px-4 py-2 text-slate-900 dark:text-white">{moduleLabel(m)}</td>
                         <td className="px-4 py-2 text-center">
                           <input
                             type="checkbox"
@@ -275,7 +275,7 @@ export default function Users() {
                   </tbody>
                 </table>
               </div>
-              <p className="mt-1 text-xs text-slate-500">Manage access also grants view access.</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Manage access also grants view access.</p>
             </div>
           )}
 
@@ -290,7 +290,7 @@ export default function Users() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -309,7 +309,7 @@ export default function Users() {
         <form onSubmit={handleResetPassword} className="flex flex-col gap-4">
           {error && <p className="text-sm text-red-600">{error}</p>}
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">New password</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">New password</span>
             <input
               type="password"
               required
@@ -333,7 +333,7 @@ export default function Users() {
                 setResetTargetId(null);
                 setResetPassword('');
               }}
-              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -341,15 +341,15 @@ export default function Users() {
         </form>
       </Modal>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
-          <p className="p-6 text-sm text-slate-500">Loading…</p>
+          <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
         ) : users.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">{search ? `No users match "${search}".` : 'No users yet.'}</p>
+          <p className="p-6 text-sm text-slate-500 dark:text-slate-400">{search ? `No users match "${search}".` : 'No users yet.'}</p>
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
             <thead>
-              <tr className="text-left text-xs font-medium uppercase text-slate-500">
+              <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
@@ -357,19 +357,21 @@ export default function Users() {
                 {canManage && <th className="px-4 py-3" />}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {users.map((u) => (
                 <tr key={u.id}>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">
                     {u.name}
-                    {u.id === currentUser.id && <span className="ml-2 text-xs text-slate-400">(you)</span>}
+                    {u.id === currentUser.id && <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">(you)</span>}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{u.email}</td>
-                  <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600">{u.role}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{u.email}</td>
+                  <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600 dark:text-slate-400">{u.role}</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        u.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                        u.active
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                          : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                       }`}
                     >
                       {u.active ? 'Active' : 'Deactivated'}

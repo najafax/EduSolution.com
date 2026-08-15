@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
+import ThemeToggle from './ThemeToggle';
 
 // `module: null` means always visible to any logged-in user regardless of
 // permissions (Dashboard). Everything else is filtered by that module's
@@ -41,11 +42,11 @@ export default function Navbar() {
 
   return (
     <header
-      className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10"
+      className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10 dark:border-slate-800 dark:bg-slate-950/80"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-        <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg">
+        <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
           EduSolution<span className="text-indigo-600">.com</span>
         </Link>
 
@@ -55,7 +56,7 @@ export default function Navbar() {
             <div className="hidden items-center gap-5 lg:flex">
               <GlobalSearch className="max-w-[180px] xl:max-w-[220px]" />
               <kbd
-                className="hidden shrink-0 rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-400 xl:block"
+                className="hidden shrink-0 rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-400 xl:block dark:border-slate-600"
                 title="Press Cmd/Ctrl+K to open the command palette"
               >
                 ⌘K
@@ -64,45 +65,50 @@ export default function Navbar() {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`text-sm font-medium hover:text-slate-900 ${isActive(link.to) ? 'text-indigo-600' : 'text-slate-700'}`}
+                  className={`text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive(link.to) ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
                 >
                   {link.label}
                 </Link>
               ))}
               <Link
                 to="/account"
-                className={`text-sm font-medium hover:text-slate-900 ${isActive('/account') ? 'text-indigo-600' : 'text-slate-700'}`}
+                className={`text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive('/account') ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
               >
                 My account
               </Link>
+              <ThemeToggle />
               <button
                 onClick={handleLogout}
-                className="min-h-11 shrink-0 whitespace-nowrap rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700"
+                className="min-h-11 shrink-0 whitespace-nowrap rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
                 Log out
               </button>
             </div>
 
             {/* Mobile menu toggle */}
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label="Toggle menu"
-              aria-expanded={menuOpen}
-              className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-700 lg:hidden"
-            >
-              {menuOpen ? (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-                </svg>
-              ) : (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-                </svg>
-              )}
-            </button>
+            <div className="flex items-center gap-1 lg:hidden">
+              <ThemeToggle />
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Toggle menu"
+                aria-expanded={menuOpen}
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-700 dark:text-slate-300"
+              >
+                {menuOpen ? (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </>
         ) : (
           <div className="flex items-center gap-2 sm:gap-4">
+            <ThemeToggle />
             <Link
               to="/login"
               className="flex min-h-11 items-center rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 sm:px-4"
@@ -114,7 +120,7 @@ export default function Navbar() {
       </nav>
 
       {user && menuOpen && (
-        <div className="border-t border-slate-200 px-4 py-2 lg:hidden">
+        <div className="border-t border-slate-200 px-4 py-2 lg:hidden dark:border-slate-800">
           <div className="py-2">
             <GlobalSearch onNavigate={() => setMenuOpen(false)} />
           </div>
@@ -123,7 +129,7 @@ export default function Navbar() {
               key={link.to}
               to={link.to}
               onClick={() => setMenuOpen(false)}
-              className={`flex min-h-11 items-center text-sm font-medium ${isActive(link.to) ? 'text-indigo-600' : 'text-slate-700'}`}
+              className={`flex min-h-11 items-center text-sm font-medium ${isActive(link.to) ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
             >
               {link.label}
             </Link>
@@ -131,13 +137,13 @@ export default function Navbar() {
           <Link
             to="/account"
             onClick={() => setMenuOpen(false)}
-            className={`flex min-h-11 items-center text-sm font-medium ${isActive('/account') ? 'text-indigo-600' : 'text-slate-700'}`}
+            className={`flex min-h-11 items-center text-sm font-medium ${isActive('/account') ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
           >
             My account
           </Link>
           <button
             onClick={handleLogout}
-            className="flex min-h-11 w-full items-center text-sm font-medium text-red-600"
+            className="flex min-h-11 w-full items-center text-sm font-medium text-red-600 dark:text-red-400"
           >
             Log out
           </button>

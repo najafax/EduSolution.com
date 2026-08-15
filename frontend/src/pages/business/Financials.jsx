@@ -25,8 +25,8 @@ export default function Financials() {
     api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
 
-  if (error) return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-red-600 sm:px-6">{error}</div>;
-  if (!summary) return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-slate-500 sm:px-6">Loading…</div>;
+  if (error) return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
+  if (!summary) return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
 
   const symbol = settings?.currency_symbol || '$';
   const collectedPct = summary.totalInvoiced > 0 ? (summary.totalPaid / summary.totalInvoiced) * 100 : 0;
@@ -85,8 +85,8 @@ export default function Financials() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900">Financials</h1>
-      <p className="mt-1 text-sm text-slate-600">A live view of what's owed, what's been paid, and where you stand.</p>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Financials</h1>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">A live view of what's owed, what's been paid, and where you stand.</p>
 
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
         {cards.map((card) => (
@@ -95,7 +95,7 @@ export default function Financials() {
       </div>
 
       {summary.totalInvoiced > 0 && (
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <MeterBar
             label="Collection rate"
             pct={collectedPct}
@@ -120,12 +120,12 @@ export default function Financials() {
       <div className="mt-6">
         <Accordion title="Recent payments">
           {summary.recentPayments.length === 0 ? (
-            <p className="text-sm text-slate-500">No payments recorded yet.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">No payments recorded yet.</p>
           ) : (
             <div className="-mx-6 overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                 <thead>
-                  <tr className="text-left text-xs font-medium uppercase text-slate-500">
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
                     <th className="px-6 py-3">Receipt</th>
                     <th className="px-4 py-3">Invoice</th>
                     <th className="px-4 py-3">Client</th>
@@ -133,18 +133,18 @@ export default function Financials() {
                     <th className="px-4 py-3 text-right">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {summary.recentPayments.map((p) => (
                     <tr key={p.id}>
-                      <td className="whitespace-nowrap px-6 py-3 font-medium text-slate-900">{p.receipt_number}</td>
+                      <td className="whitespace-nowrap px-6 py-3 font-medium text-slate-900 dark:text-white">{p.receipt_number}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <Link to={`/invoices/${p.invoice_id}`} className="text-indigo-600 hover:text-indigo-500">
                           {p.invoice_number}
                         </Link>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{p.client_name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{p.paid_at}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900">{money(symbol, p.amount)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.client_name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.paid_at}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{money(symbol, p.amount)}</td>
                     </tr>
                   ))}
                 </tbody>

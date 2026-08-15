@@ -73,12 +73,12 @@ function ProductPicker({ products, currencySymbol, onPick, placeholder }) {
           setOpen(true);
         }}
         onKeyDown={handleKeyDown}
-        className="min-h-11 w-full min-w-56 rounded-md border border-slate-300 px-3 py-2 text-base text-slate-700 focus:border-indigo-500 focus:outline-none"
+        className="min-h-11 w-full min-w-56 rounded-md border border-slate-300 px-3 py-2 text-base text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
       />
       {open && (
-        <ul className="absolute z-10 mt-1 max-h-60 w-full min-w-56 overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+        <ul className="absolute z-10 mt-1 max-h-60 w-full min-w-56 overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
           {filtered.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-slate-500">No matches.</li>
+            <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">No matches.</li>
           ) : (
             filtered.map((product, index) => (
               <li key={product.id}>
@@ -90,14 +90,14 @@ function ProductPicker({ products, currencySymbol, onPick, placeholder }) {
                   }}
                   onMouseEnter={() => setHighlighted(index)}
                   className={`flex w-full flex-col items-start px-3 py-2 text-left text-sm ${
-                    index === highlighted ? 'bg-indigo-50' : ''
+                    index === highlighted ? 'bg-indigo-50 dark:bg-indigo-950/50' : ''
                   }`}
                 >
-                  <span className="text-slate-900">
+                  <span className="text-slate-900 dark:text-white">
                     {product.name} — {currencySymbol}
                     {product.unit_price.toFixed(2)}
                   </span>
-                  {product.description && <span className="text-xs text-slate-500">{product.description}</span>}
+                  {product.description && <span className="text-xs text-slate-500 dark:text-slate-400">{product.description}</span>}
                 </button>
               </li>
             ))
@@ -179,8 +179,8 @@ export default function LineItemsEditor({
               readOnly={catalogOnly}
               value={item.description}
               onChange={(e) => updateItem(index, { description: e.target.value })}
-              className={`col-span-12 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none sm:col-span-6 ${
-                catalogOnly ? 'bg-slate-50' : ''
+              className={`col-span-12 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none sm:col-span-6 dark:border-slate-600 dark:text-white ${
+                catalogOnly ? 'bg-slate-50 dark:bg-slate-800' : 'dark:bg-slate-900'
               }`}
             />
             <input
@@ -191,7 +191,7 @@ export default function LineItemsEditor({
               required
               value={item.quantity}
               onChange={(e) => updateItem(index, { quantity: e.target.value })}
-              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none sm:col-span-2"
+              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none sm:col-span-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
             <input
               type="number"
@@ -201,13 +201,13 @@ export default function LineItemsEditor({
               required
               value={item.unit_price}
               onChange={(e) => updateItem(index, { unit_price: e.target.value })}
-              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none sm:col-span-3"
+              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none sm:col-span-3 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
             <button
               type="button"
               onClick={() => removeItem(index)}
               disabled={items.length === 1}
-              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-40 sm:col-span-1"
+              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-40 sm:col-span-1 dark:border-slate-600 dark:text-red-400 dark:hover:bg-red-950"
             >
               Remove
             </button>
@@ -220,7 +220,7 @@ export default function LineItemsEditor({
           <button
             type="button"
             onClick={addItem}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             + Add item
           </button>
@@ -234,14 +234,14 @@ export default function LineItemsEditor({
           />
         )}
         {catalogOnly && products.length === 0 && (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             No products in the catalog yet — add one on the Products page first.
           </p>
         )}
       </div>
 
-      <p className="mt-3 text-right text-sm text-slate-600">
-        Subtotal: <span className="font-medium text-slate-900">{currencySymbol}{subtotal.toFixed(2)}</span>
+      <p className="mt-3 text-right text-sm text-slate-600 dark:text-slate-400">
+        Subtotal: <span className="font-medium text-slate-900 dark:text-white">{currencySymbol}{subtotal.toFixed(2)}</span>
       </p>
     </div>
   );

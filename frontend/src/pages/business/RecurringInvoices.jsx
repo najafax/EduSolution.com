@@ -144,7 +144,7 @@ export default function RecurringInvoices() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Recurring invoices</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Recurring invoices</h1>
         {canManage && (
           <button
             onClick={startCreate}
@@ -154,7 +154,7 @@ export default function RecurringInvoices() {
           </button>
         )}
       </div>
-      <p className="mt-2 text-sm text-slate-600">
+      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
         Each template automatically creates a draft invoice on its next run date — review and send it from the{' '}
         <Link to="/invoices" className="text-indigo-600 hover:text-indigo-500">
           Invoices
@@ -166,14 +166,14 @@ export default function RecurringInvoices() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search recurring invoices…" />
       </div>
 
-      {error && !showForm && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && !showForm && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit template' : 'New template'} maxWidthClass="max-w-3xl">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Client</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client</span>
               <SearchableSelect
                 options={clients.map((c) => ({ value: c.id, label: c.name }))}
                 value={form.client_id}
@@ -183,11 +183,11 @@ export default function RecurringInvoices() {
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Frequency</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Frequency</span>
               <select
                 value={form.frequency}
                 onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               >
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
@@ -196,31 +196,31 @@ export default function RecurringInvoices() {
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Next run date</span>
-              <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Next run date</span>
+              <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500 dark:border-slate-600">
                 <input
                   type="date"
                   required
                   value={form.next_run_date}
                   onChange={(e) => setForm((f) => ({ ...f, next_run_date: e.target.value }))}
-                  className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none"
+                  className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
                 />
               </div>
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Due (days after issue)</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Due (days after issue)</span>
               <input
                 type="number"
                 min="0"
                 value={form.due_in_days}
                 onChange={(e) => setForm((f) => ({ ...f, due_in_days: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Tax rate (%)</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Tax rate (%)</span>
               <input
                 type="number"
                 min="0"
@@ -228,16 +228,16 @@ export default function RecurringInvoices() {
                 step="0.01"
                 value={form.tax_rate}
                 onChange={(e) => setForm((f) => ({ ...f, tax_rate: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Discount type</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Discount type</span>
               <select
                 value={form.discount_type}
                 onChange={(e) => setForm((f) => ({ ...f, discount_type: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               >
                 <option value="percentage">Percentage</option>
                 <option value="fixed">Fixed amount</option>
@@ -245,7 +245,7 @@ export default function RecurringInvoices() {
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Discount value {form.discount_type === 'percentage' ? '(%)' : ''}
               </span>
               <input
@@ -255,7 +255,7 @@ export default function RecurringInvoices() {
                 step="0.01"
                 value={form.discount_value}
                 onChange={(e) => setForm((f) => ({ ...f, discount_value: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
 
@@ -267,20 +267,20 @@ export default function RecurringInvoices() {
                   onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
                   className="h-5 w-5 rounded border-slate-300"
                 />
-                <span className="text-sm font-medium text-slate-700">Active</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Active</span>
               </label>
             )}
           </div>
 
           <div>
-            <span className="text-sm font-medium text-slate-700">Line items</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Line items</span>
             <div className="mt-1">
               <LineItemsEditor items={items} onChange={setItems} currencySymbol={symbol} products={products} />
             </div>
           </div>
 
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Notes</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
             <textarea
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
@@ -300,7 +300,7 @@ export default function RecurringInvoices() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -308,17 +308,17 @@ export default function RecurringInvoices() {
         </form>
       </Modal>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
-          <p className="p-6 text-sm text-slate-500">Loading…</p>
+          <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
         ) : recurring.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">
+          <p className="p-6 text-sm text-slate-500 dark:text-slate-400">
             {search ? `No recurring invoices match "${search}".` : 'No recurring invoices yet.'}
           </p>
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
             <thead>
-              <tr className="text-left text-xs font-medium uppercase text-slate-500">
+              <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
                 <th className="px-4 py-3">Client</th>
                 <th className="px-4 py-3">Frequency</th>
                 <th className="px-4 py-3">Next run</th>
@@ -326,16 +326,18 @@ export default function RecurringInvoices() {
                 {canManage && <th className="px-4 py-3" />}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {recurring.map((row) => (
                 <tr key={row.id}>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{row.client_name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600">{row.frequency}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.next_run_date}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{row.client_name}</td>
+                  <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600 dark:text-slate-400">{row.frequency}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{row.next_run_date}</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        row.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                        row.active
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                       }`}
                     >
                       {row.active ? 'Active' : 'Paused'}
