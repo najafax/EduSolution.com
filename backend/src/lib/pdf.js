@@ -474,6 +474,13 @@ const STAMP_FIT_SIZE = STAMP_BOX_SIZE / STAMP_ROTATED_INFLATION;
 // the gap is deliberate and doesn't shrink to nothing if either image's
 // box size changes later.
 const STAMP_LINE_CLEARANCE = 8;
+// A real stamp is rarely pressed dead-center on a signature — offsets it a
+// bit toward the lower-right of the ink instead. The downward part eats
+// into STAMP_LINE_CLEARANCE (leaving STAMP_LINE_CLEARANCE - STAMP_DOWN_OFFSET
+// pt of actual headroom above the line), so keep the two in proportion if
+// either changes rather than letting the stamp creep back down to the line.
+const STAMP_RIGHT_OFFSET = 10;
+const STAMP_DOWN_OFFSET = 5;
 // Total downward extent of the block from `y`: signature image, the
 // STAMP_LINE_CLEARANCE gap, then the line/caption/name text beneath it —
 // used for page-break budgeting (drawSignatureAndPayment), so it only
@@ -516,17 +523,20 @@ function drawSignatureBlock(doc, settings, y, rightBound) {
     const buffer = decodeImageDataUri(settings.stamp_image);
     if (buffer) {
       // Centered on slotCenterX — the same horizontal center the signature
-      // ink is drawn around above — so the stamp lands over the ink itself
-      // rather than off toward one edge of the box.
-      const stampX = slotCenterX - STAMP_BOX_SIZE / 2;
+      // ink is drawn around above, so the stamp lands over the ink itself
+      // rather than off toward one edge of the box — then nudged
+      // STAMP_RIGHT_OFFSET/STAMP_DOWN_OFFSET toward the ink's lower-right.
+      const stampX = slotCenterX - STAMP_BOX_SIZE / 2 + STAMP_RIGHT_OFFSET;
       // Bottom-anchored STAMP_LINE_CLEARANCE above the line when there's a
-      // signature (and therefore a line) to sit above; otherwise flush at
-      // the top of the block, same as before.
-      const stampY = settings.signature_image ? lineY - STAMP_LINE_CLEARANCE - STAMP_BOX_SIZE : y;
+      // signature (and therefore a line) to sit above (then nudged down by
+      // STAMP_DOWN_OFFSET); otherwise flush at the top of the block, same
+      // as before.
+      const stampY = (settings.signature_image ? lineY - STAMP_LINE_CLEARANCE - STAMP_BOX_SIZE : y) + STAMP_DOWN_OFFSET;
+      const centerX = stampX + STAMP_BOX_SIZE / 2;
       const centerY = stampY + STAMP_BOX_SIZE / 2;
       const fitOffset = (STAMP_BOX_SIZE - STAMP_FIT_SIZE) / 2;
       doc.save();
-      doc.rotate(STAMP_ROTATION_DEGREES, { origin: [slotCenterX, centerY] });
+      doc.rotate(STAMP_ROTATION_DEGREES, { origin: [centerX, centerY] });
       doc.image(buffer, stampX + fitOffset, stampY + fitOffset, { fit: [STAMP_FIT_SIZE, STAMP_FIT_SIZE] });
       doc.restore();
     }
