@@ -45,7 +45,7 @@ export default function Navbar() {
       className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10 dark:border-slate-800 dark:bg-slate-950/80"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <nav className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8 sm:py-4">
+      <nav className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 xl:px-8 sm:py-4">
         <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
           EduSolution<span className="text-indigo-600">.com</span>
         </Link>
@@ -58,15 +58,15 @@ export default function Navbar() {
                 internally (overflow-x-auto) if it still doesn't fit, so
                 search/account/theme/logout stay put and the page never
                 grows a horizontal scrollbar. */}
-            <div className="hidden min-w-0 flex-1 items-center justify-end gap-4 lg:flex">
-              <GlobalSearch className="max-w-[160px] shrink-0 xl:max-w-[220px]" />
+            <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 xl:flex">
+              <GlobalSearch className="max-w-[110px] shrink-0 2xl:max-w-[220px]" />
               <kbd
-                className="hidden shrink-0 rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-400 xl:block dark:border-slate-600"
+                className="hidden shrink-0 rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-400 2xl:block dark:border-slate-600"
                 title="Press Cmd/Ctrl+K to open the command palette"
               >
                 ⌘K
               </kbd>
-              <div className="flex min-w-0 items-center gap-4 overflow-x-auto">
+              <div className="nav-links-scroll flex min-w-0 items-center gap-2.5 overflow-x-auto py-1">
                 {visibleLinks.map((link) => (
                   <Link
                     key={link.to}
@@ -93,7 +93,7 @@ export default function Navbar() {
             </div>
 
             {/* Mobile menu toggle */}
-            <div className="flex items-center gap-1 lg:hidden">
+            <div className="flex items-center gap-1 xl:hidden">
               <ThemeToggle />
               <button
                 onClick={() => setMenuOpen((v) => !v)}
@@ -127,7 +127,7 @@ export default function Navbar() {
       </nav>
 
       {user && menuOpen && (
-        <div className="border-t border-slate-200 px-4 py-2 lg:hidden dark:border-slate-800">
+        <div className="border-t border-slate-200 px-4 py-2 xl:hidden dark:border-slate-800">
           <div className="py-2">
             <GlobalSearch onNavigate={() => setMenuOpen(false)} />
           </div>

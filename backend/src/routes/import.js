@@ -24,6 +24,14 @@ function addDays(dateStr, days) {
   return d.toISOString().slice(0, 10);
 }
 
+// Tolerates values copied out of a spreadsheet: strips thousands-separator
+// commas and a leading currency symbol before parsing, so "2,500" or
+// "$2,500.00" parse the same as "2500" instead of failing as NaN.
+function parseNumber(value) {
+  if (value == null) return NaN;
+  return Number(String(value).trim().replace(/[$,]/g, ''));
+}
+
 // Hands out sequential per-year numbers within a single import batch without
 // re-querying the DB per row. Seeded once per year from the real "next"
 // number (invoiceNumberForYear/receiptNumberForYear), then advanced purely
@@ -98,7 +106,7 @@ function processClients(rows, commit) {
 function validateExpenseRow(row) {
   const description = (row.description || '').trim();
   const category = (row.category || 'other').trim() || 'other';
-  const amount = Number(row.amount);
+  const amount = parseNumber(row.amount);
   const expense_date = (row.expense_date || '').trim();
 
   if (!description) return { ok: false, message: 'description is required' };
@@ -141,9 +149,21 @@ function processExpenses(rows, commit) {
 
 function validateInvoiceRow(row, clientsByEmail) {
   const clientEmail = (row.client_email || '').trim().toLowerCase();
-  const client = clientsByEmail.get(clientEmail);
   if (!clientEmail) return { ok: false, message: 'client_email is required' };
-  if (!client) return { ok: false, message: `no client found with email "${clientEmail}" — import clients first` };
+  const client = clientsByEmail.get(clientEmail);
+  if (!client) {
+    // The single most common cause of this error is previewing the clients
+    // CSV (which reports every valid row as "ready to import") without
+    // then clicking "Confirm import" — preview never writes to the
+    // database, so the client genuinely doesn't exist yet. Say so
+    // explicitly when there are zero clients on file at all, since that's
+    // the tell-tale sign.
+    const hint =
+      clientsByEmail.size === 0
+        ? 'no clients exist yet — if you already ran the Clients import, make sure you clicked "Confirm import" and not just "Preview"'
+        : 'import clients first (and click "Confirm import", not just "Preview")';
+    return { ok: false, message: `no client found with email "${clientEmail}" — ${hint}` };
+  }
 
   const issueDate = (row.issue_date || '').trim();
   if (!DATE_RE.test(issueDate)) return { ok: false, message: 'issue_date must be in YYYY-MM-DD format' };
@@ -151,10 +171,11 @@ function validateInvoiceRow(row, clientsByEmail) {
   const dueDate = (row.due_date || '').trim() || addDays(issueDate, 14);
   if (!DATE_RE.test(dueDate)) return { ok: false, message: 'due_date must be in YYYY-MM-DD format' };
 
-  const amount = Number(row.amount);
+  const amount = parseNumber(row.amount);
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: 'amount must be a positive number' };
 
-  const taxRate = row.tax_rate ? Number(row.tax_rate) : 0;
+  const taxRate = row.tax_rate ? parseNumber(row.tax_rate) : 0;
+  if (!Number.isFinite(taxRate)) return { ok: false, message: 'tax_rate must be a number' };
 
   let totals;
   try {
@@ -168,7 +189,16 @@ function validateInvoiceRow(row, clientsByEmail) {
     return { ok: false, message: err.message };
   }
 
-  const amountPaid = row.amount_paid ? Number(row.amount_paid) : 0;
+  let status = (row.status || '').trim().toLowerCase();
+  if (status && !INVOICE_STATUSES.includes(status)) {
+    return { ok: false, message: `status must be one of: ${INVOICE_STATUSES.join(', ')} (got "${(row.status || '').trim()}")` };
+  }
+
+  // "paid" with no amount_paid given means paid in full — the common case
+  // for a historical export that only records final status, not a
+  // separate payment amount that would just repeat the invoice total.
+  const amountPaidGiven = (row.amount_paid || '').trim() !== '';
+  const amountPaid = amountPaidGiven ? parseNumber(row.amount_paid) : status === 'paid' ? totals.total : 0;
   if (!Number.isFinite(amountPaid) || amountPaid < 0) return { ok: false, message: 'amount_paid must be a non-negative number' };
   if (amountPaid > totals.total) {
     return { ok: false, message: `amount_paid (${amountPaid}) cannot exceed the invoice total (${totals.total})` };
@@ -185,10 +215,6 @@ function validateInvoiceRow(row, clientsByEmail) {
     return { ok: false, message: `payment_method must be one of: ${PAYMENT_METHODS.join(', ')}` };
   }
 
-  let status = (row.status || '').trim().toLowerCase();
-  if (status && !INVOICE_STATUSES.includes(status)) {
-    return { ok: false, message: `status must be one of: ${INVOICE_STATUSES.join(', ')}` };
-  }
   if (!status) status = amountPaid >= totals.total ? 'paid' : 'sent';
 
   if (status === 'paid' && amountPaid < totals.total) {

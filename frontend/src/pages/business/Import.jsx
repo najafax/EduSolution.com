@@ -207,10 +207,13 @@ export default function Import() {
       </div>
 
       {preview && (
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-6 rounded-lg border border-amber-300 bg-white shadow-sm dark:border-amber-700 dark:bg-slate-900">
+          <p className="rounded-t-lg border-b border-amber-300 bg-amber-50 px-6 py-2 text-sm font-medium text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            Preview only — nothing has been saved yet. Click "Confirm import" below to actually import these rows.
+          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 p-6">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-              Preview: {preview.validCount} of {preview.total} row(s) ready to import
+              {preview.validCount} of {preview.total} row(s) ready to import
               {preview.errorCount > 0 && <span className="text-red-600 dark:text-red-400"> ({preview.errorCount} with errors)</span>}
             </h2>
             {preview.validCount > 0 && (
@@ -223,7 +226,9 @@ export default function Import() {
               </button>
             )}
           </div>
-          <ResultsTable results={preview.results} />
+          <div className="px-6 pb-6">
+            <ResultsTable results={preview.results} />
+          </div>
         </div>
       )}
 
