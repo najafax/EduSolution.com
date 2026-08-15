@@ -456,12 +456,6 @@ function drawCommentsBox(doc, notes, y) {
 const SIGNATURE_BOX_WIDTH = 95;
 const SIGNATURE_IMG_HEIGHT = 46;
 const STAMP_BOX_SIZE = 55;
-// The stamp box always ends flush with `rightBound` (see stampX below); this
-// is how much of the *signature's* box width sits underneath the stamp box.
-// A bigger value pulls the signature further right, deeper under the stamp
-// — i.e. this is the overlap amount itself, not an offset that shrinks it.
-const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.6;
-const STAMP_OVERHANG = STAMP_BOX_SIZE - STAMP_OVERLAP; // how much of the stamp sticks out past the signature's right edge
 const STAMP_ROTATION_DEGREES = -20; // negative = anti-clockwise
 // Rotating a square inflates its axis-aligned bounding box by (|cos|+|sin|)
 // times its side — drawing the stamp at a plain STAMP_BOX_SIZE fit *before*
@@ -490,31 +484,27 @@ const STAMP_LINE_CLEARANCE = 8;
 const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + STAMP_LINE_CLEARANCE + 16 + 11 + 6;
 
 // An authorized-signature image over a signing line (with the signatory's
-// printed name below it), and a company stamp, anchored so their combined
-// right edge lines up with `rightBound` — the caller decides where that is
-// (e.g. the right edge of a narrower left-hand column, or the page's own
-// right margin). Each image is fully independent and only drawn if its own
+// printed name below it), and a company stamp, both centered on the same
+// horizontal axis within a shared SIGNATURE_BOX_WIDTH-wide slot whose right
+// edge lines up with `rightBound` — the caller decides where that is (e.g.
+// the right edge of a narrower left-hand column, or the page's own right
+// margin). Each image is fully independent and only drawn if its own
 // business_settings field is set. When both are present, the stamp sits
-// rotated 20° anti-clockwise, overlapping most of the signature's right
-// portion (drawn after it, so it's visually in front) rather than off in
-// its own separate spot — mirroring how a physical stamp is typically
-// pressed partly over a signature.
+// rotated 20° anti-clockwise directly over the signature's own center
+// (drawn after it, so it's visually in front) — mirroring how a physical
+// stamp is typically pressed over a signature, not off to one side of it.
 function drawSignatureBlock(doc, settings, y, rightBound) {
-  const hasBoth = Boolean(settings.signature_image && settings.stamp_image);
-  const sigRight = rightBound - (hasBoth ? STAMP_OVERHANG : 0);
-  const sigX = sigRight - SIGNATURE_BOX_WIDTH;
+  const slotX = rightBound - SIGNATURE_BOX_WIDTH;
+  const slotCenterX = slotX + SIGNATURE_BOX_WIDTH / 2;
 
   if (settings.signature_image) {
     const buffer = decodeImageDataUri(settings.signature_image);
     // Centered both ways within its box — a signature squarer than this
     // wide/short box (common — most signatures aren't 3:1) shrinks to fit
     // the height and leaves empty space on either side; centering splits
-    // that evenly rather than pushing all of it to one side. The tradeoff:
-    // when a stamp is also uploaded, its overlap (see STAMP_OVERLAP/
-    // STAMP_OVERHANG below) is positioned off the box's right edge, not
-    // wherever the now-centered ink actually lands, so it may sit partly
-    // over blank space instead of squarely over the signature.
-    if (buffer) doc.image(buffer, sigX, y, { fit: [SIGNATURE_BOX_WIDTH, SIGNATURE_IMG_HEIGHT], align: 'center', valign: 'center' });
+    // that evenly rather than pushing all of it to one side, and keeps the
+    // ink's own center at slotCenterX, same as the stamp below.
+    if (buffer) doc.image(buffer, slotX, y, { fit: [SIGNATURE_BOX_WIDTH, SIGNATURE_IMG_HEIGHT], align: 'center', valign: 'center' });
   }
 
   // Fixed, deliberate gap below the signature image — not tied to the
@@ -525,26 +515,28 @@ function drawSignatureBlock(doc, settings, y, rightBound) {
   if (settings.stamp_image) {
     const buffer = decodeImageDataUri(settings.stamp_image);
     if (buffer) {
-      const stampX = rightBound - STAMP_BOX_SIZE;
+      // Centered on slotCenterX — the same horizontal center the signature
+      // ink is drawn around above — so the stamp lands over the ink itself
+      // rather than off toward one edge of the box.
+      const stampX = slotCenterX - STAMP_BOX_SIZE / 2;
       // Bottom-anchored STAMP_LINE_CLEARANCE above the line when there's a
       // signature (and therefore a line) to sit above; otherwise flush at
       // the top of the block, same as before.
       const stampY = settings.signature_image ? lineY - STAMP_LINE_CLEARANCE - STAMP_BOX_SIZE : y;
-      const centerX = stampX + STAMP_BOX_SIZE / 2;
       const centerY = stampY + STAMP_BOX_SIZE / 2;
       const fitOffset = (STAMP_BOX_SIZE - STAMP_FIT_SIZE) / 2;
       doc.save();
-      doc.rotate(STAMP_ROTATION_DEGREES, { origin: [centerX, centerY] });
+      doc.rotate(STAMP_ROTATION_DEGREES, { origin: [slotCenterX, centerY] });
       doc.image(buffer, stampX + fitOffset, stampY + fitOffset, { fit: [STAMP_FIT_SIZE, STAMP_FIT_SIZE] });
       doc.restore();
     }
   }
 
   if (settings.signature_image) {
-    doc.moveTo(sigX, lineY).lineTo(sigX + SIGNATURE_BOX_WIDTH, lineY).strokeColor(COLORS.border).lineWidth(1).stroke();
-    doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted).text('Authorized Signature', sigX, lineY + 4, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
+    doc.moveTo(slotX, lineY).lineTo(slotX + SIGNATURE_BOX_WIDTH, lineY).strokeColor(COLORS.border).lineWidth(1).stroke();
+    doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted).text('Authorized Signature', slotX, lineY + 4, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
     if (settings.signatory_name) {
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.heading).text(settings.signatory_name, sigX, lineY + 16, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.heading).text(settings.signatory_name, slotX, lineY + 16, { width: SIGNATURE_BOX_WIDTH, align: 'center' });
     }
   }
 }
@@ -573,22 +565,18 @@ function drawSignatureAndPayment(doc, { settings, bankDetails }, y) {
     y = MARGIN;
   }
 
-  // Anchors the signature's own box flush at the page margin (sigX ends up
-  // exactly MARGIN — see drawSignatureBlock), matching BILL TO/Comments,
-  // same as everywhere else on the page. Combined with the narrower
-  // SIGNATURE_BOX_WIDTH above, this is what actually pulls the *visible*
-  // ink and the stamp in close to the margin — computing rightBound
-  // directly as some offset from MARGIN instead risked sigX landing
-  // off-page (it briefly did) once the box's own width was in play. An
+  // Anchors the signature slot flush at the page margin (slotX in
+  // drawSignatureBlock ends up exactly MARGIN), matching BILL TO/Comments,
+  // same as everywhere else on the page — regardless of whether one or
+  // both of signature_image/stamp_image are set, since both are now
+  // centered within the same SIGNATURE_BOX_WIDTH-wide slot rather than
+  // needing extra width budgeted for a stamp overhanging past it. An
   // earlier attempt to nudge this ~1cm further left than MARGIN (to match
   // the Bank/Payments box's own visual weight) instead made the signature
   // line stick out past the page's left margin relative to every other
   // section — reverted in favor of staying flush with MARGIN like the rest
   // of the document.
-  const hasBothImages = Boolean(settings.signature_image && settings.stamp_image);
-  const sigRightBound = settings.signature_image
-    ? MARGIN + SIGNATURE_BOX_WIDTH + (hasBothImages ? STAMP_OVERHANG : 0)
-    : MARGIN + STAMP_BOX_SIZE;
+  const sigRightBound = MARGIN + SIGNATURE_BOX_WIDTH;
   if (hasSig) drawSignatureBlock(doc, settings, y, sigRightBound);
   if (hasBank) drawIconLabelBox(doc, { icon: 'bank', label: 'PAYMENTS PAYABLE TO', bodyText: bankDetails }, rightX, rightWidth, y);
 
