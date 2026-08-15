@@ -68,7 +68,7 @@ export default function Landing() {
             <img
               src="/ceo-hassan-najah.jpg"
               alt="Hassan Najah, Chief Executive Officer of Edu Solutions"
-              className="aspect-[4/5] w-full rounded-3xl object-cover shadow-xl"
+              className="aspect-[4/3] w-full rounded-3xl object-cover shadow-xl"
             />
             <div className="absolute bottom-4 left-4 right-4 rounded-xl bg-indigo-600 px-5 py-3 text-white shadow-lg sm:right-auto sm:min-w-[220px]">
               <p className="text-base font-semibold">Hassan Najah</p>
