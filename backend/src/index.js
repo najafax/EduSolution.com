@@ -15,6 +15,7 @@ const activityRoutes = require('./routes/activity');
 const searchRoutes = require('./routes/search');
 const importRoutes = require('./routes/import');
 const usersRoutes = require('./routes/users');
+const dataResetRoutes = require('./routes/dataReset');
 const { startScheduler } = require('./lib/scheduler');
 
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/data-reset', dataResetRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

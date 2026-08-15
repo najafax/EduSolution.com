@@ -60,4 +60,16 @@ function requirePermission(module, level = 'view') {
   };
 }
 
-module.exports = { requireAuth, requirePermission };
+// Stricter than requirePermission: bypasses the per-module grant system
+// entirely and checks the account's actual role. Reserved for actions no
+// staff grant should ever unlock — e.g. bulk-deleting all business data —
+// unlike every other gated route in this app, which a staff member can be
+// granted access to via user_permissions. Must run after requireAuth.
+function requireAdmin(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Only an admin can do this' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requirePermission, requireAdmin };

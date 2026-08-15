@@ -165,6 +165,11 @@ export const api = {
     run: (type, csv, commit, token) => request(`/import/${type}`, { method: 'POST', body: { csv, commit }, token }),
   },
 
+  dataReset: {
+    run: (confirm, includeProducts, token) =>
+      request('/data-reset', { method: 'POST', body: { confirm, includeProducts }, token }),
+  },
+
   users: {
     list: (token, { q, page } = {}) => request(`/users${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/users/${id}`, { token }),

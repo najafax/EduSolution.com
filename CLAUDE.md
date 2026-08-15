@@ -501,6 +501,37 @@ Status/derived-field conventions worth knowing before touching this code:
   column (see `db/index.js` above) one-time-promoted every pre-existing
   user to `admin` so shipping this feature could never silently strip
   access from someone already using the app.
+- `middleware/auth.js`'s `requireAdmin` is a second, stricter gate than
+  `requirePermission` — it checks `req.user.role === 'admin'` directly
+  rather than consulting `user_permissions`, so no staff grant can ever
+  unlock it (unlike every other module in this app, which a staff member
+  can be granted access to). Reserved for actions with no per-row undo:
+  currently only `routes/dataReset.js`.
+- `routes/dataReset.js` (mounted at `/api/data-reset`, `requireAuth` +
+  `requireAdmin`, its own `router.use()` chain independent of the
+  `requirePermission`/module system entirely) — `POST /` bulk-deletes
+  `clients`, `quotes`/`quote_items`, `invoices`/`invoice_items`/`payments`,
+  `recurring_invoices`/`recurring_invoice_items`, `expenses`, and
+  `activity_log` in one transaction (foreign key checks are briefly turned
+  off for the transaction, then back on — see `db/index.js`'s `PRAGMA
+  foreign_keys`), and resets each cleared table's `AUTOINCREMENT` counter
+  so a fresh import starts numbering from 1 again. `products` is only
+  included when the request explicitly sets `includeProducts: true` — a
+  catalog is often worth keeping across a reset, unlike everything else
+  here. `users`, `user_permissions`, and `business_settings` are never
+  touched by this route at all, not even conditionally: login and branding
+  must survive a reset. Requires `confirm: "DELETE"` in the body (checked
+  server-side, independent of whatever confirmation UI the frontend adds)
+  or the whole request 400s before touching anything. Logs one
+  `activity_log` entry summarizing what was cleared — written *after* the
+  delete (not before), so it survives even when `activity_log` was itself
+  one of the tables just wiped, becoming the first fresh entry for anyone
+  auditing later. `pages/business/Import.jsx`'s `DangerZone` component
+  (rendered only when `user.role === 'admin'`, re-checking the same
+  condition the backend enforces rather than trusting a hidden button) is
+  the only caller — a type-to-confirm text input matching the literal word
+  `DELETE` gates the button, plus a native `confirm()` as a second layer,
+  before `api.dataReset.run()` is ever called.
 - `routes/users.js` (mounted at `/api/users`, `requireAuth` +
   `requirePermission('users', 'view'|'manage')` per route) — the in-app
   admin user-management API: `GET /` (list), `GET /:id` (user +
@@ -756,6 +787,11 @@ frontend stops holding/sending it.
   frontend does no CSV parsing of its own. Per-type CSV templates are
   generated client-side as static strings and downloaded via a blob URL,
   the same throwaway-`<a>` pattern as `downloadFile()` in `lib/api.js`.
+  The same page also renders `DangerZone` (see `routes/dataReset.js`
+  above) at the bottom, but only when `user.role === 'admin'` — checked
+  directly against the role, not `can('import', 'manage')` like the rest
+  of this page, since a staff member could be granted that permission
+  without being trusted with a bulk, unrecoverable delete.
 - `components/GlobalSearch.jsx` — a debounced (250ms) search box that calls
   `api.search.query()` and renders a grouped dropdown (clients/quotes/
   invoices/expenses); clicking a result navigates there. Mounted twice in

@@ -44,6 +44,95 @@ function downloadTemplate(type) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+const CONFIRM_PHRASE = 'DELETE';
+
+// Admin-only (checked by the caller, not just the import:manage permission
+// every other section of this page is gated on — see routes/dataReset.js's
+// requireAdmin) — bulk-deletes clients/quotes/invoices/payments/expenses/
+// recurring invoices/activity log in one shot, e.g. to clear out test data
+// before importing real historical records. Login and business settings
+// are never touched by the backend route regardless of what's selected here.
+function DangerZone({ token }) {
+  const [includeProducts, setIncludeProducts] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState(null);
+
+  const canConfirm = confirmText === CONFIRM_PHRASE;
+
+  async function handleClear() {
+    if (!canConfirm) return;
+    if (!confirm('This permanently deletes all business data. This cannot be undone. Continue?')) return;
+    setBusy(true);
+    setError('');
+    setResult(null);
+    try {
+      const res = await api.dataReset.run(CONFIRM_PHRASE, includeProducts, token);
+      setResult(res);
+      setConfirmText('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-10 rounded-lg border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-950/40">
+      <h2 className="text-sm font-semibold text-red-900 dark:text-red-300">Danger zone</h2>
+      <p className="mt-1 text-sm text-red-800 dark:text-red-400">
+        Permanently delete every client, quote, invoice, payment, expense, recurring invoice, and activity log
+        entry — useful for clearing out test data before importing real historical records. Your login and
+        business settings are never affected. This cannot be undone.
+      </p>
+
+      <label className="mt-4 flex min-h-11 items-center gap-2">
+        <input
+          type="checkbox"
+          checked={includeProducts}
+          onChange={(e) => setIncludeProducts(e.target.checked)}
+          className="h-4 w-4 rounded border-red-300"
+        />
+        <span className="text-sm text-red-800 dark:text-red-400">Also delete the product catalog</span>
+      </label>
+
+      <label className="mt-4 block max-w-xs">
+        <span className="text-sm font-medium text-red-900 dark:text-red-300">
+          Type {CONFIRM_PHRASE} to confirm
+        </span>
+        <input
+          type="text"
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          placeholder={CONFIRM_PHRASE}
+          className="mt-1 min-h-11 w-full rounded-md border border-red-300 px-3 py-2 text-base focus:border-red-500 focus:outline-none dark:border-red-700 dark:bg-slate-900 dark:text-white"
+        />
+      </label>
+
+      {error && <p className="mt-3 text-sm text-red-700 dark:text-red-400">{error}</p>}
+      {result && (
+        <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
+          Cleared:{' '}
+          {Object.entries(result.cleared)
+            .filter(([, count]) => count > 0)
+            .map(([t, count]) => `${count} ${t.replace(/_/g, ' ')}`)
+            .join(', ') || 'nothing — everything was already empty'}
+          .
+        </p>
+      )}
+
+      <button
+        onClick={handleClear}
+        disabled={!canConfirm || busy}
+        className="mt-4 min-h-11 rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+      >
+        {busy ? 'Clearing…' : 'Clear all business data'}
+      </button>
+    </div>
+  );
+}
+
 function ResultsTable({ results }) {
   return (
     <div className="mt-4 max-h-96 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
@@ -82,7 +171,7 @@ function ResultsTable({ results }) {
 }
 
 export default function Import() {
-  const { token, can } = useAuth();
+  const { token, can, user } = useAuth();
   const canManage = can('import', 'manage');
   const [type, setType] = useState('clients');
   const [fileName, setFileName] = useState('');
@@ -252,6 +341,8 @@ export default function Import() {
           <ResultsTable results={committed.results} />
         </div>
       )}
+
+      {user?.role === 'admin' && <DangerZone token={token} />}
     </div>
   );
 }
