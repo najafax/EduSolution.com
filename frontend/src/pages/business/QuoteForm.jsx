@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard';
 import LineItemsEditor from '../../components/LineItemsEditor';
 import SearchableSelect from '../../components/SearchableSelect';
 
@@ -46,6 +47,19 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
   const [loading, setLoading] = useState(isEditing);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const initializedRef = useRef(false);
+
+  const { confirmDiscard } = useUnsavedChangesGuard(dirty);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      return;
+    }
+    setDirty(true);
+  }, [clientId, issueDate, expiryDate, taxRate, discountType, discountValue, notes, items, loading]);
 
   useEffect(() => {
     api.clients.list(token).then(({ clients }) => setClients(clients));
@@ -96,10 +110,12 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
     try {
       if (isEditing) {
         const { quote } = await api.quotes.update(id, payload, token);
+        setDirty(false);
         if (onSuccess) onSuccess(quote);
         else navigate(`/quotes/${id}`);
       } else {
         const { quote } = await api.quotes.create(payload, token);
+        setDirty(false);
         if (onSuccess) onSuccess(quote);
         else navigate(`/quotes/${quote.id}`);
       }
@@ -245,7 +261,9 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
           {embedded && (
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => {
+                if (confirmDiscard()) onCancel();
+              }}
               className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Cancel
