@@ -473,14 +473,17 @@ const STAMP_FIT_SIZE = STAMP_BOX_SIZE / STAMP_ROTATED_INFLATION;
 // left only ~1.5pt of margin before the rotation-footprint bug above) so
 // the gap is deliberate and doesn't shrink to nothing if either image's
 // box size changes later.
-const STAMP_LINE_CLEARANCE = 8;
+const STAMP_LINE_CLEARANCE = 12;
 // A real stamp is rarely pressed dead-center on a signature — offsets it a
 // bit toward the lower-right of the ink instead. The downward part eats
 // into STAMP_LINE_CLEARANCE (leaving STAMP_LINE_CLEARANCE - STAMP_DOWN_OFFSET
-// pt of actual headroom above the line), so keep the two in proportion if
-// either changes rather than letting the stamp creep back down to the line.
-const STAMP_RIGHT_OFFSET = 10;
-const STAMP_DOWN_OFFSET = 5;
+// pt of actual headroom above the line — currently 3pt), so keep the two in
+// proportion if either changes rather than letting the stamp creep back
+// down to the line. The rightward part is bounded by how much of
+// STAMP_BOX_SIZE still fits inside the SIGNATURE_BOX_WIDTH slot without
+// spilling past its edge (currently leaves ~2pt to spare).
+const STAMP_RIGHT_OFFSET = 18;
+const STAMP_DOWN_OFFSET = 9;
 // Total downward extent of the block from `y`: signature image, the
 // STAMP_LINE_CLEARANCE gap, then the line/caption/name text beneath it —
 // used for page-break budgeting (drawSignatureAndPayment), so it only
