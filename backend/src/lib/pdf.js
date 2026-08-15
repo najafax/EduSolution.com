@@ -464,6 +464,12 @@ const STAMP_OVERLAP = STAMP_BOX_SIZE * 0.6;
 const STAMP_OVERHANG = STAMP_BOX_SIZE - STAMP_OVERLAP; // how much of the stamp sticks out past the signature's right edge
 const STAMP_ROTATION_DEGREES = -20; // negative = anti-clockwise
 const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + 6 + 4 + 10 + 4 + 12;
+// Nudges the whole signature+stamp group (both anchored off the same
+// rightBound, see drawSignatureBlock below) further left than the page's
+// own MARGIN — roughly 1cm at 72pt/in — since the group otherwise sits
+// flush against the margin with the Bank/Payments box's empty gap doing
+// nothing useful to its right.
+const SIGNATURE_GROUP_LEFT_SHIFT = 28.35;
 
 // An authorized-signature image over a signing line (with the signatory's
 // printed name below it), and a company stamp, anchored so their combined
@@ -537,17 +543,19 @@ function drawSignatureAndPayment(doc, { settings, bankDetails }, y) {
     y = MARGIN;
   }
 
-  // Anchors the signature's own box flush at the page margin (sigX ends up
-  // exactly MARGIN — see drawSignatureBlock), matching BILL TO/Comments,
-  // same as everywhere else on the page. Combined with the narrower
-  // SIGNATURE_BOX_WIDTH above, this is what actually pulls the *visible*
-  // ink and the stamp in close to the margin — computing rightBound
-  // directly as some offset from MARGIN instead risked sigX landing
-  // off-page (it briefly did) once the box's own width was in play.
+  // Anchors the signature's own box at the page margin minus
+  // SIGNATURE_GROUP_LEFT_SHIFT (sigX ends up at MARGIN - the shift — see
+  // drawSignatureBlock), a bit left of BILL TO/Comments/everything else on
+  // the page. Combined with the narrower SIGNATURE_BOX_WIDTH above, this is
+  // what actually pulls the *visible* ink and the stamp in close together
+  // — computing rightBound directly as some offset from MARGIN instead
+  // risked sigX landing off-page (it briefly did) once the box's own width
+  // was in play.
   const hasBothImages = Boolean(settings.signature_image && settings.stamp_image);
-  const sigRightBound = settings.signature_image
-    ? MARGIN + SIGNATURE_BOX_WIDTH + (hasBothImages ? STAMP_OVERHANG : 0)
-    : MARGIN + STAMP_BOX_SIZE;
+  const sigRightBound =
+    (settings.signature_image
+      ? MARGIN + SIGNATURE_BOX_WIDTH + (hasBothImages ? STAMP_OVERHANG : 0)
+      : MARGIN + STAMP_BOX_SIZE) - SIGNATURE_GROUP_LEFT_SHIFT;
   if (hasSig) drawSignatureBlock(doc, settings, y, sigRightBound);
   if (hasBank) drawIconLabelBox(doc, { icon: 'bank', label: 'PAYMENTS PAYABLE TO', bodyText: bankDetails }, rightX, rightWidth, y);
 
