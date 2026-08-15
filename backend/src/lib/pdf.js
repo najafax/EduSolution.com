@@ -488,12 +488,6 @@ const STAMP_LINE_CLEARANCE = 8;
 // but that eats into the ≥20pt gap already left above this block, not this
 // budget.
 const SIGNATURE_BLOCK_HEIGHT = SIGNATURE_IMG_HEIGHT + STAMP_LINE_CLEARANCE + 16 + 11 + 6;
-// Nudges the whole signature+stamp group (both anchored off the same
-// rightBound, see drawSignatureBlock below) further left than the page's
-// own MARGIN — roughly 1cm at 72pt/in — since the group otherwise sits
-// flush against the margin with the Bank/Payments box's empty gap doing
-// nothing useful to its right.
-const SIGNATURE_GROUP_LEFT_SHIFT = 28.35;
 
 // An authorized-signature image over a signing line (with the signatory's
 // printed name below it), and a company stamp, anchored so their combined
@@ -578,19 +572,22 @@ function drawSignatureAndPayment(doc, { settings, bankDetails }, y) {
     y = MARGIN;
   }
 
-  // Anchors the signature's own box at the page margin minus
-  // SIGNATURE_GROUP_LEFT_SHIFT (sigX ends up at MARGIN - the shift — see
-  // drawSignatureBlock), a bit left of BILL TO/Comments/everything else on
-  // the page. Combined with the narrower SIGNATURE_BOX_WIDTH above, this is
-  // what actually pulls the *visible* ink and the stamp in close together
-  // — computing rightBound directly as some offset from MARGIN instead
-  // risked sigX landing off-page (it briefly did) once the box's own width
-  // was in play.
+  // Anchors the signature's own box flush at the page margin (sigX ends up
+  // exactly MARGIN — see drawSignatureBlock), matching BILL TO/Comments,
+  // same as everywhere else on the page. Combined with the narrower
+  // SIGNATURE_BOX_WIDTH above, this is what actually pulls the *visible*
+  // ink and the stamp in close to the margin — computing rightBound
+  // directly as some offset from MARGIN instead risked sigX landing
+  // off-page (it briefly did) once the box's own width was in play. An
+  // earlier attempt to nudge this ~1cm further left than MARGIN (to match
+  // the Bank/Payments box's own visual weight) instead made the signature
+  // line stick out past the page's left margin relative to every other
+  // section — reverted in favor of staying flush with MARGIN like the rest
+  // of the document.
   const hasBothImages = Boolean(settings.signature_image && settings.stamp_image);
-  const sigRightBound =
-    (settings.signature_image
-      ? MARGIN + SIGNATURE_BOX_WIDTH + (hasBothImages ? STAMP_OVERHANG : 0)
-      : MARGIN + STAMP_BOX_SIZE) - SIGNATURE_GROUP_LEFT_SHIFT;
+  const sigRightBound = settings.signature_image
+    ? MARGIN + SIGNATURE_BOX_WIDTH + (hasBothImages ? STAMP_OVERHANG : 0)
+    : MARGIN + STAMP_BOX_SIZE;
   if (hasSig) drawSignatureBlock(doc, settings, y, sigRightBound);
   if (hasBank) drawIconLabelBox(doc, { icon: 'bank', label: 'PAYMENTS PAYABLE TO', bodyText: bankDetails }, rightX, rightWidth, y);
 
