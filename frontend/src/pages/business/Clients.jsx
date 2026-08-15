@@ -1,15 +1,22 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { useUndoableDelete } from '../../lib/useUndoableDelete';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
+import { TableSkeleton } from '../../components/Skeleton';
+import EmptyState from '../../components/EmptyState';
+import BulkActionBar from '../../components/BulkActionBar';
+import { UsersIcon } from '../../components/icons';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', address: '', notes: '' };
 
 export default function Clients() {
   const { token, can } = useAuth();
+  const { toast } = useToast();
   const canManage = can('clients', 'manage');
   const [clients, setClients] = useState([]);
   const [pageInfo, setPageInfo] = useState(null);
@@ -21,6 +28,10 @@ export default function Clients() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState(() => new Set());
+
+  const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.clients.remove(id, token));
+  const visibleClients = clients.filter((c) => !pendingIds.has(c.id));
 
   function load() {
     setLoading(true);
@@ -38,6 +49,9 @@ export default function Clients() {
   useEffect(() => {
     setPage(1);
   }, [search]);
+  useEffect(() => {
+    setSelected(new Set());
+  }, [clients]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -64,8 +78,10 @@ export default function Clients() {
     try {
       if (editingId) {
         await api.clients.update(editingId, form, token);
+        toast('Client updated.', { type: 'success' });
       } else {
         await api.clients.create(form, token);
+        toast('Client created.', { type: 'success' });
       }
       setShowForm(false);
       load();
@@ -76,15 +92,27 @@ export default function Clients() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm('Delete this client?')) return;
-    setError('');
-    try {
-      await api.clients.remove(id, token);
-      load();
-    } catch (err) {
-      setError(err.message);
-    }
+  function handleDelete(client) {
+    deleteWithUndo([client.id], `"${client.name}" deleted.`);
+  }
+
+  function handleBulkDelete() {
+    const ids = [...selected];
+    deleteWithUndo(ids, `${ids.length} client${ids.length === 1 ? '' : 's'} deleted.`);
+    setSelected(new Set());
+  }
+
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) => (prev.size === visibleClients.length ? new Set() : new Set(visibleClients.map((c) => c.id))));
   }
 
   async function handleExport() {
@@ -99,11 +127,11 @@ export default function Clients() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">Clients</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Clients</h1>
         <div className="flex gap-2">
           <button
             onClick={handleExport}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Export CSV
           </button>
@@ -123,6 +151,18 @@ export default function Clients() {
       </div>
 
       {error && !showForm && <p className="mt-4 text-sm text-red-600">{error}</p>}
+
+      {canManage && (
+        <BulkActionBar count={selected.size} onClear={() => setSelected(new Set())}>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            className="min-h-9 rounded-md border border-red-300 px-3 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+          >
+            Delete
+          </button>
+        </BulkActionBar>
+      )}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit client' : 'New client'} maxWidthClass="max-w-2xl">
         <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
@@ -157,35 +197,60 @@ export default function Clients() {
         </form>
       </Modal>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
-          <p className="p-6 text-sm text-slate-500">Loading…</p>
-        ) : clients.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">
-            {search ? `No clients match "${search}".` : 'No clients yet.'}
-          </p>
+          <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-32', 'w-40', 'w-24', 'w-16'] : ['w-32', 'w-40', 'w-24']} />
+        ) : visibleClients.length === 0 ? (
+          <EmptyState
+            icon={<UsersIcon />}
+            title={search ? `No clients match "${search}".` : 'No clients yet.'}
+            message={!search && canManage ? 'Add your first client to start creating quotes and invoices.' : undefined}
+            action={!search && canManage ? { label: 'New client', onClick: startCreate } : undefined}
+          />
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
             <thead>
-              <tr className="text-left text-xs font-medium uppercase text-slate-500">
+              <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                {canManage && (
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.size > 0 && selected.size === visibleClients.length}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all clients"
+                      className="h-4 w-4 rounded border-slate-300"
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3">Client</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Phone</th>
                 {canManage && <th className="px-4 py-3" />}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {clients.map((client) => (
-                <tr key={client.id}>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{client.name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{client.email}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{client.phone || '—'}</td>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {visibleClients.map((client) => (
+                <tr key={client.id} className={selected.has(client.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : undefined}>
+                  {canManage && (
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(client.id)}
+                        onChange={() => toggleSelected(client.id)}
+                        aria-label={`Select ${client.name}`}
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                    </td>
+                  )}
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{client.name}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.email}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.phone || '—'}</td>
                   {canManage && (
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       <button onClick={() => startEdit(client)} className="mr-3 text-indigo-600 hover:text-indigo-500">
                         Edit
                       </button>
-                      <button onClick={() => handleDelete(client.id)} className="text-red-600 hover:text-red-500">
+                      <button onClick={() => handleDelete(client)} className="text-red-600 hover:text-red-500">
                         Delete
                       </button>
                     </td>

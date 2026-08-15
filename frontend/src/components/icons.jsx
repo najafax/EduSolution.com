@@ -77,3 +77,13 @@ export function UsersIcon(props) {
     </svg>
   );
 }
+
+// A half-open inbox tray — used by EmptyState for "nothing here yet".
+export function InboxIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 11.5 5 4h10l2 7.5" strokeLinejoin="round" strokeLinecap="round" />
+      <path d="M3 11.5h4.2l.9 2h3.8l.9-2H17V15a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15v-3.5Z" strokeLinejoin="round" />
+    </svg>
+  );
+}
