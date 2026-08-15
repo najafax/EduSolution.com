@@ -70,16 +70,16 @@ export default function MyAccount() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My account</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         {user?.role === 'admin' ? 'Administrator' : 'Staff'} account. Contact an admin to change your role or module
         permissions.
       </p>
 
-      <form onSubmit={handleProfileSubmit} className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handleProfileSubmit} className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Profile</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Name</span>
             <input
@@ -106,15 +106,15 @@ export default function MyAccount() {
         <button
           type="submit"
           disabled={profileSubmitting}
-          className="mt-4 min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="mt-3 min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
         >
           {profileSubmitting ? 'Saving…' : 'Save profile'}
         </button>
       </form>
 
-      <form onSubmit={handlePasswordSubmit} className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handlePasswordSubmit} className="mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Change password</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Current password</span>
             <input
@@ -144,15 +144,15 @@ export default function MyAccount() {
         <button
           type="submit"
           disabled={passwordSubmitting}
-          className="mt-4 min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="mt-3 min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
         >
           {passwordSubmitting ? 'Saving…' : 'Change password'}
         </button>
       </form>
 
-      <form onSubmit={handlePrefsSubmit} className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handlePrefsSubmit} className="mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</h2>
-        <label className="mt-4 flex min-h-11 items-center gap-2">
+        <label className="mt-3 flex min-h-11 items-center gap-2">
           <input
             type="checkbox"
             checked={notifyOverdue}
@@ -166,7 +166,7 @@ export default function MyAccount() {
         <button
           type="submit"
           disabled={prefsSubmitting}
-          className="mt-4 min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="mt-3 min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
         >
           {prefsSubmitting ? 'Saving…' : 'Save preferences'}
         </button>

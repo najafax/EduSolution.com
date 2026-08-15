@@ -165,7 +165,7 @@ export default function Clients() {
       )}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit client' : 'New client'} maxWidthClass="max-w-2xl">
-        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
           {error && (
             <p className="text-sm text-red-600 sm:col-span-2">{error}</p>
           )}

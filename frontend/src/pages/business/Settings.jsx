@@ -40,13 +40,13 @@ export default function Settings() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Business settings</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
         This information appears on every quote, invoice, and receipt PDF.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <fieldset disabled={!canManageSettings} className="contents">
           <ImageField
             label="Logo"
@@ -55,52 +55,60 @@ export default function Settings() {
             onError={setError}
             hint="Printed at the top-left of every quote/invoice/receipt PDF, next to the business name."
           />
-          <Field label="Business name" value={form.business_name} onChange={(v) => setForm((f) => ({ ...f, business_name: v }))} />
-          <Field label="Email" type="email" value={form.email} onChange={(v) => setForm((f) => ({ ...f, email: v }))} />
-          <Field label="Phone" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Business name" value={form.business_name} onChange={(v) => setForm((f) => ({ ...f, business_name: v }))} />
+            <Field label="Email" type="email" value={form.email} onChange={(v) => setForm((f) => ({ ...f, email: v }))} />
+            <Field label="Phone" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} />
+            <Field label="Tax ID (TIN)" value={form.tax_id} onChange={(v) => setForm((f) => ({ ...f, tax_id: v }))} />
+          </div>
           <Field label="Address" value={form.address} onChange={(v) => setForm((f) => ({ ...f, address: v }))} />
-          <Field label="Tax ID (TIN)" value={form.tax_id} onChange={(v) => setForm((f) => ({ ...f, tax_id: v }))} />
-          <Field label="Currency symbol" value={form.currency_symbol} onChange={(v) => setForm((f) => ({ ...f, currency_symbol: v }))} />
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">PDF template</span>
-            <select
-              value={form.pdf_template}
-              onChange={(e) => setForm((f) => ({ ...f, pdf_template: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
-            >
-              <option value="modern">Modern — logo, colors, signature/stamp images</option>
-              <option value="minimal">Minimal — plain black &amp; white, text-only signature</option>
-            </select>
-            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-              Applies to every quote, invoice, and receipt PDF generated from now on.
-            </span>
-          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Currency symbol" value={form.currency_symbol} onChange={(v) => setForm((f) => ({ ...f, currency_symbol: v }))} />
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">PDF template</span>
+              <select
+                value={form.pdf_template}
+                onChange={(e) => setForm((f) => ({ ...f, pdf_template: e.target.value }))}
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
+              >
+                <option value="modern">Modern — logo, colors, signature/stamp images</option>
+                <option value="minimal">Minimal — plain black &amp; white, text-only signature</option>
+              </select>
+            </label>
+          </div>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bank / payment details</span>
             <textarea
               value={form.bank_details}
               onChange={(e) => setForm((f) => ({ ...f, bank_details: e.target.value }))}
-              rows={3}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
+              rows={2}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
             />
           </label>
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Session timeout (minutes)</span>
-            <input
-              type="number"
-              min="1"
-              max="480"
-              step="1"
-              value={form.session_timeout_minutes}
-              onChange={(e) => setForm((f) => ({ ...f, session_timeout_minutes: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Session timeout (minutes)</span>
+              <input
+                type="number"
+                min="1"
+                max="480"
+                step="1"
+                value={form.session_timeout_minutes}
+                onChange={(e) => setForm((f) => ({ ...f, session_timeout_minutes: e.target.value }))}
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
+              />
+            </label>
+            <Field
+              label="Authorized signatory's name"
+              value={form.signatory_name}
+              onChange={(v) => setForm((f) => ({ ...f, signatory_name: v }))}
             />
-            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-              Everyone is warned and then automatically logged out after this many minutes of inactivity.
-            </span>
-          </label>
+          </div>
+          <span className="block text-xs text-slate-500 dark:text-slate-400">
+            Session timeout: everyone is warned and then logged out after that many minutes of inactivity. PDF template applies to every quote/invoice/receipt generated from now on.
+          </span>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <ImageField
               label="Authorized signature"
               value={form.signature_image}
@@ -116,11 +124,6 @@ export default function Settings() {
               hint="Printed on quote/invoice PDFs next to the signature."
             />
           </div>
-          <Field
-            label="Authorized signatory's name"
-            value={form.signatory_name}
-            onChange={(v) => setForm((f) => ({ ...f, signatory_name: v }))}
-          />
         </fieldset>
 
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -138,7 +141,7 @@ export default function Settings() {
       </form>
 
       {canManageImport && (
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Historical data</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Bring in existing clients, expenses, or invoices (with payment history) from a CSV file.

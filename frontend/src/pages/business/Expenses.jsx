@@ -170,7 +170,7 @@ export default function Expenses() {
       )}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit expense' : 'New expense'} maxWidthClass="max-w-2xl">
-        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
           {error && <p className="text-sm text-red-600 sm:col-span-2">{error}</p>}
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Category</span>

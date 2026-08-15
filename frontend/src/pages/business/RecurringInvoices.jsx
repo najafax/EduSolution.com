@@ -169,9 +169,9 @@ export default function RecurringInvoices() {
       {error && !showForm && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit template' : 'New template'} maxWidthClass="max-w-3xl">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="block">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client</span>
               <SearchableSelect

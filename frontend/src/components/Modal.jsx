@@ -25,14 +25,14 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 px-4 py-8 sm:items-center"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 px-4 py-4 sm:items-center"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose?.();
       }}
     >
-      <div className={`w-full ${maxWidthClass} rounded-lg bg-white p-6 shadow-xl dark:bg-slate-900`}>
+      <div className={`w-full ${maxWidthClass} rounded-lg bg-white p-5 shadow-xl dark:bg-slate-900`}>
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">{title}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -44,7 +44,7 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
             </svg>
           </button>
         </div>
-        <div className="mt-4">{children}</div>
+        <div className="mt-3">{children}</div>
       </div>
     </div>
   );

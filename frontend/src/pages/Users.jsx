@@ -180,7 +180,7 @@ export default function Users() {
         <form onSubmit={handleSubmit}>
           {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Name</span>
               <input
@@ -239,22 +239,22 @@ export default function Users() {
           </div>
 
           {form.role === 'staff' && (
-            <div className="mt-6">
+            <div className="mt-4">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Module permissions</h3>
-              <div className="mt-2 overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
+              <div className="mt-1.5 max-h-56 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
                 <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                   <thead>
                     <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                      <th className="px-4 py-2">Module</th>
-                      <th className="px-4 py-2 text-center">View</th>
-                      <th className="px-4 py-2 text-center">Manage</th>
+                      <th className="px-4 py-1.5">Module</th>
+                      <th className="px-4 py-1.5 text-center">View</th>
+                      <th className="px-4 py-1.5 text-center">Manage</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {modules.map((m) => (
                       <tr key={m}>
-                        <td className="px-4 py-2 text-slate-900 dark:text-white">{moduleLabel(m)}</td>
-                        <td className="px-4 py-2 text-center">
+                        <td className="px-4 py-1.5 text-slate-900 dark:text-white">{moduleLabel(m)}</td>
+                        <td className="px-4 py-1.5 text-center">
                           <input
                             type="checkbox"
                             checked={Boolean(permissions[m]?.can_view)}
@@ -262,7 +262,7 @@ export default function Users() {
                             className="h-4 w-4 rounded border-slate-300"
                           />
                         </td>
-                        <td className="px-4 py-2 text-center">
+                        <td className="px-4 py-1.5 text-center">
                           <input
                             type="checkbox"
                             checked={Boolean(permissions[m]?.can_manage)}
@@ -279,7 +279,7 @@ export default function Users() {
             </div>
           )}
 
-          <div className="mt-6 flex gap-3">
+          <div className="mt-4 flex gap-3">
             <button
               type="submit"
               disabled={submitting}
@@ -306,7 +306,7 @@ export default function Users() {
         }}
         title="Reset password"
       >
-        <form onSubmit={handleResetPassword} className="flex flex-col gap-4">
+        <form onSubmit={handleResetPassword} className="flex flex-col gap-3">
           {error && <p className="text-sm text-red-600">{error}</p>}
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">New password</span>

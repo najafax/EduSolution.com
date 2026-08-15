@@ -169,7 +169,7 @@ export default function LineItemsEditor({
 
   return (
     <div>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         {items.map((item, index) => (
           <div key={index} className="grid grid-cols-12 items-start gap-2">
             <input
@@ -215,7 +215,7 @@ export default function LineItemsEditor({
         ))}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         {!catalogOnly && (
           <button
             type="button"
@@ -240,7 +240,7 @@ export default function LineItemsEditor({
         )}
       </div>
 
-      <p className="mt-3 text-right text-sm text-slate-600 dark:text-slate-400">
+      <p className="mt-2 text-right text-sm text-slate-600 dark:text-slate-400">
         Subtotal: <span className="font-medium text-slate-900 dark:text-white">{currencySymbol}{subtotal.toFixed(2)}</span>
       </p>
     </div>

@@ -136,8 +136,8 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
   }
 
   const formEl = (
-      <form onSubmit={handleSubmit} className={embedded ? 'flex flex-col gap-4' : 'mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900'}>
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} className={embedded ? 'flex flex-col gap-3' : 'mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900'}>
+        <div className="grid gap-3 sm:grid-cols-3">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client</span>
             <SearchableSelect
@@ -243,7 +243,7 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            rows={3}
+            rows={2}
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
           />
         </label>
@@ -276,7 +276,7 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
   if (embedded) return formEl;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{isEditing ? 'Edit quote' : 'New quote'}</h1>
       {formEl}
     </div>
