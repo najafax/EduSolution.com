@@ -573,7 +573,409 @@ function drawThankYouFooter(doc, settings, y) {
   }
 }
 
+// --- Minimal template ---------------------------------------------------
+// A second, opt-in layout (business_settings.pdf_template, see
+// routes/settings.js) for businesses that want a plainer document: black/
+// gray text only, thin rules instead of filled boxes/zebra striping, and
+// no logo/signature/stamp image compositing — just a text-only signature
+// line with the signatory's printed name, since replicating the modern
+// template's stamp-over-signature overlap math would be most of its
+// complexity for a template whose whole point is to have less of it. Still
+// shares every numeric/layout constant (MARGIN, CONTENT_WIDTH, PAGE_BOTTOM),
+// money()/decodeImageDataUri()/docToBuffer(), and addPageFooter — only the
+// drawing is different, not the page geometry or footer.
+const MINIMAL_COLORS = {
+  heading: '#111111',
+  body: '#333333',
+  muted: '#8a8a8a',
+  border: '#cccccc',
+};
+
+function drawMinimalHeader(doc, { title, numberLabel, number, dateValue, tin, settings }) {
+  const logoBuffer = settings.logo_image ? decodeImageDataUri(settings.logo_image) : null;
+  const logoSize = 36;
+  const nameX = logoBuffer ? MARGIN + logoSize + 10 : MARGIN;
+  const nameWidth = 240 - (logoBuffer ? logoSize + 10 : 0);
+
+  if (logoBuffer) doc.image(logoBuffer, MARGIN, 48, { fit: [logoSize, logoSize] });
+
+  const businessName = settings.business_name || 'Your Business';
+  doc.font('Helvetica-Bold').fontSize(15).fillColor(MINIMAL_COLORS.heading).text(businessName, nameX, 50, { width: nameWidth });
+  const nameHeight = doc.heightOfString(businessName, { width: nameWidth });
+  let y = 50 + Math.max(logoBuffer ? logoSize : 0, nameHeight) + 6;
+
+  const contactLines = [settings.address, settings.phone, settings.email].filter(Boolean).join('  ·  ');
+  if (contactLines) {
+    doc.font('Helvetica').fontSize(8.5).fillColor(MINIMAL_COLORS.muted).text(contactLines, MARGIN, y, { width: 240 });
+    y += doc.heightOfString(contactLines, { width: 240 });
+  }
+
+  doc.font('Helvetica').fontSize(16).fillColor(MINIMAL_COLORS.heading).text(title, 300, 50, { width: 245, align: 'right' });
+  const metaLabelWidth = 90;
+  const metaValueWidth = 155;
+  const metaRows = [[numberLabel, number], ['Date', dateValue]];
+  if (tin) metaRows.push(['TIN', tin]);
+  let metaY = 76;
+  metaRows.forEach(([label, value]) => {
+    doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.muted).text(label, 300, metaY, { width: metaLabelWidth });
+    doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.heading).text(value, 300 + metaLabelWidth, metaY, { width: metaValueWidth, align: 'right' });
+    metaY += 14;
+  });
+
+  const dividerY = Math.max(y, metaY) + 10;
+  doc.moveTo(MARGIN, dividerY).lineTo(MARGIN + CONTENT_WIDTH, dividerY).strokeColor(MINIMAL_COLORS.border).lineWidth(0.75).stroke();
+  return dividerY + 20;
+}
+
+function drawMinimalBillTo(doc, { client, dueLabel, dueValue }, y) {
+  const leftWidth = 240;
+  doc.font('Helvetica').fontSize(8.5).fillColor(MINIMAL_COLORS.muted).text('BILL TO', MARGIN, y);
+  doc.font('Helvetica-Bold').fontSize(10.5).fillColor(MINIMAL_COLORS.heading).text(client.name, MARGIN, y + 13, { width: leftWidth });
+  const clientDetail = [client.email, client.address].filter(Boolean).join('\n');
+  doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.body).text(clientDetail, MARGIN, y + 28, { width: leftWidth });
+  const leftHeight = 28 + (clientDetail ? doc.heightOfString(clientDetail, { width: leftWidth }) : 0);
+
+  if (dueValue) {
+    doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.muted).text(dueLabel, 300, y, { width: 245, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(MINIMAL_COLORS.heading).text(dueValue, 300, y + 13, { width: 245, align: 'right' });
+  }
+
+  return y + Math.max(leftHeight, 26) + 20;
+}
+
+function drawMinimalInfoColumns(doc, { client, metaRows }, y) {
+  const leftWidth = 240;
+  const rightX = 320;
+
+  doc.font('Helvetica').fontSize(8.5).fillColor(MINIMAL_COLORS.muted).text('BILL TO', MARGIN, y);
+  doc.font('Helvetica-Bold').fontSize(10.5).fillColor(MINIMAL_COLORS.heading).text(client.name, MARGIN, y + 13, { width: leftWidth });
+  const clientDetail = [client.email, client.address].filter(Boolean).join('\n');
+  doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.body).text(clientDetail, MARGIN, y + 28, { width: leftWidth });
+  const leftHeight = 28 + (clientDetail ? doc.heightOfString(clientDetail, { width: leftWidth }) : 0);
+
+  let rowY = y;
+  for (const [label, value] of metaRows) {
+    doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.muted).text(label, rightX, rowY, { width: 100 });
+    doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.heading).text(value, rightX + 100, rowY, { width: 125, align: 'right' });
+    rowY += 15;
+  }
+  const rightHeight = rowY - y;
+
+  return y + Math.max(leftHeight, rightHeight) + 20;
+}
+
+function drawMinimalTableHeader(doc, y) {
+  doc.font('Helvetica').fontSize(8).fillColor(MINIMAL_COLORS.muted);
+  doc.text('DESCRIPTION', MARGIN, y, { width: 220 });
+  doc.text('QTY', MARGIN + 230, y, { width: 45, align: 'right' });
+  doc.text('RATE', MARGIN + 280, y, { width: 70, align: 'right' });
+  doc.text('TAX', MARGIN + 355, y, { width: 45, align: 'right' });
+  doc.text('AMOUNT', MARGIN + 405, y, { width: 80, align: 'right' });
+  const lineY = y + 14;
+  doc.moveTo(MARGIN, lineY).lineTo(MARGIN + CONTENT_WIDTH, lineY).strokeColor(MINIMAL_COLORS.border).lineWidth(0.75).stroke();
+  return lineY + 10;
+}
+
+function drawMinimalItemsTable(doc, items, startY, symbol, taxRate) {
+  let y = drawMinimalTableHeader(doc, startY);
+  const taxLabel = taxRate ? `${taxRate}%` : '—';
+
+  items.forEach((item) => {
+    doc.font('Helvetica').fontSize(9.5);
+    const rowHeight = Math.max(18, doc.heightOfString(item.description, { width: 220 }) + 8);
+
+    if (y + rowHeight > PAGE_BOTTOM) {
+      doc.addPage();
+      y = drawMinimalTableHeader(doc, MARGIN);
+    }
+
+    doc.font('Helvetica').fontSize(9.5).fillColor(MINIMAL_COLORS.heading).text(item.description, MARGIN, y, { width: 220 });
+    doc.font('Helvetica').fontSize(9.5).fillColor(MINIMAL_COLORS.body).text(String(item.quantity), MARGIN + 230, y, { width: 45, align: 'right' });
+    doc.font('Helvetica').fontSize(9.5).fillColor(MINIMAL_COLORS.body).text(money(item.unit_price, symbol), MARGIN + 280, y, { width: 70, align: 'right' });
+    doc.font('Helvetica').fontSize(9.5).fillColor(MINIMAL_COLORS.body).text(taxLabel, MARGIN + 355, y, { width: 45, align: 'right' });
+    doc.font('Helvetica').fontSize(9.5).fillColor(MINIMAL_COLORS.heading).text(money(item.amount, symbol), MARGIN + 405, y, { width: 80, align: 'right' });
+
+    y += rowHeight;
+    doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_WIDTH, y).strokeColor(MINIMAL_COLORS.border).lineWidth(0.5).stroke();
+    y += 8;
+  });
+
+  return y + 8;
+}
+
+function drawMinimalTotals(
+  doc,
+  { subtotal, discountType, discountValue, discountAmount, taxRate, taxAmount, total, amountPaid, balanceDue },
+  y,
+  symbol,
+  info,
+) {
+  const boxX = 300;
+  const boxWidth = 245;
+  const isInvoice = amountPaid !== undefined;
+  const rows = [['Subtotal', money(subtotal, symbol)]];
+  if (discountAmount > 0) {
+    const discountLabel = discountType === 'percentage' ? `Discount (${discountValue}%)` : 'Discount';
+    rows.push([discountLabel, `-${money(discountAmount, symbol)}`]);
+  }
+  if (taxRate) rows.push([`Tax (${taxRate}%)`, money(taxAmount, symbol)]);
+  if (isInvoice && amountPaid > 0) {
+    rows.push(['Total', money(total, symbol)]);
+    rows.push(['Paid', money(amountPaid, symbol)]);
+  }
+
+  const blockHeight = rows.length * 16 + 44;
+  if (y + blockHeight > PAGE_BOTTOM) {
+    doc.addPage();
+    y = MARGIN;
+  }
+
+  let rowY = y;
+  rows.forEach(([label, value]) => {
+    doc.font('Helvetica').fontSize(9.5).fillColor(MINIMAL_COLORS.body).text(label, boxX, rowY, { width: 130 });
+    doc.font('Helvetica').fontSize(9.5).fillColor(MINIMAL_COLORS.heading).text(value, boxX + 130, rowY, { width: 115, align: 'right' });
+    rowY += 16;
+  });
+
+  rowY += 4;
+  doc.moveTo(boxX, rowY).lineTo(boxX + boxWidth, rowY).strokeColor(MINIMAL_COLORS.border).lineWidth(0.75).stroke();
+  rowY += 10;
+
+  const finalLabel = isInvoice ? 'Balance Due' : 'Total';
+  const finalValue = isInvoice ? balanceDue : total;
+
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(MINIMAL_COLORS.heading).text(finalLabel, boxX, rowY, { width: 130 });
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(MINIMAL_COLORS.heading).text(money(finalValue, symbol), boxX + 130, rowY, { width: 115, align: 'right' });
+
+  if (info) {
+    info.balanceX = boxX + 130 + 115 / 2;
+    info.balanceY = rowY + 7;
+    const range = doc.bufferedPageRange();
+    info.pageIndex = range.start + range.count - 1;
+  }
+
+  return rowY + 30;
+}
+
+function drawMinimalNotes(doc, notes, y) {
+  const text = notes || 'No additional comments';
+  const labelHeight = 13;
+  const bodyHeight = doc.font('Helvetica').fontSize(9.5).heightOfString(text, { width: CONTENT_WIDTH });
+  const height = labelHeight + bodyHeight;
+  if (y + height > PAGE_BOTTOM) {
+    doc.addPage();
+    y = MARGIN;
+  }
+  doc.font('Helvetica').fontSize(8.5).fillColor(MINIMAL_COLORS.muted).text('NOTES', MARGIN, y);
+  doc.font('Helvetica').fontSize(9.5).fillColor(notes ? MINIMAL_COLORS.body : MINIMAL_COLORS.muted).text(text, MARGIN, y + labelHeight, { width: CONTENT_WIDTH });
+  return y + height + 20;
+}
+
+function drawMinimalSignatureAndPayment(doc, { settings, bankDetails }, y) {
+  const hasBank = Boolean(bankDetails);
+  const hasSignatory = Boolean(settings.signatory_name);
+  if (!hasBank && !hasSignatory) return y;
+
+  const leftWidth = 210;
+  const rightX = MARGIN + leftWidth + 25;
+  const rightWidth = MARGIN + CONTENT_WIDTH - rightX;
+
+  const bankHeight = hasBank ? 13 + doc.font('Helvetica').fontSize(9).heightOfString(bankDetails, { width: rightWidth }) : 0;
+  const sigHeight = hasSignatory ? 50 : 0;
+  const rowHeight = Math.max(sigHeight, bankHeight);
+
+  if (y + rowHeight > PAGE_BOTTOM) {
+    doc.addPage();
+    y = MARGIN;
+  }
+
+  if (hasSignatory) {
+    const lineY = y + 34;
+    doc.moveTo(MARGIN, lineY).lineTo(MARGIN + leftWidth, lineY).strokeColor(MINIMAL_COLORS.border).lineWidth(0.75).stroke();
+    doc.font('Helvetica').fontSize(8).fillColor(MINIMAL_COLORS.muted).text('Authorized Signature', MARGIN, lineY + 4, { width: leftWidth });
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(MINIMAL_COLORS.heading).text(settings.signatory_name, MARGIN, lineY + 16, { width: leftWidth });
+  }
+  if (hasBank) {
+    doc.font('Helvetica').fontSize(8.5).fillColor(MINIMAL_COLORS.muted).text('PAYMENT DETAILS', rightX, y);
+    doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.body).text(bankDetails, rightX, y + 13, { width: rightWidth });
+  }
+
+  return y + rowHeight + 20;
+}
+
+function drawMinimalThankYouFooter(doc, settings, y) {
+  if (y + 40 > PAGE_BOTTOM) {
+    doc.addPage();
+    y = MARGIN;
+  }
+  doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_WIDTH, y).strokeColor(MINIMAL_COLORS.border).lineWidth(0.75).stroke();
+  y += 14;
+  doc.font('Helvetica').fontSize(10).fillColor(MINIMAL_COLORS.body).text('Thank you for your business.', MARGIN, y, { width: CONTENT_WIDTH, align: 'center' });
+  y += 16;
+
+  const contact = [settings.phone, settings.email].filter(Boolean).join(' · ');
+  if (contact) {
+    doc.font('Helvetica').fontSize(8.5).fillColor(MINIMAL_COLORS.muted).text(`Questions? Contact ${contact}`, MARGIN, y, { width: CONTENT_WIDTH, align: 'center' });
+  }
+}
+
+// A plain text "PAID" watermark, no ring/border — the minimal template's
+// counterpart to drawPaidStamp above.
+function drawMinimalPaidStamp(doc, paidDate, target) {
+  const cx = target ? target.x : doc.page.width / 2;
+  const cy = target ? target.y : doc.page.height / 2;
+  const w = 130;
+
+  doc.save();
+  doc.rotate(-12, { origin: [cx, cy] });
+  doc.opacity(0.35);
+  doc.font('Helvetica-Bold').fontSize(24).fillColor(MINIMAL_COLORS.heading).text('PAID', cx - w / 2, cy - 18, { width: w, align: 'center', characterSpacing: 2 });
+  if (paidDate) {
+    doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.heading).text(paidDate, cx - w / 2, cy + 8, { width: w, align: 'center' });
+  }
+  doc.restore();
+}
+
+function addMinimalPaidStamp(doc, paidDate, target) {
+  if (target && typeof target.pageIndex === 'number') {
+    doc.switchToPage(target.pageIndex);
+    drawMinimalPaidStamp(doc, paidDate, target);
+    return;
+  }
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    drawMinimalPaidStamp(doc, paidDate);
+  }
+}
+
+function renderQuotePdfMinimal({ quote, client, items, settings }) {
+  const doc = newDoc();
+  const symbol = settings.currency_symbol || '$';
+
+  let y = drawMinimalHeader(doc, {
+    title: 'QUOTE',
+    numberLabel: 'Quote #',
+    number: quote.number,
+    dateValue: quote.issue_date,
+    tin: settings.tax_id,
+    settings,
+  });
+  y = drawMinimalBillTo(doc, { client, dueLabel: 'Expiry Date', dueValue: quote.expiry_date || '—' }, y);
+  y = drawMinimalItemsTable(doc, items, y, symbol, quote.tax_rate);
+  y = drawMinimalTotals(
+    doc,
+    {
+      subtotal: quote.subtotal,
+      discountType: quote.discount_type,
+      discountValue: quote.discount_value,
+      discountAmount: quote.discount_amount,
+      taxRate: quote.tax_rate,
+      taxAmount: quote.tax_amount,
+      total: quote.total,
+    },
+    y,
+    symbol,
+  );
+  y = drawMinimalNotes(doc, quote.notes, y);
+  y = drawMinimalSignatureAndPayment(doc, { settings, bankDetails: '' }, y);
+  drawMinimalThankYouFooter(doc, settings, y);
+
+  return docToBuffer(doc, (d) => addPageFooter(d, settings));
+}
+
+function renderInvoicePdfMinimal({ invoice, client, items, settings, payments }) {
+  const doc = newDoc();
+  const symbol = settings.currency_symbol || '$';
+  const balanceDue = invoice.total - invoice.amount_paid;
+  const paidDate = payments && payments.length ? payments[payments.length - 1].paid_at : null;
+
+  let y = drawMinimalHeader(doc, {
+    title: 'INVOICE',
+    numberLabel: 'Invoice #',
+    number: invoice.number,
+    dateValue: invoice.issue_date,
+    tin: settings.tax_id,
+    settings,
+  });
+  y = drawMinimalBillTo(doc, { client, dueLabel: 'Due Date', dueValue: invoice.due_date }, y);
+  y = drawMinimalItemsTable(doc, items, y, symbol, invoice.tax_rate);
+  const totalsInfo = {};
+  y = drawMinimalTotals(
+    doc,
+    {
+      subtotal: invoice.subtotal,
+      discountType: invoice.discount_type,
+      discountValue: invoice.discount_value,
+      discountAmount: invoice.discount_amount,
+      taxRate: invoice.tax_rate,
+      taxAmount: invoice.tax_amount,
+      total: invoice.total,
+      amountPaid: invoice.amount_paid,
+      balanceDue,
+    },
+    y,
+    symbol,
+    totalsInfo,
+  );
+  y = drawMinimalNotes(doc, invoice.notes, y);
+  y = drawMinimalSignatureAndPayment(doc, { settings, bankDetails: settings.bank_details }, y);
+  drawMinimalThankYouFooter(doc, settings, y);
+
+  return docToBuffer(doc, (d) => {
+    if (invoice.status === 'paid') {
+      addMinimalPaidStamp(d, paidDate, { x: totalsInfo.balanceX, y: totalsInfo.balanceY, pageIndex: totalsInfo.pageIndex });
+    }
+    addPageFooter(d, settings);
+  });
+}
+
+function renderReceiptPdfMinimal({ payment, invoice, client, settings }) {
+  const doc = newDoc();
+  const symbol = settings.currency_symbol || '$';
+
+  let y = drawMinimalHeader(doc, {
+    title: 'RECEIPT',
+    numberLabel: 'Receipt #',
+    number: payment.receipt_number,
+    dateValue: payment.paid_at,
+    tin: settings.tax_id,
+    settings,
+  });
+  y = drawMinimalInfoColumns(doc, {
+    client,
+    metaRows: [
+      ['Payment date', payment.paid_at],
+      ['For invoice', invoice.number],
+      ['Method', payment.method.replace('_', ' ').toUpperCase()],
+    ],
+  }, y);
+
+  doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.muted).text('AMOUNT RECEIVED', MARGIN, y);
+  doc.font('Helvetica-Bold').fontSize(20).fillColor(MINIMAL_COLORS.heading).text(money(payment.amount, symbol), MARGIN, y + 14);
+  y += 50;
+
+  if (payment.reference) {
+    doc.font('Helvetica').fontSize(8.5).fillColor(MINIMAL_COLORS.muted).text('REFERENCE', MARGIN, y);
+    doc.font('Helvetica').fontSize(9.5).fillColor(MINIMAL_COLORS.body).text(payment.reference, MARGIN, y + 13);
+    y += 36;
+  }
+  if (payment.notes) {
+    doc.font('Helvetica').fontSize(8.5).fillColor(MINIMAL_COLORS.muted).text('NOTES', MARGIN, y);
+    doc.font('Helvetica').fontSize(9.5).fillColor(MINIMAL_COLORS.body).text(payment.notes, MARGIN, y + 13, { width: CONTENT_WIDTH });
+    y += 36 + doc.heightOfString(payment.notes, { width: CONTENT_WIDTH });
+  }
+
+  drawMinimalThankYouFooter(doc, settings, y + 10);
+
+  return docToBuffer(doc, (d) => {
+    addMinimalPaidStamp(d, payment.paid_at);
+    addPageFooter(d, settings);
+  });
+}
+
 function renderQuotePdf({ quote, client, items, settings }) {
+  if (settings.pdf_template === 'minimal') return renderQuotePdfMinimal({ quote, client, items, settings });
   const doc = newDoc();
   const symbol = settings.currency_symbol || '$';
 
@@ -610,6 +1012,7 @@ function renderQuotePdf({ quote, client, items, settings }) {
 }
 
 function renderInvoicePdf({ invoice, client, items, settings, payments }) {
+  if (settings.pdf_template === 'minimal') return renderInvoicePdfMinimal({ invoice, client, items, settings, payments });
   const doc = newDoc();
   const symbol = settings.currency_symbol || '$';
   const balanceDue = invoice.total - invoice.amount_paid;
@@ -661,6 +1064,7 @@ function renderInvoicePdf({ invoice, client, items, settings, payments }) {
 }
 
 function renderReceiptPdf({ payment, invoice, client, settings }) {
+  if (settings.pdf_template === 'minimal') return renderReceiptPdfMinimal({ payment, invoice, client, settings });
   const doc = newDoc();
   const symbol = settings.currency_symbol || '$';
 

@@ -62,6 +62,20 @@ export default function Settings() {
           <Field label="Tax ID (TIN)" value={form.tax_id} onChange={(v) => setForm((f) => ({ ...f, tax_id: v }))} />
           <Field label="Currency symbol" value={form.currency_symbol} onChange={(v) => setForm((f) => ({ ...f, currency_symbol: v }))} />
           <label className="block">
+            <span className="text-sm font-medium text-slate-700">PDF template</span>
+            <select
+              value={form.pdf_template}
+              onChange={(e) => setForm((f) => ({ ...f, pdf_template: e.target.value }))}
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
+            >
+              <option value="modern">Modern — logo, colors, signature/stamp images</option>
+              <option value="minimal">Minimal — plain black &amp; white, text-only signature</option>
+            </select>
+            <span className="mt-1 block text-xs text-slate-500">
+              Applies to every quote, invoice, and receipt PDF generated from now on.
+            </span>
+          </label>
+          <label className="block">
             <span className="text-sm font-medium text-slate-700">Bank / payment details</span>
             <textarea
               value={form.bank_details}

@@ -17,6 +17,7 @@ router.use(requireAuth);
 // bloat every future GET/PUT /api/settings response.
 const IMAGE_DATA_URI_RE = /^data:image\/(png|jpe?g);base64,([A-Za-z0-9+/]+=*)$/;
 const MAX_IMAGE_BYTES = 400 * 1024;
+const PDF_TEMPLATES = new Set(['modern', 'minimal']);
 
 function validateImageField(value, label) {
   if (!value) return '';
@@ -46,11 +47,15 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     stamp_image = '',
     logo_image = '',
     signatory_name = '',
+    pdf_template = 'modern',
   } = req.body || {};
 
   const timeoutNum = Number(session_timeout_minutes);
   if (!Number.isInteger(timeoutNum) || timeoutNum < 1 || timeoutNum > 480) {
     return res.status(400).json({ error: 'session_timeout_minutes must be a whole number between 1 and 480' });
+  }
+  if (!PDF_TEMPLATES.has(pdf_template)) {
+    return res.status(400).json({ error: `pdf_template must be one of: ${[...PDF_TEMPLATES].join(', ')}` });
   }
 
   let signatureImage, stampImage, logoImage;
@@ -66,7 +71,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     `UPDATE business_settings
      SET business_name = ?, email = ?, phone = ?, address = ?, tax_id = ?, currency_symbol = ?, bank_details = ?,
          session_timeout_minutes = ?, signature_image = ?, stamp_image = ?, logo_image = ?, signatory_name = ?,
-         updated_at = datetime('now')
+         pdf_template = ?, updated_at = datetime('now')
      WHERE id = 1`,
   ).run(
     business_name,
@@ -81,6 +86,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     stampImage,
     logoImage,
     signatory_name,
+    pdf_template,
   );
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();

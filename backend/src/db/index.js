@@ -44,6 +44,7 @@ db.exec(`
     stamp_image TEXT NOT NULL DEFAULT '',
     logo_image TEXT NOT NULL DEFAULT '',
     signatory_name TEXT NOT NULL DEFAULT '',
+    pdf_template TEXT NOT NULL DEFAULT 'modern',
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -257,6 +258,14 @@ if (!settingsColumns.has('logo_image')) {
     ALTER TABLE business_settings ADD COLUMN logo_image TEXT NOT NULL DEFAULT '';
     ALTER TABLE business_settings ADD COLUMN signatory_name TEXT NOT NULL DEFAULT '';
   `);
+}
+
+// Same pattern again: `pdf_template` ('modern' | 'minimal' — see
+// lib/pdf.js) picks which layout quote/invoice/receipt PDFs render with,
+// added to business_settings after that table's single row already existed
+// in production.
+if (!settingsColumns.has('pdf_template')) {
+  db.exec(`ALTER TABLE business_settings ADD COLUMN pdf_template TEXT NOT NULL DEFAULT 'modern';`);
 }
 
 // Same pattern again: `clients` used to have separate `name` (contact
