@@ -43,20 +43,28 @@ function toIsoIfValid(year, month, day) {
   return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+// A slash/dash/dot-separated date with a non-4-digit first part is
+// ambiguous per-value (either part could be the day) unless one part is
+// >12, which can only be a day — see detectDateFormat() below, which uses
+// exactly that signal across a whole import batch to resolve the
+// ambiguous ones consistently instead of guessing per row.
+const AMBIGUOUS_DATE_RE = /^(\d{1,4})[/.\-](\d{1,2})[/.\-](\d{1,4})$/;
+
 // Accepts the canonical YYYY-MM-DD plus the date formats a spreadsheet
 // export commonly produces, normalizing all of them to YYYY-MM-DD (or
 // returning null if the value isn't a recognizable date at all):
 //   - YYYY/MM/DD
-//   - DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY (this app's primary market, the
-//     Maldives, writes day before month like most of the world, so this
-//     reading is tried before the US-style one below)
-//   - MM/DD/YYYY, MM-DD-YYYY, MM.DD.YYYY (only when the day-first reading
-//     above is impossible, e.g. "03/25/2024")
+//   - D/M/YYYY or M/D/YYYY (also with - or . separators) — which of these
+//     two a given value means is inherently ambiguous when both parts are
+//     <=12, so this always defers to `format` (see detectDateFormat())
+//     rather than guessing per value; `format` only matters for the
+//     ambiguous case, since a value with one part >12 only has one valid
+//     reading regardless
 //   - 2-digit years, assumed to be 2000-2099
 //   - Excel/Sheets serial date numbers (days since 1899-12-30), which is
 //     what a raw numeric date cell often turns into once exported to CSV
 //     without its display format
-function normalizeDate(raw) {
+function normalizeDate(raw, format = 'day-first') {
   const value = (raw || '').trim();
   if (!value) return null;
   if (DATE_RE.test(value)) return value;
@@ -71,7 +79,7 @@ function normalizeDate(raw) {
     return null;
   }
 
-  const m = value.match(/^(\d{1,4})[/.\-](\d{1,2})[/.\-](\d{1,4})$/);
+  const m = value.match(AMBIGUOUS_DATE_RE);
   if (!m) return null;
   const [, a, b, c] = m;
 
@@ -82,7 +90,39 @@ function normalizeDate(raw) {
   const year = c.length === 2 ? 2000 + Number(c) : Number(c);
   const first = Number(a);
   const second = Number(b);
-  return toIsoIfValid(year, second, first) || toIsoIfValid(year, first, second);
+  return format === 'month-first'
+    ? toIsoIfValid(year, first, second) || toIsoIfValid(year, second, first)
+    : toIsoIfValid(year, second, first) || toIsoIfValid(year, first, second);
+}
+
+// Scans every raw date-like value in an import batch for unambiguous
+// evidence of which part is the day: a value like "4/23/2026" can only be
+// month/day (day=23), while "23/4/2026" can only be day/month — either one
+// pins down the format for every OTHER, genuinely ambiguous value in the
+// same batch (e.g. "5/4/2026"), since a single CSV column is always one
+// consistent format throughout. Falls back to day-first (this app's
+// primary market, the Maldives, writes day before month like most of the
+// world) only when the batch has no unambiguous evidence either way —
+// mixed/contradictory evidence (dirty data) also falls back to day-first
+// rather than guessing.
+function detectDateFormat(rawValues) {
+  let dayFirst = 0;
+  let monthFirst = 0;
+  for (const raw of rawValues) {
+    const value = (raw || '').trim();
+    if (!value || DATE_RE.test(value)) continue;
+    const m = value.match(AMBIGUOUS_DATE_RE);
+    if (!m) continue;
+    const [, a, b] = m;
+    if (a.length === 4) continue;
+    const first = Number(a);
+    const second = Number(b);
+    if (first > 12 && second <= 12) dayFirst += 1;
+    else if (second > 12 && first <= 12) monthFirst += 1;
+  }
+  if (monthFirst > 0 && dayFirst === 0) return 'month-first';
+  if (dayFirst > 0 && monthFirst === 0) return 'day-first';
+  return 'day-first';
 }
 
 // Hands out sequential per-year numbers within a single import batch without
@@ -156,11 +196,11 @@ function processClients(rows, commit) {
 
 // ---- Expenses -----------------------------------------------------------------
 
-function validateExpenseRow(row) {
+function validateExpenseRow(row, dateFormat) {
   const description = (row.description || '').trim();
   const category = (row.category || 'other').trim() || 'other';
   const amount = parseNumber(row.amount);
-  const expense_date = normalizeDate(row.expense_date);
+  const expense_date = normalizeDate(row.expense_date, dateFormat);
 
   if (!description) return { ok: false, message: 'description is required' };
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: 'amount must be a positive number' };
@@ -172,6 +212,7 @@ function validateExpenseRow(row) {
 }
 
 function processExpenses(rows, commit) {
+  const dateFormat = detectDateFormat(rows.map((r) => r.expense_date));
   const results = [];
   let imported = 0;
   const insert = db.prepare(
@@ -179,7 +220,7 @@ function processExpenses(rows, commit) {
   );
 
   rows.forEach((row, index) => {
-    const outcome = validateExpenseRow(row);
+    const outcome = validateExpenseRow(row, dateFormat);
     const rowNumber = index + 2;
     if (!outcome.ok) {
       results.push({ row: rowNumber, status: 'error', message: outcome.message, preview: row.description || '' });
@@ -239,16 +280,16 @@ function clientMaps() {
 
 // ---- Invoices (with optional payment history) ----------------------------------
 
-function validateInvoiceRow(row, clientsByEmail, clientsByName) {
+function validateInvoiceRow(row, clientsByEmail, clientsByName, dateFormat) {
   const clientOutcome = resolveClient(row, clientsByEmail, clientsByName);
   if (!clientOutcome.ok) return clientOutcome;
   const { client } = clientOutcome;
 
-  const issueDate = normalizeDate(row.issue_date);
+  const issueDate = normalizeDate(row.issue_date, dateFormat);
   if (!issueDate) return { ok: false, message: 'issue_date must be a valid date (e.g. YYYY-MM-DD)' };
 
   const dueDateRaw = (row.due_date || '').trim();
-  const dueDate = dueDateRaw ? normalizeDate(dueDateRaw) : addDays(issueDate, 14);
+  const dueDate = dueDateRaw ? normalizeDate(dueDateRaw, dateFormat) : addDays(issueDate, 14);
   if (!dueDate) return { ok: false, message: 'due_date must be a valid date (e.g. YYYY-MM-DD)' };
 
   const amount = parseNumber(row.amount);
@@ -288,7 +329,7 @@ function validateInvoiceRow(row, clientsByEmail, clientsByName) {
   let paidDate = '';
   if (amountPaid > 0) {
     if (!paidDateRaw) return { ok: false, message: 'paid_date is required when amount_paid is greater than 0' };
-    paidDate = normalizeDate(paidDateRaw);
+    paidDate = normalizeDate(paidDateRaw, dateFormat);
     if (!paidDate) return { ok: false, message: 'paid_date must be a valid date (e.g. YYYY-MM-DD)' };
   }
 
@@ -325,6 +366,7 @@ function validateInvoiceRow(row, clientsByEmail, clientsByName) {
 
 function processInvoices(rows, commit) {
   const { clientsByEmail, clientsByName } = clientMaps();
+  const dateFormat = detectDateFormat(rows.flatMap((r) => [r.issue_date, r.due_date, r.paid_date]));
   const existingNumbers = new Set(db.prepare('SELECT number FROM invoices').all().map((r) => r.number));
   const usedInBatch = new Set();
   const nextInvoiceNumber = makeSequencer(invoiceNumberForYear, 'INV');
@@ -348,7 +390,7 @@ function processInvoices(rows, commit) {
 
   rows.forEach((row, index) => {
     const rowNumber = index + 2;
-    const outcome = validateInvoiceRow(row, clientsByEmail, clientsByName);
+    const outcome = validateInvoiceRow(row, clientsByEmail, clientsByName, dateFormat);
     if (!outcome.ok) {
       results.push({ row: rowNumber, status: 'error', message: outcome.message, preview: row.number || row.client_email || row.client_name || '' });
       return;
@@ -412,18 +454,18 @@ function processInvoices(rows, commit) {
 
 // ---- Quotes ---------------------------------------------------------------------
 
-function validateQuoteRow(row, clientsByEmail, clientsByName) {
+function validateQuoteRow(row, clientsByEmail, clientsByName, dateFormat) {
   const clientOutcome = resolveClient(row, clientsByEmail, clientsByName);
   if (!clientOutcome.ok) return clientOutcome;
   const { client } = clientOutcome;
 
-  const issueDate = normalizeDate(row.issue_date);
+  const issueDate = normalizeDate(row.issue_date, dateFormat);
   if (!issueDate) return { ok: false, message: 'issue_date must be a valid date (e.g. YYYY-MM-DD)' };
 
   const expiryDateRaw = (row.expiry_date || '').trim();
   // Matches QuoteForm.jsx's own default of issue date + 30 days when no
   // expiry is given.
-  const expiryDate = expiryDateRaw ? normalizeDate(expiryDateRaw) : addDays(issueDate, 30);
+  const expiryDate = expiryDateRaw ? normalizeDate(expiryDateRaw, dateFormat) : addDays(issueDate, 30);
   if (!expiryDate) return { ok: false, message: 'expiry_date must be a valid date (e.g. YYYY-MM-DD)' };
 
   const amount = parseNumber(row.amount);
@@ -466,6 +508,7 @@ function validateQuoteRow(row, clientsByEmail, clientsByName) {
 
 function processQuotes(rows, commit) {
   const { clientsByEmail, clientsByName } = clientMaps();
+  const dateFormat = detectDateFormat(rows.flatMap((r) => [r.issue_date, r.expiry_date]));
   const existingNumbers = new Set(db.prepare('SELECT number FROM quotes').all().map((r) => r.number));
   const usedInBatch = new Set();
   const nextQuoteNumber = makeSequencer(quoteNumberForYear, 'Q');
@@ -484,7 +527,7 @@ function processQuotes(rows, commit) {
 
   rows.forEach((row, index) => {
     const rowNumber = index + 2;
-    const outcome = validateQuoteRow(row, clientsByEmail, clientsByName);
+    const outcome = validateQuoteRow(row, clientsByEmail, clientsByName, dateFormat);
     if (!outcome.ok) {
       results.push({ row: rowNumber, status: 'error', message: outcome.message, preview: row.number || row.client_email || row.client_name || '' });
       return;

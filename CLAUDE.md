@@ -381,13 +381,28 @@ are deliberately untouched by either, always returning every row.
   so partial success is normal, not a failure state. Every date column
   (`issue_date`, `due_date`/`expiry_date`, `paid_date`, `expense_date`) goes
   through `normalizeDate()` rather than a strict `YYYY-MM-DD` regex —
-  spreadsheet exports routinely produce `DD/MM/YYYY` (tried before the
-  US-style `MM/DD/YYYY` reading, since this app's primary market is the
-  Maldives), `YYYY/MM/DD`, dot-separated dates, 2-digit years, and even raw
-  Excel serial-date numbers, and all of them normalize to the canonical
-  form before validation. `parseNumber()` similarly strips thousands-
-  separator commas and a leading currency symbol from `amount`/`tax_rate`/
-  `amount_paid` so `"2,500"`/`"$2,500.00"` parse the same as `"2500"`.
+  spreadsheet exports routinely produce `D/M/YYYY`-style dates (with `/`,
+  `-`, or `.` separators), `YYYY/MM/DD`, 2-digit years, and even raw Excel
+  serial-date numbers, and all of them normalize to the canonical form
+  before validation. Which of `D/M/YYYY` or `M/D/YYYY` a given value means
+  is inherently ambiguous when both parts are ≤12 (`"5/4/2025"` could be
+  either), so `normalizeDate()` never guesses per value — it takes a
+  `format` argument (`'day-first'` or `'month-first'`) and defers to it for
+  exactly that ambiguous case; a value where one part is >12 only has one
+  valid reading regardless of `format`. `detectDateFormat()` derives that
+  argument once per import batch (`processExpenses`/`processInvoices`/
+  `processQuotes` each call it before validating any row) by scanning every
+  date-ish value in the batch for unambiguous evidence — a value like
+  `"4/23/2026"` can only be month/day (day=23), which pins down the format
+  for every other, genuinely ambiguous value in the *same* batch too (e.g.
+  `"5/4/2026"` then reads as May 4, not April 5), since one CSV column is
+  always internally consistent even if individual rows are ambiguous in
+  isolation. Falls back to day-first (this app's primary market, the
+  Maldives, writes day before month like most of the world) only when the
+  batch has no unambiguous evidence either way. `parseNumber()` similarly
+  strips thousands-separator commas and a leading currency symbol from
+  `amount`/`tax_rate`/`amount_paid` so `"2,500"`/`"$2,500.00"` parse the
+  same as `"2500"`.
   Invoices and quotes are both matched to an existing client via the shared
   `resolveClient()`/`clientMaps()` helpers: by `client_email` first, falling
   back to an exact `client_name` match if `client_email` is blank (import
