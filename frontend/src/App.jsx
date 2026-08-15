@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import IdleTimeoutMonitor from './components/IdleTimeoutMonitor';
+import CommandPalette from './components/CommandPalette';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
@@ -35,6 +36,7 @@ export default function App() {
     <div className="min-h-screen bg-white">
       <Navbar />
       <IdleTimeoutMonitor />
+      <CommandPalette />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />

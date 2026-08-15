@@ -7,7 +7,7 @@ import GlobalSearch from './GlobalSearch';
 // permissions (Dashboard). Everything else is filtered by that module's
 // view permission so a restricted user never sees a link leading to a 403
 // — enforcement itself still happens server-side; this is just UX.
-const BUSINESS_LINKS = [
+export const BUSINESS_LINKS = [
   { to: '/dashboard', label: 'Dashboard', module: null },
   { to: '/clients', label: 'Clients', module: 'clients' },
   { to: '/products', label: 'Products', module: 'products' },
@@ -54,6 +54,12 @@ export default function Navbar() {
             {/* Desktop links */}
             <div className="hidden items-center gap-5 lg:flex">
               <GlobalSearch className="max-w-[180px] xl:max-w-[220px]" />
+              <kbd
+                className="hidden shrink-0 rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-400 xl:block"
+                title="Press Cmd/Ctrl+K to open the command palette"
+              >
+                ⌘K
+              </kbd>
               {visibleLinks.map((link) => (
                 <Link
                   key={link.to}
