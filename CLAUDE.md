@@ -379,7 +379,14 @@ are deliberately untouched by either, always returning every row.
   invalid ones — the frontend always previews before offering to commit.
   Each row gets a `{ row, status: 'ok'|'error', message, preview }` result,
   so partial success is normal, not a failure state. Invoices are matched
-  to an existing client by email (import clients first) and require a
+  to an existing client by `client_email`, falling back to an exact
+  `client_name` match if `client_email` is blank (import clients first) —
+  the fallback exists because not every business's historical "client"
+  identifier is a real, emailable address (e.g. a school reference code),
+  and the clients importer itself only requires that field to be
+  non-empty, not RFC-valid, matching the regular Clients page's own
+  leniency (`routes/clients.js`) rather than the stricter format check
+  this file used to apply only to CSV import. Invoices require a
   single `amount` rather than itemized line items — it's run through the
   same `computeTotals()` every other invoice uses, just with one synthetic
   line item. An optional `amount_paid`/`paid_date` creates a real `payments`

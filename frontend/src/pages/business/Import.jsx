@@ -9,7 +9,7 @@ const TYPES = [
     value: 'invoices',
     label: 'Invoices (+ payments)',
     columns:
-      'client_email*, number, issue_date*, due_date, description, amount*, tax_rate, amount_paid, paid_date, payment_method, status, notes',
+      'client_email or client_name (at least one)*, number, issue_date*, due_date, description, amount*, tax_rate, amount_paid, paid_date, payment_method, status, notes',
   },
 ];
 
@@ -17,9 +17,9 @@ const TEMPLATES = {
   clients: 'name,email,phone,address,notes\nAcme School,jane@example.com,+960 7000000,"Male, Maldives",Sample notes\n',
   expenses: 'category,description,amount,expense_date,notes\nrent,Office rent for March,15000,2026-03-01,\n',
   invoices:
-    'client_email,number,issue_date,due_date,description,amount,tax_rate,amount_paid,paid_date,payment_method,status,notes\n' +
-    'jane@example.com,,2024-01-15,2024-01-29,Website design,2000,0,2000,2024-01-20,bank_transfer,,Fully paid example\n' +
-    'jane@example.com,,2024-02-01,2024-02-15,Consulting,1500,10,0,,,,Not yet paid — leave amount_paid/paid_date blank\n',
+    'client_email,client_name,number,issue_date,due_date,description,amount,tax_rate,amount_paid,paid_date,payment_method,status,notes\n' +
+    'jane@example.com,,,2024-01-15,2024-01-29,Website design,2000,0,2000,2024-01-20,bank_transfer,,Fully paid example\n' +
+    ',Acme School,,2024-02-01,2024-02-15,Consulting,1500,10,0,,,,Matched by client_name instead of email\n',
 };
 
 function downloadTemplate(type) {
@@ -149,7 +149,8 @@ export default function Import() {
       </p>
       {type === 'invoices' && (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-          Import clients first if you haven't already — each invoice row is matched to a client by email.
+          Import clients first if you haven't already — each invoice row is matched to a client by email, or by
+          exact client name if client_email is left blank.
         </p>
       )}
 

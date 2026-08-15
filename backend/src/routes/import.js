@@ -13,7 +13,6 @@ router.use(requirePermission('import', 'manage'));
 
 const MAX_ROWS = 5000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EXPENSE_CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'marketing', 'software', 'travel', 'other'];
 const PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'cheque', 'other'];
 const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'void'];
@@ -56,7 +55,12 @@ function validateClientRow(row, seenEmails, existingEmails) {
   const name = (row.name || '').trim();
   const email = (row.email || '').trim().toLowerCase();
   if (!name) return { ok: false, message: 'name is required' };
-  if (!email || !EMAIL_RE.test(email)) return { ok: false, message: 'a valid email is required' };
+  // Deliberately as lenient as the regular Clients page (routes/clients.js
+  // only requires this field to be non-empty, no format check) — some
+  // businesses use this field as a general client identifier (e.g. a
+  // school reference code) rather than a real, emailable address, and CSV
+  // import shouldn't reject data the rest of the app already accepts.
+  if (!email) return { ok: false, message: 'email is required' };
   if (existingEmails.has(email) || seenEmails.has(email)) {
     return { ok: false, message: `duplicate: a client with email "${email}" already exists or appears earlier in this file` };
   }
@@ -147,10 +151,18 @@ function processExpenses(rows, commit) {
 
 // ---- Invoices (with optional payment history) ----------------------------------
 
-function validateInvoiceRow(row, clientsByEmail) {
+function validateInvoiceRow(row, clientsByEmail, clientsByName) {
   const clientEmail = (row.client_email || '').trim().toLowerCase();
-  if (!clientEmail) return { ok: false, message: 'client_email is required' };
-  const client = clientsByEmail.get(clientEmail);
+  const clientName = (row.client_name || '').trim();
+  if (!clientEmail && !clientName) {
+    return { ok: false, message: 'client_email or client_name is required' };
+  }
+  // Matched by email first (the primary, unambiguous key), falling back to
+  // an exact client_name match — some historical data identifies a client
+  // by a name/reference code rather than a real email address (e.g. "email"
+  // holding a school code), so a client_email that doesn't resolve isn't
+  // necessarily a missing client, just the wrong key for this row.
+  const client = (clientEmail && clientsByEmail.get(clientEmail)) || (clientName && clientsByName.get(clientName.toLowerCase()));
   if (!client) {
     // The single most common cause of this error is previewing the clients
     // CSV (which reports every valid row as "ready to import") without
@@ -158,11 +170,12 @@ function validateInvoiceRow(row, clientsByEmail) {
     // database, so the client genuinely doesn't exist yet. Say so
     // explicitly when there are zero clients on file at all, since that's
     // the tell-tale sign.
+    const identifier = clientEmail || clientName;
     const hint =
       clientsByEmail.size === 0
         ? 'no clients exist yet — if you already ran the Clients import, make sure you clicked "Confirm import" and not just "Preview"'
-        : 'import clients first (and click "Confirm import", not just "Preview")';
-    return { ok: false, message: `no client found with email "${clientEmail}" — ${hint}` };
+        : 'import clients first (and click "Confirm import", not just "Preview"), or check for a typo/mismatch against the client\'s saved name or email';
+    return { ok: false, message: `no client found matching "${identifier}" — ${hint}` };
   }
 
   const issueDate = (row.issue_date || '').trim();
@@ -242,8 +255,9 @@ function validateInvoiceRow(row, clientsByEmail) {
 }
 
 function processInvoices(rows, commit) {
-  const clients = db.prepare('SELECT id, email FROM clients').all();
+  const clients = db.prepare('SELECT id, name, email FROM clients').all();
   const clientsByEmail = new Map(clients.map((c) => [c.email.toLowerCase(), c]));
+  const clientsByName = new Map(clients.map((c) => [c.name.trim().toLowerCase(), c]));
   const existingNumbers = new Set(db.prepare('SELECT number FROM invoices').all().map((r) => r.number));
   const usedInBatch = new Set();
   const nextInvoiceNumber = makeSequencer(invoiceNumberForYear, 'INV');
@@ -267,9 +281,9 @@ function processInvoices(rows, commit) {
 
   rows.forEach((row, index) => {
     const rowNumber = index + 2;
-    const outcome = validateInvoiceRow(row, clientsByEmail);
+    const outcome = validateInvoiceRow(row, clientsByEmail, clientsByName);
     if (!outcome.ok) {
-      results.push({ row: rowNumber, status: 'error', message: outcome.message, preview: row.number || row.client_email || '' });
+      results.push({ row: rowNumber, status: 'error', message: outcome.message, preview: row.number || row.client_email || row.client_name || '' });
       return;
     }
     const v = outcome.values;
