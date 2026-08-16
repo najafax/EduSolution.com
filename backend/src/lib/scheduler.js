@@ -6,6 +6,7 @@ const { sendMail } = require('./mailer');
 const { computeTotals } = require('./totals');
 const { nextInvoiceNumber } = require('./numbering');
 const { runBackup } = require('./backup');
+const { logEmail } = require('./emailLog');
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -41,14 +42,16 @@ async function runOverdueReminders() {
       const balanceDue = Math.round((invoice.total - invoice.amount_paid) * 100) / 100;
 
       const buffer = await renderInvoicePdf({ invoice, client, items, settings });
+      const subject = `Payment reminder: invoice ${invoice.number}`;
       await sendMail({
         to: client.email,
-        subject: `Payment reminder: invoice ${invoice.number}`,
+        subject,
         html: `<p>Hi ${client.name},</p><p>This is an automated reminder that invoice ${invoice.number} for ${settings.currency_symbol}${balanceDue.toFixed(2)} was due on ${invoice.due_date}. Please find it attached.</p>`,
         attachments: [{ filename: `${invoice.number}.pdf`, content: buffer }],
       });
 
       db.prepare(`UPDATE invoices SET last_reminder_sent_at = datetime('now') WHERE id = ?`).run(invoice.id);
+      logEmail({ type: 'overdue_reminder', to: client.email, subject, sentByName: 'Automated', entityType: 'invoice', entityId: invoice.id, entityLabel: invoice.number });
       sent += 1;
       reminded.push({ number: invoice.number, clientName: client.name, balanceDue, dueDate: invoice.due_date });
     } catch (err) {

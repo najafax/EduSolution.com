@@ -447,7 +447,59 @@ are deliberately untouched by either, always returning every row.
   preview before sending" above — the plain-text-to-HTML conversion for a
   user-edited email body.
 - `lib/emailTemplates.js` — the default `{ subject, message }` for every
-  client-facing send action; see "Email preview before sending" above.
+  client-facing send action; see "Email preview before sending" above. Now
+  admin-editable via the Email Center (`routes/emailCenter.js`/
+  `pages/EmailCenter.jsx` below): `DEFAULT_TEMPLATES` holds the built-in
+  text for the 4 editable types (`quote_send`, `invoice_send`,
+  `invoice_remind`, `receipt_send`) as `{{placeholder}}` strings (e.g.
+  `Quote {{quote_number}} from {{business_name}}`); the `email_templates`
+  table (one row per `type`, primary-keyed on it — see `db/index.js`) holds
+  an optional admin override. `renderTemplate(str, vars)` does the
+  `{{key}}` substitution — an unknown placeholder is left as literal text
+  rather than blanked, so an admin typo is visible/debuggable instead of
+  silently vanishing. `buildEmail(type, to, vars)` picks the stored
+  override if one exists, else the default, renders both subject and
+  message, and is what the four exported functions
+  (`quoteSendEmail`/`invoiceSendEmail`/`invoiceRemindEmail`/
+  `receiptSendEmail`) now call internally — their signatures are unchanged,
+  so every existing call site (the preview/send routes in
+  `routes/quotes.js`/`routes/invoices.js`) needed no changes at all.
+  `PLACEHOLDERS` documents which `{{...}}` keys are valid per type (shown
+  as a hint in the Email Center UI); `TYPE_LABELS` is the human-readable
+  name per type. `getAllTemplates()`/`setTemplate(type, {subject,
+  message})`/`resetTemplate(type)` are the admin-management functions
+  `routes/emailCenter.js` calls — `getAllTemplates()` returns all 4 types
+  with whichever text is currently effective (stored override or default)
+  plus `isCustom` (so the frontend only shows "Reset to default" when
+  there's actually an override to clear) and the raw
+  `defaultSubject`/`defaultMessage` for reference. This deliberately does
+  **not** cover the automated overdue-reminder digest
+  (`lib/scheduler.js`'s `runOverdueReminders()`) — that email's content
+  stays fully automatic and non-customizable by design (unlike a
+  human-triggered send, nobody reviews it before it goes out), so it never
+  reads from this file; its sends are still recorded to the Email Center's
+  sent log under a distinct `overdue_reminder` type, just not through
+  `buildEmail()`.
+- `lib/emailLog.js` — `logEmail({ type, to, subject, sentByName,
+  entityType, entityId, entityLabel })` inserts one row into `email_log`
+  (see `db/index.js`), backing the Email Center's sent log
+  (`routes/emailCenter.js`'s `GET /log`). Distinct from `lib/activity.js`'s
+  `activity_log`: that's a general "who did what" audit trail that already
+  logs its own separate "sent"/"sent reminder for" entry per send action,
+  but never captures recipient email or subject — this is additive, not a
+  replacement, and every call site logs to both. Called after a
+  *successful* `sendMail()` only (never on a caught error) from all 4
+  manual send routes (`routes/quotes.js`'s `POST /:id/send`;
+  `routes/invoices.js`'s `POST /:id/send`, `POST /:id/remind`, and
+  `POST /:id/payments/:paymentId/send-receipt`, logged as types
+  `quote_send`/`invoice_send`/`invoice_remind`/`receipt_send` respectively
+  — the same 4 types `emailTemplates.js` covers) and from the automated
+  overdue-reminder job (`lib/scheduler.js`'s `runOverdueReminders()`, type
+  `overdue_reminder`, `sentByName: 'Automated'`) — the one log entry type
+  with no editable template. `notifyStaffOfReminders()`'s internal opt-in
+  staff digest (also in `lib/scheduler.js`) is deliberately **not**
+  logged here — it's an internal notification about client emails already
+  logged, not itself a client-facing send.
 - `lib/activity.js` — `logActivity({ userName, action, entityType,
   entityId, entityLabel })` inserts one row into `activity_log`. Called
   from every create/update/delete/send/duplicate/convert/payment/respond
@@ -610,8 +662,15 @@ Status/derived-field conventions worth knowing before touching this code:
   `requirePermission` — it checks `req.user.role === 'admin'` directly
   rather than consulting `user_permissions`, so no staff grant can ever
   unlock it (unlike every other module in this app, which a staff member
-  can be granted access to). Reserved for actions with no per-row undo:
-  currently only `routes/dataReset.js`.
+  can be granted access to). Reserved for actions with no per-row undo
+  (`routes/dataReset.js`) or, as of the Email Center, for a feature that's
+  simply admin-only *for now* by deliberate scope decision rather than a
+  no-undo action — `routes/emailCenter.js` reuses the same middleware
+  rather than adding a new gatable module to `lib/permissions.js`'s
+  `MODULES`, since opening it to staff later (if that turns out to be
+  wanted) is a one-line change to `requirePermission('email_center', ...)`
+  plus a `MODULES` entry, not a reason to add that plumbing speculatively
+  now.
 - `routes/dataReset.js` (mounted at `/api/data-reset`, `requireAuth` +
   `requireAdmin`, its own `router.use()` chain independent of the
   `requirePermission`/module system entirely) — `POST /` bulk-deletes
@@ -661,6 +720,24 @@ Status/derived-field conventions worth knowing before touching this code:
   requires at least one category checked, and shows the live selection
   count in its label) before `api.dataReset.run(confirm, categories,
   token)` is ever called.
+- `routes/emailCenter.js` (mounted at `/api/email-center`, `requireAuth` +
+  `requireAdmin` via its own `router.use()` chain — same pattern as
+  `routes/dataReset.js` above, admin-only for now rather than gated by a
+  new `MODULES` entry) — the Email Center's API: `GET /templates` (calls
+  `lib/emailTemplates.js`'s `getAllTemplates()`), `PUT /templates/:type`
+  (400s if `subject`/`message` is missing/blank, or if `:type` isn't one of
+  the 4 known types — `setTemplate()` throws on an unrecognized type, caught
+  and turned into a 400 rather than a 500), `POST /templates/:type/reset`
+  (calls `resetTemplate()`, same unknown-type handling), and `GET /log` — a
+  paginated read of `email_log`, mirroring `routes/activity.js`'s
+  `PAGE_SIZE`/`LIMIT ? OFFSET ?` pattern exactly (always paginated, 30/page,
+  newest first) rather than the business list routes' opt-in `?page=`
+  convention, since this is a chronological audit feed like activity log,
+  not a pickable list. Each log entry gets a `type_label` computed from a
+  `TYPE_LABELS` map local to this route file (the 4 editable types plus
+  `overdue_reminder`, the one type with no template) — kept separate from
+  `emailTemplates.js`'s own `TYPE_LABELS` since that one only covers the 4
+  editable types and has no reason to know about the automated reminder.
 - `routes/users.js` (mounted at `/api/users`, `requireAuth` +
   `requirePermission('users', 'view'|'manage')` per route) — the in-app
   admin user-management API: `GET /` (list), `GET /:id` (user +
@@ -801,7 +878,24 @@ frontend stops holding/sending it.
   return <...not authorized...>`) for the case of someone reaching the
   route directly by URL rather than through a nav link — same pattern
   `Dashboard.jsx` already used for its financials-gated view before this
-  feature existed. `ForgotPassword`/`ResetPassword` are public routes;
+  feature existed. `pages/EmailCenter.jsx` (route `/email-center`) is the
+  same guard pattern but checks `user?.role === 'admin'` directly instead
+  of `can(module, 'view')` — same convention as `Import.jsx`'s
+  `DangerZone` below, since this is admin-only for now rather than gated by
+  a permission module (see `routes/emailCenter.js` above). It has two
+  sections: **Templates**, a `TemplateCard` per editable type (the 4 from
+  `api.emailCenter.templates()`) with editable Subject/Message fields,
+  a `{{placeholder}}` reference line built from each template's
+  `placeholders` array, a "Customized" badge and "Reset to default" button
+  shown only when `template.isCustom`, and a "Save" button disabled until
+  the local draft actually differs from the loaded template (`dirty`) —
+  both actions re-fetch the full template list afterward so `isCustom`
+  never drifts from the server; and **Sent log**, styled after
+  `ActivityLog.jsx`'s plain `<ul>`/`<li>` list (not a table, so it sidesteps
+  the mobile-accordion-table convention entirely) reading
+  `api.emailCenter.log()` and paged with the shared `<Pagination>`
+  component rather than `ActivityLog.jsx`'s own older hand-rolled
+  Previous/Next buttons. `ForgotPassword`/`ResetPassword` are public routes;
   `ResetPassword` reads its token from `useSearchParams()` and, on success,
   navigates to `/login` passing a message via router state (shown as a
   banner on the login page). `PublicQuote`/`PublicInvoice` (routes `/q/:token`
@@ -1078,9 +1172,14 @@ frontend stops holding/sending it.
   is filtered through `can(link.module, 'view')` so a restricted user never
   sees a nav link leading to a page that would just reject them — same
   UX-only caveat as the business-page button gating above, not a security
-  boundary on its own. "My account" is appended after the filtered links,
-  unconditionally visible to any logged-in user (admin or staff) since it's
-  never permission-gated.
+  boundary on its own. The Email Center's entry additionally carries
+  `adminOnly: true` (`module: null`, since it isn't gated by the permission
+  system at all) — `visibleLinks`'s filter checks
+  `(!link.adminOnly || user?.role === 'admin')` alongside the existing
+  module check, mirroring `routes/emailCenter.js`'s `requireAdmin` rather
+  than a `can()` check, same UX-only caveat. "My account" is appended after
+  the filtered links, unconditionally visible to any logged-in user (admin
+  or staff) since it's never permission-gated.
 - `pages/Dashboard.jsx` — `SHORTCUTS` (the quick-link tiles) each carry a
   `module` and are filtered through `can(s.module, 'view')` the same way as
   `Navbar.jsx`'s links. The whole KPI/chart view additionally requires

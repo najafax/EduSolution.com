@@ -181,6 +181,14 @@ export const api = {
     profitLossPdf: (from, to, token) => openPdf(`/reports/profit-loss/pdf${qs({ from, to })}`, token),
   },
 
+  emailCenter: {
+    templates: (token) => request('/email-center/templates', { token }),
+    updateTemplate: (type, payload, token) =>
+      request(`/email-center/templates/${type}`, { method: 'PUT', body: payload, token }),
+    resetTemplate: (type, token) => request(`/email-center/templates/${type}/reset`, { method: 'POST', token }),
+    log: (token, page = 1) => request(`/email-center/log?page=${page}`, { token }),
+  },
+
   users: {
     list: (token, { q, page } = {}) => request(`/users${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/users/${id}`, { token }),

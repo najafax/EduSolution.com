@@ -198,6 +198,25 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS email_templates (
+    type TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS email_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    to_email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    sent_by_name TEXT NOT NULL DEFAULT '',
+    entity_type TEXT,
+    entity_id INTEGER,
+    entity_label TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoices_client ON invoices(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
@@ -205,6 +224,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id);
   CREATE INDEX IF NOT EXISTS idx_recurring_items ON recurring_invoice_items(recurring_invoice_id);
   CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at);
+  CREATE INDEX IF NOT EXISTS idx_email_log_created ON email_log(created_at);
 `);
 
 // Lightweight migration for columns added to `users` after this table

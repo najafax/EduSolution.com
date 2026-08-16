@@ -27,6 +27,7 @@ import ActivityLog from './pages/business/ActivityLog';
 import Import from './pages/business/Import';
 import Users from './pages/Users';
 import MyAccount from './pages/MyAccount';
+import EmailCenter from './pages/EmailCenter';
 
 function Protected({ children }) {
   return <ProtectedRoute>{children}</ProtectedRoute>;
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="/reports" element={<Protected><Reports /></Protected>} />
         <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
         <Route path="/users" element={<Protected><Users /></Protected>} />
+        <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
         <Route path="/account" element={<Protected><MyAccount /></Protected>} />
       </Routes>
     </div>

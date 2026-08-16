@@ -8,6 +8,7 @@ const { renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
 const { sendMail, textToHtml } = require('../lib/mailer');
 const { invoiceSendEmail, invoiceRemindEmail, receiptSendEmail } = require('../lib/emailTemplates');
 const { logActivity } = require('../lib/activity');
+const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
 
 const router = Router();
@@ -310,6 +311,7 @@ router.post('/:id/send', manage, async (req, res) => {
     db.prepare(`UPDATE invoices SET status = 'sent', updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
   }
   logActivity({ userName: req.user.name, action: 'sent', entityType: 'invoice', entityId: data.invoice.id, entityLabel: data.invoice.number });
+  logEmail({ type: 'invoice_send', to: data.client.email, subject, sentByName: req.user.name, entityType: 'invoice', entityId: data.invoice.id, entityLabel: data.invoice.number });
   res.json(getInvoiceWithItems(req.params.id));
 });
 
@@ -346,6 +348,7 @@ router.post('/:id/remind', manage, async (req, res) => {
 
   db.prepare(`UPDATE invoices SET last_reminder_sent_at = datetime('now') WHERE id = ?`).run(req.params.id);
   logActivity({ userName: req.user.name, action: 'sent reminder for', entityType: 'invoice', entityId: data.invoice.id, entityLabel: data.invoice.number });
+  logEmail({ type: 'invoice_remind', to: data.client.email, subject, sentByName: req.user.name, entityType: 'invoice', entityId: data.invoice.id, entityLabel: data.invoice.number });
   res.json(getInvoiceWithItems(req.params.id));
 });
 
@@ -490,6 +493,7 @@ router.post('/:id/payments/:paymentId/send-receipt', manage, async (req, res) =>
     return res.status(status).json({ error: err.message });
   }
 
+  logEmail({ type: 'receipt_send', to: data.client.email, subject, sentByName: req.user.name, entityType: 'invoice', entityId: data.invoice.id, entityLabel: payment.receipt_number });
   res.status(204).end();
 });
 

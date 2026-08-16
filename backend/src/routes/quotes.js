@@ -8,6 +8,7 @@ const { renderQuotePdf } = require('../lib/pdf');
 const { sendMail, textToHtml } = require('../lib/mailer');
 const { quoteSendEmail } = require('../lib/emailTemplates');
 const { logActivity } = require('../lib/activity');
+const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
 
 const router = Router();
@@ -283,6 +284,7 @@ router.post('/:id/send', manage, async (req, res) => {
     db.prepare(`UPDATE quotes SET status = 'sent', updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
   }
   logActivity({ userName: req.user.name, action: 'sent', entityType: 'quote', entityId: data.quote.id, entityLabel: data.quote.number });
+  logEmail({ type: 'quote_send', to: data.client.email, subject, sentByName: req.user.name, entityType: 'quote', entityId: data.quote.id, entityLabel: data.quote.number });
   res.json(getQuoteWithItems(req.params.id));
 });
 

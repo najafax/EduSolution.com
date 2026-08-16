@@ -8,6 +8,10 @@ import ThemeToggle from './ThemeToggle';
 // permissions (Dashboard). Everything else is filtered by that module's
 // view permission so a restricted user never sees a link leading to a 403
 // — enforcement itself still happens server-side; this is just UX.
+// `adminOnly: true` (Email Center) is a stricter, separate check against
+// the account's actual role rather than a module grant — mirrors the
+// backend's requireAdmin (routes/emailCenter.js), which no staff permission
+// can unlock.
 export const BUSINESS_LINKS = [
   { to: '/dashboard', label: 'Dashboard', module: null },
   { to: '/clients', label: 'Clients', module: 'clients' },
@@ -20,6 +24,7 @@ export const BUSINESS_LINKS = [
   { to: '/reports', label: 'Reports', module: 'financials' },
   { to: '/activity', label: 'Activity', module: 'activity' },
   { to: '/users', label: 'Users', module: 'users' },
+  { to: '/email-center', label: 'Email center', module: null, adminOnly: true },
   { to: '/settings', label: 'Settings', module: 'settings' },
 ];
 
@@ -29,7 +34,9 @@ export default function Navbar() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const visibleLinks = BUSINESS_LINKS.filter((link) => !link.module || can(link.module, 'view'));
+  const visibleLinks = BUSINESS_LINKS.filter(
+    (link) => (!link.module || can(link.module, 'view')) && (!link.adminOnly || user?.role === 'admin'),
+  );
 
   function handleLogout() {
     setMenuOpen(false);
