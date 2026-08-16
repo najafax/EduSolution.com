@@ -13,18 +13,19 @@ router.use(requireAdmin);
 const CONFIRM_PHRASE = 'DELETE';
 
 // What each pickable category actually clears. "clients" always pulls in
-// quotes/invoices/recurring invoices (and their items/payments) too, even
-// if the caller only ticked "clients" — those rows NOT NULL-reference
-// client_id (see db/index.js), so leaving them behind would orphan them
-// (invisible to every list page's INNER JOIN against clients, but still
-// sitting in the database forever). Every other category is safe to clear
-// on its own. users, user_permissions, and business_settings are never
-// touched by any category: login and branding must survive a reset.
+// quotes/invoices/recurring invoices/licenses (and their items/payments)
+// too, even if the caller only ticked "clients" — those rows NOT
+// NULL-reference client_id (see db/index.js), so leaving them behind would
+// orphan them (invisible to every list page's INNER JOIN against clients,
+// but still sitting in the database forever). Every other category is safe
+// to clear on its own. users, user_permissions, and business_settings are
+// never touched by any category: login and branding must survive a reset.
 const CATEGORIES = {
-  clients: ['quote_items', 'quotes', 'invoice_items', 'payments', 'invoices', 'recurring_invoice_items', 'recurring_invoices', 'clients'],
+  clients: ['quote_items', 'quotes', 'invoice_items', 'payments', 'invoices', 'recurring_invoice_items', 'recurring_invoices', 'licenses', 'clients'],
   quotes: ['quote_items', 'quotes'],
   invoices: ['invoice_items', 'payments', 'invoices'],
   recurring: ['recurring_invoice_items', 'recurring_invoices'],
+  licenses: ['licenses'],
   expenses: ['expenses'],
   products: ['products'],
   activity: ['activity_log'],
@@ -41,6 +42,7 @@ const TABLE_ORDER = [
   'invoices',
   'recurring_invoice_items',
   'recurring_invoices',
+  'licenses',
   'expenses',
   'clients',
   'products',

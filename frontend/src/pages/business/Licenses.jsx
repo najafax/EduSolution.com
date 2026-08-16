@@ -40,6 +40,7 @@ const EMPTY_FORM = {
   amount: '',
   start_date: todayStr(),
   expiry_date: todayPlus(365),
+  url: '',
   notes: '',
   status: 'active',
 };
@@ -107,6 +108,7 @@ export default function Licenses() {
         amount: license.amount,
         start_date: license.start_date,
         expiry_date: license.expiry_date,
+        url: license.url,
         notes: license.notes,
         status: license.status,
       });
@@ -132,6 +134,7 @@ export default function Licenses() {
       amount: Number(form.amount) || 0,
       start_date: form.start_date,
       expiry_date: form.expiry_date,
+      url: form.url,
       notes: form.notes,
       status: form.status,
     };
@@ -373,6 +376,17 @@ export default function Licenses() {
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="e.g. LMS Pro Annual License"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              />
+            </label>
+
+            <label className="block sm:col-span-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Activation URL</span>
+              <input
+                type="url"
+                value={form.url}
+                onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
+                placeholder="https://…"
                 className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>

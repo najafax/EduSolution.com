@@ -632,7 +632,7 @@ function validateLicenseRow(row, clientsByEmail, clientsByName, dateFormat) {
 
   return {
     ok: true,
-    values: { clientId: client.id, name, billingCycle, amount, startDate, expiryDate, status, notes: (row.notes || '').trim() },
+    values: { clientId: client.id, name, billingCycle, amount, startDate, expiryDate, status, url: (row.url || '').trim(), notes: (row.notes || '').trim() },
   };
 }
 
@@ -647,7 +647,7 @@ function processLicenses(rows, commit) {
   // that column being blank for anything generated with no human in the
   // loop, bulk CSV import included.
   const insert = db.prepare(
-    'INSERT INTO licenses (client_id, name, status, billing_cycle, amount, start_date, expiry_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO licenses (client_id, name, status, billing_cycle, amount, start_date, expiry_date, url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
   );
 
   rows.forEach((row, index) => {
@@ -659,7 +659,7 @@ function processLicenses(rows, commit) {
     }
     const v = outcome.values;
     if (commit) {
-      const result = insert.run(v.clientId, v.name, v.status, v.billingCycle, v.amount, v.startDate, v.expiryDate, v.notes);
+      const result = insert.run(v.clientId, v.name, v.status, v.billingCycle, v.amount, v.startDate, v.expiryDate, v.url, v.notes);
       imported += 1;
       results.push({ row: rowNumber, status: 'ok', message: 'imported', preview: v.name, id: result.lastInsertRowid });
     } else {

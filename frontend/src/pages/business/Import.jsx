@@ -21,7 +21,7 @@ const TYPES = [
     value: 'licenses',
     label: 'Licenses',
     columns:
-      'client_email or client_name (at least one)*, name*, billing_cycle, amount, start_date*, expiry_date, status, notes',
+      'client_email or client_name (at least one)*, name*, billing_cycle, amount, start_date*, expiry_date, status, url, notes',
   },
 ];
 
@@ -37,9 +37,9 @@ const TEMPLATES = {
     'jane@example.com,,,2024-01-15,2024-02-14,Website design proposal,2000,0,sent,Sent quote example\n' +
     ',Acme School,,2024-02-01,,Consulting package,1500,10,,Matched by client_name, status left blank (defaults to draft)\n',
   licenses:
-    'client_email,client_name,name,billing_cycle,amount,start_date,expiry_date,status,notes\n' +
-    'jane@example.com,,LMS Pro Annual License,yearly,1200,2025-08-16,2026-08-16,active,\n' +
-    ',Acme School,API Access License,monthly,50,2026-06-01,,active,Matched by client_name; expiry_date left blank (defaults to start_date + 1 billing cycle)\n',
+    'client_email,client_name,name,billing_cycle,amount,start_date,expiry_date,status,url,notes\n' +
+    'jane@example.com,,LMS Pro Annual License,yearly,1200,2025-08-16,2026-08-16,active,https://lms.example.com/activate,\n' +
+    ',Acme School,API Access License,monthly,50,2026-06-01,,active,,Matched by client_name; expiry_date left blank (defaults to start_date + 1 billing cycle)\n',
 };
 
 function downloadTemplate(type) {
@@ -67,12 +67,13 @@ const RESET_CATEGORIES = [
   {
     key: 'clients',
     label: 'Clients',
-    hint: 'Also deletes every quote, invoice, payment, and recurring invoice tied to them.',
-    forces: ['quotes', 'invoices', 'recurring'],
+    hint: 'Also deletes every quote, invoice, payment, recurring invoice, and license tied to them.',
+    forces: ['quotes', 'invoices', 'recurring', 'licenses'],
   },
   { key: 'quotes', label: 'Quotes' },
   { key: 'invoices', label: 'Invoices & payments' },
   { key: 'recurring', label: 'Recurring invoice templates' },
+  { key: 'licenses', label: 'Licenses' },
   { key: 'expenses', label: 'Expenses' },
   { key: 'products', label: 'Product catalog' },
   { key: 'activity', label: 'Activity log' },

@@ -140,6 +140,7 @@ router.get('/export.csv', view, (req, res) => {
     { label: 'Amount', key: 'amount' },
     { label: 'Start date', key: 'start_date' },
     { label: 'Expiry date', key: 'expiry_date' },
+    { label: 'URL', key: 'url' },
     { label: 'Last renewed', key: 'last_renewed_at' },
   ]);
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="licenses.csv"' });
@@ -168,16 +169,16 @@ router.post('/', manage, (req, res) => {
   const error = validate(req.body);
   if (error) return res.status(400).json({ error });
 
-  const { client_id, name, billing_cycle = 'yearly', amount = 0, start_date, expiry_date, notes = '' } = req.body;
+  const { client_id, name, billing_cycle = 'yearly', amount = 0, start_date, expiry_date, url = '', notes = '' } = req.body;
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
 
   const result = db
     .prepare(
-      `INSERT INTO licenses (client_id, name, billing_cycle, amount, start_date, expiry_date, notes, created_by_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO licenses (client_id, name, billing_cycle, amount, start_date, expiry_date, url, notes, created_by_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(client_id, name.trim(), billing_cycle, Number(amount), start_date, expiry_date, notes, req.user.name);
+    .run(client_id, name.trim(), billing_cycle, Number(amount), start_date, expiry_date, url.trim(), notes, req.user.name);
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(result.lastInsertRowid));
   logActivity({ userName: req.user.name, action: 'created', entityType: 'license', entityId: license.id, entityLabel: `${license.name} (${client.name})` });
@@ -199,15 +200,15 @@ router.put('/:id', manage, (req, res) => {
   const error = validate(req.body);
   if (error) return res.status(400).json({ error });
 
-  const { client_id, name, billing_cycle = 'yearly', amount = 0, start_date, expiry_date, notes = '', status } = req.body;
+  const { client_id, name, billing_cycle = 'yearly', amount = 0, start_date, expiry_date, url = '', notes = '', status } = req.body;
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
   const nextStatus = ['active', 'cancelled'].includes(status) ? status : existing.status;
 
   db.prepare(
-    `UPDATE licenses SET client_id = ?, name = ?, status = ?, billing_cycle = ?, amount = ?, start_date = ?, expiry_date = ?, notes = ?, updated_at = datetime('now')
+    `UPDATE licenses SET client_id = ?, name = ?, status = ?, billing_cycle = ?, amount = ?, start_date = ?, expiry_date = ?, url = ?, notes = ?, updated_at = datetime('now')
      WHERE id = ?`,
-  ).run(client_id, name.trim(), nextStatus, billing_cycle, Number(amount), start_date, expiry_date, notes, req.params.id);
+  ).run(client_id, name.trim(), nextStatus, billing_cycle, Number(amount), start_date, expiry_date, url.trim(), notes, req.params.id);
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id));
   logActivity({ userName: req.user.name, action: 'updated', entityType: 'license', entityId: license.id, entityLabel: `${license.name} (${client.name})` });

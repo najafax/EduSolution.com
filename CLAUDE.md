@@ -413,7 +413,14 @@ are deliberately untouched by either, always returning every row.
   no PDF attachment (a license isn't a document), so the send route is
   plain `sendMail({ to, subject, html })` with no buffer/attachment step.
   Blocked (409) the same as renew when `status` is `cancelled`. Every
-  mutation (create/update/delete/renew/remind) calls `logActivity()`.
+  mutation (create/update/delete/renew/remind) calls `logActivity()`. `url`
+  is an optional free-text field (no format validation beyond trimming,
+  stored/exported/imported alongside `notes` — same precedent: editable via
+  the form and included in CSV export/import, but not shown as its own list
+  or mobile-accordion column) for the client's activation/portal link;
+  nothing currently reads it back out — it's captured now so a future
+  activation-email template can interpolate it, not wired into
+  `lib/emailTemplates.js`'s `licenseRemindEmail()` yet.
 - `routes/public.js` — mounted at `/api/public`, the one route file **not**
   behind `requireAuth`. Looks quotes/invoices up by their `public_token`
   (a random 16-byte hex column generated on every quote/invoice create,
@@ -678,9 +685,12 @@ are deliberately untouched by either, always returning every row.
   `routes/licenses.js`'s own `advanceExpiry()` — same acceptable-duplication
   call as `EXPENSE_CATEGORIES`, keep both in sync), matching what the New
   License form itself defaults to. `status` (`active`/`cancelled`, blank
-  defaults to `active`) and `amount` (blank defaults to `0`) are otherwise
-  the only other columns — no line items, no document number, no PDF, since
-  a license isn't a document the way an invoice/quote is. `created_by_name`
+  defaults to `active`), `amount` (blank defaults to `0`), and an optional
+  `url` (free text, blank defaults to `''` — same field, same precedent, as
+  the manual form's "Activation URL," see `pages/business/Licenses.jsx`
+  below) are otherwise the only other columns — no line items, no document
+  number, no PDF, since a license isn't a document the way an invoice/quote
+  is. `created_by_name`
   is left at its `''` default the same way invoice/quote imports leave it
   blank, per `db/index.js`'s own note on that column being blank for
   anything generated with no human directly filling out the form.
@@ -805,17 +815,18 @@ Status/derived-field conventions worth knowing before touching this code:
   `requireAdmin`, its own `router.use()` chain independent of the
   `requirePermission`/module system entirely) — `POST /` bulk-deletes
   whichever tables the caller picks via a `categories` array (one or more
-  of `clients`, `quotes`, `invoices`, `recurring`, `expenses`, `products`,
-  `activity`), rather than an all-or-nothing clear. A `CATEGORIES` map
-  translates each picked key into the actual table(s) it touches (e.g.
-  `invoices` → `invoice_items`, `payments`, `invoices`); `clients` is the
-  one category that always pulls in more than its own table —
-  `quotes`/`invoices`/`recurring_invoices` (and their items/payments) too,
-  even if the caller only ticked "clients" — because `client_id` is a
-  `NOT NULL REFERENCES clients(id)` column on all three (see `db/index.js`),
-  so leaving them behind would silently orphan them: invisible to every
-  list page's `INNER JOIN` against `clients`, but still sitting in the
-  database forever. Every other category is safe to clear on its own. The
+  of `clients`, `quotes`, `invoices`, `recurring`, `licenses`, `expenses`,
+  `products`, `activity`), rather than an all-or-nothing clear. A
+  `CATEGORIES` map translates each picked key into the actual table(s) it
+  touches (e.g. `invoices` → `invoice_items`, `payments`, `invoices`);
+  `clients` is the one category that always pulls in more than its own
+  table — `quotes`/`invoices`/`recurring_invoices`/`licenses` (and their
+  items/payments) too, even if the caller only ticked "clients" — because
+  `client_id` is a `NOT NULL REFERENCES clients(id)` column on all four
+  (see `db/index.js`), so leaving them behind would silently orphan them:
+  invisible to every list page's `INNER JOIN` against `clients`, but still
+  sitting in the database forever. Every other category is safe to clear on
+  its own. The
   request 400s with "Select at least one type of data to delete" if
   `categories` is missing or empty, or if it contains no recognized key.
   The selected categories' tables are deleted in one transaction (foreign
@@ -841,7 +852,7 @@ Status/derived-field conventions worth knowing before touching this code:
   (rendered only when `user.role === 'admin'`, re-checking the same
   condition the backend enforces rather than trusting a hidden button) is
   the only caller — a checkbox per category (`RESET_CATEGORIES`), with
-  checking "Clients" auto-checking and disabling its three dependent
+  checking "Clients" auto-checking and disabling its four dependent
   categories client-side (mirroring the backend's forced cascade, with an
   "Included automatically with Clients." hint rather than letting someone
   uncheck a category the backend would clear anyway) — plus a
@@ -1179,7 +1190,14 @@ frontend stops holding/sending it.
   active/expiring_soon/expired/cancelled). Amounts use plain
   `.toFixed(2)`, not `lib/money.js`'s compact formatter — per that file's
   own scoping note, compacting is for Dashboard/Financials summary views,
-  not a list page reviewing individual records.
+  not a list page reviewing individual records. The form's "Activation URL"
+  field (a plain `type="url"` input, spanning both grid columns like
+  "License name" above it) follows the same not-in-the-list-or-card
+  precedent as "Notes" below it — captured on create/edit and round-tripped
+  through `startEdit()`, but never rendered as its own column or accordion
+  row, since nothing currently reads it back beyond the form itself (see
+  `routes/licenses.js` above for why: it's there for a future activation-
+  email template to interpolate, not wired to one yet).
   `ActivityLog.jsx` is a simple paginated read-only list. `Import.jsx` (linked from `Settings.jsx`, not a top-level
   Navbar item — it's a rare-use admin tool) reads a chosen CSV file
   client-side via `FileReader`, calls `api.import.run(type, csv, commit,

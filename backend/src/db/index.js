@@ -226,6 +226,7 @@ db.exec(`
     amount REAL NOT NULL DEFAULT 0,
     start_date TEXT NOT NULL,
     expiry_date TEXT NOT NULL,
+    url TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
     last_renewed_at TEXT,
     last_reminder_sent_at TEXT,
