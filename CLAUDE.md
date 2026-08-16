@@ -723,11 +723,39 @@ are deliberately untouched by either, always returning every row.
   is left at its `''` default the same way invoice/quote imports leave it
   blank, per `db/index.js`'s own note on that column being blank for
   anything generated with no human directly filling out the form.
+  **Repeated rows for the same client + license name are folded into one
+  license's renewal history, not imported as separate licenses** — this is
+  the shape a business's actual historical export usually takes (one row
+  per past renewal period, same client, same license name, different
+  dates), and importing each row as its own license would both duplicate
+  the license and lose the fact that it was ever renewed. After per-row
+  validation, `processLicenses()` groups valid rows by `clientId` +
+  `name.toLowerCase()` (same trim+lowercase match `resolveClient()`/
+  `clientMaps()` already use for client name) and sorts each group by
+  `start_date` — the row with the *latest* `start_date` becomes the
+  license's current record (its `status`/`amount`/`billing_cycle`/`url`/
+  `notes` win, and the license's `start_date` is the *earliest* row's, not
+  the current row's, matching how `POST /:id/renew` itself never touches
+  `start_date`), and every earlier row becomes a `license_renewals` entry
+  (`previous_expiry_date`/`new_expiry_date` from that pair's consecutive
+  `expiry_date`s) exactly like a manual renewal writes — see
+  `routes/licenses.js`'s `POST /:id/renew` above. `renewed_at`/
+  `last_renewed_at` have no source column in the CSV, so they're
+  approximated as the newer row's `start_date` at midnight (`renewed_by_name`
+  stays at its `''` default, same as `created_by_name`). A license with no
+  duplicate rows behaves exactly as before (single insert, `last_renewed_at`
+  stays `NULL`) — grouping is a no-op for the common case. Each row still
+  gets its own line in the returned `results` (`"imported"` for the winning
+  row, `"imported as renewal history for row N (...)"` for the rest) so the
+  preview step shows exactly which rows will merge before anything commits.
   Whole commit runs in one `db.transaction()` since an invoice import
   writes to three tables (`invoices`, `invoice_items`, `payments`) per row
-  (two for quotes, no `payments` row; one for licenses, a single-table
-  insert like clients/expenses). Logs one summary `activity_log`
-  entry per import ("bulk imported 42 clients from CSV"), not one per row.
+  (two for quotes, no `payments` row; licenses write one or two tables per
+  row depending on whether that row merges into an existing group).
+  `imported` counts every successfully-processed row (both new-license and
+  merged-into-history rows), not distinct license count. Logs one summary
+  `activity_log` entry per import ("bulk imported 42 clients from CSV"),
+  not one per row.
 - `lib/backup.js` — `runBackup()`: skips entirely if `BACKUP_S3_BUCKET`
   isn't set. Otherwise runs `VACUUM INTO` to write a consistent snapshot of
   the live database (safe against catching a WAL-mode write mid-flight,

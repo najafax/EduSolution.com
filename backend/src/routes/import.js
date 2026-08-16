@@ -639,33 +639,115 @@ function validateLicenseRow(row, clientsByEmail, clientsByName, dateFormat) {
 function processLicenses(rows, commit) {
   const { clientsByEmail, clientsByName } = clientMaps();
   const dateFormat = detectDateFormat(rows.flatMap((r) => [r.start_date, r.expiry_date]));
-  const results = [];
+  const results = new Array(rows.length);
   let imported = 0;
 
-  // created_by_name is deliberately omitted (left at its '' default), same
-  // as invoices/quotes imported this way — see db/index.js's own note on
-  // that column being blank for anything generated with no human in the
-  // loop, bulk CSV import included.
-  const insert = db.prepare(
-    'INSERT INTO licenses (client_id, name, status, billing_cycle, amount, start_date, expiry_date, url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  );
-
+  const valid = [];
   rows.forEach((row, index) => {
     const rowNumber = index + 2;
     const outcome = validateLicenseRow(row, clientsByEmail, clientsByName, dateFormat);
     if (!outcome.ok) {
-      results.push({ row: rowNumber, status: 'error', message: outcome.message, preview: row.name || row.client_email || row.client_name || '' });
+      results[index] = { row: rowNumber, status: 'error', message: outcome.message, preview: row.name || row.client_email || row.client_name || '' };
       return;
     }
-    const v = outcome.values;
-    if (commit) {
-      const result = insert.run(v.clientId, v.name, v.status, v.billingCycle, v.amount, v.startDate, v.expiryDate, v.url, v.notes);
-      imported += 1;
-      results.push({ row: rowNumber, status: 'ok', message: 'imported', preview: v.name, id: result.lastInsertRowid });
-    } else {
-      results.push({ row: rowNumber, status: 'ok', message: 'ready to import', preview: v.name });
-    }
+    valid.push({ index, rowNumber, values: outcome.values });
   });
+
+  // Two (or more) rows for the same client + license name aren't two
+  // separate licenses — they're one license's renewal history, one CSV row
+  // per past renewal period (the common shape for a business backfilling
+  // years of a client's actual renewal history rather than just its
+  // current state). Group by client id + license name (same trim+lowercase
+  // match resolveClient()/clientMaps() already use for client name), then
+  // order each group chronologically by start_date: the row with the
+  // latest start_date becomes the license's current record — its
+  // status/amount/billing_cycle/url/notes win, same as the live app always
+  // reflecting the most recent state — while every earlier row becomes a
+  // license_renewals entry (see routes/licenses.js's POST /:id/renew,
+  // which writes this same table on every manual renewal) recording that
+  // period's previous→new expiry. The created license's own start_date is
+  // the *earliest* row's start_date (when the license actually began), not
+  // the current row's — matching how POST /:id/renew itself never touches
+  // start_date, only expiry_date.
+  const groups = new Map();
+  for (const entry of valid) {
+    const key = `${entry.values.clientId}::${entry.values.name.toLowerCase()}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+
+  // created_by_name/renewed_by_name are deliberately omitted (left at their
+  // '' default), same as invoices/quotes imported this way — see
+  // db/index.js's own note on that column being blank for anything
+  // generated with no human in the loop, bulk CSV import included.
+  const insertLicense = db.prepare(
+    `INSERT INTO licenses (client_id, name, status, billing_cycle, amount, start_date, expiry_date, url, notes, last_renewed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const insertRenewal = db.prepare(
+    'INSERT INTO license_renewals (license_id, previous_expiry_date, new_expiry_date, renewed_at) VALUES (?, ?, ?, ?)',
+  );
+
+  for (const group of groups.values()) {
+    group.sort((a, b) => (a.values.startDate < b.values.startDate ? -1 : a.values.startDate > b.values.startDate ? 1 : 0));
+    const current = group[group.length - 1];
+    const history = group.slice(0, -1);
+
+    if (commit) {
+      // Best-effort renewal timestamp: the exact time isn't in the CSV, so
+      // approximate it with the new period's start_date, the same way this
+      // whole row's dates are date-only already.
+      const lastRenewedAt = history.length > 0 ? `${current.values.startDate} 00:00:00` : null;
+      const result = insertLicense.run(
+        current.values.clientId,
+        current.values.name,
+        current.values.status,
+        current.values.billingCycle,
+        current.values.amount,
+        group[0].values.startDate,
+        current.values.expiryDate,
+        current.values.url,
+        current.values.notes,
+        lastRenewedAt,
+      );
+      const licenseId = result.lastInsertRowid;
+      for (let i = 1; i < group.length; i++) {
+        insertRenewal.run(licenseId, group[i - 1].values.expiryDate, group[i].values.expiryDate, `${group[i].values.startDate} 00:00:00`);
+      }
+      imported += group.length;
+      results[current.index] = {
+        row: current.rowNumber,
+        status: 'ok',
+        message: history.length > 0 ? `imported — current record (${history.length} earlier row(s) merged as renewal history)` : 'imported',
+        preview: current.values.name,
+        id: licenseId,
+      };
+      for (const h of history) {
+        results[h.index] = {
+          row: h.rowNumber,
+          status: 'ok',
+          message: `imported as renewal history for row ${current.rowNumber} (${current.values.name})`,
+          preview: h.values.name,
+          id: licenseId,
+        };
+      }
+    } else {
+      results[current.index] = {
+        row: current.rowNumber,
+        status: 'ok',
+        message: history.length > 0 ? `ready to import — current record (${history.length} earlier row(s) will merge as renewal history)` : 'ready to import',
+        preview: current.values.name,
+      };
+      for (const h of history) {
+        results[h.index] = {
+          row: h.rowNumber,
+          status: 'ok',
+          message: `ready to import as renewal history for row ${current.rowNumber} (${current.values.name})`,
+          preview: h.values.name,
+        };
+      }
+    }
+  }
 
   return { results, imported };
 }

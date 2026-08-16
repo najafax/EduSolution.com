@@ -22,6 +22,7 @@ const TYPES = [
     label: 'Licenses',
     columns:
       'client_email or client_name (at least one)*, name*, billing_cycle, amount, start_date*, expiry_date, status, url, notes',
+    note: "Multiple rows with the same client and license name are treated as one license's renewal history, not separate licenses — the row with the latest start_date becomes the current record, and every earlier row becomes a past renewal.",
   },
 ];
 
@@ -38,7 +39,8 @@ const TEMPLATES = {
     ',Acme School,,2024-02-01,,Consulting package,1500,10,,Matched by client_name, status left blank (defaults to draft)\n',
   licenses:
     'client_email,client_name,name,billing_cycle,amount,start_date,expiry_date,status,url,notes\n' +
-    'jane@example.com,,LMS Pro Annual License,yearly,1200,2025-08-16,2026-08-16,active,https://lms.example.com/activate,\n' +
+    'jane@example.com,,LMS Pro Annual License,yearly,1100,2024-08-16,2025-08-16,active,,First year — earlier row, becomes renewal history\n' +
+    'jane@example.com,,LMS Pro Annual License,yearly,1200,2025-08-16,2026-08-16,active,https://lms.example.com/activate,Second year — latest start_date, becomes the current record\n' +
     ',Acme School,API Access License,monthly,50,2026-06-01,,active,,Matched by client_name; expiry_date left blank (defaults to start_date + 1 billing cycle)\n',
 };
 
@@ -334,6 +336,7 @@ export default function Import() {
         <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Expected columns</p>
         <p className="mt-1 break-words font-mono text-xs text-slate-600 dark:text-slate-400">{current.columns}</p>
         <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">* required</p>
+        {current.note && <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{current.note}</p>}
         <button
           onClick={() => downloadTemplate(type)}
           className="mt-3 min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
