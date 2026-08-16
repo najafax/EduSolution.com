@@ -163,6 +163,7 @@ export const api = {
     update: (id, payload, token) => request(`/licenses/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/licenses/${id}`, { method: 'DELETE', token }),
     renew: (id, token) => request(`/licenses/${id}/renew`, { method: 'POST', token }),
+    renewals: (id, token) => request(`/licenses/${id}/renewals`, { token }),
     remindPreview: (id, token) => request(`/licenses/${id}/remind-preview`, { token }),
     remind: (id, payload, token) => request(`/licenses/${id}/remind`, { method: 'POST', body: payload, token }),
     exportCsv: (token) => downloadFile('/licenses/export.csv', token, 'licenses.csv'),

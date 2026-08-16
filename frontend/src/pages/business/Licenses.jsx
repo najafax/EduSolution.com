@@ -64,6 +64,9 @@ export default function Licenses() {
   const [submitting, setSubmitting] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [remindTarget, setRemindTarget] = useState(null);
+  const [historyTarget, setHistoryTarget] = useState(null);
+  const [renewals, setRenewals] = useState(null);
+  const [renewalsError, setRenewalsError] = useState('');
 
   function load() {
     setLoading(true);
@@ -189,6 +192,16 @@ export default function Licenses() {
     }
   }
 
+  function openHistory(l) {
+    setHistoryTarget(l);
+    setRenewals(null);
+    setRenewalsError('');
+    api.licenses
+      .renewals(l.id, token)
+      .then(({ renewals }) => setRenewals(renewals))
+      .catch((err) => setRenewalsError(err.message));
+  }
+
   const symbol = settings?.currency_symbol || '$';
 
   function rowActions(l) {
@@ -208,6 +221,9 @@ export default function Licenses() {
             Remind
           </button>
         )}
+        <button onClick={() => openHistory(l)} className="text-slate-600 hover:text-slate-500 dark:text-slate-300">
+          History
+        </button>
         <button onClick={() => startEdit(l)} className="text-slate-600 hover:text-slate-500 dark:text-slate-300">
           Edit
         </button>
@@ -500,6 +516,27 @@ export default function Licenses() {
           }
         />
       )}
+
+      <Modal open={!!historyTarget} onClose={() => setHistoryTarget(null)} title={historyTarget ? `Renewal history — ${historyTarget.name}` : ''}>
+        {renewalsError ? (
+          <p className="text-sm text-red-600 dark:text-red-400">{renewalsError}</p>
+        ) : renewals === null ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+        ) : renewals.length === 0 ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">No renewals recorded yet.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {renewals.map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-4 py-2.5 text-sm">
+                <span className="text-slate-500 dark:text-slate-400">{r.renewed_at.slice(0, 10)}</span>
+                <span className="text-slate-900 dark:text-white">
+                  {r.previous_expiry_date} → {r.new_expiry_date}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Modal>
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New license" />}
     </div>

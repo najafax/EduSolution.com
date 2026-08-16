@@ -413,7 +413,20 @@ are deliberately untouched by either, always returning every row.
   no PDF attachment (a license isn't a document), so the send route is
   plain `sendMail({ to, subject, html })` with no buffer/attachment step.
   Blocked (409) the same as renew when `status` is `cancelled`. Every
-  mutation (create/update/delete/renew/remind) calls `logActivity()`. `url`
+  mutation (create/update/delete/renew/remind) calls `logActivity()`.
+  **Renewal history**: every `POST /:id/renew` above also inserts one row
+  into `license_renewals` (`license_id`, `previous_expiry_date`,
+  `new_expiry_date`, `renewed_by_name`, `renewed_at`), in the same
+  `db.transaction()` as the `licenses` `UPDATE` so the two never drift.
+  This is deliberately a separate table from `activity_log` (which already
+  gets its own one-line "renewed" entry per renewal, see `lib/activity.js`
+  below) — `activity_log`'s `entity_label` is a free-text summary string
+  meant for a global chronological feed, not something built to be queried
+  per-license or to expose the exact previous/new expiry pair as structured
+  data. `GET /:id/renewals` (`view`-gated, same as every other read on this
+  router) returns that license's own renewals newest-first with no
+  pagination — a single license's renewal count is inherently small (at
+  most one per billing cycle since the license existed). `url`
   is an optional free-text field (no format validation beyond trimming,
   stored/exported/imported alongside `notes` — same precedent: editable via
   the form and included in CSV export/import, but not shown as its own list
@@ -1190,7 +1203,18 @@ frontend stops holding/sending it.
   active/expiring_soon/expired/cancelled). Amounts use plain
   `.toFixed(2)`, not `lib/money.js`'s compact formatter — per that file's
   own scoping note, compacting is for Dashboard/Financials summary views,
-  not a list page reviewing individual records. The form's "Activation URL"
+  not a list page reviewing individual records. A "History" action (in the
+  same `rowActions()` set as Renew/Remind/Edit/Delete, so it appears in
+  both the desktop table's action cell and each mobile card's expanded
+  body) opens a `Modal` listing that license's renewal log from `GET
+  /:id/renewals` — fetched fresh on open (no caching across opens, mirroring
+  `EmailPreviewModal`'s own "fetch on open" pattern rather than prefetching
+  history for every row up front), each entry showing just the renewal date
+  and the previous→new expiry it produced (`renewed_at.slice(0, 10)` for
+  the date, since `renewed_at` is a full datetime but every other date
+  shown in this app's UI is date-only), newest first, with a "No renewals
+  recorded yet." empty state for a license that's never been renewed.
+  The form's "Activation URL"
   field (a plain `type="url"` input, spanning both grid columns like
   "License name" above it) follows the same not-in-the-list-or-card
   precedent as "Notes" below it — captured on create/edit and round-tripped

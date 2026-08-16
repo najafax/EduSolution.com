@@ -241,13 +241,34 @@ router.post('/:id/renew', manage, (req, res) => {
   const base = existing.expiry_date > today() ? existing.expiry_date : today();
   const nextExpiry = advanceExpiry(base, existing.billing_cycle);
 
-  db.prepare(
-    `UPDATE licenses SET expiry_date = ?, last_renewed_at = datetime('now'), last_reminder_sent_at = NULL, updated_at = datetime('now') WHERE id = ?`,
-  ).run(nextExpiry, req.params.id);
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE licenses SET expiry_date = ?, last_renewed_at = datetime('now'), last_reminder_sent_at = NULL, updated_at = datetime('now') WHERE id = ?`,
+    ).run(nextExpiry, req.params.id);
+    db.prepare(
+      `INSERT INTO license_renewals (license_id, previous_expiry_date, new_expiry_date, renewed_by_name) VALUES (?, ?, ?, ?)`,
+    ).run(req.params.id, existing.expiry_date, nextExpiry, req.user.name);
+  })();
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id));
   logActivity({ userName: req.user.name, action: 'renewed', entityType: 'license', entityId: license.id, entityLabel: `${existing.name} (${existing.client_name}) → ${nextExpiry}` });
   res.json({ license });
+});
+
+// Renewal history log — every POST /:id/renew above writes one row here, so
+// this is a straight read of that log for one license, newest first. Kept
+// as its own row-level table (not folded into activity_log, which already
+// gets a one-line "renewed" entry per renewal too) since this needs to be
+// filterable/renderable per-license without parsing activity_log's free-text
+// entityLabel, and needs the exact previous/new expiry pair, not just a
+// human-readable summary string.
+router.get('/:id/renewals', view, (req, res) => {
+  const license = db.prepare('SELECT id FROM licenses WHERE id = ?').get(req.params.id);
+  if (!license) return res.status(404).json({ error: 'License not found' });
+  const renewals = db
+    .prepare('SELECT * FROM license_renewals WHERE license_id = ? ORDER BY renewed_at DESC, id DESC')
+    .all(req.params.id);
+  res.json({ renewals });
 });
 
 router.get('/:id/remind-preview', manage, (req, res) => {
