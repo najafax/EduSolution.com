@@ -10,6 +10,7 @@ import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import BulkActionBar from '../../components/BulkActionBar';
+import MobileListAccordion from '../../components/MobileListAccordion';
 import { UsersIcon } from '../../components/icons';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', address: '', notes: '' };
@@ -197,9 +198,11 @@ export default function Clients() {
         </form>
       </Modal>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
-          <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-32', 'w-40', 'w-24', 'w-16'] : ['w-32', 'w-40', 'w-24']} />
+          <div className="overflow-x-auto">
+            <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-32', 'w-40', 'w-24', 'w-16'] : ['w-32', 'w-40', 'w-24']} />
+          </div>
         ) : visibleClients.length === 0 ? (
           <EmptyState
             icon={<UsersIcon />}
@@ -208,57 +211,103 @@ export default function Clients() {
             action={!search && canManage ? { label: 'New client', onClick: startCreate } : undefined}
           />
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-            <thead>
-              <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                {canManage && (
-                  <th className="w-10 px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.size > 0 && selected.size === visibleClients.length}
-                      onChange={toggleSelectAll}
-                      aria-label="Select all clients"
-                      className="h-4 w-4 rounded border-slate-300"
-                    />
-                  </th>
-                )}
-                <th className="px-4 py-3">Client</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Phone</th>
-                {canManage && <th className="px-4 py-3" />}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <>
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                    {canManage && (
+                      <th className="w-10 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selected.size > 0 && selected.size === visibleClients.length}
+                          onChange={toggleSelectAll}
+                          aria-label="Select all clients"
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                      </th>
+                    )}
+                    <th className="px-4 py-3">Client</th>
+                    <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3">Phone</th>
+                    {canManage && <th className="px-4 py-3" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {visibleClients.map((client) => (
+                    <tr key={client.id} className={selected.has(client.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : undefined}>
+                      {canManage && (
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(client.id)}
+                            onChange={() => toggleSelected(client.id)}
+                            aria-label={`Select ${client.name}`}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                        </td>
+                      )}
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{client.name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.email}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.phone || '—'}</td>
+                      {canManage && (
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <button onClick={() => startEdit(client)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                            Edit
+                          </button>
+                          <button onClick={() => handleDelete(client)} className="text-red-600 hover:text-red-500">
+                            Delete
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
               {visibleClients.map((client) => (
-                <tr key={client.id} className={selected.has(client.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : undefined}>
+                <MobileListAccordion
+                  key={client.id}
+                  highlighted={selected.has(client.id)}
+                  summary={
+                    <div className="flex items-center gap-3">
+                      {canManage && (
+                        <input
+                          type="checkbox"
+                          checked={selected.has(client.id)}
+                          onChange={() => toggleSelected(client.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Select ${client.name}`}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-slate-900 dark:text-white">{client.name}</p>
+                        <p className="truncate text-slate-500 dark:text-slate-400">{client.email}</p>
+                      </div>
+                    </div>
+                  }
+                >
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500 dark:text-slate-400">Phone</dt>
+                    <dd className="text-slate-900 dark:text-white">{client.phone || '—'}</dd>
+                  </div>
                   {canManage && (
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(client.id)}
-                        onChange={() => toggleSelected(client.id)}
-                        aria-label={`Select ${client.name}`}
-                        className="h-4 w-4 rounded border-slate-300"
-                      />
-                    </td>
-                  )}
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{client.name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.email}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.phone || '—'}</td>
-                  {canManage && (
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <button onClick={() => startEdit(client)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                    <div className="flex gap-4 pt-1">
+                      <button onClick={() => startEdit(client)} className="text-indigo-600 hover:text-indigo-500">
                         Edit
                       </button>
                       <button onClick={() => handleDelete(client)} className="text-red-600 hover:text-red-500">
                         Delete
                       </button>
-                    </td>
+                    </div>
                   )}
-                </tr>
+                </MobileListAccordion>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 

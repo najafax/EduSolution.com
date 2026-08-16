@@ -12,6 +12,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import BulkActionBar from '../../components/BulkActionBar';
 import StatusFilterChips from '../../components/StatusFilterChips';
+import MobileListAccordion from '../../components/MobileListAccordion';
 import { InvoiceIcon } from '../../components/icons';
 import QuoteForm from './QuoteForm';
 
@@ -131,9 +132,11 @@ export default function Quotes() {
         </BulkActionBar>
       )}
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
-          <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-28', 'w-32', 'w-24', 'w-20', 'w-20'] : ['w-28', 'w-32', 'w-24', 'w-20', 'w-20']} />
+          <div className="overflow-x-auto">
+            <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-28', 'w-32', 'w-24', 'w-20', 'w-20'] : ['w-28', 'w-32', 'w-24', 'w-20', 'w-20']} />
+          </div>
         ) : visibleQuotes.length === 0 ? (
           <EmptyState
             icon={<InvoiceIcon />}
@@ -142,56 +145,103 @@ export default function Quotes() {
             action={!search && !status && canManage ? { label: 'New quote', onClick: () => setShowNewForm(true) } : undefined}
           />
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-            <thead>
-              <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                {canManage && (
-                  <th className="w-10 px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.size > 0 && selected.size === visibleQuotes.length}
-                      onChange={toggleSelectAll}
-                      aria-label="Select all quotes"
-                      className="h-4 w-4 rounded border-slate-300"
-                    />
-                  </th>
-                )}
-                <th className="px-4 py-3">Number</th>
-                <th className="px-4 py-3">Client</th>
-                <th className="px-4 py-3">Issued</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <>
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                    {canManage && (
+                      <th className="w-10 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selected.size > 0 && selected.size === visibleQuotes.length}
+                          onChange={toggleSelectAll}
+                          aria-label="Select all quotes"
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                      </th>
+                    )}
+                    <th className="px-4 py-3">Number</th>
+                    <th className="px-4 py-3">Client</th>
+                    <th className="px-4 py-3">Issued</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {visibleQuotes.map((quote) => (
+                    <tr key={quote.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800 ${selected.has(quote.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : ''}`}>
+                      {canManage && (
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(quote.id)}
+                            onChange={() => toggleSelected(quote.id)}
+                            aria-label={`Select ${quote.number}`}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                        </td>
+                      )}
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <Link to={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
+                          {quote.number}
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{quote.client_name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{quote.issue_date}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <StatusBadge status={quote.status} />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{quote.total.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
               {visibleQuotes.map((quote) => (
-                <tr key={quote.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800 ${selected.has(quote.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : ''}`}>
-                  {canManage && (
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(quote.id)}
-                        onChange={() => toggleSelected(quote.id)}
-                        aria-label={`Select ${quote.number}`}
-                        className="h-4 w-4 rounded border-slate-300"
-                      />
-                    </td>
-                  )}
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <Link to={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
-                      {quote.number}
-                    </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{quote.client_name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{quote.issue_date}</td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <StatusBadge status={quote.status} />
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{quote.total.toFixed(2)}</td>
-                </tr>
+                <MobileListAccordion
+                  key={quote.id}
+                  highlighted={selected.has(quote.id)}
+                  summary={
+                    <div className="flex items-center gap-3">
+                      {canManage && (
+                        <input
+                          type="checkbox"
+                          checked={selected.has(quote.id)}
+                          onChange={() => toggleSelected(quote.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Select ${quote.number}`}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          to={`/quotes/${quote.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-medium text-indigo-600 hover:text-indigo-500"
+                        >
+                          {quote.number}
+                        </Link>
+                        <p className="truncate text-slate-500 dark:text-slate-400">{quote.client_name}</p>
+                      </div>
+                      <StatusBadge status={quote.status} />
+                    </div>
+                  }
+                >
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500 dark:text-slate-400">Issued</dt>
+                    <dd className="text-slate-900 dark:text-white">{quote.issue_date}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500 dark:text-slate-400">Total</dt>
+                    <dd className="text-slate-900 dark:text-white">{quote.total.toFixed(2)}</dd>
+                  </div>
+                </MobileListAccordion>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 

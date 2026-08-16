@@ -9,6 +9,7 @@ import SearchableSelect from '../../components/SearchableSelect';
 import SearchInput from '../../components/SearchInput';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
+import MobileListAccordion from '../../components/MobileListAccordion';
 
 const EMPTY_FORM = {
   client_id: '',
@@ -307,7 +308,7 @@ export default function RecurringInvoices() {
         </form>
       </Modal>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
         ) : recurring.length === 0 ? (
@@ -315,47 +316,92 @@ export default function RecurringInvoices() {
             {search ? `No recurring invoices match "${search}".` : 'No recurring invoices yet.'}
           </p>
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-            <thead>
-              <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                <th className="px-4 py-3">Client</th>
-                <th className="px-4 py-3">Frequency</th>
-                <th className="px-4 py-3">Next run</th>
-                <th className="px-4 py-3">Status</th>
-                {canManage && <th className="px-4 py-3" />}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <>
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                    <th className="px-4 py-3">Client</th>
+                    <th className="px-4 py-3">Frequency</th>
+                    <th className="px-4 py-3">Next run</th>
+                    <th className="px-4 py-3">Status</th>
+                    {canManage && <th className="px-4 py-3" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {recurring.map((row) => (
+                    <tr key={row.id}>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{row.client_name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600 dark:text-slate-400">{row.frequency}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{row.next_run_date}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            row.active
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}
+                        >
+                          {row.active ? 'Active' : 'Paused'}
+                        </span>
+                      </td>
+                      {canManage && (
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <button onClick={() => startEdit(row)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                            Edit
+                          </button>
+                          <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-500">
+                            Delete
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
               {recurring.map((row) => (
-                <tr key={row.id}>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{row.client_name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600 dark:text-slate-400">{row.frequency}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{row.next_run_date}</td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        row.active
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                      }`}
-                    >
-                      {row.active ? 'Active' : 'Paused'}
-                    </span>
-                  </td>
+                <MobileListAccordion
+                  key={row.id}
+                  summary={
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate font-medium text-slate-900 dark:text-white">{row.client_name}</p>
+                      <span
+                        className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          row.active
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        }`}
+                      >
+                        {row.active ? 'Active' : 'Paused'}
+                      </span>
+                    </div>
+                  }
+                >
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500 dark:text-slate-400">Frequency</dt>
+                    <dd className="capitalize text-slate-900 dark:text-white">{row.frequency}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500 dark:text-slate-400">Next run</dt>
+                    <dd className="text-slate-900 dark:text-white">{row.next_run_date}</dd>
+                  </div>
                   {canManage && (
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <button onClick={() => startEdit(row)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                    <div className="flex gap-4 pt-1">
+                      <button onClick={() => startEdit(row)} className="text-indigo-600 hover:text-indigo-500">
                         Edit
                       </button>
                       <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-500">
                         Delete
                       </button>
-                    </td>
+                    </div>
                   )}
-                </tr>
+                </MobileListAccordion>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 

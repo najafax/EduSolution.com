@@ -5,6 +5,7 @@ import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
+import MobileListAccordion from '../../components/MobileListAccordion';
 
 const EMPTY_FORM = { name: '', description: '', unit_price: '', tax_rate: '' };
 
@@ -185,7 +186,7 @@ export default function Products() {
         </form>
       </Modal>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
         ) : products.length === 0 ? (
@@ -193,42 +194,82 @@ export default function Products() {
             {search ? `No products match "${search}".` : 'No products yet.'}
           </p>
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-            <thead>
-              <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Description</th>
-                <th className="px-4 py-3 text-right">Unit price</th>
-                <th className="px-4 py-3 text-right">Tax</th>
-                {canManage && <th className="px-4 py-3" />}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <>
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Description</th>
+                    <th className="px-4 py-3 text-right">Unit price</th>
+                    <th className="px-4 py-3 text-right">Tax</th>
+                    {canManage && <th className="px-4 py-3" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {products.map((product) => (
+                    <tr key={product.id}>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{product.name}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{product.description || '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
+                        {symbol}
+                        {product.unit_price.toFixed(2)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600 dark:text-slate-400">
+                        {product.tax_rate ? `${product.tax_rate}%` : '—'}
+                      </td>
+                      {canManage && (
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <button onClick={() => startEdit(product)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                            Edit
+                          </button>
+                          <button onClick={() => handleDelete(product.id)} className="text-red-600 hover:text-red-500">
+                            Delete
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
               {products.map((product) => (
-                <tr key={product.id}>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{product.name}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{product.description || '—'}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
-                    {symbol}
-                    {product.unit_price.toFixed(2)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600 dark:text-slate-400">
-                    {product.tax_rate ? `${product.tax_rate}%` : '—'}
-                  </td>
+                <MobileListAccordion
+                  key={product.id}
+                  summary={
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate font-medium text-slate-900 dark:text-white">{product.name}</p>
+                      <p className="shrink-0 text-slate-900 dark:text-white">
+                        {symbol}
+                        {product.unit_price.toFixed(2)}
+                      </p>
+                    </div>
+                  }
+                >
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500 dark:text-slate-400">Description</dt>
+                    <dd className="text-right text-slate-900 dark:text-white">{product.description || '—'}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500 dark:text-slate-400">Tax</dt>
+                    <dd className="text-slate-900 dark:text-white">{product.tax_rate ? `${product.tax_rate}%` : '—'}</dd>
+                  </div>
                   {canManage && (
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <button onClick={() => startEdit(product)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                    <div className="flex gap-4 pt-1">
+                      <button onClick={() => startEdit(product)} className="text-indigo-600 hover:text-indigo-500">
                         Edit
                       </button>
                       <button onClick={() => handleDelete(product.id)} className="text-red-600 hover:text-red-500">
                         Delete
                       </button>
-                    </td>
+                    </div>
                   )}
-                </tr>
+                </MobileListAccordion>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 

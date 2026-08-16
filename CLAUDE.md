@@ -966,6 +966,32 @@ frontend stops holding/sending it.
   `pageInfo`) so `<Pagination>` only renders once a paginated response has
   actually come back (i.e. `pageInfo` stays `null` until a `page` param was
   sent and `totalPages` was present in the response).
+- `components/MobileListAccordion.jsx` — every list page's table
+  (`Invoices.jsx`, `Quotes.jsx`, `Clients.jsx`, `Products.jsx`,
+  `Expenses.jsx`, `RecurringInvoices.jsx`, `pages/Users.jsx`) renders
+  twice below the `sm` breakpoint's split: the existing `<table>`
+  unchanged, now wrapped in `hidden overflow-x-auto sm:block`, and a
+  second `sm:hidden` block that maps the same row data through
+  `MobileListAccordion` instead — one per row, each a native
+  `<details>/<summary>` (same convention as `components/Accordion.jsx`,
+  no JS breakpoint detection) collapsed to just the columns a user scans
+  the list by (e.g. invoice number + client name + status badge for
+  Invoices), expanding on tap to the row's remaining fields as `dt`/`dd`
+  pairs — the same visual pattern `InvoiceDetail.jsx`/`QuoteDetail.jsx`
+  already use for their own detail sections. This replaces relying on
+  horizontal scroll to read a wide table on a narrow screen. Any
+  interactive element placed inside a row's `summary` (the number/name
+  `Link`, a bulk-select checkbox) needs its own
+  `onClick={(e) => e.stopPropagation()}`, same reasoning as `Accordion`'s
+  own `action` prop — otherwise tapping it also toggles the row open/
+  closed. `Expenses.jsx`'s Total row (the desktop table's `<tfoot>`) has a
+  matching flex row rendered once below the mobile accordion list, not
+  per-row. Loading (`TableSkeleton`) and empty (`EmptyState`) states are
+  unchanged and shown at both breakpoints — only the *populated* list
+  gets the responsive split, wrapped in its own `overflow-x-auto` so a
+  brief loading flash can't cause a mobile horizontal scrollbar now that
+  the outer card container itself no longer carries `overflow-x-auto`
+  unconditionally.
 - `components/Modal.jsx` — the shared popup styling for every "New X" (and
   reused "Edit X") entry form: the same dimmed backdrop + centered white
   card treatment as `IdleTimeoutMonitor`'s "Still there?" warning, just

@@ -11,6 +11,7 @@ import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import BulkActionBar from '../../components/BulkActionBar';
+import MobileListAccordion from '../../components/MobileListAccordion';
 import { ExpenseIcon } from '../../components/icons';
 
 const EMPTY_FORM = { category: 'other', description: '', amount: '', expense_date: todayStr(), notes: '' };
@@ -252,9 +253,11 @@ export default function Expenses() {
         </form>
       </Modal>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
-          <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-24', 'w-24', 'w-40', 'w-20', 'w-16'] : ['w-24', 'w-24', 'w-40', 'w-20']} />
+          <div className="overflow-x-auto">
+            <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-24', 'w-24', 'w-40', 'w-20', 'w-16'] : ['w-24', 'w-24', 'w-40', 'w-20']} />
+          </div>
         ) : visibleExpenses.length === 0 ? (
           <EmptyState
             icon={<ExpenseIcon />}
@@ -263,68 +266,121 @@ export default function Expenses() {
             action={!search && canManage ? { label: 'New expense', onClick: startCreate } : undefined}
           />
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-            <thead>
-              <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                {canManage && (
-                  <th className="w-10 px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.size > 0 && selected.size === visibleExpenses.length}
-                      onChange={toggleSelectAll}
-                      aria-label="Select all expenses"
-                      className="h-4 w-4 rounded border-slate-300"
-                    />
-                  </th>
-                )}
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Description</th>
-                <th className="px-4 py-3 text-right">Amount</th>
-                {canManage && <th className="px-4 py-3" />}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {visibleExpenses.map((expense) => (
-                <tr key={expense.id} className={selected.has(expense.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : undefined}>
-                  {canManage && (
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(expense.id)}
-                        onChange={() => toggleSelected(expense.id)}
-                        aria-label={`Select ${expense.description}`}
-                        className="h-4 w-4 rounded border-slate-300"
-                      />
+          <>
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                    {canManage && (
+                      <th className="w-10 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selected.size > 0 && selected.size === visibleExpenses.length}
+                          onChange={toggleSelectAll}
+                          aria-label="Select all expenses"
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                      </th>
+                    )}
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3">Description</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                    {canManage && <th className="px-4 py-3" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {visibleExpenses.map((expense) => (
+                    <tr key={expense.id} className={selected.has(expense.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : undefined}>
+                      {canManage && (
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(expense.id)}
+                            onChange={() => toggleSelected(expense.id)}
+                            aria-label={`Select ${expense.description}`}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                        </td>
+                      )}
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{expense.expense_date}</td>
+                      <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600 dark:text-slate-400">{expense.category}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{expense.description}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{expense.amount.toFixed(2)}</td>
+                      {canManage && (
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <button onClick={() => startEdit(expense)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                            Edit
+                          </button>
+                          <button onClick={() => handleDelete(expense)} className="text-red-600 hover:text-red-500">
+                            Delete
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-slate-200 dark:border-slate-700">
+                    <td colSpan={canManage ? 4 : 3} className="px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">
+                      Total
                     </td>
-                  )}
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{expense.expense_date}</td>
-                  <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600 dark:text-slate-400">{expense.category}</td>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{expense.description}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{expense.amount.toFixed(2)}</td>
-                  {canManage && (
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <button onClick={() => startEdit(expense)} className="mr-3 text-indigo-600 hover:text-indigo-500">
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(expense)} className="text-red-600 hover:text-red-500">
-                        Delete
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-slate-200 dark:border-slate-700">
-                <td colSpan={canManage ? 4 : 3} className="px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">
-                  Total
-                </td>
-                <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">{total.toFixed(2)}</td>
-                {canManage && <td />}
-              </tr>
-            </tfoot>
-          </table>
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">{total.toFixed(2)}</td>
+                    {canManage && <td />}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="sm:hidden">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {visibleExpenses.map((expense) => (
+                  <MobileListAccordion
+                    key={expense.id}
+                    highlighted={selected.has(expense.id)}
+                    summary={
+                      <div className="flex items-center gap-3">
+                        {canManage && (
+                          <input
+                            type="checkbox"
+                            checked={selected.has(expense.id)}
+                            onChange={() => toggleSelected(expense.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Select ${expense.description}`}
+                            className="h-4 w-4 shrink-0 rounded border-slate-300"
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-slate-900 dark:text-white">{expense.description}</p>
+                          <p className="capitalize text-slate-500 dark:text-slate-400">{expense.category}</p>
+                        </div>
+                        <p className="shrink-0 text-slate-900 dark:text-white">{expense.amount.toFixed(2)}</p>
+                      </div>
+                    }
+                  >
+                    <div className="flex justify-between">
+                      <dt className="text-slate-500 dark:text-slate-400">Date</dt>
+                      <dd className="text-slate-900 dark:text-white">{expense.expense_date}</dd>
+                    </div>
+                    {canManage && (
+                      <div className="flex gap-4 pt-1">
+                        <button onClick={() => startEdit(expense)} className="text-indigo-600 hover:text-indigo-500">
+                          Edit
+                        </button>
+                        <button onClick={() => handleDelete(expense)} className="text-red-600 hover:text-red-500">
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </MobileListAccordion>
+                ))}
+              </div>
+              <div className="flex justify-between border-t border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900 dark:border-slate-700 dark:text-white">
+                <span>Total</span>
+                <span>{total.toFixed(2)}</span>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
