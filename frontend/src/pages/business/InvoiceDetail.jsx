@@ -70,6 +70,19 @@ export default function InvoiceDetail() {
     }
   }
 
+  // Opening the form pre-fills Amount with the invoice's current balance
+  // due — the common case is paying it off in full, and it's still a
+  // plain editable number for a partial payment. Only set on open (not
+  // close), so toggling the form shut and back open always re-syncs to
+  // the current balance rather than keeping whatever was last typed.
+  function togglePaymentForm() {
+    setShowPayment((v) => {
+      const opening = !v;
+      if (opening) setPayment((p) => ({ ...p, amount: invoice.balance_due.toFixed(2) }));
+      return opening;
+    });
+  }
+
   async function handleRecordPayment(e) {
     e.preventDefault();
     setError('');
@@ -218,7 +231,7 @@ export default function InvoiceDetail() {
             canManage &&
             invoice.balance_due > 0 && (
               <button
-                onClick={() => setShowPayment((v) => !v)}
+                onClick={togglePaymentForm}
                 className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500"
               >
                 Record payment

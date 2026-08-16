@@ -835,7 +835,14 @@ frontend stops holding/sending it.
   ("This invoice has been sent to the client / paid and can no longer be
   edited") — `Delete` is intentionally *not* gated by this, since deleting
   a sent-but-unpaid invoice is still allowed (governed separately by the
-  backend's "has recorded payments" guard). Any page that calls
+  backend's "has recorded payments" guard). `InvoiceDetail.jsx`'s "Record
+  payment" button (`togglePaymentForm`) pre-fills the form's Amount field
+  with `invoice.balance_due` each time the form is *opened* (not on
+  close) — paying off the full remaining balance is the common case, and
+  the field is still freely editable for a partial payment; the `max`
+  attribute already capped it at `balance_due` before this. Re-opening
+  after closing always re-syncs to the current balance rather than
+  leaving behind whatever was last typed. Any page that calls
   `api.settings.get()` for the currency-symbol fallback does so with a
   trailing `.catch(() => {})` — `settings` is its own gated module now, so
   a staff user without `settings:view` would otherwise leave an unhandled
@@ -1024,7 +1031,31 @@ frontend stops holding/sending it.
   a KPI or a rate means the same thing everywhere it's used, rather than
   each page inventing its own ad hoc card styling. `components/icons.jsx`
   is a small set of hand-rolled 20×20 outline icons (no icon-library
-  dependency) used inside `KpiCard`'s tinted circle.
+  dependency) used inside `KpiCard`'s tinted circle. Both pages' `money()`
+  calls (KPI values, `MeterBar`'s sub text, the recent-payments list) come
+  from the shared `lib/money.js` rather than a local per-page helper —
+  full two-decimal precision below one million, a compact `1.3m`/`2b`-
+  style suffix at or above it (trailing `.0` dropped, so a round number
+  reads `$2m` not `$2.0m`), sign kept in front of the currency symbol for
+  a negative value (e.g. a net loss). `RevenueTrendChart.jsx`'s own
+  `formatCompact()` (its y-axis tick labels) mirrors the same `k`/`m`
+  thresholds independently, since it formats a bare number the caller
+  prefixes with the currency symbol separately rather than taking one
+  through `lib/money.js`. This compacting is deliberately scoped to
+  Dashboard/Financials' own summary views (many large numbers shown
+  together, where 7-digit figures get hard to scan at a glance) — invoice/
+  quote/expense detail and list pages, PDFs, and CSV exports all keep full
+  precision, since those are reviewing one specific figure rather than
+  scanning several. `Financials.jsx`'s recent-payments table makes the
+  Receipt column a button (styled like the adjacent Invoice link) that
+  calls `api.invoices.openReceiptPdf(invoice_id, id, token)` — the same
+  download used on `InvoiceDetail.jsx`'s own payments list — rather than
+  plain text, so a receipt is one click away without navigating to the
+  invoice first. A failed download sets `error` without blanking the
+  already-loaded page (`if (error && !summary) return …` only short-
+  circuits before the initial load succeeds, matching the `error && !data`
+  pattern `QuoteDetail.jsx`/`InvoiceDetail.jsx` already use) — it renders
+  as an inline `<p>` near the top instead.
 - `pages/business/Reports.jsx` (route `/reports`, `Navbar.jsx` link gated
   on the same `financials` module as `/financials`) — a single from/to date
   range (`<input type="date">` pair, defaulting to `startOfMonthStr()`

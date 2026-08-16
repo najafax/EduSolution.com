@@ -10,11 +10,7 @@ import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import DashboardShortcutsEditor from '../components/DashboardShortcutsEditor';
 import { UsersIcon, InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, TrendUpIcon, TrendDownIcon } from '../components/icons';
-
-function money(symbol, value) {
-  const sign = value < 0 ? '-' : '';
-  return `${sign}${symbol}${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+import { money } from '../lib/money';
 
 const SHORTCUTS = [
   { to: '/clients', label: 'Clients', module: 'clients' },
@@ -148,10 +144,7 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center gap-4">
                         <span className="text-slate-500 dark:text-slate-400">{p.paid_at}</span>
-                        <span className="font-medium text-slate-900 dark:text-white">
-                          {symbol}
-                          {p.amount.toFixed(2)}
-                        </span>
+                        <span className="font-medium text-slate-900 dark:text-white">{money(symbol, p.amount)}</span>
                       </div>
                     </div>
                   ))}

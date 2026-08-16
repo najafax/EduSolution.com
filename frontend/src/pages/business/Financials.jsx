@@ -8,11 +8,7 @@ import MeterBar from '../../components/MeterBar';
 import RevenueTrendChart from '../../components/RevenueTrendChart';
 import StatusBreakdownChart from '../../components/StatusBreakdownChart';
 import { InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, ExpenseIcon, TrendUpIcon, TrendDownIcon } from '../../components/icons';
-
-function money(symbol, value) {
-  const sign = value < 0 ? '-' : '';
-  return `${sign}${symbol}${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+import { money } from '../../lib/money';
 
 export default function Financials() {
   const { token } = useAuth();
@@ -25,7 +21,16 @@ export default function Financials() {
     api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);
 
-  if (error) return <div className="px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6 lg:px-8">{error}</div>;
+  async function handleDownloadReceipt(invoiceId, paymentId) {
+    setError('');
+    try {
+      await api.invoices.openReceiptPdf(invoiceId, paymentId, token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  if (error && !summary) return <div className="px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6 lg:px-8">{error}</div>;
   if (!summary) return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">Loading…</div>;
 
   const symbol = settings?.currency_symbol || '$';
@@ -88,6 +93,8 @@ export default function Financials() {
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Financials</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">A live view of what's owed, what's been paid, and where you stand.</p>
 
+      {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
+
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
         {cards.map((card) => (
           <KpiCard key={card.key} label={card.label} value={card.value} sub={card.sub} icon={card.icon} tone={card.tone} />
@@ -136,7 +143,11 @@ export default function Financials() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {summary.recentPayments.map((p) => (
                     <tr key={p.id}>
-                      <td className="whitespace-nowrap px-6 py-3 font-medium text-slate-900 dark:text-white">{p.receipt_number}</td>
+                      <td className="whitespace-nowrap px-6 py-3 font-medium">
+                        <button type="button" onClick={() => handleDownloadReceipt(p.invoice_id, p.id)} className="text-indigo-600 hover:text-indigo-500">
+                          {p.receipt_number}
+                        </button>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <Link to={`/invoices/${p.invoice_id}`} className="text-indigo-600 hover:text-indigo-500">
                           {p.invoice_number}
