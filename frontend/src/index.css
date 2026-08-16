@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/* Manual dark-mode toggle (see context/ThemeContext.jsx): with this
+   variant registered, `dark:` classes activate off a `.dark` class on
+   <html> instead of only `prefers-color-scheme` — the class is what lets a
+   user's explicit Light/Dark choice override their OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Navbar's desktop link strip (components/Navbar.jsx): on narrow desktop
+   widths it can still be wider than the space it's given, and scrolls
+   internally rather than forcing the page to scroll horizontally. Default
+   overlay scrollbars are invisible at rest on most OSes, which makes that
+   internal scroll look like clipped/broken text instead of "more content
+   this way" — a always-visible thin bar makes it readable as an
+   intentional scroll strip instead. */
+.nav-links-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+.nav-links-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.nav-links-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(203 213 225);
+  border-radius: 9999px;
+}
+.dark .nav-links-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(71 85 105);
+}
