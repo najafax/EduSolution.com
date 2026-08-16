@@ -1,14 +1,16 @@
 import { useRef, useState } from 'react';
 import { useToast } from '../context/ToastContext';
 
-// Delete-with-a-few-seconds-to-undo, for both single-row and bulk delete
-// actions on list pages. The actual API call is delayed rather than fired
-// immediately: ids go into `pendingIds` (which callers filter their
-// rendered list by, so deleted-but-not-yet-committed rows disappear right
-// away) and a timer fires the real DELETE request after the toast's
-// window closes. Clicking "Undo" in that window just clears the timer and
-// un-hides the row(s) — no API call is ever made. This replaces the old
-// `confirm()` dialog: undo is a gentler safety net than a blocking prompt.
+// Delete-with-a-few-seconds-to-undo for a single-row delete action on a
+// list page. The actual API call is delayed rather than fired immediately:
+// the id goes into `pendingIds` (which callers filter their rendered list
+// by, so a deleted-but-not-yet-committed row disappears right away) and a
+// timer fires the real DELETE request after the toast's window closes.
+// Clicking "Undo" in that window just clears the timer and un-hides the
+// row — no API call is ever made. This replaces the old `confirm()`
+// dialog: undo is a gentler safety net than a blocking prompt.
+// `deleteWithUndo` still takes an array (originally shared with a now-
+// removed bulk-delete flow) — callers pass a single-element array.
 export function useUndoableDelete(removeOne) {
   const { toast } = useToast();
   const [pendingIds, setPendingIds] = useState(() => new Set());

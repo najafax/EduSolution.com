@@ -238,6 +238,7 @@ export default function Products() {
               {products.map((product) => (
                 <MobileListAccordion
                   key={product.id}
+                  name="products-list"
                   summary={
                     <div className="flex items-center justify-between gap-3">
                       <p className="min-w-0 truncate font-medium text-slate-900 dark:text-white">{product.name}</p>

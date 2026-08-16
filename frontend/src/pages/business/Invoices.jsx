@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { useUndoableDelete } from '../../lib/useUndoableDelete';
 import StatusBadge from '../../components/StatusBadge';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
@@ -10,7 +9,6 @@ import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
-import BulkActionBar from '../../components/BulkActionBar';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import { InvoiceIcon } from '../../components/icons';
@@ -36,10 +34,6 @@ export default function Invoices() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
-  const [selected, setSelected] = useState(() => new Set());
-
-  const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.invoices.remove(id, token));
-  const visibleInvoices = invoices.filter((i) => !pendingIds.has(i.id));
 
   useEffect(() => {
     setLoading(true);
@@ -55,9 +49,6 @@ export default function Invoices() {
   useEffect(() => {
     setPage(1);
   }, [search, status]);
-  useEffect(() => {
-    setSelected(new Set());
-  }, [invoices]);
 
   async function handleExport() {
     setError('');
@@ -66,25 +57,6 @@ export default function Invoices() {
     } catch (err) {
       setError(err.message);
     }
-  }
-
-  function handleBulkDelete() {
-    const ids = [...selected];
-    deleteWithUndo(ids, `${ids.length} invoice${ids.length === 1 ? '' : 's'} deleted.`);
-    setSelected(new Set());
-  }
-
-  function toggleSelected(id) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    setSelected((prev) => (prev.size === visibleInvoices.length ? new Set() : new Set(visibleInvoices.map((i) => i.id))));
   }
 
   return (
@@ -119,24 +91,12 @@ export default function Invoices() {
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      {canManage && (
-        <BulkActionBar count={selected.size} onClear={() => setSelected(new Set())}>
-          <button
-            type="button"
-            onClick={handleBulkDelete}
-            className="min-h-9 rounded-md border border-red-300 px-3 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
-          >
-            Delete
-          </button>
-        </BulkActionBar>
-      )}
-
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-28', 'w-32', 'w-24', 'w-20', 'w-20', 'w-20'] : ['w-28', 'w-32', 'w-24', 'w-20', 'w-20', 'w-20']} />
+            <TableSkeleton rows={5} cols={['w-28', 'w-32', 'w-24', 'w-20', 'w-20', 'w-20']} />
           </div>
-        ) : visibleInvoices.length === 0 ? (
+        ) : invoices.length === 0 ? (
           <EmptyState
             icon={<InvoiceIcon />}
             title={search || status ? 'No invoices match these filters.' : 'No invoices yet.'}
@@ -149,17 +109,6 @@ export default function Invoices() {
               <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                 <thead>
                   <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                    {canManage && (
-                      <th className="w-10 px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selected.size > 0 && selected.size === visibleInvoices.length}
-                          onChange={toggleSelectAll}
-                          aria-label="Select all invoices"
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                      </th>
-                    )}
                     <th className="px-4 py-3">Number</th>
                     <th className="px-4 py-3">Client</th>
                     <th className="px-4 py-3">Due</th>
@@ -169,19 +118,8 @@ export default function Invoices() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {visibleInvoices.map((invoice) => (
-                    <tr key={invoice.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800 ${selected.has(invoice.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : ''}`}>
-                      {canManage && (
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(invoice.id)}
-                            onChange={() => toggleSelected(invoice.id)}
-                            aria-label={`Select ${invoice.number}`}
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                        </td>
-                      )}
+                  {invoices.map((invoice) => (
+                    <tr key={invoice.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <td className="whitespace-nowrap px-4 py-3">
                         <Link to={`/invoices/${invoice.id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
                           {invoice.number}
@@ -201,22 +139,12 @@ export default function Invoices() {
             </div>
 
             <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
-              {visibleInvoices.map((invoice) => (
+              {invoices.map((invoice) => (
                 <MobileListAccordion
                   key={invoice.id}
-                  highlighted={selected.has(invoice.id)}
+                  name="invoices-list"
                   summary={
                     <div className="flex items-center gap-3">
-                      {canManage && (
-                        <input
-                          type="checkbox"
-                          checked={selected.has(invoice.id)}
-                          onChange={() => toggleSelected(invoice.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label={`Select ${invoice.number}`}
-                          className="h-4 w-4 shrink-0 rounded border-slate-300"
-                        />
-                      )}
                       <div className="min-w-0 flex-1">
                         <Link
                           to={`/invoices/${invoice.id}`}

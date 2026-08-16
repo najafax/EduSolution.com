@@ -408,6 +408,7 @@ export default function Users() {
               {users.map((u) => (
                 <MobileListAccordion
                   key={u.id}
+                  name="users-list"
                   summary={
                     <div className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">

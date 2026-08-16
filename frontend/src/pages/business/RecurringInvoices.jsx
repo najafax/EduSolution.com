@@ -365,6 +365,7 @@ export default function RecurringInvoices() {
               {recurring.map((row) => (
                 <MobileListAccordion
                   key={row.id}
+                  name="recurring-list"
                   summary={
                     <div className="flex items-center justify-between gap-3">
                       <p className="min-w-0 truncate font-medium text-slate-900 dark:text-white">{row.client_name}</p>

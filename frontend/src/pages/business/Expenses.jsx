@@ -10,7 +10,6 @@ import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
-import BulkActionBar from '../../components/BulkActionBar';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import { ExpenseIcon } from '../../components/icons';
 
@@ -32,7 +31,6 @@ export default function Expenses() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState(() => new Set());
 
   const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.expenses.remove(id, token));
   const visibleExpenses = expenses.filter((e) => !pendingIds.has(e.id));
@@ -55,9 +53,6 @@ export default function Expenses() {
   useEffect(() => {
     setPage(1);
   }, [search]);
-  useEffect(() => {
-    setSelected(new Set());
-  }, [expenses]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -102,25 +97,6 @@ export default function Expenses() {
     deleteWithUndo([expense.id], `"${expense.description}" deleted.`);
   }
 
-  function handleBulkDelete() {
-    const ids = [...selected];
-    deleteWithUndo(ids, `${ids.length} expense${ids.length === 1 ? '' : 's'} deleted.`);
-    setSelected(new Set());
-  }
-
-  function toggleSelected(id) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    setSelected((prev) => (prev.size === visibleExpenses.length ? new Set() : new Set(visibleExpenses.map((e) => e.id))));
-  }
-
   async function handleExport() {
     setError('');
     try {
@@ -157,18 +133,6 @@ export default function Expenses() {
       </div>
 
       {error && !showForm && <p className="mt-4 text-sm text-red-600">{error}</p>}
-
-      {canManage && (
-        <BulkActionBar count={selected.size} onClear={() => setSelected(new Set())}>
-          <button
-            type="button"
-            onClick={handleBulkDelete}
-            className="min-h-9 rounded-md border border-red-300 px-3 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
-          >
-            Delete
-          </button>
-        </BulkActionBar>
-      )}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit expense' : 'New expense'} maxWidthClass="max-w-2xl">
         <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
@@ -256,7 +220,7 @@ export default function Expenses() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-24', 'w-24', 'w-40', 'w-20', 'w-16'] : ['w-24', 'w-24', 'w-40', 'w-20']} />
+            <TableSkeleton rows={5} cols={canManage ? ['w-24', 'w-24', 'w-40', 'w-20', 'w-16'] : ['w-24', 'w-24', 'w-40', 'w-20']} />
           </div>
         ) : visibleExpenses.length === 0 ? (
           <EmptyState
@@ -271,17 +235,6 @@ export default function Expenses() {
               <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                 <thead>
                   <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                    {canManage && (
-                      <th className="w-10 px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selected.size > 0 && selected.size === visibleExpenses.length}
-                          onChange={toggleSelectAll}
-                          aria-label="Select all expenses"
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                      </th>
-                    )}
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">Category</th>
                     <th className="px-4 py-3">Description</th>
@@ -291,18 +244,7 @@ export default function Expenses() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {visibleExpenses.map((expense) => (
-                    <tr key={expense.id} className={selected.has(expense.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : undefined}>
-                      {canManage && (
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(expense.id)}
-                            onChange={() => toggleSelected(expense.id)}
-                            aria-label={`Select ${expense.description}`}
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                        </td>
-                      )}
+                    <tr key={expense.id}>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{expense.expense_date}</td>
                       <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600 dark:text-slate-400">{expense.category}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{expense.description}</td>
@@ -337,19 +279,9 @@ export default function Expenses() {
                 {visibleExpenses.map((expense) => (
                   <MobileListAccordion
                     key={expense.id}
-                    highlighted={selected.has(expense.id)}
+                    name="expenses-list"
                     summary={
                       <div className="flex items-center gap-3">
-                        {canManage && (
-                          <input
-                            type="checkbox"
-                            checked={selected.has(expense.id)}
-                            onChange={() => toggleSelected(expense.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Select ${expense.description}`}
-                            className="h-4 w-4 shrink-0 rounded border-slate-300"
-                          />
-                        )}
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-medium text-slate-900 dark:text-white">{expense.description}</p>
                           <p className="capitalize text-slate-500 dark:text-slate-400">{expense.category}</p>

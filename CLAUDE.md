@@ -979,12 +979,34 @@ frontend stops holding/sending it.
   Invoices), expanding on tap to the row's remaining fields as `dt`/`dd`
   pairs — the same visual pattern `InvoiceDetail.jsx`/`QuoteDetail.jsx`
   already use for their own detail sections. This replaces relying on
-  horizontal scroll to read a wide table on a narrow screen. Any
+  horizontal scroll to read a wide table on a narrow screen. Every row in
+  one rendered list shares a single `name` prop (e.g. `"invoices-list"`),
+  which the native `<details name>` behavior (Chrome/Edge 120+, Safari
+  17.2+, Firefox 125+) uses to keep at most one row open at a time within
+  that list — opening a row auto-closes whichever other row in the same
+  group was open, no JS state needed; each rendered list on a page (e.g.
+  `InvoiceDetail.jsx`'s Payments sub-table alongside its own Items list)
+  uses a distinct `name` so they don't cross-close each other. Any
   interactive element placed inside a row's `summary` (the number/name
-  `Link`, a bulk-select checkbox) needs its own
-  `onClick={(e) => e.stopPropagation()}`, same reasoning as `Accordion`'s
-  own `action` prop — otherwise tapping it also toggles the row open/
-  closed. `Expenses.jsx`'s Total row (the desktop table's `<tfoot>`) has a
+  `Link`) needs its own `onClick={(e) => e.stopPropagation()}`, same
+  reasoning as `Accordion`'s own `action` prop — otherwise tapping it also
+  toggles the row open/closed. There's deliberately no bulk-select
+  checkbox in any row's summary, desktop or mobile — `Invoices.jsx`,
+  `Quotes.jsx`, `Clients.jsx`, and `Expenses.jsx` used to have one (a
+  header "select all" checkbox, a per-row checkbox, and a `BulkActionBar`
+  with a bulk-delete button, backed by `lib/useUndoableDelete.js`), but
+  multi-select delete was removed outright — deleting is single-row only
+  now, via the existing per-row `Delete` button (`Clients.jsx`/
+  `Expenses.jsx`) or from the record's own detail page
+  (`Invoices.jsx`/`Quotes.jsx`, which never had a per-row list action to
+  begin with). `components/BulkActionBar.jsx` was deleted along with its
+  last caller. `lib/useUndoableDelete.js` itself is unrelated to bulk
+  specifically — it's the delete-with-a-few-seconds-to-undo pattern
+  `Clients.jsx`/`Expenses.jsx` still use for their single-row `Delete`
+  button, `deleteWithUndo(ids, label)` just happens to take an array
+  (originally shared with the now-removed bulk flow) that every remaining
+  caller passes as a single-element array.
+  `Expenses.jsx`'s Total row (the desktop table's `<tfoot>`) has a
   matching flex row rendered once below the mobile accordion list, not
   per-row. Loading (`TableSkeleton`) and empty (`EmptyState`) states are
   unchanged and shown at both breakpoints — only the *populated* list

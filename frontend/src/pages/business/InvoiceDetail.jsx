@@ -362,6 +362,7 @@ export default function InvoiceDetail() {
                 {payments.map((p) => (
                   <MobileListAccordion
                     key={p.id}
+                    name="invoice-payments"
                     summary={
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">

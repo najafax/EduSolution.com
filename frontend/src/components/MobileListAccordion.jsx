@@ -6,16 +6,23 @@
 // scans the list by, e.g. number + client) that expands on tap to show
 // the row's remaining fields. Built on native <details>/<summary>, the
 // same convention as components/Accordion.jsx (no JS breakpoint
-// detection), but per-row instead of per-page-section, so each row opens
-// and closes independently of the others.
+// detection), but per-row instead of per-page-section.
 //
-// Any interactive element placed inside `summary` (a Link, a checkbox)
-// needs its own `onClick={(e) => e.stopPropagation()}` — otherwise
-// tapping it also toggles the accordion, same as the `action` prop on
-// components/Accordion.jsx.
-export default function MobileListAccordion({ summary, children, highlighted = false }) {
+// `name` groups every row in one rendered list into a single exclusive-
+// open set via the native <details name> behavior (Chrome/Edge 120+,
+// Safari 17.2+, Firefox 125+) — opening one row auto-closes whichever
+// other row in the same group was open, no JS state needed. Callers pass
+// one fixed string per rendered list (e.g. "invoices-list") so a page
+// with more than one list (or sub-table) on screen doesn't accidentally
+// group rows that belong to different lists together.
+//
+// Any interactive element placed inside `summary` (e.g. a Link to the
+// row's detail page) needs its own `onClick={(e) => e.stopPropagation()}`
+// — otherwise tapping it also toggles the accordion, same as the `action`
+// prop on components/Accordion.jsx.
+export default function MobileListAccordion({ summary, children, name }) {
   return (
-    <details className={`group ${highlighted ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : ''}`}>
+    <details name={name} className="group">
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0 flex-1">{summary}</div>
         <svg

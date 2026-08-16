@@ -9,7 +9,6 @@ import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
-import BulkActionBar from '../../components/BulkActionBar';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import { UsersIcon } from '../../components/icons';
 
@@ -29,7 +28,6 @@ export default function Clients() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState(() => new Set());
 
   const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.clients.remove(id, token));
   const visibleClients = clients.filter((c) => !pendingIds.has(c.id));
@@ -50,9 +48,6 @@ export default function Clients() {
   useEffect(() => {
     setPage(1);
   }, [search]);
-  useEffect(() => {
-    setSelected(new Set());
-  }, [clients]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -97,25 +92,6 @@ export default function Clients() {
     deleteWithUndo([client.id], `"${client.name}" deleted.`);
   }
 
-  function handleBulkDelete() {
-    const ids = [...selected];
-    deleteWithUndo(ids, `${ids.length} client${ids.length === 1 ? '' : 's'} deleted.`);
-    setSelected(new Set());
-  }
-
-  function toggleSelected(id) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    setSelected((prev) => (prev.size === visibleClients.length ? new Set() : new Set(visibleClients.map((c) => c.id))));
-  }
-
   async function handleExport() {
     setError('');
     try {
@@ -153,18 +129,6 @@ export default function Clients() {
 
       {error && !showForm && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      {canManage && (
-        <BulkActionBar count={selected.size} onClear={() => setSelected(new Set())}>
-          <button
-            type="button"
-            onClick={handleBulkDelete}
-            className="min-h-9 rounded-md border border-red-300 px-3 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
-          >
-            Delete
-          </button>
-        </BulkActionBar>
-      )}
-
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit client' : 'New client'} maxWidthClass="max-w-2xl">
         <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
           {error && (
@@ -201,7 +165,7 @@ export default function Clients() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-32', 'w-40', 'w-24', 'w-16'] : ['w-32', 'w-40', 'w-24']} />
+            <TableSkeleton rows={5} cols={canManage ? ['w-32', 'w-40', 'w-24', 'w-16'] : ['w-32', 'w-40', 'w-24']} />
           </div>
         ) : visibleClients.length === 0 ? (
           <EmptyState
@@ -216,17 +180,6 @@ export default function Clients() {
               <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                 <thead>
                   <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                    {canManage && (
-                      <th className="w-10 px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selected.size > 0 && selected.size === visibleClients.length}
-                          onChange={toggleSelectAll}
-                          aria-label="Select all clients"
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                      </th>
-                    )}
                     <th className="px-4 py-3">Client</th>
                     <th className="px-4 py-3">Email</th>
                     <th className="px-4 py-3">Phone</th>
@@ -235,18 +188,7 @@ export default function Clients() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {visibleClients.map((client) => (
-                    <tr key={client.id} className={selected.has(client.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : undefined}>
-                      {canManage && (
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(client.id)}
-                            onChange={() => toggleSelected(client.id)}
-                            aria-label={`Select ${client.name}`}
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                        </td>
-                      )}
+                    <tr key={client.id}>
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{client.name}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.email}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.phone || '—'}</td>
@@ -270,19 +212,9 @@ export default function Clients() {
               {visibleClients.map((client) => (
                 <MobileListAccordion
                   key={client.id}
-                  highlighted={selected.has(client.id)}
+                  name="clients-list"
                   summary={
                     <div className="flex items-center gap-3">
-                      {canManage && (
-                        <input
-                          type="checkbox"
-                          checked={selected.has(client.id)}
-                          onChange={() => toggleSelected(client.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label={`Select ${client.name}`}
-                          className="h-4 w-4 shrink-0 rounded border-slate-300"
-                        />
-                      )}
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-slate-900 dark:text-white">{client.name}</p>
                         <p className="truncate text-slate-500 dark:text-slate-400">{client.email}</p>

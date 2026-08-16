@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { useUndoableDelete } from '../../lib/useUndoableDelete';
 import StatusBadge from '../../components/StatusBadge';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
@@ -10,7 +9,6 @@ import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
-import BulkActionBar from '../../components/BulkActionBar';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import { InvoiceIcon } from '../../components/icons';
@@ -37,10 +35,6 @@ export default function Quotes() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
-  const [selected, setSelected] = useState(() => new Set());
-
-  const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.quotes.remove(id, token));
-  const visibleQuotes = quotes.filter((q) => !pendingIds.has(q.id));
 
   useEffect(() => {
     setLoading(true);
@@ -56,9 +50,6 @@ export default function Quotes() {
   useEffect(() => {
     setPage(1);
   }, [search, status]);
-  useEffect(() => {
-    setSelected(new Set());
-  }, [quotes]);
 
   async function handleExport() {
     setError('');
@@ -67,25 +58,6 @@ export default function Quotes() {
     } catch (err) {
       setError(err.message);
     }
-  }
-
-  function handleBulkDelete() {
-    const ids = [...selected];
-    deleteWithUndo(ids, `${ids.length} quote${ids.length === 1 ? '' : 's'} deleted.`);
-    setSelected(new Set());
-  }
-
-  function toggleSelected(id) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    setSelected((prev) => (prev.size === visibleQuotes.length ? new Set() : new Set(visibleQuotes.map((q) => q.id))));
   }
 
   return (
@@ -120,24 +92,12 @@ export default function Quotes() {
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      {canManage && (
-        <BulkActionBar count={selected.size} onClear={() => setSelected(new Set())}>
-          <button
-            type="button"
-            onClick={handleBulkDelete}
-            className="min-h-9 rounded-md border border-red-300 px-3 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
-          >
-            Delete
-          </button>
-        </BulkActionBar>
-      )}
-
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={canManage ? ['w-8', 'w-28', 'w-32', 'w-24', 'w-20', 'w-20'] : ['w-28', 'w-32', 'w-24', 'w-20', 'w-20']} />
+            <TableSkeleton rows={5} cols={['w-28', 'w-32', 'w-24', 'w-20', 'w-20']} />
           </div>
-        ) : visibleQuotes.length === 0 ? (
+        ) : quotes.length === 0 ? (
           <EmptyState
             icon={<InvoiceIcon />}
             title={search || status ? 'No quotes match these filters.' : 'No quotes yet.'}
@@ -150,17 +110,6 @@ export default function Quotes() {
               <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                 <thead>
                   <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                    {canManage && (
-                      <th className="w-10 px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selected.size > 0 && selected.size === visibleQuotes.length}
-                          onChange={toggleSelectAll}
-                          aria-label="Select all quotes"
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                      </th>
-                    )}
                     <th className="px-4 py-3">Number</th>
                     <th className="px-4 py-3">Client</th>
                     <th className="px-4 py-3">Issued</th>
@@ -169,19 +118,8 @@ export default function Quotes() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {visibleQuotes.map((quote) => (
-                    <tr key={quote.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800 ${selected.has(quote.id) ? 'bg-indigo-50/50 dark:bg-indigo-950/30' : ''}`}>
-                      {canManage && (
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(quote.id)}
-                            onChange={() => toggleSelected(quote.id)}
-                            aria-label={`Select ${quote.number}`}
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                        </td>
-                      )}
+                  {quotes.map((quote) => (
+                    <tr key={quote.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <td className="whitespace-nowrap px-4 py-3">
                         <Link to={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
                           {quote.number}
@@ -200,22 +138,12 @@ export default function Quotes() {
             </div>
 
             <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
-              {visibleQuotes.map((quote) => (
+              {quotes.map((quote) => (
                 <MobileListAccordion
                   key={quote.id}
-                  highlighted={selected.has(quote.id)}
+                  name="quotes-list"
                   summary={
                     <div className="flex items-center gap-3">
-                      {canManage && (
-                        <input
-                          type="checkbox"
-                          checked={selected.has(quote.id)}
-                          onChange={() => toggleSelected(quote.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label={`Select ${quote.number}`}
-                          className="h-4 w-4 shrink-0 rounded border-slate-300"
-                        />
-                      )}
                       <div className="min-w-0 flex-1">
                         <Link
                           to={`/quotes/${quote.id}`}
