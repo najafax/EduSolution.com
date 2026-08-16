@@ -10,6 +10,7 @@ const { invoiceSendEmail, invoiceRemindEmail, receiptSendEmail } = require('../l
 const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
+const { renewLicense } = require('../lib/licenseRenewal');
 
 const router = Router();
 router.use(requireAuth);
@@ -471,7 +472,39 @@ router.post('/:id/payments', manage, (req, res) => {
 
   const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(result.lastInsertRowid);
   logActivity({ userName: req.user.name, action: 'recorded payment for', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: `${data.invoice.number} (${receiptNumber})` });
-  res.status(201).json({ payment, invoice: getInvoiceWithItems(req.params.id).invoice });
+
+  // Auto-renew any of this client's active licenses that this invoice was
+  // actually billing for — matched by a line item description naming the
+  // license exactly (trimmed, case-insensitive), not just "client has an
+  // invoice," so an unrelated invoice for the same client never touches a
+  // license it didn't bill. Only fires the moment the invoice is fully
+  // paid (newStatus === 'paid'), not on a partial payment — mirrors the
+  // "once they've paid, renew it" framing the manual Renew button already
+  // uses. Reuses the exact same renewLicense() the manual Renew button and
+  // routes/licenses.js's POST /:id/renew call, so an auto-renewal writes
+  // the same license_renewals row and resets last_reminder_sent_at
+  // identically to a human clicking "Renew".
+  const autoRenewedLicenses = [];
+  if (newStatus === 'paid') {
+    const descriptions = new Set(data.items.map((item) => (item.description || '').trim().toLowerCase()).filter(Boolean));
+    if (descriptions.size > 0) {
+      const clientLicenses = db.prepare("SELECT * FROM licenses WHERE client_id = ? AND status = 'active'").all(data.invoice.client_id);
+      for (const license of clientLicenses) {
+        if (!descriptions.has(license.name.trim().toLowerCase())) continue;
+        const nextExpiry = renewLicense(license, req.user.name);
+        logActivity({
+          userName: req.user.name,
+          action: 'auto-renewed via invoice payment for',
+          entityType: 'license',
+          entityId: license.id,
+          entityLabel: `${license.name} (${data.client.name}) → ${nextExpiry}`,
+        });
+        autoRenewedLicenses.push({ id: license.id, name: license.name, expiry_date: nextExpiry });
+      }
+    }
+  }
+
+  res.status(201).json({ payment, invoice: getInvoiceWithItems(req.params.id).invoice, autoRenewedLicenses });
 });
 
 router.get('/:id/payments/:paymentId/pdf', view, async (req, res) => {

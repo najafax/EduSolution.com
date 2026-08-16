@@ -6,6 +6,7 @@ const { parseCsv } = require('../lib/csv');
 const { computeTotals } = require('../lib/totals');
 const { invoiceNumberForYear, quoteNumberForYear, receiptNumberForYear } = require('../lib/numbering');
 const { logActivity } = require('../lib/activity');
+const { advanceExpiry } = require('../lib/licenseRenewal');
 
 const router = Router();
 router.use(requireAuth);
@@ -24,20 +25,6 @@ const LICENSE_STATUSES = ['active', 'cancelled'];
 function addDays(dateStr, days) {
   const d = new Date(`${dateStr}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-// Same month-end-clamped billing-cycle math as routes/licenses.js's own
-// advanceExpiry() (e.g. Jan 31 + monthly clamps to Feb 28/29 instead of
-// rolling into March) — duplicated here rather than imported, same
-// acceptable-duplication call as EXPENSE_CATEGORIES below. Only used to
-// default a blank expiry_date to start_date + one billing cycle.
-function advanceByCycle(dateStr, cycle) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  const originalDay = d.getDate();
-  if (cycle === 'yearly') d.setFullYear(d.getFullYear() + 1);
-  else d.setMonth(d.getMonth() + 1);
-  if (d.getDate() !== originalDay) d.setDate(0);
   return d.toISOString().slice(0, 10);
 }
 
@@ -616,7 +603,7 @@ function validateLicenseRow(row, clientsByEmail, clientsByName, dateFormat) {
   // Matches routes/licenses.js's own form default: an unspecified expiry is
   // one billing cycle after the start date.
   const expiryDateRaw = (row.expiry_date || '').trim();
-  const expiryDate = expiryDateRaw ? normalizeDate(expiryDateRaw, dateFormat) : advanceByCycle(startDate, billingCycle);
+  const expiryDate = expiryDateRaw ? normalizeDate(expiryDateRaw, dateFormat) : advanceExpiry(startDate, billingCycle);
   if (!expiryDate) return { ok: false, message: 'expiry_date must be a valid date (e.g. YYYY-MM-DD)' };
   if (expiryDate < startDate) return { ok: false, message: 'expiry_date cannot be before start_date' };
 

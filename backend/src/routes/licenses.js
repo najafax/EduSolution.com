@@ -6,6 +6,7 @@ const { licenseRemindEmail } = require('../lib/emailTemplates');
 const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
+const { renewLicense } = require('../lib/licenseRenewal');
 
 const router = Router();
 router.use(requireAuth);
@@ -39,19 +40,6 @@ function withComputed(license) {
     else if (license.expiry_date <= warningDate()) displayStatus = 'expiring_soon';
   }
   return { ...license, display_status: displayStatus };
-}
-
-function advanceExpiry(dateStr, cycle) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  const originalDay = d.getDate();
-  if (cycle === 'yearly') d.setFullYear(d.getFullYear() + 1);
-  else d.setMonth(d.getMonth() + 1); // monthly, the default
-  // setMonth/setFullYear roll into the next month when the anchor day
-  // doesn't exist in the target month (e.g. Jan 31 -> Mar 3) — clamp back
-  // to the target month's last day instead, same fix lib/scheduler.js's
-  // own advanceDate() applies for recurring invoices.
-  if (d.getDate() !== originalDay) d.setDate(0);
-  return d.toISOString().slice(0, 10);
 }
 
 const PAGE_SIZE = 20;
@@ -238,17 +226,7 @@ router.post('/:id/renew', manage, (req, res) => {
     return res.status(409).json({ error: 'This license is cancelled and cannot be renewed' });
   }
 
-  const base = existing.expiry_date > today() ? existing.expiry_date : today();
-  const nextExpiry = advanceExpiry(base, existing.billing_cycle);
-
-  db.transaction(() => {
-    db.prepare(
-      `UPDATE licenses SET expiry_date = ?, last_renewed_at = datetime('now'), last_reminder_sent_at = NULL, updated_at = datetime('now') WHERE id = ?`,
-    ).run(nextExpiry, req.params.id);
-    db.prepare(
-      `INSERT INTO license_renewals (license_id, previous_expiry_date, new_expiry_date, renewed_by_name) VALUES (?, ?, ?, ?)`,
-    ).run(req.params.id, existing.expiry_date, nextExpiry, req.user.name);
-  })();
+  const nextExpiry = renewLicense(existing, req.user.name);
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id));
   logActivity({ userName: req.user.name, action: 'renewed', entityType: 'license', entityId: license.id, entityLabel: `${existing.name} (${existing.client_name}) → ${nextExpiry}` });

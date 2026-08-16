@@ -89,10 +89,11 @@ export default function InvoiceDetail() {
     setError('');
     setBusy(true);
     try {
-      await api.invoices.recordPayment(id, { ...payment, amount: Number(payment.amount) }, token);
+      const result = await api.invoices.recordPayment(id, { ...payment, amount: Number(payment.amount) }, token);
       setShowPayment(false);
       setPayment({ amount: '', method: 'bank_transfer', reference: '', notes: '', paid_at: todayStr() });
-      setNotice('Payment recorded.');
+      const renewedNames = (result.autoRenewedLicenses || []).map((l) => l.name);
+      setNotice(renewedNames.length > 0 ? `Payment recorded. Also renewed: ${renewedNames.join(', ')}.` : 'Payment recorded.');
       load();
     } catch (err) {
       setError(err.message);
