@@ -279,7 +279,30 @@ are deliberately untouched by either, always returning every row.
   `draft` is always editable. This only blocks the edit route itself —
   `/duplicate` (which creates a fresh draft copy) and recording a payment
   are unaffected, and deletion is still governed separately by the
-  existing "has recorded payments" guard below.
+  existing "has recorded payments" guard below. **Invoices only**, also:
+  `POST /:id/void` is the actual way an invoice becomes `void` — a
+  dedicated action route rather than a `status` value on the generic
+  `PUT /:id` above, because that route already 409s once `status` is
+  `sent`/`paid`, but voiding is precisely the escape hatch a *sent*
+  invoice needs (cancel a mistake, e.g. a client backed out) — it has to
+  work exactly where `PUT` refuses to. (`PUT /:id` still technically
+  accepts `status: 'void'` in its body too, but since it's blocked for
+  `sent`/`paid` invoices and the frontend never sends a `status` field at
+  all, that path is effectively dead — `POST /:id/void` is the only route
+  that matters in practice.) Blocked with 409 if the invoice is already
+  `void`, already `paid` (voiding real money needs a refund process, not a
+  status flip), or has *any* recorded payment at all — mirrors the
+  DELETE guard's "has recorded payments" check, so a partially-paid sent
+  invoice can't have its payments silently orphaned by voiding it.
+  Voiding also has ripple effects on the other invoice actions, all
+  enforced server-side: `POST /:id/send` and `POST /:id/remind` both 409
+  on a `void` invoice (there's no reason to email or nag a client about a
+  cancelled invoice), and `POST /:id/payments` already rejected `void`
+  the same as `draft` before this feature existed. A voided invoice is
+  excluded from `routes/financials.js`'s summary and the sales/tax PDF
+  reports in `routes/reports.js` (both filter `status != 'void'`), the
+  same way those already excluded nothing else — void is the only status
+  either of them filters out.
 - **Email preview before sending**: every client-facing email this app
   sends from a button click (not the automated overdue-reminder digest —
   see `lib/scheduler.js` below, which stays fully automatic) goes through
@@ -929,7 +952,20 @@ frontend stops holding/sending it.
   ("This invoice has been sent to the client / paid and can no longer be
   edited") — `Delete` is intentionally *not* gated by this, since deleting
   a sent-but-unpaid invoice is still allowed (governed separately by the
-  backend's "has recorded payments" guard). `InvoiceDetail.jsx`'s "Record
+  backend's "has recorded payments" guard). A separate `canVoid` check
+  (`status` is `draft` or `sent`, and `amount_paid === 0`) mirrors the
+  backend's `POST /:id/void` guard exactly, so the "Void" button never
+  shows for a click that would just 409 — it's deliberately independent of
+  `isLocked`/`canManage && !isLocked`, since voiding a `sent` invoice is
+  the one action allowed precisely where editing is locked. Voiding
+  `confirm()`s, then calls `api.invoices.void` and reloads; a
+  `status === 'void'` notice ("excluded from financial totals and
+  reports") renders next to the existing locked-status one. "Email to
+  client", "Send reminder", and the Payments card's "Record payment"
+  action are all additionally gated on `invoice.status !== 'void'` (the
+  first two on top of their own existing conditions) — voiding a client's
+  invoice shouldn't leave buttons around that would just error against the
+  backend guards described above. `InvoiceDetail.jsx`'s "Record
   payment" button (`togglePaymentForm`) pre-fills the form's Amount field
   with `invoice.balance_due` each time the form is *opened* (not on
   close) — paying off the full remaining balance is the common case, and

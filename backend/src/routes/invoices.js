@@ -258,6 +258,35 @@ router.delete('/:id', manage, (req, res) => {
   res.status(204).end();
 });
 
+// Cancels an invoice without deleting it — a void invoice is excluded from
+// financial totals/reports (see routes/financials.js, routes/reports.js)
+// but the record itself stays, unlike DELETE above. Deliberately its own
+// action route rather than a status value on PUT /:id: that route already
+// 409s once status is 'sent'/'paid' (a delivered/settled document can't be
+// edited), but voiding is exactly the escape hatch a sent invoice needs —
+// it has to work precisely where PUT refuses to. Only blocked when the
+// invoice is already void, already paid (voiding paid money needs a real
+// refund process, not a status flip), or has any recorded payments at all
+// (mirrors the DELETE guard above — a partially-paid invoice can't just
+// have its payments silently orphaned by voiding it).
+router.post('/:id/void', manage, (req, res) => {
+  const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Invoice not found' });
+  if (existing.status === 'void') {
+    return res.status(409).json({ error: 'This invoice is already void' });
+  }
+  if (existing.status === 'paid') {
+    return res.status(409).json({ error: 'This invoice has already been paid and cannot be voided' });
+  }
+  if (existing.amount_paid > 0) {
+    return res.status(409).json({ error: 'This invoice has recorded payments and cannot be voided' });
+  }
+
+  db.prepare(`UPDATE invoices SET status = 'void', updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
+  logActivity({ userName: req.user.name, action: 'voided', entityType: 'invoice', entityId: existing.id, entityLabel: existing.number });
+  res.json(getInvoiceWithItems(req.params.id));
+});
+
 router.get('/:id/pdf', view, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
@@ -286,6 +315,9 @@ router.get('/:id/send-preview', manage, (req, res) => {
 router.post('/:id/send', manage, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  if (data.invoice.status === 'void') {
+    return res.status(409).json({ error: 'This invoice has been voided and cannot be sent' });
+  }
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
 
   const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
@@ -325,6 +357,9 @@ router.get('/:id/remind-preview', manage, (req, res) => {
 router.post('/:id/remind', manage, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  if (data.invoice.status === 'void') {
+    return res.status(409).json({ error: 'This invoice has been voided' });
+  }
   if (data.invoice.balance_due <= 0) {
     return res.status(409).json({ error: 'This invoice is already fully paid' });
   }

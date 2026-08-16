@@ -110,12 +110,33 @@ export default function InvoiceDetail() {
     }
   }
 
+  async function handleVoid() {
+    if (!confirm('Void this invoice? It will be excluded from financial totals and can no longer be sent, edited, or paid.')) return;
+    setError('');
+    setBusy(true);
+    try {
+      await api.invoices.void(id, token);
+      setNotice('Invoice voided.');
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (error && !data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
   if (!data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
 
   const { invoice, items, client, payments } = data;
   const symbol = settings?.currency_symbol || '$';
   const isLocked = invoice.status === 'sent' || invoice.status === 'paid';
+  // Mirrors the backend's POST /:id/void guard (routes/invoices.js) so the
+  // button never shows for a case that would just 409 — void is reachable
+  // from draft or sent (unlike Edit, which locks once sent), but not once
+  // paid, already void, or partially paid (amount_paid > 0 would silently
+  // orphan a recorded payment on a "this doesn't count" invoice).
+  const canVoid = (invoice.status === 'draft' || invoice.status === 'sent') && invoice.amount_paid === 0;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -135,12 +156,12 @@ export default function InvoiceDetail() {
           <button onClick={handleDownload} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
             Download PDF
           </button>
-          {canManage && (
+          {canManage && invoice.status !== 'void' && (
             <button onClick={() => setEmailModal({ type: 'send' })} disabled={busy} className="min-h-11 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
               Email to client
             </button>
           )}
-          {canManage && invoice.balance_due > 0 && (
+          {canManage && invoice.status !== 'void' && invoice.balance_due > 0 && (
             <button onClick={() => setEmailModal({ type: 'remind' })} disabled={busy} className="min-h-11 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950">
               Send reminder
             </button>
@@ -148,6 +169,11 @@ export default function InvoiceDetail() {
           {canManage && (
             <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
               Duplicate
+            </button>
+          )}
+          {canManage && canVoid && (
+            <button onClick={handleVoid} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              Void
             </button>
           )}
           {canManage && (
@@ -164,6 +190,11 @@ export default function InvoiceDetail() {
         <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
           This invoice has been {invoice.status === 'paid' ? 'paid' : 'sent to the client'} and can no longer be
           edited.
+        </p>
+      )}
+      {invoice.status === 'void' && (
+        <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          This invoice has been voided and is excluded from financial totals and reports.
         </p>
       )}
       {invoice.last_reminder_sent_at && (
@@ -273,6 +304,7 @@ export default function InvoiceDetail() {
           title="Payments"
           action={
             canManage &&
+            invoice.status !== 'void' &&
             invoice.balance_due > 0 && (
               <button
                 onClick={togglePaymentForm}

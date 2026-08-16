@@ -127,6 +127,7 @@ export const api = {
     remindPreview: (id, token) => request(`/invoices/${id}/remind-preview`, { token }),
     remind: (id, payload, token) => request(`/invoices/${id}/remind`, { method: 'POST', body: payload, token }),
     duplicate: (id, token) => request(`/invoices/${id}/duplicate`, { method: 'POST', token }),
+    void: (id, token) => request(`/invoices/${id}/void`, { method: 'POST', token }),
     recordPayment: (id, payload, token) =>
       request(`/invoices/${id}/payments`, { method: 'POST', body: payload, token }),
     receiptPreview: (id, paymentId, token) =>
