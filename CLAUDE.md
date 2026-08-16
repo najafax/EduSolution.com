@@ -1005,7 +1005,17 @@ frontend stops holding/sending it.
   sub-table *does* still get the full `MobileListAccordion` treatment
   (receipt/date/amount summary, Method + Download/Email actions in the
   expanded body) since it has real detail worth collapsing behind a tap,
-  same as the top-level list pages.
+  same as the top-level list pages. **This split is the standing
+  convention for every table in the app, not a one-time cleanup** — any
+  new `<table>` (a new list page, a new sub-table on a detail page) needs
+  the same `hidden overflow-x-auto sm:block` desktop wrapper plus a
+  `sm:hidden` mobile counterpart rendered from the same row data, not a
+  bare table left to horizontal-scroll on narrow screens. Pick
+  `MobileListAccordion` when a row has real detail worth collapsing behind
+  a tap (the common case — most rows have more fields than fit in a
+  one-line summary); use a plain stacked-card list only when every column
+  is already essential and short enough to show at once with nothing left
+  to hide (the Items-table case above is the only current example).
 - `components/Modal.jsx` — the shared popup styling for every "New X" (and
   reused "Edit X") entry form: the same dimmed backdrop + centered white
   card treatment as `IdleTimeoutMonitor`'s "Still there?" warning, just
