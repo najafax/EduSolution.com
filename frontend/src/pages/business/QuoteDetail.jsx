@@ -175,27 +175,42 @@ export default function QuoteDetail() {
 
       <div className="mt-6">
         <Accordion title="Items">
-          <div className="-mx-6 overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-              <thead>
-                <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                  <th className="px-6 py-3">Description</th>
-                  <th className="px-4 py-3 text-right">Qty</th>
-                  <th className="px-4 py-3 text-right">Unit price</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-6 py-3 dark:text-white">{item.description}</td>
-                    <td className="px-4 py-3 text-right dark:text-white">{item.quantity}</td>
-                    <td className="px-4 py-3 text-right dark:text-white">{symbol}{item.unit_price.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right dark:text-white">{symbol}{item.amount.toFixed(2)}</td>
+          <div className="-mx-6">
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                    <th className="px-6 py-3">Description</th>
+                    <th className="px-4 py-3 text-right">Qty</th>
+                    <th className="px-4 py-3 text-right">Unit price</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {items.map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-6 py-3 dark:text-white">{item.description}</td>
+                      <td className="px-4 py-3 text-right dark:text-white">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right dark:text-white">{symbol}{item.unit_price.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right dark:text-white">{symbol}{item.amount.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-slate-100 text-sm sm:hidden dark:divide-slate-800">
+              {items.map((item) => (
+                <div key={item.id} className="flex items-start justify-between gap-3 px-6 py-3">
+                  <div className="min-w-0">
+                    <p className="text-slate-900 dark:text-white">{item.description}</p>
+                    <p className="text-slate-500 dark:text-slate-400">{item.quantity} × {symbol}{item.unit_price.toFixed(2)}</p>
+                  </div>
+                  <p className="shrink-0 font-medium text-slate-900 dark:text-white">{symbol}{item.amount.toFixed(2)}</p>
+                </div>
+              ))}
+            </div>
+
             <div className="border-t border-slate-200 px-6 py-3 text-right text-sm dark:border-slate-700">
               <p className="text-slate-600 dark:text-slate-400">Subtotal: {symbol}{quote.subtotal.toFixed(2)}</p>
               {quote.discount_amount > 0 && (

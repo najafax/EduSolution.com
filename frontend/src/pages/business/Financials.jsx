@@ -9,6 +9,7 @@ import RevenueTrendChart from '../../components/RevenueTrendChart';
 import StatusBreakdownChart from '../../components/StatusBreakdownChart';
 import { InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, ExpenseIcon, TrendUpIcon, TrendDownIcon } from '../../components/icons';
 import { money } from '../../lib/money';
+import MobileListAccordion from '../../components/MobileListAccordion';
 
 export default function Financials() {
   const { token } = useAuth();
@@ -129,38 +130,80 @@ export default function Financials() {
           {summary.recentPayments.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">No payments recorded yet.</p>
           ) : (
-            <div className="-mx-6 overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-                <thead>
-                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                    <th className="px-6 py-3">Receipt</th>
-                    <th className="px-4 py-3">Invoice</th>
-                    <th className="px-4 py-3">Client</th>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {summary.recentPayments.map((p) => (
-                    <tr key={p.id}>
-                      <td className="whitespace-nowrap px-6 py-3 font-medium">
-                        <button type="button" onClick={() => handleDownloadReceipt(p.invoice_id, p.id)} className="text-indigo-600 hover:text-indigo-500">
+            <>
+              <div className="-mx-6 hidden overflow-x-auto sm:block">
+                <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                  <thead>
+                    <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                      <th className="px-6 py-3">Receipt</th>
+                      <th className="px-4 py-3">Invoice</th>
+                      <th className="px-4 py-3">Client</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {summary.recentPayments.map((p) => (
+                      <tr key={p.id}>
+                        <td className="whitespace-nowrap px-6 py-3 font-medium">
+                          <button type="button" onClick={() => handleDownloadReceipt(p.invoice_id, p.id)} className="text-indigo-600 hover:text-indigo-500">
+                            {p.receipt_number}
+                          </button>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <Link to={`/invoices/${p.invoice_id}`} className="text-indigo-600 hover:text-indigo-500">
+                            {p.invoice_number}
+                          </Link>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.client_name}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.paid_at}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{money(symbol, p.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="-mx-6 divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+                {summary.recentPayments.map((p) => (
+                  <MobileListAccordion
+                    key={p.id}
+                    summary={
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <Link
+                            to={`/invoices/${p.invoice_id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-medium text-indigo-600 hover:text-indigo-500"
+                          >
+                            {p.invoice_number}
+                          </Link>
+                          <p className="truncate text-slate-500 dark:text-slate-400">{p.client_name}</p>
+                        </div>
+                        <p className="shrink-0 text-slate-900 dark:text-white">{money(symbol, p.amount)}</p>
+                      </div>
+                    }
+                  >
+                    <div className="flex justify-between">
+                      <dt className="text-slate-500 dark:text-slate-400">Receipt</dt>
+                      <dd>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadReceipt(p.invoice_id, p.id)}
+                          className="text-indigo-600 hover:text-indigo-500"
+                        >
                           {p.receipt_number}
                         </button>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <Link to={`/invoices/${p.invoice_id}`} className="text-indigo-600 hover:text-indigo-500">
-                          {p.invoice_number}
-                        </Link>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.client_name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.paid_at}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{money(symbol, p.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-slate-500 dark:text-slate-400">Date</dt>
+                      <dd className="text-slate-900 dark:text-white">{p.paid_at}</dd>
+                    </div>
+                  </MobileListAccordion>
+                ))}
+              </div>
+            </>
           )}
         </Accordion>
       </div>

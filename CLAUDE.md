@@ -991,7 +991,21 @@ frontend stops holding/sending it.
   gets the responsive split, wrapped in its own `overflow-x-auto` so a
   brief loading flash can't cause a mobile horizontal scrollbar now that
   the outer card container itself no longer carries `overflow-x-auto`
-  unconditionally.
+  unconditionally. The same split extends to every other wide table in
+  the app, not just the top-level list pages: `Financials.jsx`'s Recent
+  Payments table uses `MobileListAccordion` the same way (receipt/invoice/
+  client/date collapse under invoice number + client + amount). Two
+  tables get a *plain* mobile stacked-card list instead of an accordion —
+  `InvoiceDetail.jsx`/`QuoteDetail.jsx`'s Items table (also reused,
+  unauthenticated, on `PublicInvoice.jsx`/`PublicQuote.jsx`) — because a
+  line item's four fields (description, qty, unit price, amount) are all
+  already essential and shown at once; there's nothing left to hide behind
+  a tap, so wrapping it in a collapsed `<details>` would just add a
+  pointless extra tap with no payoff. `InvoiceDetail.jsx`'s Payments
+  sub-table *does* still get the full `MobileListAccordion` treatment
+  (receipt/date/amount summary, Method + Download/Email actions in the
+  expanded body) since it has real detail worth collapsing behind a tap,
+  same as the top-level list pages.
 - `components/Modal.jsx` — the shared popup styling for every "New X" (and
   reused "Edit X") entry form: the same dimmed backdrop + centered white
   card treatment as `IdleTimeoutMonitor`'s "Still there?" warning, just

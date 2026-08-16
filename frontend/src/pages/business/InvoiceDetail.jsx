@@ -6,6 +6,7 @@ import { todayStr } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
+import MobileListAccordion from '../../components/MobileListAccordion';
 
 const METHODS = ['bank_transfer', 'cash', 'card', 'cheque', 'other'];
 
@@ -186,27 +187,45 @@ export default function InvoiceDetail() {
 
       <div className="mt-6">
         <Accordion title="Items">
-          <div className="-mx-6 overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-              <thead>
-                <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                  <th className="px-6 py-3">Description</th>
-                  <th className="px-4 py-3 text-right">Qty</th>
-                  <th className="px-4 py-3 text-right">Unit price</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-6 py-3 dark:text-white">{item.description}</td>
-                    <td className="px-4 py-3 text-right dark:text-white">{item.quantity}</td>
-                    <td className="px-4 py-3 text-right dark:text-white">{symbol}{item.unit_price.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right dark:text-white">{symbol}{item.amount.toFixed(2)}</td>
+          <div className="-mx-6">
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                    <th className="px-6 py-3">Description</th>
+                    <th className="px-4 py-3 text-right">Qty</th>
+                    <th className="px-4 py-3 text-right">Unit price</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {items.map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-6 py-3 dark:text-white">{item.description}</td>
+                      <td className="px-4 py-3 text-right dark:text-white">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right dark:text-white">{symbol}{item.unit_price.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right dark:text-white">{symbol}{item.amount.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* No accordion here — a line item already shows everything
+                (description, qty × rate, amount), nothing to expand into,
+                so mobile just gets a stacked card per item instead. */}
+            <div className="divide-y divide-slate-100 text-sm sm:hidden dark:divide-slate-800">
+              {items.map((item) => (
+                <div key={item.id} className="flex items-start justify-between gap-3 px-6 py-3">
+                  <div className="min-w-0">
+                    <p className="text-slate-900 dark:text-white">{item.description}</p>
+                    <p className="text-slate-500 dark:text-slate-400">{item.quantity} × {symbol}{item.unit_price.toFixed(2)}</p>
+                  </div>
+                  <p className="shrink-0 font-medium text-slate-900 dark:text-white">{symbol}{item.amount.toFixed(2)}</p>
+                </div>
+              ))}
+            </div>
+
             <div className="border-t border-slate-200 px-6 py-3 text-right text-sm dark:border-slate-700">
               <p className="text-slate-600 dark:text-slate-400">Subtotal: {symbol}{invoice.subtotal.toFixed(2)}</p>
               {invoice.discount_amount > 0 && (
@@ -304,39 +323,73 @@ export default function InvoiceDetail() {
           {payments.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">No payments recorded yet.</p>
           ) : (
-            <div className="-mx-6 overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-                <thead>
-                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                    <th className="px-6 py-3">Receipt</th>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Method</th>
-                    <th className="px-4 py-3 text-right">Amount</th>
-                    <th className="px-6 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {payments.map((p) => (
-                    <tr key={p.id}>
-                      <td className="whitespace-nowrap px-6 py-3 font-medium text-slate-900 dark:text-white">{p.receipt_number}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.paid_at}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.method.replace('_', ' ')}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{symbol}{p.amount.toFixed(2)}</td>
-                      <td className="whitespace-nowrap px-6 py-3 text-right">
-                        <button onClick={() => handleDownloadReceipt(p.id)} className="mr-3 text-indigo-600 hover:text-indigo-500">
-                          Download
-                        </button>
-                        {canManage && (
-                          <button onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })} className="text-indigo-600 hover:text-indigo-500">
-                            Email
-                          </button>
-                        )}
-                      </td>
+            <>
+              <div className="-mx-6 hidden overflow-x-auto sm:block">
+                <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                  <thead>
+                    <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                      <th className="px-6 py-3">Receipt</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Method</th>
+                      <th className="px-4 py-3 text-right">Amount</th>
+                      <th className="px-6 py-3" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {payments.map((p) => (
+                      <tr key={p.id}>
+                        <td className="whitespace-nowrap px-6 py-3 font-medium text-slate-900 dark:text-white">{p.receipt_number}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.paid_at}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.method.replace('_', ' ')}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{symbol}{p.amount.toFixed(2)}</td>
+                        <td className="whitespace-nowrap px-6 py-3 text-right">
+                          <button onClick={() => handleDownloadReceipt(p.id)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                            Download
+                          </button>
+                          {canManage && (
+                            <button onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })} className="text-indigo-600 hover:text-indigo-500">
+                              Email
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="-mx-6 divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+                {payments.map((p) => (
+                  <MobileListAccordion
+                    key={p.id}
+                    summary={
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900 dark:text-white">{p.receipt_number}</p>
+                          <p className="text-slate-500 dark:text-slate-400">{p.paid_at}</p>
+                        </div>
+                        <p className="shrink-0 text-slate-900 dark:text-white">{symbol}{p.amount.toFixed(2)}</p>
+                      </div>
+                    }
+                  >
+                    <div className="flex justify-between">
+                      <dt className="text-slate-500 dark:text-slate-400">Method</dt>
+                      <dd className="text-slate-900 dark:text-white">{p.method.replace('_', ' ')}</dd>
+                    </div>
+                    <div className="flex gap-4 pt-1">
+                      <button onClick={() => handleDownloadReceipt(p.id)} className="text-indigo-600 hover:text-indigo-500">
+                        Download
+                      </button>
+                      {canManage && (
+                        <button onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })} className="text-indigo-600 hover:text-indigo-500">
+                          Email
+                        </button>
+                      )}
+                    </div>
+                  </MobileListAccordion>
+                ))}
+              </div>
+            </>
           )}
         </Accordion>
       </div>
