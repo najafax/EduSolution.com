@@ -9,7 +9,7 @@ router.use(requireAuth);
 const view = requirePermission('expenses', 'view');
 const manage = requirePermission('expenses', 'manage');
 
-const CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'marketing', 'software', 'travel', 'other'];
+const CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'shareholder payments', 'marketing', 'software', 'travel', 'other'];
 
 const PAGE_SIZE = 20;
 

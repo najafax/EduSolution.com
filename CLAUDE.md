@@ -289,8 +289,10 @@ are deliberately untouched by either, always returning every row.
   the current page's `expenses` array, so the total stays the true
   search-filtered grand total once pagination means that array is no longer
   the complete result set. `CATEGORIES` is a fixed list (`rent, utilities,
-  supplies, salaries, marketing, software, travel, other`) served to the
-  frontend for the category `<select>`.
+  supplies, salaries, shareholder payments, marketing, software, travel,
+  other`) served to the frontend for the category `<select>` — the same
+  list (`EXPENSE_CATEGORIES`) is duplicated in `routes/import.js` for CSV
+  import validation, so a category added here needs to be added there too.
 - `routes/recurring.js` — CRUD for `recurring_invoices` (+ their
   `recurring_invoice_items` template line items) mounted at
   `/api/recurring-invoices`. Frequency is `weekly|monthly|yearly`. `GET /`
