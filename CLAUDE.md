@@ -93,7 +93,23 @@ backend port in frontend code.
   `products.tax_rate` (see `routes/products.js` below), added after
   `products` already had real catalog rows in production — a plain
   `ALTER TABLE products ADD COLUMN tax_rate REAL NOT NULL DEFAULT 0`,
-  guarded by a `PRAGMA table_info(products)` check.
+  guarded by a `PRAGMA table_info(products)` check. Same pattern again for
+  `licenses.url` (see `routes/licenses.js` below) — this one is a cautionary
+  example of the rule this section opens with: a brand-new table only
+  needs a plain `CREATE TABLE IF NOT EXISTS` edit *the first time it's
+  created*, but the moment that table has shipped and a real deploy has
+  run against it even once, every column added afterward needs the
+  `ALTER TABLE` treatment regardless of how "new" the feature still feels —
+  `url` was added to the `licenses` `CREATE TABLE` statement directly
+  (reasoning, at the time, that the table itself was created earlier in the
+  same work session so surely had no production data yet), but the
+  Licenses feature had already been deployed by then, so every environment
+  that had pulled that earlier deploy still had a `licenses` table with no
+  `url` column — every write naming that column (manual create/edit,
+  `POST /api/import/licenses`) 500'd with "table licenses has no column
+  named url" until the follow-up `ALTER TABLE licenses ADD COLUMN url TEXT
+  NOT NULL DEFAULT ''`, guarded by the usual `PRAGMA table_info(licenses)`
+  check.
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
   <jwt>` header, then **re-fetches the live user row from the DB** (by the
   id in the JWT payload) rather than trusting the token's claims, and

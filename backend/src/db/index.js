@@ -381,6 +381,18 @@ if (!invoiceColumns.has('created_by_name')) {
   db.exec(`ALTER TABLE invoices ADD COLUMN created_by_name TEXT NOT NULL DEFAULT '';`);
 }
 
+// Same pattern again: `url` added to `licenses` (the client's activation/
+// portal link, see routes/licenses.js) after that table already existed in
+// production with real license rows from an earlier deploy of the Licenses
+// feature — without this, every INSERT/UPDATE that names the `url` column
+// (manual create/edit, POST /api/import/licenses) 500s with "table licenses
+// has no column named url" against a database created before this column
+// was added.
+const licenseColumns = new Set(db.prepare('PRAGMA table_info(licenses)').all().map((c) => c.name));
+if (!licenseColumns.has('url')) {
+  db.exec(`ALTER TABLE licenses ADD COLUMN url TEXT NOT NULL DEFAULT '';`);
+}
+
 db.pragma('foreign_keys = ON');
 
 // Bound params rather than string-interpolated into the exec() block above,
