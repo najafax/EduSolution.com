@@ -38,4 +38,27 @@ async function sendMail({ to, subject, html, attachments }) {
   });
 }
 
-module.exports = { sendMail };
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+
+const URL_RE = /(https?:\/\/[^\s<]+)/g;
+
+// Converts the plain-text body a user edits in the Send-preview modal
+// (routes/quotes.js, routes/invoices.js) into the HTML actually emailed.
+// Escapes entities first so a literal '<'/'&' typed by the user can't
+// break the markup, then auto-linkifies bare URLs (the public quote/
+// invoice link is included as plain text in the default message — see
+// lib/emailTemplates.js — so it needs to become clickable here rather
+// than the caller having to hand-write an <a> tag), and turns blank-line-
+// separated blocks into paragraphs with single newlines as <br>.
+function textToHtml(text) {
+  const paragraphs = String(text || '').trim().split(/\n\s*\n/).filter(Boolean);
+  return paragraphs
+    .map((p) => escapeHtml(p).replace(/\n/g, '<br>').replace(URL_RE, (url) => `<a href="${url}">${url}</a>`))
+    .map((p) => `<p>${p}</p>`)
+    .join('');
+}
+
+module.exports = { sendMail, textToHtml };

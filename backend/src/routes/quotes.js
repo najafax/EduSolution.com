@@ -5,7 +5,8 @@ const { requireAuth, requirePermission } = require('../middleware/auth');
 const { computeTotals } = require('../lib/totals');
 const { nextQuoteNumber, nextInvoiceNumber } = require('../lib/numbering');
 const { renderQuotePdf } = require('../lib/pdf');
-const { sendMail } = require('../lib/mailer');
+const { sendMail, textToHtml } = require('../lib/mailer');
+const { quoteSendEmail } = require('../lib/emailTemplates');
 const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
 
@@ -234,6 +235,21 @@ router.get('/:id/pdf', view, async (req, res) => {
   res.send(buffer);
 });
 
+// Preview endpoint for the frontend's Send-preview modal: returns exactly
+// the { to, subject, message } the actual send below would use if the
+// caller doesn't override them, computed by the same emailTemplates.js
+// function — so what's shown for editing is never out of sync with what
+// would actually go out. Gated on `manage` (not `view`) since the Send
+// button itself is manage-only; a view-only user has no reason to see it.
+router.get('/:id/send-preview', manage, (req, res) => {
+  const data = getQuoteWithItems(req.params.id);
+  if (!data) return res.status(404).json({ error: 'Quote not found' });
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const publicUrl = `${clientOrigin}/q/${data.quote.public_token}`;
+  res.json(quoteSendEmail({ quote: data.quote, client: data.client, settings, publicUrl }));
+});
+
 router.post('/:id/send', manage, async (req, res) => {
   const data = getQuoteWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Quote not found' });
@@ -241,13 +257,21 @@ router.post('/:id/send', manage, async (req, res) => {
 
   const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
   const publicUrl = `${clientOrigin}/q/${data.quote.public_token}`;
+  const defaults = quoteSendEmail({ quote: data.quote, client: data.client, settings, publicUrl });
+  // subject/message are optional overrides from the Send-preview modal
+  // (the user reviewed and possibly edited the defaults above) — an
+  // empty/missing value falls back to the same default rather than
+  // sending a blank subject/body, so a programmatic caller that skips the
+  // preview step still gets today's behavior.
+  const subject = (req.body?.subject || '').trim() || defaults.subject;
+  const message = (req.body?.message || '').trim() || defaults.message;
 
   try {
     const buffer = await renderQuotePdf({ quote: data.quote, client: data.client, items: data.items, settings });
     await sendMail({
       to: data.client.email,
-      subject: `Quote ${data.quote.number} from ${settings.business_name || 'us'}`,
-      html: `<p>Hi ${data.client.name},</p><p>Please find attached quote ${data.quote.number} for your review.</p><p>You can also view it online and let us know your decision here: <a href="${publicUrl}">${publicUrl}</a></p>`,
+      subject,
+      html: textToHtml(message),
       attachments: [{ filename: `${data.quote.number}.pdf`, content: buffer }],
     });
   } catch (err) {

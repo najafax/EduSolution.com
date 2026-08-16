@@ -5,7 +5,8 @@ const { requireAuth, requirePermission } = require('../middleware/auth');
 const { computeTotals } = require('../lib/totals');
 const { nextInvoiceNumber, nextReceiptNumber } = require('../lib/numbering');
 const { renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
-const { sendMail } = require('../lib/mailer');
+const { sendMail, textToHtml } = require('../lib/mailer');
+const { invoiceSendEmail, invoiceRemindEmail, receiptSendEmail } = require('../lib/emailTemplates');
 const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
 
@@ -269,6 +270,18 @@ router.get('/:id/pdf', view, async (req, res) => {
   res.send(buffer);
 });
 
+// See routes/quotes.js's /:id/send-preview for why this exists: the exact
+// same emailTemplates.js function backs both this preview and the actual
+// send's fallback-when-not-overridden defaults below.
+router.get('/:id/send-preview', manage, (req, res) => {
+  const data = getInvoiceWithItems(req.params.id);
+  if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const publicUrl = `${clientOrigin}/i/${data.invoice.public_token}`;
+  res.json(invoiceSendEmail({ invoice: data.invoice, client: data.client, settings, publicUrl }));
+});
+
 router.post('/:id/send', manage, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
@@ -276,13 +289,16 @@ router.post('/:id/send', manage, async (req, res) => {
 
   const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
   const publicUrl = `${clientOrigin}/i/${data.invoice.public_token}`;
+  const defaults = invoiceSendEmail({ invoice: data.invoice, client: data.client, settings, publicUrl });
+  const subject = (req.body?.subject || '').trim() || defaults.subject;
+  const message = (req.body?.message || '').trim() || defaults.message;
 
   try {
     const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings, payments: data.payments });
     await sendMail({
       to: data.client.email,
-      subject: `Invoice ${data.invoice.number} from ${settings.business_name || 'us'}`,
-      html: `<p>Hi ${data.client.name},</p><p>Please find attached invoice ${data.invoice.number}, due ${data.invoice.due_date}.</p><p>You can also view it online here: <a href="${publicUrl}">${publicUrl}</a></p>`,
+      subject,
+      html: textToHtml(message),
       attachments: [{ filename: `${data.invoice.number}.pdf`, content: buffer }],
     });
   } catch (err) {
@@ -297,6 +313,13 @@ router.post('/:id/send', manage, async (req, res) => {
   res.json(getInvoiceWithItems(req.params.id));
 });
 
+router.get('/:id/remind-preview', manage, (req, res) => {
+  const data = getInvoiceWithItems(req.params.id);
+  if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  res.json(invoiceRemindEmail({ invoice: data.invoice, client: data.client, settings }));
+});
+
 router.post('/:id/remind', manage, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
@@ -304,13 +327,16 @@ router.post('/:id/remind', manage, async (req, res) => {
     return res.status(409).json({ error: 'This invoice is already fully paid' });
   }
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const defaults = invoiceRemindEmail({ invoice: data.invoice, client: data.client, settings });
+  const subject = (req.body?.subject || '').trim() || defaults.subject;
+  const message = (req.body?.message || '').trim() || defaults.message;
 
   try {
     const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings, payments: data.payments });
     await sendMail({
       to: data.client.email,
-      subject: `Payment reminder: invoice ${data.invoice.number}`,
-      html: `<p>Hi ${data.client.name},</p><p>This is a reminder that invoice ${data.invoice.number} for ${settings.currency_symbol}${data.invoice.balance_due.toFixed(2)} was due on ${data.invoice.due_date}. Please find it attached.</p>`,
+      subject,
+      html: textToHtml(message),
       attachments: [{ filename: `${data.invoice.number}.pdf`, content: buffer }],
     });
   } catch (err) {
@@ -427,6 +453,17 @@ router.get('/:id/payments/:paymentId/pdf', view, async (req, res) => {
   res.send(buffer);
 });
 
+router.get('/:id/payments/:paymentId/receipt-preview', manage, (req, res) => {
+  const data = getInvoiceWithItems(req.params.id);
+  if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  const payment = db
+    .prepare('SELECT * FROM payments WHERE id = ? AND invoice_id = ?')
+    .get(req.params.paymentId, req.params.id);
+  if (!payment) return res.status(404).json({ error: 'Payment not found' });
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  res.json(receiptSendEmail({ payment, client: data.client, settings }));
+});
+
 router.post('/:id/payments/:paymentId/send-receipt', manage, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
@@ -436,13 +473,16 @@ router.post('/:id/payments/:paymentId/send-receipt', manage, async (req, res) =>
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const defaults = receiptSendEmail({ payment, client: data.client, settings });
+  const subject = (req.body?.subject || '').trim() || defaults.subject;
+  const message = (req.body?.message || '').trim() || defaults.message;
 
   try {
     const buffer = await renderReceiptPdf({ payment, invoice: data.invoice, client: data.client, settings });
     await sendMail({
       to: data.client.email,
-      subject: `Receipt ${payment.receipt_number} from ${settings.business_name || 'us'}`,
-      html: `<p>Hi ${data.client.name},</p><p>Thanks for your payment. Please find your receipt attached.</p>`,
+      subject,
+      html: textToHtml(message),
       attachments: [{ filename: `${payment.receipt_number}.pdf`, content: buffer }],
     });
   } catch (err) {

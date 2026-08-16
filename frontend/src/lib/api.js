@@ -107,7 +107,8 @@ export const api = {
     create: (payload, token) => request('/quotes', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/quotes/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/quotes/${id}`, { method: 'DELETE', token }),
-    send: (id, token) => request(`/quotes/${id}/send`, { method: 'POST', token }),
+    sendPreview: (id, token) => request(`/quotes/${id}/send-preview`, { token }),
+    send: (id, payload, token) => request(`/quotes/${id}/send`, { method: 'POST', body: payload, token }),
     convertToInvoice: (id, payload, token) =>
       request(`/quotes/${id}/convert-to-invoice`, { method: 'POST', body: payload, token }),
     duplicate: (id, token) => request(`/quotes/${id}/duplicate`, { method: 'POST', token }),
@@ -121,13 +122,17 @@ export const api = {
     create: (payload, token) => request('/invoices', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/invoices/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/invoices/${id}`, { method: 'DELETE', token }),
-    send: (id, token) => request(`/invoices/${id}/send`, { method: 'POST', token }),
-    remind: (id, token) => request(`/invoices/${id}/remind`, { method: 'POST', token }),
+    sendPreview: (id, token) => request(`/invoices/${id}/send-preview`, { token }),
+    send: (id, payload, token) => request(`/invoices/${id}/send`, { method: 'POST', body: payload, token }),
+    remindPreview: (id, token) => request(`/invoices/${id}/remind-preview`, { token }),
+    remind: (id, payload, token) => request(`/invoices/${id}/remind`, { method: 'POST', body: payload, token }),
     duplicate: (id, token) => request(`/invoices/${id}/duplicate`, { method: 'POST', token }),
     recordPayment: (id, payload, token) =>
       request(`/invoices/${id}/payments`, { method: 'POST', body: payload, token }),
-    sendReceipt: (id, paymentId, token) =>
-      request(`/invoices/${id}/payments/${paymentId}/send-receipt`, { method: 'POST', token }),
+    receiptPreview: (id, paymentId, token) =>
+      request(`/invoices/${id}/payments/${paymentId}/receipt-preview`, { token }),
+    sendReceipt: (id, paymentId, payload, token) =>
+      request(`/invoices/${id}/payments/${paymentId}/send-receipt`, { method: 'POST', body: payload, token }),
     openPdf: (id, token) => openPdf(`/invoices/${id}/pdf`, token),
     openReceiptPdf: (id, paymentId, token) => openPdf(`/invoices/${id}/payments/${paymentId}/pdf`, token),
     exportCsv: (token) => downloadFile('/invoices/export.csv', token, 'invoices.csv'),

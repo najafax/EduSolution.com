@@ -280,6 +280,44 @@ are deliberately untouched by either, always returning every row.
   `/duplicate` (which creates a fresh draft copy) and recording a payment
   are unaffected, and deletion is still governed separately by the
   existing "has recorded payments" guard below.
+- **Email preview before sending**: every client-facing email this app
+  sends from a button click (not the automated overdue-reminder digest —
+  see `lib/scheduler.js` below, which stays fully automatic) goes through
+  a review step first rather than sending immediately. Each send action
+  has a matching `GET .../<action>-preview` route — `GET
+  /quotes/:id/send-preview`, `GET /invoices/:id/send-preview`, `GET
+  /invoices/:id/remind-preview`, `GET
+  /invoices/:id/payments/:paymentId/receipt-preview` — all gated `manage`
+  (same as the send routes themselves) that return `{ to, subject,
+  message }`. `lib/emailTemplates.js` is the single source of that default
+  text (`quoteSendEmail`/`invoiceSendEmail`/`invoiceRemindEmail`/
+  `receiptSendEmail`, each taking the relevant row(s) + `settings` +
+  `publicUrl` where applicable) — the preview route and the actual send
+  route call the *same* function, so what's shown for editing can never
+  drift from what would be sent if left unedited. The send routes
+  (`POST /quotes/:id/send`, `POST /invoices/:id/send`, `POST
+  /invoices/:id/remind`, `POST /invoices/:id/payments/:paymentId/send-
+  receipt`) now accept optional `subject`/`message` in the body —
+  a blank/whitespace-only value (or the field omitted entirely) falls back
+  to `emailTemplates.js`'s default rather than sending an empty subject/
+  body, so a programmatic caller that skips the preview step still gets
+  today's behavior. `message` is plain text (not HTML) — `lib/mailer.js`'s
+  `textToHtml()` converts it: escapes HTML entities first (so a literal
+  `<`/`&` a user types can't break the markup), auto-linkifies bare `http(s)://`
+  URLs (the public quote/invoice link is plain text in the default
+  message, see `emailTemplates.js`), and turns blank-line-separated blocks
+  into `<p>` paragraphs with single newlines as `<br>`.
+  `components/EmailPreviewModal.jsx` is the shared frontend piece: given a
+  `loadPreview()` (calls the matching `*Preview` function in `lib/api.js`)
+  and `onSend({ subject, message })`, it fetches the default text on open,
+  renders To (read-only)/Subject/Message (both editable) fields, and only
+  calls `onSend` — the real `POST .../send` — once "Send email" is
+  clicked; "Cancel" or the backdrop/Escape close it without sending
+  anything. `QuoteDetail.jsx` uses one instance for its single send
+  action; `InvoiceDetail.jsx` uses one shared instance for all three of
+  its send actions (send/remind/receipt), switched by an `emailModal`
+  state object (`{ type: 'send' | 'remind' | 'receipt', paymentId? }`)
+  that picks which preview/send API calls to wire up.
 - `routes/expenses.js` — CRUD for `expenses` (category/description/amount/
   expense_date/notes) plus `GET /` (`?q=` search, `?page=` — see
   "Pagination convention" above) and `GET /export.csv`. `GET /` also always
@@ -405,7 +443,11 @@ are deliberately untouched by either, always returning every row.
   isn't set, it throws `EMAIL_NOT_CONFIGURED` rather than crashing — routes
   catch this and return `503` with a message telling the caller which env
   vars to set. Everything else (PDF download, payments, financials) works
-  with no SMTP configured at all.
+  with no SMTP configured at all. Also exports `textToHtml()` — see "Email
+  preview before sending" above — the plain-text-to-HTML conversion for a
+  user-edited email body.
+- `lib/emailTemplates.js` — the default `{ subject, message }` for every
+  client-facing send action; see "Email preview before sending" above.
 - `lib/activity.js` — `logActivity({ userName, action, entityType,
   entityId, entityLabel })` inserts one row into `activity_log`. Called
   from every create/update/delete/send/duplicate/convert/payment/respond

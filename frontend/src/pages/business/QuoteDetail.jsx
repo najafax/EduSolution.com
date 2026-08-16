@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { todayPlus } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
+import EmailPreviewModal from '../../components/EmailPreviewModal';
 
 export default function QuoteDetail() {
   const { token, can } = useAuth();
@@ -20,6 +21,7 @@ export default function QuoteDetail() {
   const [busy, setBusy] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
   const [dueDate, setDueDate] = useState(todayPlus(14));
+  const [showSendPreview, setShowSendPreview] = useState(false);
 
   function load() {
     api.quotes
@@ -39,21 +41,6 @@ export default function QuoteDetail() {
       await api.quotes.openPdf(id, token);
     } catch (err) {
       setError(err.message);
-    }
-  }
-
-  async function handleSend() {
-    setError('');
-    setNotice('');
-    setBusy(true);
-    try {
-      await api.quotes.send(id, token);
-      setNotice('Quote emailed to client.');
-      load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -117,7 +104,7 @@ export default function QuoteDetail() {
             Download PDF
           </button>
           {canManage && (
-            <button onClick={handleSend} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
+            <button onClick={() => setShowSendPreview(true)} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
               Email to client
             </button>
           )}
@@ -231,6 +218,18 @@ export default function QuoteDetail() {
           </Accordion>
         </div>
       )}
+
+      <EmailPreviewModal
+        open={showSendPreview}
+        onClose={() => setShowSendPreview(false)}
+        title="Review email before sending"
+        loadPreview={() => api.quotes.sendPreview(id, token)}
+        onSend={async ({ subject, message }) => {
+          await api.quotes.send(id, { subject, message }, token);
+          setNotice('Quote emailed to client.');
+          load();
+        }}
+      />
     </div>
   );
 }

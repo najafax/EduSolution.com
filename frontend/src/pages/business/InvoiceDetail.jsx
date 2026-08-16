@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { todayStr } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
+import EmailPreviewModal from '../../components/EmailPreviewModal';
 
 const METHODS = ['bank_transfer', 'cash', 'card', 'cheque', 'other'];
 
@@ -21,6 +22,10 @@ export default function InvoiceDetail() {
   const [busy, setBusy] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [payment, setPayment] = useState({ amount: '', method: 'bank_transfer', reference: '', notes: '', paid_at: todayStr() });
+  // { type: 'send' } | { type: 'remind' } | { type: 'receipt', paymentId } | null —
+  // one EmailPreviewModal instance shared by all three send-email triggers
+  // on this page, since only one can be open at a time.
+  const [emailModal, setEmailModal] = useState(null);
 
   function load() {
     api.invoices
@@ -40,36 +45,6 @@ export default function InvoiceDetail() {
       await api.invoices.openPdf(id, token);
     } catch (err) {
       setError(err.message);
-    }
-  }
-
-  async function handleSend() {
-    setError('');
-    setNotice('');
-    setBusy(true);
-    try {
-      await api.invoices.send(id, token);
-      setNotice('Invoice emailed to client.');
-      load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleRemind() {
-    setError('');
-    setNotice('');
-    setBusy(true);
-    try {
-      await api.invoices.remind(id, token);
-      setNotice('Reminder emailed to client.');
-      load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -121,20 +96,6 @@ export default function InvoiceDetail() {
     }
   }
 
-  async function handleSendReceipt(paymentId) {
-    setError('');
-    setNotice('');
-    setBusy(true);
-    try {
-      await api.invoices.sendReceipt(id, paymentId, token);
-      setNotice('Receipt emailed to client.');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (error && !data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
   if (!data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
 
@@ -161,12 +122,12 @@ export default function InvoiceDetail() {
             Download PDF
           </button>
           {canManage && (
-            <button onClick={handleSend} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
+            <button onClick={() => setEmailModal({ type: 'send' })} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
               Email to client
             </button>
           )}
           {canManage && invoice.balance_due > 0 && (
-            <button onClick={handleRemind} disabled={busy} className="min-h-11 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950">
+            <button onClick={() => setEmailModal({ type: 'remind' })} disabled={busy} className="min-h-11 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950">
               Send reminder
             </button>
           )}
@@ -353,7 +314,7 @@ export default function InvoiceDetail() {
                           Download
                         </button>
                         {canManage && (
-                          <button onClick={() => handleSendReceipt(p.id)} className="text-indigo-600 hover:text-indigo-500">
+                          <button onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })} className="text-indigo-600 hover:text-indigo-500">
                             Email
                           </button>
                         )}
@@ -374,6 +335,36 @@ export default function InvoiceDetail() {
           </Accordion>
         </div>
       )}
+
+      <EmailPreviewModal
+        open={emailModal !== null}
+        onClose={() => setEmailModal(null)}
+        title={
+          emailModal?.type === 'remind'
+            ? 'Review reminder before sending'
+            : emailModal?.type === 'receipt'
+              ? 'Review receipt email before sending'
+              : 'Review email before sending'
+        }
+        loadPreview={() => {
+          if (emailModal?.type === 'remind') return api.invoices.remindPreview(id, token);
+          if (emailModal?.type === 'receipt') return api.invoices.receiptPreview(id, emailModal.paymentId, token);
+          return api.invoices.sendPreview(id, token);
+        }}
+        onSend={async ({ subject, message }) => {
+          if (emailModal?.type === 'remind') {
+            await api.invoices.remind(id, { subject, message }, token);
+            setNotice('Reminder emailed to client.');
+          } else if (emailModal?.type === 'receipt') {
+            await api.invoices.sendReceipt(id, emailModal.paymentId, { subject, message }, token);
+            setNotice('Receipt emailed to client.');
+          } else {
+            await api.invoices.send(id, { subject, message }, token);
+            setNotice('Invoice emailed to client.');
+          }
+          load();
+        }}
+      />
     </div>
   );
 }
