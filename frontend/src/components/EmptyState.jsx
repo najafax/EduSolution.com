@@ -19,7 +19,7 @@ export default function EmptyState({ icon, title, message, action }) {
         <button
           type="button"
           onClick={action.onClick}
-          className="mt-2 min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+          className="mt-2 min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
         >
           {action.label}
         </button>

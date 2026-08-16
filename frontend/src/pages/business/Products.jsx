@@ -101,7 +101,7 @@ export default function Products() {
         {canManage && (
           <button
             onClick={startCreate}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+            className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
           >
             New product
           </button>
@@ -128,7 +128,7 @@ export default function Products() {
               required
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
           <label className="block">
@@ -140,7 +140,7 @@ export default function Products() {
               required
               value={form.unit_price}
               onChange={(e) => setForm((f) => ({ ...f, unit_price: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
           <label className="block">
@@ -153,7 +153,7 @@ export default function Products() {
               value={form.tax_rate}
               onChange={(e) => setForm((f) => ({ ...f, tax_rate: e.target.value }))}
               placeholder="0"
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
           <div className="sm:col-span-2">
@@ -163,7 +163,7 @@ export default function Products() {
                 type="text"
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
           </div>
@@ -171,7 +171,7 @@ export default function Products() {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
             >
               {submitting ? 'Saving…' : 'Save'}
             </button>
@@ -220,7 +220,7 @@ export default function Products() {
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <button onClick={() => startEdit(product)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                          <button onClick={() => startEdit(product)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
                             Edit
                           </button>
                           <button onClick={() => handleDelete(product.id)} className="text-red-600 hover:text-red-500">
@@ -234,7 +234,7 @@ export default function Products() {
               </table>
             </div>
 
-            <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+            <div className="flex flex-col gap-2.5 sm:hidden">
               {products.map((product) => (
                 <MobileListAccordion
                   key={product.id}
@@ -259,7 +259,7 @@ export default function Products() {
                   </div>
                   {canManage && (
                     <div className="flex gap-4 pt-1">
-                      <button onClick={() => startEdit(product)} className="text-indigo-600 hover:text-indigo-500">
+                      <button onClick={() => startEdit(product)} className="text-lagoon-600 hover:text-lagoon-500">
                         Edit
                       </button>
                       <button onClick={() => handleDelete(product.id)} className="text-red-600 hover:text-red-500">

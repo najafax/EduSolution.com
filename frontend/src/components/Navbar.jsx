@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
 import ThemeToggle from './ThemeToggle';
+import { SearchIcon, XIcon } from './icons';
 
 // `module: null` means always visible to any logged-in user regardless of
 // permissions (Dashboard). Everything else is filtered by that module's
@@ -33,6 +34,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
 
   const visibleLinks = BUSINESS_LINKS.filter(
     (link) => (!link.module || can(link.module, 'view')) && (!link.adminOnly || user?.role === 'admin'),
@@ -55,7 +57,7 @@ export default function Navbar() {
     >
       <nav className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 xl:px-8 sm:py-4">
         <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
-          EduSolution<span className="text-indigo-600">.com</span>
+          EduSolution<span className="text-lagoon-600">.com</span>
         </Link>
 
         {user ? (
@@ -79,7 +81,7 @@ export default function Navbar() {
                   <Link
                     key={link.to}
                     to={link.to}
-                    className={`shrink-0 text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive(link.to) ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
+                    className={`shrink-0 text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive(link.to) ? 'text-lagoon-600' : 'text-slate-700 dark:text-slate-300'}`}
                   >
                     {link.label}
                   </Link>
@@ -87,7 +89,7 @@ export default function Navbar() {
               </div>
               <Link
                 to="/account"
-                className={`shrink-0 text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive('/account') ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
+                className={`shrink-0 text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive('/account') ? 'text-lagoon-600' : 'text-slate-700 dark:text-slate-300'}`}
               >
                 My account
               </Link>
@@ -100,14 +102,28 @@ export default function Navbar() {
               </button>
             </div>
 
-            {/* Mobile menu toggle */}
+            {/* Mobile menu toggle. Below `sm` (phones), BottomNav.jsx's tab
+                bar + "More" sheet replaces this hamburger entirely — so the
+                hamburger itself only renders from `sm` up (tablets), while
+                the phone-only search toggle takes its place below `sm`
+                (GlobalSearch otherwise only appears inside this drawer or
+                the tablet-and-up desktop bar, so phones need their own way
+                in). */}
             <div className="flex items-center gap-1 xl:hidden">
+              <button
+                onClick={() => setPhoneSearchOpen((v) => !v)}
+                aria-label={phoneSearchOpen ? 'Close search' : 'Search'}
+                aria-expanded={phoneSearchOpen}
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-700 sm:hidden dark:text-slate-300"
+              >
+                {phoneSearchOpen ? <XIcon width={22} height={22} /> : <SearchIcon width={22} height={22} />}
+              </button>
               <ThemeToggle />
               <button
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-label="Toggle menu"
                 aria-expanded={menuOpen}
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-700 dark:text-slate-300"
+                className="hidden min-h-11 min-w-11 items-center justify-center rounded-md text-slate-700 sm:flex dark:text-slate-300"
               >
                 {menuOpen ? (
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -126,7 +142,7 @@ export default function Navbar() {
             <ThemeToggle />
             <Link
               to="/login"
-              className="flex min-h-11 items-center rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 sm:px-4"
+              className="flex min-h-11 items-center rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 sm:px-4"
             >
               Log in
             </Link>
@@ -134,8 +150,17 @@ export default function Navbar() {
         )}
       </nav>
 
+      {/* Phone-only inline search row, opened by the search icon above.
+          Tablet/desktop reach GlobalSearch via the drawer/desktop bar
+          instead, so this is hidden from `sm` up. */}
+      {user && phoneSearchOpen && (
+        <div className="border-t border-slate-200 px-4 py-2 sm:hidden dark:border-slate-800">
+          <GlobalSearch onNavigate={() => setPhoneSearchOpen(false)} autoFocus />
+        </div>
+      )}
+
       {user && menuOpen && (
-        <div className="border-t border-slate-200 px-4 py-2 xl:hidden dark:border-slate-800">
+        <div className="hidden border-t border-slate-200 px-4 py-2 sm:block xl:hidden dark:border-slate-800">
           <div className="py-2">
             <GlobalSearch onNavigate={() => setMenuOpen(false)} />
           </div>
@@ -144,7 +169,7 @@ export default function Navbar() {
               key={link.to}
               to={link.to}
               onClick={() => setMenuOpen(false)}
-              className={`flex min-h-11 items-center text-sm font-medium ${isActive(link.to) ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
+              className={`flex min-h-11 items-center text-sm font-medium ${isActive(link.to) ? 'text-lagoon-600' : 'text-slate-700 dark:text-slate-300'}`}
             >
               {link.label}
             </Link>
@@ -152,7 +177,7 @@ export default function Navbar() {
           <Link
             to="/account"
             onClick={() => setMenuOpen(false)}
-            className={`flex min-h-11 items-center text-sm font-medium ${isActive('/account') ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}
+            className={`flex min-h-11 items-center text-sm font-medium ${isActive('/account') ? 'text-lagoon-600' : 'text-slate-700 dark:text-slate-300'}`}
           >
             My account
           </Link>

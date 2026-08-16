@@ -3,7 +3,7 @@
 // generic categorical hue set.
 const STATUS_META = [
   { key: 'draft', label: 'Draft', color: '#94a3b8' },
-  { key: 'sent', label: 'Sent', color: '#4f46e5' },
+  { key: 'sent', label: 'Sent', color: '#0e7c86' },
   { key: 'paid', label: 'Paid', color: '#059669' },
   { key: 'void', label: 'Void', color: '#dc2626' },
 ];

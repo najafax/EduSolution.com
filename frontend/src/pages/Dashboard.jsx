@@ -12,6 +12,13 @@ import DashboardShortcutsEditor from '../components/DashboardShortcutsEditor';
 import { UsersIcon, InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, TrendUpIcon, TrendDownIcon } from '../components/icons';
 import { money } from '../lib/money';
 
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 const SHORTCUTS = [
   { to: '/clients', label: 'Clients', module: 'clients' },
   { to: '/products', label: 'Products', module: 'products' },
@@ -69,10 +76,13 @@ export default function Dashboard() {
       ]
     : [];
 
+  const firstName = user?.name?.split(' ')[0];
+
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Welcome, {user?.name}</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{user?.email}</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{greeting()}</p>
+      <h1 className="font-display text-3xl font-extrabold text-slate-900 dark:text-white">{firstName}</h1>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{settings?.business_name || user?.email}</p>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
@@ -137,7 +147,7 @@ export default function Dashboard() {
                   {summary.recentPayments.slice(0, 5).map((p) => (
                     <div key={p.id} className="flex flex-col gap-1 px-6 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <div>
-                        <Link to={`/invoices/${p.invoice_id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
+                        <Link to={`/invoices/${p.invoice_id}`} className="font-medium text-lagoon-600 hover:text-lagoon-500">
                           {p.invoice_number}
                         </Link>
                         <span className="ml-2 text-slate-500 dark:text-slate-400">{p.client_name}</span>

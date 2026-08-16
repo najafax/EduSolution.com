@@ -146,12 +146,12 @@ export default function Financials() {
                     {summary.recentPayments.map((p) => (
                       <tr key={p.id}>
                         <td className="whitespace-nowrap px-6 py-3 font-medium">
-                          <button type="button" onClick={() => handleDownloadReceipt(p.invoice_id, p.id)} className="text-indigo-600 hover:text-indigo-500">
+                          <button type="button" onClick={() => handleDownloadReceipt(p.invoice_id, p.id)} className="text-lagoon-600 hover:text-lagoon-500">
                             {p.receipt_number}
                           </button>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
-                          <Link to={`/invoices/${p.invoice_id}`} className="text-indigo-600 hover:text-indigo-500">
+                          <Link to={`/invoices/${p.invoice_id}`} className="text-lagoon-600 hover:text-lagoon-500">
                             {p.invoice_number}
                           </Link>
                         </td>
@@ -164,7 +164,7 @@ export default function Financials() {
                 </table>
               </div>
 
-              <div className="-mx-6 divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+              <div className="flex flex-col gap-2.5 sm:hidden">
                 {summary.recentPayments.map((p) => (
                   <MobileListAccordion
                     key={p.id}
@@ -175,7 +175,7 @@ export default function Financials() {
                           <Link
                             to={`/invoices/${p.invoice_id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="font-medium text-indigo-600 hover:text-indigo-500"
+                            className="font-medium text-lagoon-600 hover:text-lagoon-500"
                           >
                             {p.invoice_number}
                           </Link>
@@ -191,7 +191,7 @@ export default function Financials() {
                         <button
                           type="button"
                           onClick={() => handleDownloadReceipt(p.invoice_id, p.id)}
-                          className="text-indigo-600 hover:text-indigo-500"
+                          className="text-lagoon-600 hover:text-lagoon-500"
                         >
                           {p.receipt_number}
                         </button>

@@ -46,7 +46,7 @@ export default function DashboardShortcutsEditor({ items, hiddenSet, onToggle, o
       <button
         type="button"
         onClick={onReset}
-        className="mt-3 self-start text-sm font-medium text-indigo-600 hover:text-indigo-500"
+        className="mt-3 self-start text-sm font-medium text-lagoon-600 hover:text-lagoon-500"
       >
         Reset to default
       </button>

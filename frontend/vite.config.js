@@ -10,7 +10,13 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'favicon-32x32.png', 'apple-touch-icon.png'],
+      includeAssets: [
+        'favicon.svg',
+        'favicon-32x32.png',
+        'apple-touch-icon.png',
+        'fonts/sora-700.woff2',
+        'fonts/sora-800.woff2',
+      ],
       manifest: {
         name: 'EduSolution.com',
         short_name: 'EduSolution',
@@ -18,7 +24,7 @@ export default defineConfig({
         start_url: '/',
         display: 'standalone',
         background_color: '#ffffff',
-        theme_color: '#4f46e5',
+        theme_color: '#0e7c86',
         icons: [
           {
             src: '/pwa-192x192.png',

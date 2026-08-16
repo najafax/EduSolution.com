@@ -1132,6 +1132,23 @@ frontend stops holding/sending it.
   one-line summary); use a plain stacked-card list only when every column
   is already essential and short enough to show at once with nothing left
   to hide (the Items-table case above is the only current example).
+  Each row is its own floating card (`rounded-2xl border shadow-sm`), not
+  a flat divided list — callers wrap their set of rows in `flex flex-col
+  gap-2.5` rather than `divide-y` (the mobile visual redesign pass, see
+  "Mobile design system" below). An optional `accent` prop (a Tailwind
+  `bg-*` class, e.g. `bg-red-500` for an overdue invoice) renders as a 4px
+  left stripe — `Invoices.jsx`/`Quotes.jsx` are the two callers that pass
+  it (via a local `ACCENT` map keyed by status, mirroring `StatusBadge`'s
+  own color semantics), everything else omits it since Clients/Products/
+  Users/etc. have no comparable per-row status dimension. That stripe is
+  rendered on a plain wrapping `<div>` around `<details>`, not inside
+  `<details>` itself — Chrome 120+ wraps a `<details>`'s post-summary
+  content in an internal `::details-content` box that collapses to zero
+  height while closed, which silently breaks `inset-y-0`-style stretching
+  (or any percentage-height child) placed directly inside `<details>`; the
+  wrapping div sidesteps that native quirk while `<details>`/`<summary>`
+  still own the open/close behavior and the `name`-grouped exclusive-open
+  behavior described above unchanged.
 - `components/Modal.jsx` — the shared popup styling for every "New X" (and
   reused "Edit X") entry form: the same dimmed backdrop + centered white
   card treatment as `IdleTimeoutMonitor`'s "Still there?" warning, just
@@ -1245,6 +1262,89 @@ frontend stops holding/sending it.
   `vite.config.js` and `src/index.css`) — no `tailwind.config.js`/PostCSS
   setup exists or is needed for v4's Vite integration. Utility classes are
   used directly in JSX; there's no separate component-style layer.
+
+### Mobile design system
+
+A ground-up visual pass (palette, type, navigation, and card language),
+aimed primarily at the phone breakpoint since that's where the app is
+weakest as a plain responsive layout rather than a considered mobile
+experience — desktop inherits the same tokens/colors for consistency but
+keeps its existing layout.
+
+- `src/index.css`'s `@theme` block defines a `lagoon` color scale
+  (`--color-lagoon-50` … `--color-lagoon-950`, a deep turquoise teal fitting
+  a Maldives-based business) that replaced every `indigo-*` Tailwind class
+  app-wide at the same shade numbers (`indigo-600` → `lagoon-600`, etc.) —
+  a mechanical, 1:1 rename across every component and page, so `lagoon` is
+  now the single accent color used for buttons, links, active nav/tab
+  states, focus rings, the FAB, chart lines (`RevenueTrendChart.jsx`'s
+  `INVOICED_COLOR`, `StatusBreakdownChart.jsx`'s `sent` entry — both were
+  hardcoded hex, not Tailwind classes, so those were hand-updated to the
+  same `#0e7c86`), and `StatusBadge`'s `sent` pill (previously blue). The
+  same block also defines `--font-display: 'Sora', ui-sans-serif, system-ui,
+  sans-serif` (Tailwind v4 auto-generates the `font-display` utility from
+  any `--font-*` theme key) plus two `@font-face` rules pointing at
+  `/fonts/sora-700.woff2`/`sora-800.woff2` — self-hosted rather than a
+  Google Fonts CDN link (consistent with the PWA's no-CDN-dependency goal
+  below), subset to Latin, and listed in `vite.config.js`'s
+  `VitePWA({ includeAssets })` so the service worker precaches them for
+  offline use like every other static asset. `font-display` is used
+  sparingly — page titles/greetings and KPI figures — never body text.
+  `MeterBar.jsx`'s `color` prop was renamed from `indigo` to `lagoon` to
+  match (no external caller passed it explicitly, so this was a same-file
+  rename, not a breaking prop change).
+- `components/BottomNav.jsx` — a fixed, phone-only (`sm:hidden`) tab bar
+  that replaces `Navbar.jsx`'s hamburger drawer below the `sm` breakpoint
+  (tablets and up still get the hamburger — see `Navbar.jsx` below). Four
+  permanent tabs (`PRIMARY_TABS`: Home/Invoices/Quotes/Clients, each
+  filtered through `can(module, 'view')` the same way `Navbar.jsx`'s
+  `visibleLinks` is) plus a fifth "More" tab that opens a
+  `components/BottomSheet.jsx` listing everything else from `Navbar.jsx`'s
+  exported `BUSINESS_LINKS` (Products, Recurring, Expenses, Financials,
+  Reports, Activity, Users, Email Center when `user.role === 'admin'`,
+  Settings) plus "My account" and "Log out" — the same set the old mobile
+  drawer held. `App.jsx` renders `<BottomNav />` only when `user` is
+  truthy (mirroring `Navbar.jsx`'s own `{user ? ... }` split) and wraps the
+  routed `<Routes>` in a `pb-16 sm:pb-0` div so the fixed bar never covers
+  a page's last content or action buttons; `FloatingActionButton.jsx`'s
+  `bottom` offset was raised to `calc(5.5rem + env(safe-area-inset-bottom))`
+  for the same reason, and got the mockup's gradient (`from-lagoon-600
+  to-lagoon-700`) + `rounded-2xl` squircle treatment instead of a flat
+  circle.
+- `components/BottomSheet.jsx` — the mobile counterpart to `Modal.jsx`:
+  same open/backdrop-click/Escape/body-scroll-lock contract, but slides up
+  from the bottom with rounded top corners and a drag-handle bar instead of
+  a centered card, matching the native-mobile-app convention for a menu
+  triggered from a bottom tab. Currently used only by `BottomNav.jsx`'s
+  "More" tab, but is a generic `{ open, onClose, title, children }`
+  component like `Modal.jsx`, not hardcoded to that one caller.
+- `components/Navbar.jsx` now splits its previously-single `xl:hidden`
+  mobile treatment into two: a phone-only search icon toggle (`sm:hidden`)
+  that reveals an inline `GlobalSearch` row below the header (`GlobalSearch`
+  gained an `autoFocus` prop for this), since `BottomNav.jsx` replaced
+  phones' only other route to `GlobalSearch` (the hamburger drawer); and
+  the hamburger toggle itself + its dropdown drawer, now `hidden sm:flex`/
+  `hidden sm:block` — visible from `sm` up to `xl` (tablets) only, since
+  phones use `BottomNav.jsx` instead. `xl:flex` desktop nav is unchanged.
+- `components/KpiCard.jsx` picked up the mockup's card language:
+  `rounded-2xl` (was `rounded-lg`), a smaller `rounded-xl` icon chip (was a
+  circle), and the value rendered in `font-display font-extrabold
+  tabular-nums` instead of a plain `font-semibold` — same `tone`→color
+  contract as before (`neutral`/`positive`/`negative`/`warning`), just
+  restyled. `components/Accordion.jsx` picked up the same `rounded-2xl`
+  for visual consistency with `KpiCard`/`MobileListAccordion`'s cards.
+- `pages/Dashboard.jsx` opens with a time-of-day greeting (`greeting()` —
+  "Good morning"/afternoon/evening by `new Date().getHours()`) above the
+  user's first name in `font-display`, with the business name (falling back
+  to the user's email if `business_settings` hasn't loaded yet) underneath
+  — replacing the previous plain "Welcome, {name}" + email line.
+- `pages/business/InvoiceDetail.jsx` gained a mobile-only (`sm:hidden`)
+  gradient hero card between the header actions and the existing Bill-to/
+  Details grid: total due in `font-display`, a paid-vs-total progress bar,
+  and a Paid/Balance split — desktop has no equivalent (its "Details" card
+  already surfaces balance due inline), this is purely a phone-first
+  "surface the number before the fold" addition and doesn't change any
+  desktop markup or the page's data flow.
 
 ### Responsive / PWA
 

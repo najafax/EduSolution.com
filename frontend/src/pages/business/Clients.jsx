@@ -115,7 +115,7 @@ export default function Clients() {
           {canManage && (
             <button
               onClick={startCreate}
-              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
             >
               New client
             </button>
@@ -147,7 +147,7 @@ export default function Clients() {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
             >
               {submitting ? 'Saving…' : 'Save'}
             </button>
@@ -194,7 +194,7 @@ export default function Clients() {
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.phone || '—'}</td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <button onClick={() => startEdit(client)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                          <button onClick={() => startEdit(client)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
                             Edit
                           </button>
                           <button onClick={() => handleDelete(client)} className="text-red-600 hover:text-red-500">
@@ -208,7 +208,7 @@ export default function Clients() {
               </table>
             </div>
 
-            <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+            <div className="flex flex-col gap-2.5 sm:hidden">
               {visibleClients.map((client) => (
                 <MobileListAccordion
                   key={client.id}
@@ -228,7 +228,7 @@ export default function Clients() {
                   </div>
                   {canManage && (
                     <div className="flex gap-4 pt-1">
-                      <button onClick={() => startEdit(client)} className="text-indigo-600 hover:text-indigo-500">
+                      <button onClick={() => startEdit(client)} className="text-lagoon-600 hover:text-lagoon-500">
                         Edit
                       </button>
                       <button onClick={() => handleDelete(client)} className="text-red-600 hover:text-red-500">
@@ -259,7 +259,7 @@ function Field({ label, value, onChange, type = 'text', required = false }) {
         required={required}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+        className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
       />
     </label>
   );

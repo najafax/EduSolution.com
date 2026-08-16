@@ -136,7 +136,7 @@ export default function InvoiceDetail() {
             Download PDF
           </button>
           {canManage && (
-            <button onClick={() => setEmailModal({ type: 'send' })} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
+            <button onClick={() => setEmailModal({ type: 'send' })} disabled={busy} className="min-h-11 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
               Email to client
             </button>
           )}
@@ -169,6 +169,31 @@ export default function InvoiceDetail() {
       {invoice.last_reminder_sent_at && (
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Last reminder sent {invoice.last_reminder_sent_at}</p>
       )}
+
+      {/* Mobile-only summary hero — desktop already shows Total/Balance due
+          via the "Details" card below, this just surfaces it before the
+          fold on a phone, with a paid-vs-total progress bar the desktop
+          layout has no equivalent for. */}
+      <div className="mt-6 rounded-2xl bg-gradient-to-br from-lagoon-600 to-lagoon-700 p-5 text-white shadow-lg shadow-lagoon-900/20 sm:hidden">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-lagoon-100">Total due</p>
+        <p className="font-display text-3xl font-extrabold tabular-nums">{symbol}{invoice.total.toFixed(2)}</p>
+        <div className="mt-3.5 h-1.5 overflow-hidden rounded-full bg-white/25">
+          <div
+            className="h-full rounded-full bg-white"
+            style={{ width: `${Math.min(100, Math.max(0, (invoice.amount_paid / invoice.total) * 100 || 0))}%` }}
+          />
+        </div>
+        <div className="mt-2.5 flex justify-between text-sm">
+          <div>
+            <span className="block text-[10.5px] text-lagoon-100">Paid</span>
+            <b className="tabular-nums">{symbol}{invoice.amount_paid.toFixed(2)}</b>
+          </div>
+          <div className="text-right">
+            <span className="block text-[10.5px] text-lagoon-100">Balance</span>
+            <b className="tabular-nums">{symbol}{invoice.balance_due.toFixed(2)}</b>
+          </div>
+        </div>
+      </div>
 
       <div className="mt-6 grid gap-6 sm:grid-cols-2">
         <Accordion title="Bill to">
@@ -216,7 +241,7 @@ export default function InvoiceDetail() {
                 so mobile just gets a stacked card per item instead. */}
             <div className="divide-y divide-slate-100 text-sm sm:hidden dark:divide-slate-800">
               {items.map((item) => (
-                <div key={item.id} className="flex items-start justify-between gap-3 px-6 py-3">
+                <div key={item.id} className="flex items-start justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="text-slate-900 dark:text-white">{item.description}</p>
                     <p className="text-slate-500 dark:text-slate-400">{item.quantity} × {symbol}{item.unit_price.toFixed(2)}</p>
@@ -251,7 +276,7 @@ export default function InvoiceDetail() {
             invoice.balance_due > 0 && (
               <button
                 onClick={togglePaymentForm}
-                className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500"
+                className="min-h-11 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500"
               >
                 Record payment
               </button>
@@ -270,7 +295,7 @@ export default function InvoiceDetail() {
                   required
                   value={payment.amount}
                   onChange={(e) => setPayment((p) => ({ ...p, amount: e.target.value }))}
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 />
               </label>
               <label className="block">
@@ -278,7 +303,7 @@ export default function InvoiceDetail() {
                 <select
                   value={payment.method}
                   onChange={(e) => setPayment((p) => ({ ...p, method: e.target.value }))}
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 >
                   {METHODS.map((m) => (
                     <option key={m} value={m}>
@@ -289,7 +314,7 @@ export default function InvoiceDetail() {
               </label>
               <label className="block">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Date</span>
-                <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500 dark:border-slate-600">
+                <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
                   <input
                     type="date"
                     required
@@ -305,14 +330,14 @@ export default function InvoiceDetail() {
                   type="text"
                   value={payment.reference}
                   onChange={(e) => setPayment((p) => ({ ...p, reference: e.target.value }))}
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 />
               </label>
               <div className="sm:col-span-2">
                 <button
                   type="submit"
                   disabled={busy}
-                  className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+                  className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
                 >
                   {busy ? 'Recording…' : 'Record payment'}
                 </button>
@@ -343,11 +368,11 @@ export default function InvoiceDetail() {
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.method.replace('_', ' ')}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{symbol}{p.amount.toFixed(2)}</td>
                         <td className="whitespace-nowrap px-6 py-3 text-right">
-                          <button onClick={() => handleDownloadReceipt(p.id)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                          <button onClick={() => handleDownloadReceipt(p.id)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
                             Download
                           </button>
                           {canManage && (
-                            <button onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })} className="text-indigo-600 hover:text-indigo-500">
+                            <button onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })} className="text-lagoon-600 hover:text-lagoon-500">
                               Email
                             </button>
                           )}
@@ -358,7 +383,7 @@ export default function InvoiceDetail() {
                 </table>
               </div>
 
-              <div className="-mx-6 divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+              <div className="flex flex-col gap-2.5 sm:hidden">
                 {payments.map((p) => (
                   <MobileListAccordion
                     key={p.id}
@@ -378,11 +403,11 @@ export default function InvoiceDetail() {
                       <dd className="text-slate-900 dark:text-white">{p.method.replace('_', ' ')}</dd>
                     </div>
                     <div className="flex gap-4 pt-1">
-                      <button onClick={() => handleDownloadReceipt(p.id)} className="text-indigo-600 hover:text-indigo-500">
+                      <button onClick={() => handleDownloadReceipt(p.id)} className="text-lagoon-600 hover:text-lagoon-500">
                         Download
                       </button>
                       {canManage && (
-                        <button onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })} className="text-indigo-600 hover:text-indigo-500">
+                        <button onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })} className="text-lagoon-600 hover:text-lagoon-500">
                           Email
                         </button>
                       )}

@@ -148,7 +148,7 @@ export default function RecurringInvoices() {
         {canManage && (
           <button
             onClick={startCreate}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+            className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
           >
             New template
           </button>
@@ -156,7 +156,7 @@ export default function RecurringInvoices() {
       </div>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
         Each template automatically creates a draft invoice on its next run date — review and send it from the{' '}
-        <Link to="/invoices" className="text-indigo-600 hover:text-indigo-500">
+        <Link to="/invoices" className="text-lagoon-600 hover:text-lagoon-500">
           Invoices
         </Link>{' '}
         page like any other.
@@ -187,7 +187,7 @@ export default function RecurringInvoices() {
               <select
                 value={form.frequency}
                 onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               >
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
@@ -197,7 +197,7 @@ export default function RecurringInvoices() {
 
             <label className="block">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Next run date</span>
-              <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500 dark:border-slate-600">
+              <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
                 <input
                   type="date"
                   required
@@ -215,7 +215,7 @@ export default function RecurringInvoices() {
                 min="0"
                 value={form.due_in_days}
                 onChange={(e) => setForm((f) => ({ ...f, due_in_days: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
 
@@ -228,7 +228,7 @@ export default function RecurringInvoices() {
                 step="0.01"
                 value={form.tax_rate}
                 onChange={(e) => setForm((f) => ({ ...f, tax_rate: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
 
@@ -237,7 +237,7 @@ export default function RecurringInvoices() {
               <select
                 value={form.discount_type}
                 onChange={(e) => setForm((f) => ({ ...f, discount_type: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               >
                 <option value="percentage">Percentage</option>
                 <option value="fixed">Fixed amount</option>
@@ -255,7 +255,7 @@ export default function RecurringInvoices() {
                 step="0.01"
                 value={form.discount_value}
                 onChange={(e) => setForm((f) => ({ ...f, discount_value: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
 
@@ -285,7 +285,7 @@ export default function RecurringInvoices() {
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               rows={2}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
             />
           </label>
 
@@ -293,7 +293,7 @@ export default function RecurringInvoices() {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
             >
               {submitting ? 'Saving…' : 'Save'}
             </button>
@@ -347,7 +347,7 @@ export default function RecurringInvoices() {
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <button onClick={() => startEdit(row)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                          <button onClick={() => startEdit(row)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
                             Edit
                           </button>
                           <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-500">
@@ -361,7 +361,7 @@ export default function RecurringInvoices() {
               </table>
             </div>
 
-            <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+            <div className="flex flex-col gap-2.5 sm:hidden">
               {recurring.map((row) => (
                 <MobileListAccordion
                   key={row.id}
@@ -391,7 +391,7 @@ export default function RecurringInvoices() {
                   </div>
                   {canManage && (
                     <div className="flex gap-4 pt-1">
-                      <button onClick={() => startEdit(row)} className="text-indigo-600 hover:text-indigo-500">
+                      <button onClick={() => startEdit(row)} className="text-lagoon-600 hover:text-lagoon-500">
                         Edit
                       </button>
                       <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-500">

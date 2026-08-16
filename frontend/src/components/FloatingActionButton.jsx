@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
 
+// bottom clears the fixed mobile BottomNav (components/BottomNav.jsx) below it.
 const CLASSES =
-  'fixed z-20 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-500 sm:hidden';
-const STYLE = { right: '1.25rem', bottom: 'calc(1.25rem + env(safe-area-inset-bottom))' };
+  'fixed z-20 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-lagoon-600 to-lagoon-700 text-white shadow-lg shadow-lagoon-900/30 hover:from-lagoon-500 hover:to-lagoon-600 sm:hidden';
+const STYLE = { right: '1.25rem', bottom: 'calc(5.5rem + env(safe-area-inset-bottom))' };
 
 const PlusIcon = () => (
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

@@ -310,7 +310,7 @@ export default function Import() {
             onClick={() => handleTypeChange(t.value)}
             className={`min-h-11 rounded-md px-4 text-sm font-medium ${
               type === t.value
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-lagoon-600 text-white'
                 : 'border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800'
             }`}
           >
@@ -337,7 +337,7 @@ export default function Import() {
               type="file"
               accept=".csv,text/csv"
               onChange={handleFile}
-              className="mt-1 block w-full text-sm text-slate-600 file:mr-4 file:min-h-11 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 dark:text-slate-400 dark:file:bg-indigo-950 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900"
+              className="mt-1 block w-full text-sm text-slate-600 file:mr-4 file:min-h-11 file:rounded-md file:border-0 file:bg-lagoon-50 file:px-4 file:text-sm file:font-medium file:text-lagoon-700 hover:file:bg-lagoon-100 dark:text-slate-400 dark:file:bg-lagoon-950 dark:file:text-lagoon-400 dark:hover:file:bg-lagoon-900"
             />
           </label>
           {fileName && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Selected: {fileName}</p>}
@@ -349,7 +349,7 @@ export default function Import() {
           <button
             onClick={handlePreview}
             disabled={!csvText || busy}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
           >
             {busy ? 'Working…' : 'Preview'}
           </button>

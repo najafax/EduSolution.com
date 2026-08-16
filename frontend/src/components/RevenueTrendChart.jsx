@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 
 // Two series on one shared $ axis (never dual-axis) — Invoiced vs Paid,
-// same brand colors used for status elsewhere in the app (indigo = brand,
+// same brand colors used for status elsewhere in the app (lagoon = brand,
 // emerald = money received), so the chart reads consistently with the rest
 // of the UI rather than introducing a new arbitrary palette.
-const INVOICED_COLOR = '#4f46e5';
+const INVOICED_COLOR = '#0e7c86';
 const PAID_COLOR = '#059669';
 
 const WIDTH = 600;

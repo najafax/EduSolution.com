@@ -120,7 +120,7 @@ export default function Expenses() {
           {canManage && (
             <button
               onClick={startCreate}
-              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
             >
               New expense
             </button>
@@ -142,7 +142,7 @@ export default function Expenses() {
             <select
               value={form.category}
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
             >
               {categories.map((c) => (
                 <option key={c} value={c}>
@@ -160,7 +160,7 @@ export default function Expenses() {
               required
               value={form.amount}
               onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
             />
           </label>
           <div className="sm:col-span-2">
@@ -171,13 +171,13 @@ export default function Expenses() {
                 required
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
               />
             </label>
           </div>
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Date</span>
-            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500">
+            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500">
               <input
                 type="date"
                 required
@@ -194,7 +194,7 @@ export default function Expenses() {
                 type="text"
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
               />
             </label>
           </div>
@@ -202,7 +202,7 @@ export default function Expenses() {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
             >
               {submitting ? 'Saving…' : 'Save'}
             </button>
@@ -251,7 +251,7 @@ export default function Expenses() {
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{expense.amount.toFixed(2)}</td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <button onClick={() => startEdit(expense)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                          <button onClick={() => startEdit(expense)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
                             Edit
                           </button>
                           <button onClick={() => handleDelete(expense)} className="text-red-600 hover:text-red-500">
@@ -275,7 +275,7 @@ export default function Expenses() {
             </div>
 
             <div className="sm:hidden">
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="flex flex-col gap-2.5">
                 {visibleExpenses.map((expense) => (
                   <MobileListAccordion
                     key={expense.id}
@@ -296,7 +296,7 @@ export default function Expenses() {
                     </div>
                     {canManage && (
                       <div className="flex gap-4 pt-1">
-                        <button onClick={() => startEdit(expense)} className="text-indigo-600 hover:text-indigo-500">
+                        <button onClick={() => startEdit(expense)} className="text-lagoon-600 hover:text-lagoon-500">
                           Edit
                         </button>
                         <button onClick={() => handleDelete(expense)} className="text-red-600 hover:text-red-500">
@@ -307,7 +307,7 @@ export default function Expenses() {
                   </MobileListAccordion>
                 ))}
               </div>
-              <div className="flex justify-between border-t border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900 dark:border-slate-700 dark:text-white">
+              <div className="mt-2.5 flex justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-white">
                 <span>Total</span>
                 <span>{total.toFixed(2)}</span>
               </div>
