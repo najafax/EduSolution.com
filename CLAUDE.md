@@ -525,28 +525,52 @@ Status/derived-field conventions worth knowing before touching this code:
 - `routes/dataReset.js` (mounted at `/api/data-reset`, `requireAuth` +
   `requireAdmin`, its own `router.use()` chain independent of the
   `requirePermission`/module system entirely) — `POST /` bulk-deletes
-  `clients`, `quotes`/`quote_items`, `invoices`/`invoice_items`/`payments`,
-  `recurring_invoices`/`recurring_invoice_items`, `expenses`, and
-  `activity_log` in one transaction (foreign key checks are briefly turned
-  off for the transaction, then back on — see `db/index.js`'s `PRAGMA
-  foreign_keys`), and resets each cleared table's `AUTOINCREMENT` counter
-  so a fresh import starts numbering from 1 again. `products` is only
-  included when the request explicitly sets `includeProducts: true` — a
-  catalog is often worth keeping across a reset, unlike everything else
-  here. `users`, `user_permissions`, and `business_settings` are never
-  touched by this route at all, not even conditionally: login and branding
-  must survive a reset. Requires `confirm: "DELETE"` in the body (checked
+  whichever tables the caller picks via a `categories` array (one or more
+  of `clients`, `quotes`, `invoices`, `recurring`, `expenses`, `products`,
+  `activity`), rather than an all-or-nothing clear. A `CATEGORIES` map
+  translates each picked key into the actual table(s) it touches (e.g.
+  `invoices` → `invoice_items`, `payments`, `invoices`); `clients` is the
+  one category that always pulls in more than its own table —
+  `quotes`/`invoices`/`recurring_invoices` (and their items/payments) too,
+  even if the caller only ticked "clients" — because `client_id` is a
+  `NOT NULL REFERENCES clients(id)` column on all three (see `db/index.js`),
+  so leaving them behind would silently orphan them: invisible to every
+  list page's `INNER JOIN` against `clients`, but still sitting in the
+  database forever. Every other category is safe to clear on its own. The
+  request 400s with "Select at least one type of data to delete" if
+  `categories` is missing or empty, or if it contains no recognized key.
+  The selected categories' tables are deleted in one transaction (foreign
+  key checks are briefly turned off for the transaction, then back on —
+  see `db/index.js`'s `PRAGMA foreign_keys`) in a fixed `TABLE_ORDER` so
+  children are always cleared before the parents they'd otherwise
+  reference, and each cleared table's `AUTOINCREMENT` counter is reset so
+  a fresh import starts numbering from 1 again. After the deletes, three
+  defensive `UPDATE`s NULL out nullable, unenforced cross-references that
+  carry no `REFERENCES` constraint at all (`invoices.quote_id`,
+  `quotes.converted_invoice_id`, `invoices.recurring_invoice_id` — see
+  `db/index.js`) whenever one side of a soft link was cleared without the
+  other, so a surviving row never points at an id that no longer exists.
+  `users`, `user_permissions`, and `business_settings` are never touched by
+  this route at all, not even conditionally: login and branding must
+  survive a reset. Requires `confirm: "DELETE"` in the body (checked
   server-side, independent of whatever confirmation UI the frontend adds)
   or the whole request 400s before touching anything. Logs one
   `activity_log` entry summarizing what was cleared — written *after* the
   delete (not before), so it survives even when `activity_log` was itself
-  one of the tables just wiped, becoming the first fresh entry for anyone
+  one of the cleared tables, becoming the first fresh entry for anyone
   auditing later. `pages/business/Import.jsx`'s `DangerZone` component
   (rendered only when `user.role === 'admin'`, re-checking the same
   condition the backend enforces rather than trusting a hidden button) is
-  the only caller — a type-to-confirm text input matching the literal word
-  `DELETE` gates the button, plus a native `confirm()` as a second layer,
-  before `api.dataReset.run()` is ever called.
+  the only caller — a checkbox per category (`RESET_CATEGORIES`), with
+  checking "Clients" auto-checking and disabling its three dependent
+  categories client-side (mirroring the backend's forced cascade, with an
+  "Included automatically with Clients." hint rather than letting someone
+  uncheck a category the backend would clear anyway) — plus a
+  type-to-confirm text input matching the literal word `DELETE` and a
+  native `confirm()` as a second layer, both gating the button (which also
+  requires at least one category checked, and shows the live selection
+  count in its label) before `api.dataReset.run(confirm, categories,
+  token)` is ever called.
 - `routes/users.js` (mounted at `/api/users`, `requireAuth` +
   `requirePermission('users', 'view'|'manage')` per route) — the in-app
   admin user-management API: `GET /` (list), `GET /:id` (user +

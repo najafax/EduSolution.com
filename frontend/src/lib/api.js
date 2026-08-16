@@ -166,8 +166,7 @@ export const api = {
   },
 
   dataReset: {
-    run: (confirm, includeProducts, token) =>
-      request('/data-reset', { method: 'POST', body: { confirm, includeProducts }, token }),
+    run: (confirm, categories, token) => request('/data-reset', { method: 'POST', body: { confirm, categories }, token }),
   },
 
   users: {

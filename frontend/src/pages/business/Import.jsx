@@ -46,31 +46,70 @@ function downloadTemplate(type) {
 
 const CONFIRM_PHRASE = 'DELETE';
 
+// Matches backend/src/routes/dataReset.js's CATEGORIES exactly — the
+// server is the source of truth for which tables each key actually clears,
+// this is just the checkbox list. "clients" forces quotes/invoices/
+// recurring on too (see `forces` below) since those NOT NULL-reference
+// client_id and the backend clears them regardless of whether they're
+// individually ticked — forcing them here just keeps the UI honest about
+// what will actually happen.
+const RESET_CATEGORIES = [
+  {
+    key: 'clients',
+    label: 'Clients',
+    hint: 'Also deletes every quote, invoice, payment, and recurring invoice tied to them.',
+    forces: ['quotes', 'invoices', 'recurring'],
+  },
+  { key: 'quotes', label: 'Quotes' },
+  { key: 'invoices', label: 'Invoices & payments' },
+  { key: 'recurring', label: 'Recurring invoice templates' },
+  { key: 'expenses', label: 'Expenses' },
+  { key: 'products', label: 'Product catalog' },
+  { key: 'activity', label: 'Activity log' },
+];
+
+const CLIENTS_FORCES = RESET_CATEGORIES.find((c) => c.key === 'clients').forces;
+
 // Admin-only (checked by the caller, not just the import:manage permission
 // every other section of this page is gated on — see routes/dataReset.js's
-// requireAdmin) — bulk-deletes clients/quotes/invoices/payments/expenses/
-// recurring invoices/activity log in one shot, e.g. to clear out test data
-// before importing real historical records. Login and business settings
-// are never touched by the backend route regardless of what's selected here.
+// requireAdmin) — bulk-deletes whichever categories are ticked, e.g. to
+// clear out test data before importing real historical records. Login and
+// business settings are never touched by the backend route regardless of
+// what's selected here.
 function DangerZone({ token }) {
-  const [includeProducts, setIncludeProducts] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
   const [confirmText, setConfirmText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
 
-  const canConfirm = confirmText === CONFIRM_PHRASE;
+  const canConfirm = confirmText === CONFIRM_PHRASE && selected.size > 0;
+
+  function toggle(key) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+        const category = RESET_CATEGORIES.find((c) => c.key === key);
+        category?.forces?.forEach((f) => next.add(f));
+      }
+      return next;
+    });
+  }
 
   async function handleClear() {
     if (!canConfirm) return;
-    if (!confirm('This permanently deletes all business data. This cannot be undone. Continue?')) return;
+    if (!confirm('This permanently deletes the selected data. This cannot be undone. Continue?')) return;
     setBusy(true);
     setError('');
     setResult(null);
     try {
-      const res = await api.dataReset.run(CONFIRM_PHRASE, includeProducts, token);
+      const res = await api.dataReset.run(CONFIRM_PHRASE, [...selected], token);
       setResult(res);
       setConfirmText('');
+      setSelected(new Set());
     } catch (err) {
       setError(err.message);
     } finally {
@@ -82,20 +121,31 @@ function DangerZone({ token }) {
     <div className="mt-10 rounded-lg border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-950/40">
       <h2 className="text-sm font-semibold text-red-900 dark:text-red-300">Danger zone</h2>
       <p className="mt-1 text-sm text-red-800 dark:text-red-400">
-        Permanently delete every client, quote, invoice, payment, expense, recurring invoice, and activity log
-        entry — useful for clearing out test data before importing real historical records. Your login and
-        business settings are never affected. This cannot be undone.
+        Tick the data you want permanently deleted — useful for clearing out test data before importing real
+        historical records. Your login and business settings are never affected. This cannot be undone.
       </p>
 
-      <label className="mt-4 flex min-h-11 items-center gap-2">
-        <input
-          type="checkbox"
-          checked={includeProducts}
-          onChange={(e) => setIncludeProducts(e.target.checked)}
-          className="h-4 w-4 rounded border-red-300"
-        />
-        <span className="text-sm text-red-800 dark:text-red-400">Also delete the product catalog</span>
-      </label>
+      <div className="mt-4 flex flex-col gap-1">
+        {RESET_CATEGORIES.map((c) => {
+          const forcedOn = c.key !== 'clients' && selected.has('clients') && CLIENTS_FORCES.includes(c.key);
+          return (
+            <label key={c.key} className="flex min-h-11 items-start gap-2 py-1">
+              <input
+                type="checkbox"
+                checked={selected.has(c.key)}
+                onChange={() => toggle(c.key)}
+                disabled={forcedOn}
+                className="mt-3.5 h-4 w-4 shrink-0 rounded border-red-300 disabled:opacity-60"
+              />
+              <span className="flex flex-col justify-center text-sm text-red-800 dark:text-red-400">
+                {c.label}
+                {c.hint && <span className="text-xs text-red-600 dark:text-red-500">{c.hint}</span>}
+                {forcedOn && <span className="text-xs text-red-600 dark:text-red-500">Included automatically with Clients.</span>}
+              </span>
+            </label>
+          );
+        })}
+      </div>
 
       <label className="mt-4 block max-w-xs">
         <span className="text-sm font-medium text-red-900 dark:text-red-300">
@@ -127,7 +177,7 @@ function DangerZone({ token }) {
         disabled={!canConfirm || busy}
         className="mt-4 min-h-11 rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
       >
-        {busy ? 'Clearing…' : 'Clear all business data'}
+        {busy ? 'Clearing…' : `Clear selected data${selected.size ? ` (${selected.size})` : ''}`}
       </button>
     </div>
   );
