@@ -217,6 +217,23 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS licenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL REFERENCES clients(id),
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    billing_cycle TEXT NOT NULL DEFAULT 'yearly',
+    amount REAL NOT NULL DEFAULT 0,
+    start_date TEXT NOT NULL,
+    expiry_date TEXT NOT NULL,
+    notes TEXT NOT NULL DEFAULT '',
+    last_renewed_at TEXT,
+    last_reminder_sent_at TEXT,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoices_client ON invoices(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
@@ -225,6 +242,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_recurring_items ON recurring_invoice_items(recurring_invoice_id);
   CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at);
   CREATE INDEX IF NOT EXISTS idx_email_log_created ON email_log(created_at);
+  CREATE INDEX IF NOT EXISTS idx_licenses_client ON licenses(client_id);
+  CREATE INDEX IF NOT EXISTS idx_licenses_expiry ON licenses(expiry_date);
 `);
 
 // Lightweight migration for columns added to `users` after this table

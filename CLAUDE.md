@@ -111,8 +111,8 @@ backend port in frontend code.
 - `lib/permissions.js` — the single source of truth for the permission
   model. `MODULES` is the fixed list of gatable modules (`clients`,
   `products`, `quotes`, `invoices`, `expenses`, `recurring_invoices`,
-  `financials`, `activity`, `settings`, `users`, `import`) — kept as a
-  hardcoded list
+  `licenses`, `financials`, `activity`, `settings`, `users`, `import`) —
+  kept as a hardcoded list
   (rather than derived from route files) so a typo'd module name in a route
   fails closed instead of silently creating a new, ungrantable slot.
   `hasPermission(user, module, level)` short-circuits to `true` for
@@ -310,17 +310,19 @@ are deliberately untouched by either, always returning every row.
   has a matching `GET .../<action>-preview` route — `GET
   /quotes/:id/send-preview`, `GET /invoices/:id/send-preview`, `GET
   /invoices/:id/remind-preview`, `GET
-  /invoices/:id/payments/:paymentId/receipt-preview` — all gated `manage`
+  /invoices/:id/payments/:paymentId/receipt-preview`, `GET
+  /licenses/:id/remind-preview` — all gated `manage`
   (same as the send routes themselves) that return `{ to, subject,
   message }`. `lib/emailTemplates.js` is the single source of that default
   text (`quoteSendEmail`/`invoiceSendEmail`/`invoiceRemindEmail`/
-  `receiptSendEmail`, each taking the relevant row(s) + `settings` +
-  `publicUrl` where applicable) — the preview route and the actual send
-  route call the *same* function, so what's shown for editing can never
-  drift from what would be sent if left unedited. The send routes
+  `receiptSendEmail`/`licenseRemindEmail`, each taking the relevant row(s) +
+  `settings` + `publicUrl` where applicable) — the preview route and the
+  actual send route call the *same* function, so what's shown for editing
+  can never drift from what would be sent if left unedited. The send routes
   (`POST /quotes/:id/send`, `POST /invoices/:id/send`, `POST
   /invoices/:id/remind`, `POST /invoices/:id/payments/:paymentId/send-
-  receipt`) now accept optional `subject`/`message` in the body —
+  receipt`, `POST /licenses/:id/remind`) now accept optional
+  `subject`/`message` in the body —
   a blank/whitespace-only value (or the field omitted entirely) falls back
   to `emailTemplates.js`'s default rather than sending an empty subject/
   body, so a programmatic caller that skips the preview step still gets
@@ -340,7 +342,11 @@ are deliberately untouched by either, always returning every row.
   action; `InvoiceDetail.jsx` uses one shared instance for all three of
   its send actions (send/remind/receipt), switched by an `emailModal`
   state object (`{ type: 'send' | 'remind' | 'receipt', paymentId? }`)
-  that picks which preview/send API calls to wire up.
+  that picks which preview/send API calls to wire up. An optional
+  `showAttachmentNote` prop (default `true`) toggles the "The PDF is
+  attached automatically" hint line — `Licenses.jsx` passes `false` for its
+  own reminder instance, since a license reminder has no PDF to attach
+  (see `routes/licenses.js` above).
 - `routes/expenses.js` — CRUD for `expenses` (category/description/amount/
   expense_date/notes) plus `GET /` (`?q=` search, `?page=` — see
   "Pagination convention" above) and `GET /export.csv`. `GET /` also always
@@ -364,6 +370,50 @@ are deliberately untouched by either, always returning every row.
   from current unit prices every time an invoice is actually generated (see
   `lib/scheduler.js` below), since prices may have changed since the
   template was saved.
+- `routes/licenses.js` — CRUD for `licenses` (a client's subscription/
+  license, not a document like an invoice — no PDF, no public token, no
+  numbering scheme). `status` only ever *stores* `active` | `cancelled`;
+  everything else a viewer cares about (`expired`, `expiring_soon`) is
+  *derived* at read time from `expiry_date` vs. today, the same
+  don't-store-what-you-can-compute approach `invoices.js`'s `withComputed()`
+  takes for `is_overdue`/`is_partially_paid` — every response carries both
+  the raw `status` and a computed `display_status` (`active` | `expiring_soon`
+  | `expired` | `cancelled`), and only `display_status` is what
+  `StatusBadge`/the mobile accent stripe render. `EXPIRY_WARNING_DAYS = 14`
+  is the one threshold controlling both when a still-active license starts
+  reading as `expiring_soon` and which licenses `lib/scheduler.js`'s
+  automated alert job (below) treats as candidates — duplicated as a literal
+  over there rather than imported (same acceptable-duplication call as
+  `EXPENSE_CATEGORIES` between `routes/expenses.js`/`routes/import.js`; keep
+  both in sync). `GET /` supports `?q=` (license name or client name) and
+  `?status=` (one of the four `display_status` values — `statusWhere()`
+  translates each into the actual SQL date comparison against `expiry_date`,
+  since only `cancelled` is a direct column match) composed with `?page=`
+  (see "Pagination convention" above). `GET /summary` is independent of
+  pagination/search — a `{ active, expiring_soon, expired, cancelled, total }`
+  count across every license, backing the KPI strip at the top of
+  `Licenses.jsx` — and `GET /export.csv`, both following the usual
+  conventions. **The core action**: `POST /:id/renew` is "the client paid,
+  extend it" — advances `expiry_date` by one `billing_cycle` (`monthly` or
+  `yearly`, month-end-clamped the same way `lib/scheduler.js`'s own
+  `advanceDate()` handles Jan 31 → Feb) from *whichever is later*, the
+  current `expiry_date` or today: renewing early keeps the remaining time
+  instead of losing it, renewing a lapsed license extends from today instead
+  of compounding a backdated short window off the old expiry. Blocked (409)
+  only when `status` is already `cancelled` — a cancelled license needs an
+  explicit edit back to `active` first, `renew` is for "still active, just
+  needs paying," not for un-cancelling. Renewing also clears
+  `last_reminder_sent_at` back to `NULL`, so a license that was reminded
+  right before renewal doesn't inherit a stale suppression window blocking
+  its *next* expiry cycle's alerts. **Email reminder**: `GET
+  /:id/remind-preview` + `POST /:id/remind` follow the exact "preview then
+  send" contract documented under "Email preview before sending" below —
+  `lib/emailTemplates.js`'s `licenseRemindEmail()` backs both, logged to
+  `email_log` as type `license_remind`. Unlike invoice/quote sends, there's
+  no PDF attachment (a license isn't a document), so the send route is
+  plain `sendMail({ to, subject, html })` with no buffer/attachment step.
+  Blocked (409) the same as renew when `status` is `cancelled`. Every
+  mutation (create/update/delete/renew/remind) calls `logActivity()`.
 - `routes/public.js` — mounted at `/api/public`, the one route file **not**
   behind `requireAuth`. Looks quotes/invoices up by their `public_token`
   (a random 16-byte hex column generated on every quote/invoice create,
@@ -473,25 +523,31 @@ are deliberately untouched by either, always returning every row.
   client-facing send action; see "Email preview before sending" above. Now
   admin-editable via the Email Center (`routes/emailCenter.js`/
   `pages/EmailCenter.jsx` below): `DEFAULT_TEMPLATES` holds the built-in
-  text for the 4 editable types (`quote_send`, `invoice_send`,
-  `invoice_remind`, `receipt_send`) as `{{placeholder}}` strings (e.g.
-  `Quote {{quote_number}} from {{business_name}}`); the `email_templates`
-  table (one row per `type`, primary-keyed on it — see `db/index.js`) holds
-  an optional admin override. `renderTemplate(str, vars)` does the
-  `{{key}}` substitution — an unknown placeholder is left as literal text
-  rather than blanked, so an admin typo is visible/debuggable instead of
-  silently vanishing. `buildEmail(type, to, vars)` picks the stored
-  override if one exists, else the default, renders both subject and
-  message, and is what the four exported functions
+  text for the 5 editable types (`quote_send`, `invoice_send`,
+  `invoice_remind`, `receipt_send`, `license_remind`) as `{{placeholder}}`
+  strings (e.g. `Quote {{quote_number}} from {{business_name}}`); the
+  `email_templates` table (one row per `type`, primary-keyed on it — see
+  `db/index.js`) holds an optional admin override. `renderTemplate(str,
+  vars)` does the `{{key}}` substitution — an unknown placeholder is left as
+  literal text rather than blanked, so an admin typo is visible/debuggable
+  instead of silently vanishing. `buildEmail(type, to, vars)` picks the
+  stored override if one exists, else the default, renders both subject and
+  message, and is what the five exported functions
   (`quoteSendEmail`/`invoiceSendEmail`/`invoiceRemindEmail`/
-  `receiptSendEmail`) now call internally — their signatures are unchanged,
-  so every existing call site (the preview/send routes in
-  `routes/quotes.js`/`routes/invoices.js`) needed no changes at all.
-  `PLACEHOLDERS` documents which `{{...}}` keys are valid per type (shown
-  as a hint in the Email Center UI); `TYPE_LABELS` is the human-readable
-  name per type. `getAllTemplates()`/`setTemplate(type, {subject,
+  `receiptSendEmail`/`licenseRemindEmail`) now call internally — their
+  signatures are unchanged, so every existing call site (the preview/send
+  routes in `routes/quotes.js`/`routes/invoices.js`/`routes/licenses.js`)
+  needed no changes at all when this template system was added; adding
+  `licenseRemindEmail` later needed no changes to `getAllTemplates()`/
+  `setTemplate()`/`resetTemplate()` below either, since they all iterate
+  `DEFAULT_TEMPLATES`' own keys generically — a 5th type just needed an
+  entry in `DEFAULT_TEMPLATES`/`PLACEHOLDERS`/`TYPE_LABELS` and it's
+  automatically picked up everywhere. `PLACEHOLDERS` documents which
+  `{{...}}` keys are valid per type (shown as a hint in the Email Center
+  UI); `TYPE_LABELS` is the human-readable name per type.
+  `getAllTemplates()`/`setTemplate(type, {subject,
   message})`/`resetTemplate(type)` are the admin-management functions
-  `routes/emailCenter.js` calls — `getAllTemplates()` returns all 4 types
+  `routes/emailCenter.js` calls — `getAllTemplates()` returns all 5 types
   with whichever text is currently effective (stored override or default)
   plus `isCustom` (so the frontend only shows "Reset to default" when
   there's actually an override to clear) and the raw
@@ -502,7 +558,17 @@ are deliberately untouched by either, always returning every row.
   human-triggered send, nobody reviews it before it goes out), so it never
   reads from this file; its sends are still recorded to the Email Center's
   sent log under a distinct `overdue_reminder` type, just not through
-  `buildEmail()`.
+  `buildEmail()`. The automated license-expiry alert
+  (`lib/scheduler.js`'s `runLicenseExpiryAlerts()`) is the **opposite**
+  case, deliberately: it calls `licenseRemindEmail()` — the very same
+  admin-editable template the manual "Remind" button uses — rather than
+  hardcoding its own text like the overdue-reminder digest does, so an
+  admin who customizes the license reminder wording gets that wording
+  whether a human clicked "Remind" or the cron job sent it automatically.
+  Its sends are still logged under their own distinct type
+  (`license_expiry_alert`, see `lib/emailLog.js` below) purely so the sent
+  log can tell "a human sent this" apart from "the cron job sent this,"
+  the same reason `overdue_reminder` is distinct from `invoice_remind`.
 - `lib/emailLog.js` — `logEmail({ type, to, subject, sentByName,
   entityType, entityId, entityLabel })` inserts one row into `email_log`
   (see `db/index.js`), backing the Email Center's sent log
@@ -511,15 +577,20 @@ are deliberately untouched by either, always returning every row.
   logs its own separate "sent"/"sent reminder for" entry per send action,
   but never captures recipient email or subject — this is additive, not a
   replacement, and every call site logs to both. Called after a
-  *successful* `sendMail()` only (never on a caught error) from all 4
+  *successful* `sendMail()` only (never on a caught error) from all 5
   manual send routes (`routes/quotes.js`'s `POST /:id/send`;
   `routes/invoices.js`'s `POST /:id/send`, `POST /:id/remind`, and
-  `POST /:id/payments/:paymentId/send-receipt`, logged as types
-  `quote_send`/`invoice_send`/`invoice_remind`/`receipt_send` respectively
-  — the same 4 types `emailTemplates.js` covers) and from the automated
-  overdue-reminder job (`lib/scheduler.js`'s `runOverdueReminders()`, type
-  `overdue_reminder`, `sentByName: 'Automated'`) — the one log entry type
-  with no editable template. `notifyStaffOfReminders()`'s internal opt-in
+  `POST /:id/payments/:paymentId/send-receipt`; `routes/licenses.js`'s
+  `POST /:id/remind` — logged as types
+  `quote_send`/`invoice_send`/`invoice_remind`/`receipt_send`/
+  `license_remind` respectively, the same 5 types `emailTemplates.js`
+  covers) and from the two automated jobs in `lib/scheduler.js`
+  (`runOverdueReminders()`, type `overdue_reminder`, and
+  `runLicenseExpiryAlerts()`, type `license_expiry_alert` — both
+  `sentByName: 'Automated'`) — the two log entry types with no *distinct*
+  editable template of their own (`license_expiry_alert` reuses
+  `license_remind`'s template as explained above; `overdue_reminder` has no
+  template at all). `notifyStaffOfReminders()`'s internal opt-in
   staff digest (also in `lib/scheduler.js`) is deliberately **not**
   logged here — it's an internal notification about client emails already
   logged, not itself a client-facing send.
@@ -617,9 +688,9 @@ are deliberately untouched by either, always returning every row.
   directly over the live `DB_PATH` — swapping a restored file in is a
   deliberate manual step (stop the backend, replace the file, restart).
 - `lib/scheduler.js` — `startScheduler()` (called once from `index.js`'s
-  `app.listen` callback) registers three `node-cron` jobs, all server-time:
+  `app.listen` callback) registers four `node-cron` jobs, all server-time:
   - `0 3 * * *` — `runBackup()` (see `lib/backup.js` above), scheduled
-    ahead of the other two jobs so a backup reflects state from before
+    ahead of the other jobs so a backup reflects state from before
     the day's automated invoice/reminder mutations.
   - `0 7 * * *` — `generateDueRecurringInvoices()`: for every
     `recurring_invoices` row with `active=1` and `next_run_date <= today`,
@@ -648,9 +719,27 @@ are deliberately untouched by either, always returning every row.
     it only runs after the SMTP-configured check above, it's naturally
     dormant (never even reached) when SMTP isn't set — no separate gate
     needed.
-  All three jobs are also exported directly (`runBackup`,
-  `generateDueRecurringInvoices`, `runOverdueReminders`) so they can be
-  invoked outside the cron schedule (tests, or a manual "run now" action).
+  - `15 8 * * *` — `runLicenseExpiryAlerts()`: staggered 15 minutes after
+    the overdue-reminder job purely so the two jobs' console output doesn't
+    interleave, not for any functional reason. Same shape as
+    `runOverdueReminders()` — skips entirely if `SMTP_HOST` isn't set,
+    same 7-day `last_reminder_sent_at` re-send suppression — but selects
+    `licenses` where `status = 'active'` and `expiry_date` is within
+    `routes/licenses.js`'s `EXPIRY_WARNING_DAYS` (14, duplicated here as a
+    literal — see that file's own comment) of today, which naturally
+    includes already-lapsed licenses too (a past `expiry_date` is always
+    `<=` today+14). Emails via `licenseRemindEmail()` — the same
+    admin-editable template the manual "Remind" button on `Licenses.jsx`
+    uses, see `lib/emailTemplates.js` above for why this is the one
+    automated job that reuses an editable template instead of hardcoding
+    its own text — with no PDF attachment (a license isn't a document).
+    Logged to `email_log` as type `license_expiry_alert`. No staff-digest
+    equivalent to `notifyStaffOfReminders()` for this job — that's scoped
+    to overdue invoices specifically, not extended here.
+  All four jobs are also exported directly (`runBackup`,
+  `generateDueRecurringInvoices`, `runOverdueReminders`,
+  `runLicenseExpiryAlerts`) so they can be invoked outside the cron
+  schedule (tests, or a manual "run now" action).
 
 Status/derived-field conventions worth knowing before touching this code:
 - Quote `status`: `draft | sent | accepted | declined | expired`, set
@@ -1049,6 +1138,30 @@ frontend stops holding/sending it.
   column in the list table.
   `Expenses.jsx` and `RecurringInvoices.jsx` also follow that pattern (no
   separate detail page — edit happens inline in the list).
+  `Licenses.jsx` (route `/licenses`) is the same list+inline-modal-form+FAB
+  pattern once more, with two additions on top: a KPI summary strip
+  (`KpiCard`s for Active/Expiring soon/Expired/Cancelled counts, from
+  `api.licenses.summary()` — independent of the list's own pagination/
+  search/`?status=` filter, called on load and refreshed after every
+  mutation via a local `loadSummary()`) and a `rowActions()` helper shared
+  between the desktop table's action cell and each mobile
+  `MobileListAccordion` card's expanded body, since both need the exact
+  same conditional Renew/Remind/Edit/Delete buttons and duplicating them
+  would drift. Renew and Remind buttons are conditioned on the row's raw
+  `status` (`active`/`cancelled`), not the computed `display_status` — a
+  lapsed-but-not-cancelled license (`display_status: 'expired'`) still
+  shows both, mirroring `routes/licenses.js`'s own guards exactly (Renew
+  is blocked only by `cancelled`, not by having already expired — that's
+  the whole point of a renew button). The "New license"/"Edit license"
+  modal's Status field (`active`/`cancelled`) only renders while editing
+  an existing license (`editingId` truthy) — a brand-new license is always
+  created `active`, there's nothing to toggle yet. Mobile cards get the
+  same accent-stripe treatment as `Invoices.jsx`/`Quotes.jsx`, keyed off
+  `display_status` via a local `ACCENT` map (emerald/amber/red/slate for
+  active/expiring_soon/expired/cancelled). Amounts use plain
+  `.toFixed(2)`, not `lib/money.js`'s compact formatter — per that file's
+  own scoping note, compacting is for Dashboard/Financials summary views,
+  not a list page reviewing individual records.
   `ActivityLog.jsx` is a simple paginated read-only list. `Import.jsx` (linked from `Settings.jsx`, not a top-level
   Navbar item — it's a rare-use admin tool) reads a chosen CSV file
   client-side via `FileReader`, calls `api.import.run(type, csv, commit,
@@ -1173,10 +1286,11 @@ frontend stops holding/sending it.
   gap-2.5` rather than `divide-y` (the mobile visual redesign pass, see
   "Mobile design system" below). An optional `accent` prop (a Tailwind
   `bg-*` class, e.g. `bg-red-500` for an overdue invoice) renders as a 4px
-  left stripe — `Invoices.jsx`/`Quotes.jsx` are the two callers that pass
-  it (via a local `ACCENT` map keyed by status, mirroring `StatusBadge`'s
-  own color semantics), everything else omits it since Clients/Products/
-  Users/etc. have no comparable per-row status dimension. That stripe is
+  left stripe — `Invoices.jsx`/`Quotes.jsx`/`Licenses.jsx` are the callers
+  that pass it (via a local `ACCENT` map keyed by status, mirroring
+  `StatusBadge`'s own color semantics), everything else omits it since
+  Clients/Products/Users/etc. have no comparable per-row status dimension.
+  That stripe is
   rendered on a plain wrapping `<div>` around `<details>`, not inside
   `<details>` itself — Chrome 120+ wraps a `<details>`'s post-summary
   content in an internal `::details-content` box that collapses to zero

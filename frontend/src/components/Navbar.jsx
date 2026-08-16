@@ -20,6 +20,7 @@ export const BUSINESS_LINKS = [
   { to: '/quotes', label: 'Quotes', module: 'quotes' },
   { to: '/invoices', label: 'Invoices', module: 'invoices' },
   { to: '/recurring-invoices', label: 'Recurring', module: 'recurring_invoices' },
+  { to: '/licenses', label: 'Licenses', module: 'licenses' },
   { to: '/expenses', label: 'Expenses', module: 'expenses' },
   { to: '/financials', label: 'Financials', module: 'financials' },
   { to: '/reports', label: 'Reports', module: 'financials' },

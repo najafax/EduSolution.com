@@ -12,16 +12,20 @@ const router = Router();
 router.use(requireAuth);
 router.use(requireAdmin);
 
-// Human label for the one log entry type that has no editable template
-// (the automated overdue-reminder digest — see lib/scheduler.js and
-// lib/emailTemplates.js's own doc comment for why it stays non-customizable).
-// The four editable types already carry a `label` from getAllTemplates().
+// Human label for the log entry types that have no editable template — the
+// automated overdue-reminder digest and the automated license-expiry alert
+// (see lib/scheduler.js and lib/emailTemplates.js's own doc comment for why
+// those stay non-customizable). The editable types already carry a `label`
+// from getAllTemplates(), duplicated here too since this map backs a
+// different endpoint (the sent log, not the template editor).
 const TYPE_LABELS = {
   quote_send: 'Quote sent',
   invoice_send: 'Invoice sent',
   invoice_remind: 'Payment reminder',
   receipt_send: 'Payment receipt',
+  license_remind: 'License renewal reminder',
   overdue_reminder: 'Automated overdue reminder',
+  license_expiry_alert: 'Automated license expiry alert',
 };
 
 router.get('/templates', (req, res) => {

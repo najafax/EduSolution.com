@@ -8,7 +8,7 @@ import Modal from './Modal';
 // backend (the same template the send route falls back to), lets the user
 // edit subject/message, and only actually sends once they click "Send
 // email" — `onSend` does the real POST with the (possibly edited) values.
-export default function EmailPreviewModal({ open, onClose, title, loadPreview, onSend }) {
+export default function EmailPreviewModal({ open, onClose, title, loadPreview, onSend, showAttachmentNote = true }) {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -80,7 +80,9 @@ export default function EmailPreviewModal({ open, onClose, title, loadPreview, o
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
             />
           </label>
-          <p className="text-xs text-slate-500 dark:text-slate-400">The PDF is attached automatically — no need to mention it here.</p>
+          {showAttachmentNote && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">The PDF is attached automatically — no need to mention it here.</p>
+          )}
           <div className="mt-1 flex justify-end gap-2">
             <button
               type="button"

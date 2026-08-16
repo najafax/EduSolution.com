@@ -2,11 +2,12 @@ const cron = require('node-cron');
 const crypto = require('crypto');
 const db = require('../db');
 const { renderInvoicePdf } = require('./pdf');
-const { sendMail } = require('./mailer');
+const { sendMail, textToHtml } = require('./mailer');
 const { computeTotals } = require('./totals');
 const { nextInvoiceNumber } = require('./numbering');
 const { runBackup } = require('./backup');
 const { logEmail } = require('./emailLog');
+const { licenseRemindEmail } = require('./emailTemplates');
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -84,6 +85,52 @@ async function notifyStaffOfReminders(reminded, settings) {
       console.error(`[reminders] Failed to send staff digest to ${recipient.email}:`, err.message);
     }
   }
+}
+
+// Same shape as runOverdueReminders() above: emails clients whose license
+// is within the expiry-warning window (or already lapsed) and hasn't been
+// reminded — manually or automatically — in the last 7 days. `14` here is
+// routes/licenses.js's EXPIRY_WARNING_DAYS duplicated as a literal (same
+// acceptable-duplication call as that file's own comment explains) — keep
+// both in sync if the window ever changes. Licenses don't attach a PDF
+// (there's no license document to render, unlike an invoice), just the
+// templated reminder text.
+async function runLicenseExpiryAlerts() {
+  if (!process.env.SMTP_HOST) {
+    console.log('[license-alerts] SMTP not configured, skipping automated license expiry alerts');
+    return { sent: 0, skipped: true };
+  }
+
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+  const warningDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const candidates = db
+    .prepare(
+      `SELECT licenses.*, clients.name AS client_name, clients.email AS client_email
+       FROM licenses JOIN clients ON clients.id = licenses.client_id
+       WHERE licenses.status = 'active' AND licenses.expiry_date <= ?
+         AND (licenses.last_reminder_sent_at IS NULL OR licenses.last_reminder_sent_at < ?)`,
+    )
+    .all(warningDate, sevenDaysAgo);
+
+  let sent = 0;
+  for (const license of candidates) {
+    try {
+      const client = { name: license.client_name, email: license.client_email };
+      const { subject, message } = licenseRemindEmail({ license, client, settings });
+      await sendMail({ to: client.email, subject, html: textToHtml(message) });
+
+      db.prepare(`UPDATE licenses SET last_reminder_sent_at = datetime('now') WHERE id = ?`).run(license.id);
+      logEmail({ type: 'license_expiry_alert', to: client.email, subject, sentByName: 'Automated', entityType: 'license', entityId: license.id, entityLabel: license.name });
+      sent += 1;
+    } catch (err) {
+      console.error(`[license-alerts] Failed to send expiry alert for license #${license.id}:`, err.message);
+    }
+  }
+
+  console.log(`[license-alerts] Sent ${sent} automated license expiry alert(s)`);
+  return { sent, skipped: false };
 }
 
 function advanceDate(dateStr, frequency) {
@@ -180,10 +227,15 @@ function startScheduler() {
   cron.schedule('0 8 * * *', () => {
     runOverdueReminders().catch((err) => console.error('[reminders] job failed:', err));
   });
+  // Daily at 08:15, staggered a few minutes after the overdue-invoice job
+  // above purely so the two jobs' console/log output don't interleave.
+  cron.schedule('15 8 * * *', () => {
+    runLicenseExpiryAlerts().catch((err) => console.error('[license-alerts] job failed:', err));
+  });
   // Daily at 03:00 server time, ahead of the other jobs — see lib/backup.js.
   cron.schedule('0 3 * * *', () => {
     runBackup().catch((err) => console.error('[backup] job failed:', err));
   });
 }
 
-module.exports = { startScheduler, runOverdueReminders, generateDueRecurringInvoices, runBackup };
+module.exports = { startScheduler, runOverdueReminders, generateDueRecurringInvoices, runLicenseExpiryAlerts, runBackup };

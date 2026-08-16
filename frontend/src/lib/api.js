@@ -155,6 +155,19 @@ export const api = {
     remove: (id, token) => request(`/recurring-invoices/${id}`, { method: 'DELETE', token }),
   },
 
+  licenses: {
+    list: (token, { q, status, page } = {}) => request(`/licenses${qs({ q, status, page })}`, { token }),
+    summary: (token) => request('/licenses/summary', { token }),
+    get: (id, token) => request(`/licenses/${id}`, { token }),
+    create: (payload, token) => request('/licenses', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/licenses/${id}`, { method: 'PUT', body: payload, token }),
+    remove: (id, token) => request(`/licenses/${id}`, { method: 'DELETE', token }),
+    renew: (id, token) => request(`/licenses/${id}/renew`, { method: 'POST', token }),
+    remindPreview: (id, token) => request(`/licenses/${id}/remind-preview`, { token }),
+    remind: (id, payload, token) => request(`/licenses/${id}/remind`, { method: 'POST', body: payload, token }),
+    exportCsv: (token) => downloadFile('/licenses/export.csv', token, 'licenses.csv'),
+  },
+
   activity: {
     list: (token, page = 1) => request(`/activity?page=${page}`, { token }),
   },

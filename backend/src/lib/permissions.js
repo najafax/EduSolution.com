@@ -12,6 +12,7 @@ const MODULES = [
   'invoices',
   'expenses',
   'recurring_invoices',
+  'licenses',
   'financials',
   'activity',
   'settings',

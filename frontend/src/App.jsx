@@ -23,6 +23,7 @@ import Invoices from './pages/business/Invoices';
 import InvoiceForm from './pages/business/InvoiceForm';
 import InvoiceDetail from './pages/business/InvoiceDetail';
 import RecurringInvoices from './pages/business/RecurringInvoices';
+import Licenses from './pages/business/Licenses';
 import Financials from './pages/business/Financials';
 import Reports from './pages/business/Reports';
 import ActivityLog from './pages/business/ActivityLog';
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="/invoices/:id/edit" element={<Protected><InvoiceForm /></Protected>} />
 
           <Route path="/recurring-invoices" element={<Protected><RecurringInvoices /></Protected>} />
+          <Route path="/licenses" element={<Protected><Licenses /></Protected>} />
 
           <Route path="/financials" element={<Protected><Financials /></Protected>} />
           <Route path="/reports" element={<Protected><Reports /></Protected>} />

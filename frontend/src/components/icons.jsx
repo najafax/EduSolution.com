@@ -160,6 +160,18 @@ export function XIcon(props) {
   );
 }
 
+// A shield with a checkmark — used for the Licenses module (nav link,
+// dashboard shortcut, KpiCard icons, EmptyState) since a license is
+// fundamentally "this client is currently authorized/covered."
+export function LicenseIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 2.5 4 5v5c0 4 2.6 6.7 6 7.5 3.4-.8 6-3.5 6-7.5V5l-6-2.5Z" strokeLinejoin="round" />
+      <path d="M7.2 9.8 9.3 12l3.5-4.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function LogoutIcon(props) {
   return (
     <svg {...base} {...props}>
