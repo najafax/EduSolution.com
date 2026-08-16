@@ -1360,14 +1360,26 @@ frontend stops holding/sending it.
   still own the open/close behavior and the `name`-grouped exclusive-open
   behavior described above unchanged.
 - `components/Modal.jsx` — the shared popup styling for every "New X" (and
-  reused "Edit X") entry form: the same dimmed backdrop + centered white
-  card treatment as `IdleTimeoutMonitor`'s "Still there?" warning, just
+  reused "Edit X") entry form, the Licenses "History" log, and every other
+  small popup in the app: the same dimmed backdrop + centered white card
+  treatment as `IdleTimeoutMonitor`'s "Still there?" warning, just
   wider/scrollable (`maxWidthClass`, default `max-w-lg`) to hold a form
   instead of a couple lines of text. Takes `{ open, onClose, title,
   children, maxWidthClass }`; closes on Escape or a click on the dimmed
   backdrop (via `document.body.style.overflow = 'hidden'` while open, so the
   page behind can't scroll), in addition to whatever the caller wires up
-  inside (a Cancel button, a successful save). `Clients.jsx`, `Products.jsx`,
+  inside (a Cancel button, a successful save). The backdrop is
+  `items-center` at every breakpoint, not just `sm:` and up — it used to be
+  `items-start` (pinned to the top of the viewport) below `sm`, but a
+  vertically centered popup is the expected default on mobile just as much
+  as desktop, so this app keeps that consistent everywhere rather than
+  special-casing small screens. When content is taller than the viewport,
+  `overflow-y-auto` on the backdrop still makes it scrollable — a form long
+  enough to overflow (e.g. `QuoteForm.jsx`/`InvoiceForm.jsx` with several
+  line items) simply loads scrolled to its own top rather than the backdrop
+  clipping it, so nothing above the fold becomes unreachable. Any new modal
+  treatment added later should keep this centered-by-default behavior
+  rather than reintroducing a top-aligned mobile layout. `Clients.jsx`, `Products.jsx`,
   `Expenses.jsx`, `RecurringInvoices.jsx`, and `Users.jsx` (both its
   create/edit form and its separate reset-password form) each wrap their
   existing inline `{showForm && (<form>...)}` block in `<Modal>` instead of

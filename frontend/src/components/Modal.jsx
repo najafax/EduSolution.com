@@ -6,6 +6,14 @@ import { useEffect } from 'react';
 // enough to hold a form instead of a couple lines of text. Closes on
 // Escape or a click on the dimmed backdrop, in addition to whatever the
 // caller wires up inside (a Cancel button, a successful save, etc).
+// Vertically centered at every breakpoint, not just `sm:` and up — every
+// modal in the app (forms, the Licenses "History" log, etc.) should sit in
+// the middle of the screen on mobile the same way it does on desktop. When
+// content is taller than the viewport, `overflow-y-auto` on the backdrop
+// still lets it scroll — centering doesn't clip the top, it just starts
+// scrolled so the card's middle lines up with the viewport's middle. Keep
+// this centered-by-default behavior for any new modal treatment added
+// later rather than reverting to top-aligned on small screens.
 export default function Modal({ open, onClose, title, children, maxWidthClass = 'max-w-lg' }) {
   useEffect(() => {
     if (!open) return;
@@ -25,7 +33,7 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 px-4 py-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose?.();
       }}
