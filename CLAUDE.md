@@ -608,15 +608,16 @@ are deliberately untouched by either, always returning every row.
   embedded commas/newlines/escaped quotes, \r\n or \n line endings) that
   backs `routes/import.js`.
 - `routes/import.js` — `POST /api/import/:type` (`type` is `clients`,
-  `expenses`, `invoices`, or `quotes`) bulk-imports historical data from CSV
-  text in the request body. Always validates every row first; `commit: false`
+  `expenses`, `invoices`, `quotes`, or `licenses`) bulk-imports historical
+  data from CSV text in the request body. Always validates every row first; `commit: false`
   (the default) is a dry-run that reports what *would* happen with no DB
   writes, `commit: true` actually inserts the valid rows and skips the
   invalid ones — the frontend always previews before offering to commit.
   Each row gets a `{ row, status: 'ok'|'error', message, preview }` result,
   so partial success is normal, not a failure state. Every date column
-  (`issue_date`, `due_date`/`expiry_date`, `paid_date`, `expense_date`) goes
-  through `normalizeDate()` rather than a strict `YYYY-MM-DD` regex —
+  (`issue_date`, `due_date`/`expiry_date`, `paid_date`, `expense_date`,
+  `start_date`) goes through `normalizeDate()` rather than a strict
+  `YYYY-MM-DD` regex —
   spreadsheet exports routinely produce `D/M/YYYY`-style dates (with `/`,
   `-`, or `.` separators), `YYYY/MM/DD`, 2-digit years, and even raw Excel
   serial-date numbers, and all of them normalize to the canonical form
@@ -627,7 +628,8 @@ are deliberately untouched by either, always returning every row.
   exactly that ambiguous case; a value where one part is >12 only has one
   valid reading regardless of `format`. `detectDateFormat()` derives that
   argument once per import batch (`processExpenses`/`processInvoices`/
-  `processQuotes` each call it before validating any row) by scanning every
+  `processQuotes`/`processLicenses` each call it before validating any row)
+  by scanning every
   date-ish value in the batch for unambiguous evidence — a value like
   `"4/23/2026"` can only be month/day (day=23), which pins down the format
   for every other, genuinely ambiguous value in the *same* batch too (e.g.
@@ -667,9 +669,25 @@ are deliberately untouched by either, always returning every row.
   real DB count, rather than re-querying per row — needed because preview
   mode never writes anything, so two same-year rows calling the DB-backed
   numbering function directly would collide on the same "next" number.
+  Licenses are matched to a client the same way, via the same
+  `resolveClient()`/`clientMaps()` helpers — the one other row type besides
+  invoices/quotes that references a client rather than being one. A row's
+  `billing_cycle` (`monthly`/`yearly`, blank defaults to `yearly`) and
+  `start_date` are required; a blank `expiry_date` defaults to
+  `start_date` + one billing cycle via `advanceByCycle()` (a duplicate of
+  `routes/licenses.js`'s own `advanceExpiry()` — same acceptable-duplication
+  call as `EXPENSE_CATEGORIES`, keep both in sync), matching what the New
+  License form itself defaults to. `status` (`active`/`cancelled`, blank
+  defaults to `active`) and `amount` (blank defaults to `0`) are otherwise
+  the only other columns — no line items, no document number, no PDF, since
+  a license isn't a document the way an invoice/quote is. `created_by_name`
+  is left at its `''` default the same way invoice/quote imports leave it
+  blank, per `db/index.js`'s own note on that column being blank for
+  anything generated with no human directly filling out the form.
   Whole commit runs in one `db.transaction()` since an invoice import
   writes to three tables (`invoices`, `invoice_items`, `payments`) per row
-  (two for quotes, no `payments` row). Logs one summary `activity_log`
+  (two for quotes, no `payments` row; one for licenses, a single-table
+  insert like clients/expenses). Logs one summary `activity_log`
   entry per import ("bulk imported 42 clients from CSV"), not one per row.
 - `lib/backup.js` — `runBackup()`: skips entirely if `BACKUP_S3_BUCKET`
   isn't set. Otherwise runs `VACUUM INTO` to write a consistent snapshot of

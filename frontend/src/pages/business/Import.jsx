@@ -17,6 +17,12 @@ const TYPES = [
     columns:
       'client_email or client_name (at least one)*, number, issue_date*, expiry_date, description, amount*, tax_rate, status, notes',
   },
+  {
+    value: 'licenses',
+    label: 'Licenses',
+    columns:
+      'client_email or client_name (at least one)*, name*, billing_cycle, amount, start_date*, expiry_date, status, notes',
+  },
 ];
 
 const TEMPLATES = {
@@ -30,6 +36,10 @@ const TEMPLATES = {
     'client_email,client_name,number,issue_date,expiry_date,description,amount,tax_rate,status,notes\n' +
     'jane@example.com,,,2024-01-15,2024-02-14,Website design proposal,2000,0,sent,Sent quote example\n' +
     ',Acme School,,2024-02-01,,Consulting package,1500,10,,Matched by client_name, status left blank (defaults to draft)\n',
+  licenses:
+    'client_email,client_name,name,billing_cycle,amount,start_date,expiry_date,status,notes\n' +
+    'jane@example.com,,LMS Pro Annual License,yearly,1200,2025-08-16,2026-08-16,active,\n' +
+    ',Acme School,API Access License,monthly,50,2026-06-01,,active,Matched by client_name; expiry_date left blank (defaults to start_date + 1 billing cycle)\n',
 };
 
 function downloadTemplate(type) {
@@ -293,12 +303,12 @@ export default function Import() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Import historical data</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        Bring in existing clients, expenses, invoices (with payment history), or quotes from a CSV file. Preview
-        first to catch errors — nothing is saved until you confirm.
+        Bring in existing clients, expenses, invoices (with payment history), quotes, or licenses from a CSV file.
+        Preview first to catch errors — nothing is saved until you confirm.
       </p>
-      {(type === 'invoices' || type === 'quotes') && (
+      {(type === 'invoices' || type === 'quotes' || type === 'licenses') && (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-          Import clients first if you haven't already — each {type === 'invoices' ? 'invoice' : 'quote'} row is
+          Import clients first if you haven't already — each {type === 'invoices' ? 'invoice' : type === 'quotes' ? 'quote' : 'license'} row is
           matched to a client by email, or by exact client name if client_email is left blank.
         </p>
       )}

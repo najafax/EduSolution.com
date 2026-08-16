@@ -18,10 +18,26 @@ const EXPENSE_CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'shareh
 const PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'cheque', 'other'];
 const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'void'];
 const QUOTE_STATUSES = ['draft', 'sent', 'accepted', 'declined', 'expired'];
+const LICENSE_BILLING_CYCLES = ['monthly', 'yearly'];
+const LICENSE_STATUSES = ['active', 'cancelled'];
 
 function addDays(dateStr, days) {
   const d = new Date(`${dateStr}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// Same month-end-clamped billing-cycle math as routes/licenses.js's own
+// advanceExpiry() (e.g. Jan 31 + monthly clamps to Feb 28/29 instead of
+// rolling into March) — duplicated here rather than imported, same
+// acceptable-duplication call as EXPENSE_CATEGORIES below. Only used to
+// default a blank expiry_date to start_date + one billing cycle.
+function advanceByCycle(dateStr, cycle) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  const originalDay = d.getDate();
+  if (cycle === 'yearly') d.setFullYear(d.getFullYear() + 1);
+  else d.setMonth(d.getMonth() + 1);
+  if (d.getDate() !== originalDay) d.setDate(0);
   return d.toISOString().slice(0, 10);
 }
 
@@ -579,15 +595,96 @@ function processQuotes(rows, commit) {
   return { results, imported };
 }
 
+// ---- Licenses -------------------------------------------------------------------
+
+function validateLicenseRow(row, clientsByEmail, clientsByName, dateFormat) {
+  const clientOutcome = resolveClient(row, clientsByEmail, clientsByName);
+  if (!clientOutcome.ok) return clientOutcome;
+  const { client } = clientOutcome;
+
+  const name = (row.name || '').trim();
+  if (!name) return { ok: false, message: 'name is required' };
+
+  const billingCycle = (row.billing_cycle || 'yearly').trim().toLowerCase() || 'yearly';
+  if (!LICENSE_BILLING_CYCLES.includes(billingCycle)) {
+    return { ok: false, message: `billing_cycle must be one of: ${LICENSE_BILLING_CYCLES.join(', ')}` };
+  }
+
+  const startDate = normalizeDate(row.start_date, dateFormat);
+  if (!startDate) return { ok: false, message: 'start_date must be a valid date (e.g. YYYY-MM-DD)' };
+
+  // Matches routes/licenses.js's own form default: an unspecified expiry is
+  // one billing cycle after the start date.
+  const expiryDateRaw = (row.expiry_date || '').trim();
+  const expiryDate = expiryDateRaw ? normalizeDate(expiryDateRaw, dateFormat) : advanceByCycle(startDate, billingCycle);
+  if (!expiryDate) return { ok: false, message: 'expiry_date must be a valid date (e.g. YYYY-MM-DD)' };
+  if (expiryDate < startDate) return { ok: false, message: 'expiry_date cannot be before start_date' };
+
+  const amountRaw = (row.amount || '').trim();
+  const amount = amountRaw ? parseNumber(row.amount) : 0;
+  if (!Number.isFinite(amount) || amount < 0) return { ok: false, message: 'amount must be a non-negative number' };
+
+  let status = (row.status || '').trim().toLowerCase();
+  if (status && !LICENSE_STATUSES.includes(status)) {
+    return { ok: false, message: `status must be one of: ${LICENSE_STATUSES.join(', ')} (got "${(row.status || '').trim()}")` };
+  }
+  if (!status) status = 'active';
+
+  return {
+    ok: true,
+    values: { clientId: client.id, name, billingCycle, amount, startDate, expiryDate, status, notes: (row.notes || '').trim() },
+  };
+}
+
+function processLicenses(rows, commit) {
+  const { clientsByEmail, clientsByName } = clientMaps();
+  const dateFormat = detectDateFormat(rows.flatMap((r) => [r.start_date, r.expiry_date]));
+  const results = [];
+  let imported = 0;
+
+  // created_by_name is deliberately omitted (left at its '' default), same
+  // as invoices/quotes imported this way — see db/index.js's own note on
+  // that column being blank for anything generated with no human in the
+  // loop, bulk CSV import included.
+  const insert = db.prepare(
+    'INSERT INTO licenses (client_id, name, status, billing_cycle, amount, start_date, expiry_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  );
+
+  rows.forEach((row, index) => {
+    const rowNumber = index + 2;
+    const outcome = validateLicenseRow(row, clientsByEmail, clientsByName, dateFormat);
+    if (!outcome.ok) {
+      results.push({ row: rowNumber, status: 'error', message: outcome.message, preview: row.name || row.client_email || row.client_name || '' });
+      return;
+    }
+    const v = outcome.values;
+    if (commit) {
+      const result = insert.run(v.clientId, v.name, v.status, v.billingCycle, v.amount, v.startDate, v.expiryDate, v.notes);
+      imported += 1;
+      results.push({ row: rowNumber, status: 'ok', message: 'imported', preview: v.name, id: result.lastInsertRowid });
+    } else {
+      results.push({ row: rowNumber, status: 'ok', message: 'ready to import', preview: v.name });
+    }
+  });
+
+  return { results, imported };
+}
+
 // ---- Route --------------------------------------------------------------------
 
-const HANDLERS = { clients: processClients, expenses: processExpenses, invoices: processInvoices, quotes: processQuotes };
+const HANDLERS = {
+  clients: processClients,
+  expenses: processExpenses,
+  invoices: processInvoices,
+  quotes: processQuotes,
+  licenses: processLicenses,
+};
 
 router.post('/:type', (req, res) => {
   const { type } = req.params;
   const handler = HANDLERS[type];
   if (!handler) {
-    return res.status(400).json({ error: `Unknown import type "${type}". Must be one of: clients, expenses, invoices, quotes.` });
+    return res.status(400).json({ error: `Unknown import type "${type}". Must be one of: clients, expenses, invoices, quotes, licenses.` });
   }
 
   const { csv, commit = false } = req.body || {};
