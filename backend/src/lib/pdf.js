@@ -1154,4 +1154,21 @@ function renderReceiptPdf({ payment, invoice, client, settings }) {
   });
 }
 
-module.exports = { renderQuotePdf, renderInvoicePdf, renderReceiptPdf };
+module.exports = {
+  renderQuotePdf,
+  renderInvoicePdf,
+  renderReceiptPdf,
+  // Shared low-level primitives — also used by lib/reportPdf.js, which
+  // renders the standalone (no bill-to/signature/stamp) sales/tax/P&L/
+  // expense report PDFs and needs the same page geometry, palette, and
+  // money/image helpers rather than duplicating them.
+  MARGIN,
+  CONTENT_WIDTH,
+  PAGE_BOTTOM,
+  COLORS,
+  money,
+  newDoc,
+  docToBuffer,
+  decodeImageDataUri,
+  addPageFooter,
+};

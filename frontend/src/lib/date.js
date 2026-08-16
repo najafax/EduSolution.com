@@ -22,3 +22,12 @@ export function todayPlus(days) {
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+// The 1st of the current local-calendar month — the default "from" date
+// for Reports.jsx's date-range picker (paired with todayStr() as "to").
+export function startOfMonthStr() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}-01`;
+}

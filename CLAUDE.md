@@ -333,6 +333,52 @@ are deliberately untouched by either, always returning every row.
   `Dashboard` and `Financials` pages. Computed from `invoices`/`payments`/
   `clients`/`expenses` on every request, nothing is cached or denormalized
   beyond `invoices.amount_paid`.
+- `routes/reports.js` (mounted at `/api/reports`) — four downloadable PDF
+  reports, each `GET /<type>/pdf?from=&to=` (`YYYY-MM-DD`, both required;
+  400s if either is missing/malformed or `from` is after `to`). Gated on
+  the same `requirePermission('financials', 'view')` as the Financials
+  page/summary endpoint rather than a dedicated `reports` module — these
+  PDFs surface the same sales/tax/expense data at the same sensitivity
+  level, so reusing the existing grant avoids a second permission slot (and
+  a `Users` page/`MODULES` update) for data staff can already see once
+  granted. Sales and tax reports both read `invoices` by `issue_date`
+  (accrual — what was billed in the period, regardless of whether it's
+  been paid), excluding `void` the same way `routes/financials.js` does:
+  `GET /sales/pdf` lists each invoice with client/date/status/total/paid/
+  balance plus totals; `GET /tax/pdf` lists each invoice's taxable amount
+  (`subtotal - discount_amount`, the base `tax_amount` was actually
+  computed against — see `lib/totals.js`), rate, and tax collected, plus
+  grand totals — a filing-style report. `GET /expenses/pdf` lists
+  `expenses` by `expense_date` in range, grouped by category with a
+  subtotal per category and a grand total. `GET /profit-loss/pdf` is cash-
+  basis, mirroring `netProfit`'s own convention: revenue is
+  `SUM(payments.amount)` where `paid_at` falls in the range (cash actually
+  received, not invoiced), expenses are grouped by category the same way
+  the expense report is, and net profit/loss is revenue minus total
+  expenses — rendered as a green "NET PROFIT" or red "NET LOSS" bar
+  depending on the sign. None of these routes call `logActivity()` (same
+  as the existing `:id/pdf` routes — a read-only download isn't a
+  mutation) or accept `page`/`q` (each report is inherently a from/to
+  filtered dump, not a paginated list).
+- `lib/reportPdf.js` — renders the four report PDFs above with `pdfkit`.
+  These are tabular/statement documents, not the bill-to/line-items/
+  signature shape `lib/pdf.js` renders for quote/invoice/receipt — but
+  share that module's page geometry, palette, and `money()`/image/buffer
+  helpers (re-exported from `lib/pdf.js` for this reason) rather than
+  duplicating them. `drawReportHeader` is the equivalent of `lib/pdf.js`'s
+  `drawHeader`, but with a report title/date-range/generated-timestamp on
+  the right instead of a numbered document's meta rows. `drawReportTable`
+  is a generic paginating table (caller supplies `{ key, label, x, width,
+  align, format(row) }` columns) backing the sales/tax reports and each
+  category's rows on the expense report; `drawSummaryBox` is the generic
+  right-aligned label:value totals block those three use in place of
+  `lib/pdf.js`'s fixed subtotal/discount/tax shape. The P&L statement uses
+  its own `drawStatementSection` (a REVENUE/EXPENSES section: heading, one
+  row per line item, a bold total row) twice, then `drawNetProfitBar` for
+  the closing figure — net profit is the one amount here that can go
+  negative, so it's formatted with `signedMoney()` (mirrors the frontend's
+  own `Financials.jsx` `money()` helper's sign handling) rather than the
+  shared `money()`, which never special-cases a sign.
 - `lib/totals.js` — `computeTotals(items, taxRate, discountType, discountValue)`
   validates a raw line-items payload and computes subtotal → discount → tax
   → total, in that order (tax applies to the post-discount amount).
@@ -606,6 +652,11 @@ Status/derived-field conventions worth knowing before touching this code:
   `import.js` applies `requirePermission('import', 'manage')` once via
   `router.use()` right after `router.use(requireAuth)`, since every route
   in that file is a mutation (there's no read-only CSV-import action).
+  `reports.js` is the reverse case: every route in it is a read (a PDF
+  download, never a mutation), so it applies `requirePermission('financials',
+  'view')` once via `router.use()` rather than gating individual routes —
+  and reuses the `financials` module rather than declaring its own, since
+  these reports surface the same data at the same sensitivity level.
 
 ### Idle session timeout
 
@@ -932,6 +983,20 @@ frontend stops holding/sending it.
   each page inventing its own ad hoc card styling. `components/icons.jsx`
   is a small set of hand-rolled 20×20 outline icons (no icon-library
   dependency) used inside `KpiCard`'s tinted circle.
+- `pages/business/Reports.jsx` (route `/reports`, `Navbar.jsx` link gated
+  on the same `financials` module as `/financials`) — a single from/to date
+  range (`<input type="date">` pair, defaulting to `startOfMonthStr()`
+  through `todayStr()` from `lib/date.js`) plus three quick-pick preset
+  buttons (This month/Last month/This year), shared by four report cards
+  (Sales, Tax, Profit & Loss, Expense) laid out with the same icon-circle +
+  label + description shape as `KpiCard`. Each card's "Download PDF" button
+  calls its matching `api.reports.*Pdf(from, to, token)` — which, like
+  `api.invoices.openPdf`/`api.quotes.openPdf`, goes through `lib/api.js`'s
+  `openPdf()` rather than `request()` (binary response, opened as a blob
+  URL in a new tab, not JSON) — with a per-button `busyKey` disabling only
+  the clicked card's button while its PDF generates, and a page-level
+  `error` if the request fails or the range is invalid (`from` after `to`,
+  checked client-side before the request as well as server-side).
 - Styling is Tailwind CSS v4 via the `@tailwindcss/vite` plugin (see
   `vite.config.js` and `src/index.css`) — no `tailwind.config.js`/PostCSS
   setup exists or is needed for v4's Vite integration. Utility classes are

@@ -17,6 +17,7 @@ export const BUSINESS_LINKS = [
   { to: '/recurring-invoices', label: 'Recurring', module: 'recurring_invoices' },
   { to: '/expenses', label: 'Expenses', module: 'expenses' },
   { to: '/financials', label: 'Financials', module: 'financials' },
+  { to: '/reports', label: 'Reports', module: 'financials' },
   { to: '/activity', label: 'Activity', module: 'activity' },
   { to: '/users', label: 'Users', module: 'users' },
   { to: '/settings', label: 'Settings', module: 'settings' },

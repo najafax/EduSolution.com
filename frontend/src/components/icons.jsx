@@ -87,3 +87,16 @@ export function InboxIcon(props) {
     </svg>
   );
 }
+
+// A document with a small bar-chart mark — used on Reports.jsx's report
+// cards (sales/tax/P&L/expense reports are all "a document with numbers
+// in it", distinct from InvoiceIcon's folded-corner receipt shape).
+export function ReportIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 3h7l3 3v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" strokeLinejoin="round" />
+      <path d="M12 3v3h3" strokeLinejoin="round" />
+      <path d="M7 14.5v-2M10 14.5v-4M13 14.5v-1.5" strokeLinecap="round" />
+    </svg>
+  );
+}

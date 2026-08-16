@@ -169,6 +169,13 @@ export const api = {
     run: (confirm, categories, token) => request('/data-reset', { method: 'POST', body: { confirm, categories }, token }),
   },
 
+  reports: {
+    salesPdf: (from, to, token) => openPdf(`/reports/sales/pdf${qs({ from, to })}`, token),
+    taxPdf: (from, to, token) => openPdf(`/reports/tax/pdf${qs({ from, to })}`, token),
+    expensesPdf: (from, to, token) => openPdf(`/reports/expenses/pdf${qs({ from, to })}`, token),
+    profitLossPdf: (from, to, token) => openPdf(`/reports/profit-loss/pdf${qs({ from, to })}`, token),
+  },
+
   users: {
     list: (token, { q, page } = {}) => request(`/users${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/users/${id}`, { token }),
