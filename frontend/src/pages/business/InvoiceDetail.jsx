@@ -7,6 +7,7 @@ import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import MobileListAccordion from '../../components/MobileListAccordion';
+import { useConfirm } from '../../lib/useConfirm';
 
 const METHODS = ['bank_transfer', 'cash', 'card', 'cheque', 'other'];
 
@@ -27,6 +28,7 @@ export default function InvoiceDetail() {
   // one EmailPreviewModal instance shared by all three send-email triggers
   // on this page, since only one can be open at a time.
   const [emailModal, setEmailModal] = useState(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     api.invoices
@@ -50,7 +52,7 @@ export default function InvoiceDetail() {
   }
 
   async function handleDelete() {
-    if (!confirm('Delete this invoice?')) return;
+    if (!(await confirm({ title: 'Delete this invoice?', confirmLabel: 'Delete' }))) return;
     try {
       await api.invoices.remove(id, token);
       navigate('/invoices');
@@ -112,7 +114,14 @@ export default function InvoiceDetail() {
   }
 
   async function handleVoid() {
-    if (!confirm('Void this invoice? It will be excluded from financial totals and can no longer be sent, edited, or paid.')) return;
+    if (
+      !(await confirm({
+        title: 'Void this invoice?',
+        message: 'It will be excluded from financial totals and can no longer be sent, edited, or paid.',
+        confirmLabel: 'Void',
+      }))
+    )
+      return;
     setError('');
     setBusy(true);
     try {
@@ -490,6 +499,8 @@ export default function InvoiceDetail() {
           load();
         }}
       />
+
+      {confirmDialog}
     </div>
   );
 }

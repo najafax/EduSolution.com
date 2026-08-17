@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
+import { useConfirm } from '../../lib/useConfirm';
 
 const TYPES = [
   { value: 'clients', label: 'Clients', columns: 'name*, email*, phone, address, notes' },
@@ -95,6 +96,7 @@ function DangerZone({ token }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   const canConfirm = confirmText === CONFIRM_PHRASE && selected.size > 0;
 
@@ -114,7 +116,14 @@ function DangerZone({ token }) {
 
   async function handleClear() {
     if (!canConfirm) return;
-    if (!confirm('This permanently deletes the selected data. This cannot be undone. Continue?')) return;
+    if (
+      !(await confirm({
+        title: 'Permanently delete this data?',
+        message: 'This cannot be undone.',
+        confirmLabel: 'Delete',
+      }))
+    )
+      return;
     setBusy(true);
     setError('');
     setResult(null);
@@ -192,6 +201,8 @@ function DangerZone({ token }) {
       >
         {busy ? 'Clearing…' : `Clear selected data${selected.size ? ` (${selected.size})` : ''}`}
       </button>
+
+      {confirmDialog}
     </div>
   );
 }

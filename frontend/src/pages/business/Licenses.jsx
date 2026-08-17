@@ -15,6 +15,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import KpiCard from '../../components/KpiCard';
 import { LicenseIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon } from '../../components/icons';
+import { useConfirm } from '../../lib/useConfirm';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
@@ -67,6 +68,7 @@ export default function Licenses() {
   const [historyTarget, setHistoryTarget] = useState(null);
   const [renewals, setRenewals] = useState(null);
   const [renewalsError, setRenewalsError] = useState('');
+  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     setLoading(true);
@@ -158,7 +160,7 @@ export default function Licenses() {
   }
 
   async function handleDelete(id) {
-    if (!confirm('Delete this license? This cannot be undone.')) return;
+    if (!(await confirm({ title: 'Delete this license?', message: 'This cannot be undone.', confirmLabel: 'Delete' }))) return;
     setError('');
     try {
       await api.licenses.remove(id, token);
@@ -539,6 +541,8 @@ export default function Licenses() {
       </Modal>
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New license" />}
+
+      {confirmDialog}
     </div>
   );
 }

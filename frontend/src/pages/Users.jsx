@@ -6,6 +6,7 @@ import SearchInput from '../components/SearchInput';
 import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import MobileListAccordion from '../components/MobileListAccordion';
+import { useConfirm } from '../lib/useConfirm';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', active: true };
 
@@ -41,6 +42,7 @@ export default function Users() {
   const [resetTargetId, setResetTargetId] = useState(null);
   const [resetPassword, setResetPassword] = useState('');
   const [resetSubmitting, setResetSubmitting] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     if (!canView) return;
@@ -120,7 +122,7 @@ export default function Users() {
   }
 
   async function handleDelete(user) {
-    if (!confirm(`Delete ${user.name}? This cannot be undone.`)) return;
+    if (!(await confirm({ title: `Delete ${user.name}?`, message: 'This cannot be undone.', confirmLabel: 'Delete' }))) return;
     setError('');
     try {
       await api.users.remove(user.id, token);
@@ -459,6 +461,8 @@ export default function Users() {
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New user" />}
+
+      {confirmDialog}
     </div>
   );
 }

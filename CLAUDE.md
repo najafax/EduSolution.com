@@ -1613,6 +1613,38 @@ frontend stops holding/sending it.
   is — so editing still gets the full page (with its own URL, refresh-safe,
   bookmarkable) and `InvoiceForm.jsx`'s locked-status guard (see below)
   keeps working unmodified.
+- `components/ConfirmDialog.jsx` + `lib/useConfirm.js` — the one confirmation
+  prompt every destructive action in the app renders, replacing both the
+  browser's native `window.confirm()` (unstyled, ignores dark mode,
+  inconsistent across browsers) and, on `Clients.jsx`/`Expenses.jsx`, the
+  "delete immediately, offer a few seconds to undo via a toast" pattern
+  those two pages used to rely on as their *only* safety net (see
+  `lib/useUndoableDelete.js` below) — a mis-click there deleted the row
+  before anyone saw a prompt. Every Delete/Void/"clear selected data"
+  button in the app (`Clients.jsx`, `Products.jsx`, `Expenses.jsx`,
+  `RecurringInvoices.jsx`, `Licenses.jsx`, `Users.jsx`,
+  `QuoteDetail.jsx`, `InvoiceDetail.jsx`'s delete *and* void actions, and
+  `Import.jsx`'s `DangerZone`) now goes through the same
+  `const { confirm, confirmDialog } = useConfirm()` — `confirm({ title,
+  message, confirmLabel, cancelLabel, danger })` returns a Promise the same
+  way `window.confirm()` returns a boolean (`if (!(await confirm({...})))
+  return;`), resolving only once the person clicks Confirm/Cancel (Escape
+  and a backdrop click both count as Cancel) — and each caller renders
+  `{confirmDialog}` once in its JSX to mount the actual popup.
+  `ConfirmDialog.jsx` itself is presentational only (nothing calls it
+  directly) and reuses `Modal.jsx`/`IdleTimeoutMonitor`'s exact backdrop +
+  centered-card language, just with a two-button Confirm/Cancel footer
+  instead of form content — `danger` (default `true`, every current caller
+  destructive) picks red vs. `lagoon` for the Confirm button, matching the
+  red styling every Delete button/`DangerZone` already used. `Clients.jsx`/
+  `Expenses.jsx` now confirm *and* still call `deleteWithUndo` afterward —
+  belt and suspenders, not an either/or: the confirm step stops a mis-click
+  from doing anything at all, and the undo toast still covers "I confirmed
+  but changed my mind" a few seconds later. `Import.jsx`'s `DangerZone` is
+  unique in keeping *two* layers on top of each other — the existing
+  type-`DELETE`-to-confirm text input (`canConfirm`) still gates the button
+  itself, and clicking it now opens this same themed dialog as the second
+  layer, replacing what used to be a second, native `confirm()` call.
 - `components/Navbar.jsx` — `BUSINESS_LINKS` entries each carry a `module`
   (`null` for Dashboard, which is always visible); the rendered link list
   is filtered through `can(link.module, 'view')` so a restricted user never

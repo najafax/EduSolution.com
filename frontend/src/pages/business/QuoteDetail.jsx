@@ -6,6 +6,7 @@ import { todayPlus } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
+import { useConfirm } from '../../lib/useConfirm';
 
 export default function QuoteDetail() {
   const { token, can } = useAuth();
@@ -22,6 +23,7 @@ export default function QuoteDetail() {
   const [showConvert, setShowConvert] = useState(false);
   const [dueDate, setDueDate] = useState(todayPlus(14));
   const [showSendPreview, setShowSendPreview] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     api.quotes
@@ -45,7 +47,7 @@ export default function QuoteDetail() {
   }
 
   async function handleDelete() {
-    if (!confirm('Delete this quote?')) return;
+    if (!(await confirm({ title: 'Delete this quote?', confirmLabel: 'Delete' }))) return;
     try {
       await api.quotes.remove(id, token);
       navigate('/quotes');
@@ -245,6 +247,8 @@ export default function QuoteDetail() {
           load();
         }}
       />
+
+      {confirmDialog}
     </div>
   );
 }

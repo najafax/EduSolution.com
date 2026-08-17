@@ -6,6 +6,7 @@ import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import MobileListAccordion from '../../components/MobileListAccordion';
+import { useConfirm } from '../../lib/useConfirm';
 
 const EMPTY_FORM = { name: '', description: '', unit_price: '', tax_rate: '' };
 
@@ -24,6 +25,7 @@ export default function Products() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const { confirm, confirmDialog } = useConfirm();
 
   const symbol = settings?.currency_symbol || '$';
 
@@ -84,7 +86,7 @@ export default function Products() {
   }
 
   async function handleDelete(id) {
-    if (!confirm('Delete this product?')) return;
+    if (!(await confirm({ title: 'Delete this product?', confirmLabel: 'Delete' }))) return;
     setError('');
     try {
       await api.products.remove(id, token);
@@ -277,6 +279,8 @@ export default function Products() {
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New product" />}
+
+      {confirmDialog}
     </div>
   );
 }

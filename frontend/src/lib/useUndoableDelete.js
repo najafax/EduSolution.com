@@ -7,10 +7,15 @@ import { useToast } from '../context/ToastContext';
 // by, so a deleted-but-not-yet-committed row disappears right away) and a
 // timer fires the real DELETE request after the toast's window closes.
 // Clicking "Undo" in that window just clears the timer and un-hides the
-// row — no API call is ever made. This replaces the old `confirm()`
-// dialog: undo is a gentler safety net than a blocking prompt.
-// `deleteWithUndo` still takes an array (originally shared with a now-
-// removed bulk-delete flow) — callers pass a single-element array.
+// row — no API call is ever made. This used to replace an upfront
+// `confirm()` step entirely (undo as the only safety net), but every
+// Delete button in the app now also confirms first via lib/useConfirm.js —
+// see Clients.jsx/Expenses.jsx's own `handleDelete()` — so undo here is a
+// second layer, not the only one: a deliberate confirm prevents a mis-click
+// from doing anything at all, and undo still covers "I confirmed but
+// changed my mind" a few seconds later. `deleteWithUndo` still takes an
+// array (originally shared with a now-removed bulk-delete flow) — callers
+// pass a single-element array.
 export function useUndoableDelete(removeOne) {
   const { toast } = useToast();
   const [pendingIds, setPendingIds] = useState(() => new Set());

@@ -3,6 +3,7 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useUndoableDelete } from '../../lib/useUndoableDelete';
+import { useConfirm } from '../../lib/useConfirm';
 import { todayStr } from '../../lib/date';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
@@ -39,6 +40,7 @@ export default function Expenses() {
 
   const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.expenses.remove(id, token));
   const visibleExpenses = expenses.filter((e) => !pendingIds.has(e.id));
+  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     setLoading(true);
@@ -100,7 +102,8 @@ export default function Expenses() {
     }
   }
 
-  function handleDelete(expense) {
+  async function handleDelete(expense) {
+    if (!(await confirm({ title: `Delete "${expense.description}"?`, confirmLabel: 'Delete' }))) return;
     deleteWithUndo([expense.id], `"${expense.description}" deleted.`);
   }
 
@@ -364,6 +367,8 @@ export default function Expenses() {
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New expense" />}
+
+      {confirmDialog}
     </div>
   );
 }

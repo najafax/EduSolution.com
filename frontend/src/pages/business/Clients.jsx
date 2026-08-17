@@ -3,6 +3,7 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useUndoableDelete } from '../../lib/useUndoableDelete';
+import { useConfirm } from '../../lib/useConfirm';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
@@ -31,6 +32,7 @@ export default function Clients() {
 
   const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.clients.remove(id, token));
   const visibleClients = clients.filter((c) => !pendingIds.has(c.id));
+  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     setLoading(true);
@@ -88,7 +90,8 @@ export default function Clients() {
     }
   }
 
-  function handleDelete(client) {
+  async function handleDelete(client) {
+    if (!(await confirm({ title: `Delete ${client.name}?`, confirmLabel: 'Delete' }))) return;
     deleteWithUndo([client.id], `"${client.name}" deleted.`);
   }
 
@@ -246,6 +249,8 @@ export default function Clients() {
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New client" />}
+
+      {confirmDialog}
     </div>
   );
 }

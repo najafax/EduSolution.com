@@ -10,6 +10,7 @@ import SearchInput from '../../components/SearchInput';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import MobileListAccordion from '../../components/MobileListAccordion';
+import { useConfirm } from '../../lib/useConfirm';
 
 const EMPTY_FORM = {
   client_id: '',
@@ -40,6 +41,7 @@ export default function RecurringInvoices() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: 0 }]);
   const [submitting, setSubmitting] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     setLoading(true);
@@ -129,7 +131,14 @@ export default function RecurringInvoices() {
   }
 
   async function handleDelete(id) {
-    if (!confirm('Delete this recurring invoice? Invoices already generated from it are not affected.')) return;
+    if (
+      !(await confirm({
+        title: 'Delete this recurring invoice?',
+        message: 'Invoices already generated from it are not affected.',
+        confirmLabel: 'Delete',
+      }))
+    )
+      return;
     setError('');
     try {
       await api.recurringInvoices.remove(id, token);
@@ -409,6 +418,8 @@ export default function RecurringInvoices() {
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New recurring invoice" />}
+
+      {confirmDialog}
     </div>
   );
 }
