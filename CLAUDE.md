@@ -530,8 +530,18 @@ are deliberately untouched by either, always returning every row.
   duplicate, convert-to-invoice, and recurring-invoice generation) rather
   than by id, so a client with the link can view/download a document
   without an account. `GET /quotes/:token` and `GET /invoices/:token`
-  return the document + client + business settings; `GET .../pdf` streams
-  the same PDF the authenticated routes produce; `POST /quotes/:token/respond`
+  return the document + client + business settings — the settings row is
+  passed through `publicSettings()` first, which strips
+  `starting_balance` and `session_timeout_minutes` before the response is
+  sent: those are internal-only (a financial figure and a security policy
+  value, respectively), and unlike the rest of `business_settings` there's
+  no client-facing reason for either to be readable by anyone holding a
+  public link. Every other settings field is intentionally left as-is
+  (business name/address/tax ID/bank details/logo etc.) since it's the
+  same data the token's own PDF route (below) already renders; the PDF
+  routes fetch `settings` straight from the table with no filtering, since
+  `lib/pdf.js` never reads either excluded field anyway. `GET .../pdf`
+  streams the same PDF the authenticated routes produce; `POST /quotes/:token/respond`
   lets the client accept/decline (only while `status` is `draft`/`sent`;
   stores `quotes.client_response`/`client_responded_at` and updates
   `status`). The emails sent from `quotes.js`/`invoices.js` `/send` routes
