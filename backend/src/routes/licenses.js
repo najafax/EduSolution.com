@@ -76,9 +76,15 @@ router.get('/', view, (req, res) => {
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const baseFrom = 'FROM licenses JOIN clients ON clients.id = licenses.client_id';
 
+  // Most recently renewed license first — SQLite sorts NULL last_renewed_at
+  // (never renewed) after every real timestamp in DESC order by default, so
+  // a license that's never been renewed naturally falls to the bottom
+  // rather than needing a separate CASE to push it there.
+  const orderBy = 'ORDER BY licenses.last_renewed_at DESC, licenses.id DESC';
+
   if (!pageParam) {
     const rows = db
-      .prepare(`SELECT licenses.*, clients.name AS client_name ${baseFrom} ${where} ORDER BY licenses.expiry_date ASC, licenses.id DESC`)
+      .prepare(`SELECT licenses.*, clients.name AS client_name ${baseFrom} ${where} ${orderBy}`)
       .all(...params);
     return res.json({ licenses: rows.map(withComputed) });
   }
@@ -87,7 +93,7 @@ router.get('/', view, (req, res) => {
   const offset = (page - 1) * PAGE_SIZE;
   const { total } = db.prepare(`SELECT COUNT(*) AS total ${baseFrom} ${where}`).get(...params);
   const rows = db
-    .prepare(`SELECT licenses.*, clients.name AS client_name ${baseFrom} ${where} ORDER BY licenses.expiry_date ASC, licenses.id DESC LIMIT ? OFFSET ?`)
+    .prepare(`SELECT licenses.*, clients.name AS client_name ${baseFrom} ${where} ${orderBy} LIMIT ? OFFSET ?`)
     .all(...params, PAGE_SIZE, offset);
   res.json({
     licenses: rows.map(withComputed),

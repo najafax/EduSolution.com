@@ -471,7 +471,15 @@ are deliberately untouched by either, always returning every row.
   `?status=` (one of the four `display_status` values — `statusWhere()`
   translates each into the actual SQL date comparison against `expiry_date`,
   since only `cancelled` is a direct column match) composed with `?page=`
-  (see "Pagination convention" above). `GET /summary` is independent of
+  (see "Pagination convention" above). List order is `last_renewed_at DESC,
+  id DESC` — the most recently renewed license first, so the list surfaces
+  what's just been paid/renewed rather than what happens to expire soonest;
+  a license that's never been renewed has `last_renewed_at = NULL`, which
+  SQLite sorts last in `DESC` order by default, so those naturally fall to
+  the bottom with no extra `CASE` needed. (`GET /export.csv` below keeps its
+  own separate `expiry_date ASC` order — a downloaded report reads better
+  chronologically by expiry than by renewal recency.) `GET /summary` is
+  independent of
   pagination/search — a `{ active, expiring_soon, expired, cancelled, total }`
   count across every license, backing the KPI strip at the top of
   `Licenses.jsx` — and `GET /export.csv`, both following the usual
