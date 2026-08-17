@@ -412,8 +412,9 @@ are deliberately untouched by either, always returning every row.
   filtered grand total once pagination means that array is no longer
   the complete result set. `CATEGORIES` is a fixed list (`rent, utilities,
   supplies, salaries, shareholder payments, marketing, software, travel,
-  other`) served to the frontend for the category `<select>`/filter chips —
-  the same list (`EXPENSE_CATEGORIES`) is duplicated in `routes/import.js`
+  currency exchange, other`) served to the frontend for the category
+  `<select>`/filter chips — the same list (`EXPENSE_CATEGORIES`) is
+  duplicated in `routes/import.js`
   for CSV import validation, so a category added here needs to be added
   there too. **Expense filters**: `GET /` also accepts `?category=` (exact
   match against `CATEGORIES`) and `?payee=` (exact match against `payee`),

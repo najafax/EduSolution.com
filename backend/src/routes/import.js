@@ -15,7 +15,7 @@ router.use(requirePermission('import', 'manage'));
 const MAX_ROWS = 5000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const EXPENSE_CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'shareholder payments', 'marketing', 'software', 'travel', 'other'];
+const EXPENSE_CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'shareholder payments', 'marketing', 'software', 'travel', 'currency exchange', 'other'];
 const PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'cheque', 'other'];
 const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'void'];
 const QUOTE_STATUSES = ['draft', 'sent', 'accepted', 'declined', 'expired'];
