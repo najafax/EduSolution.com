@@ -158,6 +158,7 @@ export const api = {
   licenses: {
     list: (token, { q, status, page } = {}) => request(`/licenses${qs({ q, status, page })}`, { token }),
     summary: (token) => request('/licenses/summary', { token }),
+    analytics: (token) => request('/licenses/analytics', { token }),
     get: (id, token) => request(`/licenses/${id}`, { token }),
     create: (payload, token) => request('/licenses', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/licenses/${id}`, { method: 'PUT', body: payload, token }),

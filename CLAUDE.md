@@ -535,7 +535,60 @@ are deliberately untouched by either, always returning every row.
   or mobile-accordion column) for the client's activation/portal link;
   nothing currently reads it back out — it's captured now so a future
   activation-email template can interpolate it, not wired into
-  `lib/emailTemplates.js`'s `licenseRemindEmail()` yet.
+  `lib/emailTemplates.js`'s `licenseRemindEmail()` yet. **Structured change
+  tracking**: `PUT /:id` compares the incoming `billing_cycle`/`status`
+  against the existing row and, on top of the generic `'updated'`
+  `logActivity()` call every edit already gets, writes a second, distinct
+  entry when either actually changed — `action: 'changed billing cycle'` (an
+  edit whose only distinguishing feature is that specific field flipping,
+  e.g. monthly → yearly) or `action: 'cancelled'`/`'reactivated'` (status
+  `active` ↔ `cancelled`) rather than one generic `'changed status'`, so the
+  two directions read naturally in the activity feed and can be counted
+  separately. This exists so `GET /analytics` (below) can count these
+  transitions precisely by exact `action` string — the free-text
+  `entity_label` on the generic `'updated'` entry was never structured
+  enough to query reliably. Both are attributed to whoever made the edit,
+  same as `'updated'` itself; the `renewed`/`created`/`deleted` actions
+  elsewhere in this router are unaffected.
+- **License analytics**: `GET /licenses/analytics` (`view`-gated,
+  registered before `GET /:id` for the same "don't let `:id` swallow a
+  literal path" reason `GET /summary`/`GET /export.csv` already are) is a
+  year-over-year view, distinct from `GET /summary`'s current-snapshot
+  counts. For every year from the earliest license's `start_date` through
+  the current year (gap years included at zero, not skipped, so the
+  frontend's chart/table never silently jumps), it reports `newLicenses`
+  (by `start_date` year), `renewals` (by `license_renewals.renewed_at`
+  year), `cancelled`/`reactivated`/`billingCycleChanges` (by the
+  `activity_log` entries `PUT /:id` now writes for those transitions, see
+  above), and `revenueEstimate`. That estimate is deliberately not exact
+  history — `license_renewals` only ever recorded the previous/new expiry
+  dates, never what was actually charged at the time (no per-renewal amount
+  column, no link back to a specific invoice/payment) — so every license
+  counted in a given year (new or renewed) is valued at its **current**
+  `amount` as a stand-in for "what it'd be worth at today's pricing," the
+  same kind of clearly-labeled proxy `routes/financials.js`'s own
+  `bankBalance` already is for a different figure, not a claim about what
+  was actually billed that year. Also returns `byBillingCycle` (current
+  monthly/yearly counts), `topClients` (top 5 by license count, then by
+  current total `amount`, via a plain `GROUP BY`), and a `totals` block
+  (all-time sums of the same five per-year metrics). Because
+  `cancelled`/`reactivated`/`billingCycleChanges` only exist from the
+  `activity_log` entries introduced alongside this feature, every year
+  before it shipped reads `0` for those three columns even if such changes
+  really happened — `pages/business/LicenseAnalytics.jsx` (route
+  `/licenses/analytics`, linked from `Licenses.jsx`'s header next to
+  "Export CSV") says so directly above the yearly table rather than letting
+  a `0` read as "nothing happened." That page follows the same
+  permission-gate-at-the-top-of-the-component pattern as `Reports.jsx`
+  (`can('licenses', 'view')`, not a dedicated module), a KPI strip via the
+  shared `KpiCard`, a grouped year-by-year bar chart modeled directly on
+  `components/RevenueTrendChart.jsx` (same shared-axis/hover-tooltip shape,
+  counts instead of money) but kept local to this page rather than
+  promoted to a shared component, a billing-cycle breakdown modeled on
+  `components/StatusBreakdownChart.jsx`'s horizontal-bar shape, and the
+  standard `hidden overflow-x-auto sm:block` desktop table +
+  `MobileListAccordion` `sm:hidden` mobile counterpart (see "Mobile design
+  system" below) for both the yearly table and the top-clients table.
 - `routes/public.js` — mounted at `/api/public`, the one route file **not**
   behind `requireAuth`. Looks quotes/invoices up by their `public_token`
   (a random 16-byte hex column generated on every quote/invoice create,

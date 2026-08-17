@@ -141,6 +141,95 @@ router.get('/export.csv', view, (req, res) => {
   res.send(csv);
 });
 
+// Historical, year-over-year view — distinct from GET /summary's current-
+// snapshot counts (active/expiring/expired/cancelled as of right now).
+// Registered before GET /:id so "analytics" isn't swallowed as a license id,
+// same reason GET /summary and GET /export.csv are also declared above it.
+//
+// billingCycleChanges/cancelled/reactivated per year come from activity_log
+// entries PUT /:id above started writing (action = 'changed billing cycle' |
+// 'cancelled' | 'reactivated') the moment this feature shipped — a license
+// edited before that only left the older generic 'updated' entry behind,
+// which isn't distinguishable from an edit that didn't touch either field,
+// so those three counts are 0 for any year entirely before this change and
+// only become accurate going forward from here.
+//
+// revenueEstimate is deliberately not exact history: license_renewals only
+// records previous/new expiry dates, not what was actually charged at the
+// time (no per-renewal amount column, no link back to a specific invoice/
+// payment), so a past year's estimate uses each license's CURRENT `amount`
+// as a stand-in for "what it would be worth at today's pricing," the same
+// kind of clearly-labeled proxy routes/financials.js's own `bankBalance`
+// already is for a different figure — not a claim about what was actually
+// billed that year.
+router.get('/analytics', view, (req, res) => {
+  const licenses = db.prepare('SELECT id, client_id, billing_cycle, amount, start_date FROM licenses').all();
+  const renewals = db.prepare('SELECT license_id, renewed_at FROM license_renewals').all();
+  const billingChanges = db
+    .prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'changed billing cycle'")
+    .all();
+  const cancellations = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'cancelled'").all();
+  const reactivations = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'reactivated'").all();
+
+  const amountByLicenseId = new Map(licenses.map((l) => [l.id, l.amount]));
+  const yearOf = (dateStr) => dateStr.slice(0, 4);
+  const currentYear = new Date().getFullYear();
+
+  const years = new Set([currentYear]);
+  [...licenses.map((l) => l.start_date), ...renewals.map((r) => r.renewed_at), ...billingChanges.map((r) => r.created_at), ...cancellations.map((r) => r.created_at), ...reactivations.map((r) => r.created_at)]
+    .forEach((dateStr) => years.add(Number(yearOf(dateStr))));
+  const minYear = Math.min(...years);
+
+  const byYear = [];
+  for (let year = currentYear; year >= minYear; year--) {
+    const y = String(year);
+    const newLicensesThisYear = licenses.filter((l) => yearOf(l.start_date) === y);
+    const renewalsThisYear = renewals.filter((r) => yearOf(r.renewed_at) === y);
+    const revenueEstimate =
+      Math.round(
+        (newLicensesThisYear.reduce((sum, l) => sum + l.amount, 0) +
+          renewalsThisYear.reduce((sum, r) => sum + (amountByLicenseId.get(r.license_id) || 0), 0)) *
+          100,
+      ) / 100;
+
+    byYear.push({
+      year,
+      newLicenses: newLicensesThisYear.length,
+      renewals: renewalsThisYear.length,
+      cancelled: cancellations.filter((r) => yearOf(r.created_at) === y).length,
+      reactivated: reactivations.filter((r) => yearOf(r.created_at) === y).length,
+      billingCycleChanges: billingChanges.filter((r) => yearOf(r.created_at) === y).length,
+      revenueEstimate,
+    });
+  }
+
+  const byBillingCycle = { monthly: 0, yearly: 0 };
+  for (const l of licenses) byBillingCycle[l.billing_cycle] = (byBillingCycle[l.billing_cycle] || 0) + 1;
+
+  const topClients = db
+    .prepare(
+      `SELECT clients.id, clients.name, COUNT(*) AS license_count, COALESCE(SUM(licenses.amount), 0) AS total_amount
+       FROM licenses JOIN clients ON clients.id = licenses.client_id
+       GROUP BY clients.id
+       ORDER BY license_count DESC, total_amount DESC
+       LIMIT 5`,
+    )
+    .all();
+
+  res.json({
+    byYear,
+    byBillingCycle,
+    topClients,
+    totals: {
+      totalLicenses: licenses.length,
+      totalRenewals: renewals.length,
+      totalBillingCycleChanges: billingChanges.length,
+      totalCancelled: cancellations.length,
+      totalReactivated: reactivations.length,
+    },
+  });
+});
+
 function validate(body) {
   const { client_id, name, billing_cycle = 'yearly', amount, start_date, expiry_date } = body || {};
   if (!client_id || !name || !start_date || !expiry_date) {
@@ -206,6 +295,30 @@ router.put('/:id', manage, (req, res) => {
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id));
   logActivity({ userName: req.user.name, action: 'updated', entityType: 'license', entityId: license.id, entityLabel: `${license.name} (${client.name})` });
+
+  // Distinct, structured entries on top of the generic 'updated' one above —
+  // GET /analytics counts these by exact action string to report billing-
+  // cycle changes and cancellations/reactivations per year, which the free-
+  // text 'updated' entry alone can't be queried for reliably.
+  if (existing.billing_cycle !== billing_cycle) {
+    logActivity({
+      userName: req.user.name,
+      action: 'changed billing cycle',
+      entityType: 'license',
+      entityId: license.id,
+      entityLabel: `${license.name} (${client.name}): ${existing.billing_cycle} → ${billing_cycle}`,
+    });
+  }
+  if (existing.status !== nextStatus) {
+    logActivity({
+      userName: req.user.name,
+      action: nextStatus === 'cancelled' ? 'cancelled' : 'reactivated',
+      entityType: 'license',
+      entityId: license.id,
+      entityLabel: `${license.name} (${client.name})`,
+    });
+  }
+
   res.json({ license });
 });
 
