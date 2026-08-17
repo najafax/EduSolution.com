@@ -211,7 +211,10 @@ function validateExpenseRow(row, dateFormat) {
   if (!EXPENSE_CATEGORIES.includes(category)) {
     return { ok: false, message: `category must be one of: ${EXPENSE_CATEGORIES.join(', ')}` };
   }
-  return { ok: true, values: { category, description, amount, expense_date, notes: (row.notes || '').trim() } };
+  return {
+    ok: true,
+    values: { category, description, amount, expense_date, payee: (row.payee || '').trim(), notes: (row.notes || '').trim() },
+  };
 }
 
 function processExpenses(rows, commit) {
@@ -219,7 +222,7 @@ function processExpenses(rows, commit) {
   const results = [];
   let imported = 0;
   const insert = db.prepare(
-    'INSERT INTO expenses (category, description, amount, expense_date, notes) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO expenses (category, description, amount, expense_date, payee, notes) VALUES (?, ?, ?, ?, ?, ?)',
   );
 
   rows.forEach((row, index) => {
@@ -231,7 +234,7 @@ function processExpenses(rows, commit) {
     }
     const v = outcome.values;
     if (commit) {
-      const result = insert.run(v.category, v.description, v.amount, v.expense_date, v.notes);
+      const result = insert.run(v.category, v.description, v.amount, v.expense_date, v.payee, v.notes);
       imported += 1;
       results.push({ row: rowNumber, status: 'ok', message: 'imported', preview: v.description, id: result.lastInsertRowid });
     } else {

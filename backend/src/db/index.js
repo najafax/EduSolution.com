@@ -159,6 +159,7 @@ db.exec(`
     description TEXT NOT NULL,
     amount REAL NOT NULL,
     expense_date TEXT NOT NULL,
+    payee TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -399,6 +400,15 @@ if (!invoiceColumns.has('created_by_name')) {
 const licenseColumns = new Set(db.prepare('PRAGMA table_info(licenses)').all().map((c) => c.name));
 if (!licenseColumns.has('url')) {
   db.exec(`ALTER TABLE licenses ADD COLUMN url TEXT NOT NULL DEFAULT '';`);
+}
+
+// Same pattern again: `payee` (who an expense was paid to — a shareholder,
+// an employee, a landlord, a vendor; see "Expense filters" in
+// routes/expenses.js below) added to `expenses` after that table already
+// existed in production with real expense rows.
+const expenseColumns = new Set(db.prepare('PRAGMA table_info(expenses)').all().map((c) => c.name));
+if (!expenseColumns.has('payee')) {
+  db.exec(`ALTER TABLE expenses ADD COLUMN payee TEXT NOT NULL DEFAULT '';`);
 }
 
 db.pragma('foreign_keys = ON');

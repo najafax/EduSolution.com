@@ -113,7 +113,9 @@ backend port in frontend code.
   (see "Bank balance" in `routes/financials.js` below) — added directly to
   the `ALTER TABLE` migration list this time, having learned the `licenses.url`
   lesson above, since `business_settings`'s single row has had real
-  production data since the very first deploy.
+  production data since the very first deploy. Same pattern again for
+  `expenses.payee` (see "Expense filters" in `routes/expenses.js` below) —
+  `expenses` has carried real rows since long before this column existed.
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
   <jwt>` header, then **re-fetches the live user row from the DB** (by the
   id in the JWT payload) rather than trusting the token's claims, and
@@ -401,18 +403,44 @@ are deliberately untouched by either, always returning every row.
   own reminder instance, since a license reminder has no PDF to attach
   (see `routes/licenses.js` above).
 - `routes/expenses.js` — CRUD for `expenses` (category/description/amount/
-  expense_date/notes) plus `GET /` (`?q=` search, `?page=` — see
+  expense_date/`payee`/notes) plus `GET /` (`?q=` search, `?page=` — see
   "Pagination convention" above) and `GET /export.csv`. `GET /` also always
   returns `totalAmount` (`SUM(amount)` over every row matching the current
-  `?q=` filter, computed independently of `LIMIT`/`OFFSET`) alongside
+  filters, computed independently of `LIMIT`/`OFFSET`) alongside
   `expenses` — `Expenses.jsx`'s "Total" row reads this rather than summing
   the current page's `expenses` array, so the total stays the true
-  search-filtered grand total once pagination means that array is no longer
+  filtered grand total once pagination means that array is no longer
   the complete result set. `CATEGORIES` is a fixed list (`rent, utilities,
   supplies, salaries, shareholder payments, marketing, software, travel,
-  other`) served to the frontend for the category `<select>` — the same
-  list (`EXPENSE_CATEGORIES`) is duplicated in `routes/import.js` for CSV
-  import validation, so a category added here needs to be added there too.
+  other`) served to the frontend for the category `<select>`/filter chips —
+  the same list (`EXPENSE_CATEGORIES`) is duplicated in `routes/import.js`
+  for CSV import validation, so a category added here needs to be added
+  there too. **Expense filters**: `GET /` also accepts `?category=` (exact
+  match against `CATEGORIES`) and `?payee=` (exact match against `payee`),
+  composing freely with each other and with `?q=` (which now also matches
+  `payee`, not just `description`/`category`) — the same "narrow the same
+  query" convention every other list route's filters already follow.
+  `payee` is a free-text, optional field (blank default) capturing who an
+  expense was paid to — a shareholder, an employee, a landlord, a vendor —
+  not a separate `payees` table, since this app has no shareholder/employee
+  entity of its own to reference; a business just types the same name
+  consistently across expenses. `distinctPayees()` returns every non-blank
+  `payee` value used so far (case-insensitive sort), served as `payees` on
+  every `GET /` response alongside `categories` — independent of whatever
+  filter is currently applied, same reasoning as `categories`, so the
+  payee filter's own dropdown always offers everyone ever paid, not just
+  who survived the current filter. `Expenses.jsx` renders `categories`
+  through the existing `StatusFilterChips` (reused as-is — a fixed list of
+  9 categories is exactly what that component already handles for status
+  filters elsewhere) and `payees` through `SearchableSelect` (an
+  open-ended, potentially-long list is what that component is for) with a
+  prepended `{ value: '', label: 'All payees' }` option; the payee filter
+  is only rendered once `payees.length > 0`, so a business that's never
+  used the field doesn't see a pointless "All payees"-only dropdown.
+  Payee is shown as its own column in the desktop table (falling back to
+  an em dash when blank) and, unlike `notes`, as its own mobile-accordion
+  detail row — but only when non-blank, so most expenses (which have no
+  payee) don't show an empty row.
 - `routes/recurring.js` — CRUD for `recurring_invoices` (+ their
   `recurring_invoice_items` template line items) mounted at
   `/api/recurring-invoices`. Frequency is `weekly|monthly|yearly`. `GET /`
@@ -536,7 +564,12 @@ are deliberately untouched by either, always returning every row.
   unrecorded. `Dashboard.jsx`/`Financials.jsx` both render it as a `KpiCard`
   (icon: `BankIcon`) alongside the other summary figures, tone flipping to
   `negative` the same way `netProfit`'s own card does when the number goes
-  below zero (a startup deficit or heavy early spending).
+  below zero (a startup deficit or heavy early spending). Rendered
+  full-width (`col-span-2 sm:col-span-3 lg:col-span-6` on Dashboard,
+  `col-span-2 lg:col-span-3` on Financials — matching each page's own grid
+  breakpoints) via `KpiCard`'s optional `className` prop, rather than
+  sharing a cell with the other KPIs, since it's the one figure meant to
+  read as a standalone headline rather than one stat among several.
 - `routes/reports.js` (mounted at `/api/reports`) — five downloadable PDF
   reports, each `GET /<type>/pdf?from=&to=` (`YYYY-MM-DD`, both required;
   400s if either is missing/malformed or `from` is after `to`). Gated on
@@ -1673,6 +1706,11 @@ keeps its existing layout.
   contract as before (`neutral`/`positive`/`negative`/`warning`), just
   restyled. `components/Accordion.jsx` picked up the same `rounded-2xl`
   for visual consistency with `KpiCard`/`MobileListAccordion`'s cards.
+  `KpiCard` also takes an optional `className` (default `''`), appended to
+  the card's own classes — the one caller today is the Dashboard/Financials
+  "Bank balance" card's full-width grid span (see `routes/financials.js`
+  above), but any future card that needs to break out of the shared grid's
+  per-cell sizing can use the same prop rather than a one-off wrapper.
 - `pages/Dashboard.jsx` opens with a time-of-day greeting (`greeting()` —
   "Good morning"/afternoon/evening by `new Date().getHours()`) above the
   user's first name in `font-display`, with the business name (falling back

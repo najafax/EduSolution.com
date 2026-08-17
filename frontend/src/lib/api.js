@@ -140,7 +140,7 @@ export const api = {
   },
 
   expenses: {
-    list: (token, { q, page } = {}) => request(`/expenses${qs({ q, page })}`, { token }),
+    list: (token, { q, page, category, payee } = {}) => request(`/expenses${qs({ q, page, category, payee })}`, { token }),
     create: (payload, token) => request('/expenses', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/expenses/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/expenses/${id}`, { method: 'DELETE', token }),

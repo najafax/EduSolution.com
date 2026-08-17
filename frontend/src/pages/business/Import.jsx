@@ -4,7 +4,7 @@ import { api } from '../../lib/api';
 
 const TYPES = [
   { value: 'clients', label: 'Clients', columns: 'name*, email*, phone, address, notes' },
-  { value: 'expenses', label: 'Expenses', columns: 'category*, description*, amount*, expense_date*, notes' },
+  { value: 'expenses', label: 'Expenses', columns: 'category*, description*, amount*, expense_date*, payee, notes' },
   {
     value: 'invoices',
     label: 'Invoices (+ payments)',
@@ -28,7 +28,7 @@ const TYPES = [
 
 const TEMPLATES = {
   clients: 'name,email,phone,address,notes\nAcme School,jane@example.com,+960 7000000,"Male, Maldives",Sample notes\n',
-  expenses: 'category,description,amount,expense_date,notes\nrent,Office rent for March,15000,2026-03-01,\n',
+  expenses: 'category,description,amount,expense_date,payee,notes\nrent,Office rent for March,15000,2026-03-01,,\nshareholder payments,Q1 dividend,5000,2026-03-15,Jane Doe,\n',
   invoices:
     'client_email,client_name,number,issue_date,due_date,description,amount,tax_rate,amount_paid,paid_date,payment_method,status,notes\n' +
     'jane@example.com,,,2024-01-15,2024-01-29,Website design,2000,0,2000,2024-01-20,bank_transfer,,Fully paid example\n' +

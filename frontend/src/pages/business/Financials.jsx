@@ -107,7 +107,15 @@ export default function Financials() {
 
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
         {cards.map((card) => (
-          <KpiCard key={card.key} label={card.label} value={card.value} sub={card.sub} icon={card.icon} tone={card.tone} />
+          <KpiCard
+            key={card.key}
+            label={card.label}
+            value={card.value}
+            sub={card.sub}
+            icon={card.icon}
+            tone={card.tone}
+            className={card.key === 'bankBalance' ? 'col-span-2 lg:col-span-3' : ''}
+          />
         ))}
       </div>
 

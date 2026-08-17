@@ -8,12 +8,14 @@ import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
+import StatusFilterChips from '../../components/StatusFilterChips';
+import SearchableSelect from '../../components/SearchableSelect';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import { ExpenseIcon } from '../../components/icons';
 
-const EMPTY_FORM = { category: 'other', description: '', amount: '', expense_date: todayStr(), notes: '' };
+const EMPTY_FORM = { category: 'other', description: '', amount: '', expense_date: todayStr(), payee: '', notes: '' };
 
 export default function Expenses() {
   const { token, can } = useAuth();
@@ -21,6 +23,7 @@ export default function Expenses() {
   const canManage = can('expenses', 'manage');
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [payees, setPayees] = useState([]);
   const [pageInfo, setPageInfo] = useState(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -31,6 +34,8 @@ export default function Expenses() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [payeeFilter, setPayeeFilter] = useState('');
 
   const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.expenses.remove(id, token));
   const visibleExpenses = expenses.filter((e) => !pendingIds.has(e.id));
@@ -38,10 +43,11 @@ export default function Expenses() {
   function load() {
     setLoading(true);
     api.expenses
-      .list(token, { q: search, page })
-      .then(({ expenses, categories, totalAmount, ...rest }) => {
+      .list(token, { q: search, page, category: categoryFilter, payee: payeeFilter })
+      .then(({ expenses, categories, payees, totalAmount, ...rest }) => {
         setExpenses(expenses);
         setCategories(categories);
+        setPayees(payees);
         setTotal(totalAmount);
         setPageInfo(rest.totalPages ? rest : null);
       })
@@ -49,10 +55,10 @@ export default function Expenses() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token, search, page]);
+  useEffect(load, [token, search, page, categoryFilter, payeeFilter]);
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, categoryFilter, payeeFilter]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -66,6 +72,7 @@ export default function Expenses() {
       description: expense.description,
       amount: expense.amount,
       expense_date: expense.expense_date,
+      payee: expense.payee,
       notes: expense.notes,
     });
     setEditingId(expense.id);
@@ -128,8 +135,28 @@ export default function Expenses() {
         </div>
       </div>
 
-      <div className="mt-4 max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search expenses…" />
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <div className="max-w-sm flex-1">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search expenses…" />
+        </div>
+        {payees.length > 0 && (
+          <div className="w-full max-w-xs sm:w-56">
+            <SearchableSelect
+              options={[{ value: '', label: 'All payees' }, ...payees.map((p) => ({ value: p, label: p }))]}
+              value={payeeFilter}
+              onChange={setPayeeFilter}
+              placeholder="Filter by payee…"
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3">
+        <StatusFilterChips
+          options={[{ value: '', label: 'All' }, ...categories.map((c) => ({ value: c, label: c }))]}
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+        />
       </div>
 
       {error && !showForm && <p className="mt-4 text-sm text-red-600">{error}</p>}
@@ -187,6 +214,16 @@ export default function Expenses() {
               />
             </div>
           </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Payee</span>
+            <input
+              type="text"
+              value={form.payee}
+              onChange={(e) => setForm((f) => ({ ...f, payee: e.target.value }))}
+              placeholder="Who was paid — a shareholder, employee, vendor…"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
+            />
+          </label>
           <div className="sm:col-span-2">
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Notes</span>
@@ -220,14 +257,14 @@ export default function Expenses() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={canManage ? ['w-24', 'w-24', 'w-40', 'w-20', 'w-16'] : ['w-24', 'w-24', 'w-40', 'w-20']} />
+            <TableSkeleton rows={5} cols={canManage ? ['w-24', 'w-24', 'w-28', 'w-40', 'w-20', 'w-16'] : ['w-24', 'w-24', 'w-28', 'w-40', 'w-20']} />
           </div>
         ) : visibleExpenses.length === 0 ? (
           <EmptyState
             icon={<ExpenseIcon />}
-            title={search ? `No expenses match "${search}".` : 'No expenses yet.'}
-            message={!search && canManage ? 'Log your first expense to start tracking spending.' : undefined}
-            action={!search && canManage ? { label: 'New expense', onClick: startCreate } : undefined}
+            title={search || categoryFilter || payeeFilter ? 'No expenses match these filters.' : 'No expenses yet.'}
+            message={!search && !categoryFilter && !payeeFilter && canManage ? 'Log your first expense to start tracking spending.' : undefined}
+            action={!search && !categoryFilter && !payeeFilter && canManage ? { label: 'New expense', onClick: startCreate } : undefined}
           />
         ) : (
           <>
@@ -237,6 +274,7 @@ export default function Expenses() {
                   <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3">Payee</th>
                     <th className="px-4 py-3">Description</th>
                     <th className="px-4 py-3 text-right">Amount</th>
                     {canManage && <th className="px-4 py-3" />}
@@ -247,6 +285,7 @@ export default function Expenses() {
                     <tr key={expense.id}>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{expense.expense_date}</td>
                       <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600 dark:text-slate-400">{expense.category}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{expense.payee || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{expense.description}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{expense.amount.toFixed(2)}</td>
                       {canManage && (
@@ -264,7 +303,7 @@ export default function Expenses() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-slate-200 dark:border-slate-700">
-                    <td colSpan={canManage ? 4 : 3} className="px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">
+                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">
                       Total
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">{total.toFixed(2)}</td>
@@ -294,6 +333,12 @@ export default function Expenses() {
                       <dt className="text-slate-500 dark:text-slate-400">Date</dt>
                       <dd className="text-slate-900 dark:text-white">{expense.expense_date}</dd>
                     </div>
+                    {expense.payee && (
+                      <div className="flex justify-between">
+                        <dt className="text-slate-500 dark:text-slate-400">Payee</dt>
+                        <dd className="text-slate-900 dark:text-white">{expense.payee}</dd>
+                      </div>
+                    )}
                     {canManage && (
                       <div className="flex gap-4 pt-1">
                         <button onClick={() => startEdit(expense)} className="text-lagoon-600 hover:text-lagoon-500">

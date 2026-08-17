@@ -131,7 +131,15 @@ export default function Dashboard() {
         <>
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {kpis.map((kpi) => (
-              <KpiCard key={kpi.key} label={kpi.label} value={kpi.value} sub={kpi.sub} icon={kpi.icon} tone={kpi.tone} />
+              <KpiCard
+                key={kpi.key}
+                label={kpi.label}
+                value={kpi.value}
+                sub={kpi.sub}
+                icon={kpi.icon}
+                tone={kpi.tone}
+                className={kpi.key === 'bankBalance' ? 'col-span-2 sm:col-span-3 lg:col-span-6' : ''}
+              />
             ))}
           </div>
 
