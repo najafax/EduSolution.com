@@ -901,6 +901,33 @@ are deliberately untouched by either, always returning every row.
   `restore.js` always downloads to a separate file and refuses to write
   directly over the live `DB_PATH` — swapping a restored file in is a
   deliberate manual step (stop the backend, replace the file, restart).
+- `backend/scripts/fix-license-renewal-dates.js` (`npm run fix-license-renewals`,
+  `--apply` to write — dry-run by default) — a one-off correction for data
+  written by the old, pre-fix `renewLicense()` (see "The core action" above),
+  which advanced a renewal from whichever was later, the license's
+  `expiry_date` or *today*, instead of always from the license's own
+  `expiry_date` — so renewing a lapsed license landed the new expiry on
+  today's day-of-month rather than the license's real billing day. Not a
+  blind bulk `UPDATE`: for each license it walks `license_renewals`
+  chronologically from the first row's `previous_expiry_date` (a trustworthy
+  snapshot, never itself computed by the buggy code) and recomputes what
+  each `new_expiry_date` — and, for any row after the first, that row's own
+  `previous_expiry_date` too, so a corrected chain stays internally
+  consistent and a re-run reads it as already-fixed rather than a fresh
+  discontinuity — *should* have been using the current (fixed)
+  `advanceExpiry()`. The moment a row's recorded `previous_expiry_date`
+  doesn't match what the prior step actually produced, that license's chain
+  is left untouched from that point on and reported as needing manual
+  review instead of guessed at, since the mismatch means something this
+  script can't explain happened in between (most plausibly a deliberate
+  manual `expiry_date` edit) — overwriting it would risk destroying real
+  data instead of fixing a bug. Only updates the license's *current*
+  `expiry_date` when it still equals exactly what the chain's last renewal
+  actually wrote (i.e. nothing has touched it since); otherwise it fixes the
+  history log only and leaves the live `expiry_date` flagged for a human to
+  check. Take a fresh backup first (`npm run backup`, or copy `data.sqlite3`
+  directly if self-hosted) before running with `--apply` — this writes to
+  real `licenses`/`license_renewals` rows.
 - `lib/scheduler.js` — `startScheduler()` (called once from `index.js`'s
   `app.listen` callback) registers four `node-cron` jobs, all server-time:
   - `0 3 * * *` — `runBackup()` (see `lib/backup.js` above), scheduled

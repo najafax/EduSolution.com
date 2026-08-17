@@ -10,7 +10,8 @@
     "create-user": "node scripts/create-user.js",
     "backup": "node scripts/backup.js",
     "backup:list": "node scripts/list-backups.js",
-    "backup:restore": "node scripts/restore.js"
+    "backup:restore": "node scripts/restore.js",
+    "fix-license-renewals": "node scripts/fix-license-renewal-dates.js"
   },
   "keywords": [],
   "author": "",
