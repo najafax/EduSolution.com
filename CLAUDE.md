@@ -782,7 +782,15 @@ are deliberately untouched by either, always returning every row.
   batch has no unambiguous evidence either way. `parseNumber()` similarly
   strips thousands-separator commas and a leading currency symbol from
   `amount`/`tax_rate`/`amount_paid` so `"2,500"`/`"$2,500.00"` parse the
-  same as `"2500"`.
+  same as `"2500"`. Every enum-like column matched against a fixed list
+  (invoice/quote `status`, license `billing_cycle`/`status`, expense
+  `category`, invoice `payment_method`) is `.trim().toLowerCase()`'d before
+  the `includes()` check — expense `category` and invoice `payment_method`
+  originally weren't, a real bug (found when a user's spreadsheet used
+  Title Case like `"Rent"`/`"Cash"` and every one of those rows silently
+  failed validation and got skipped, quietly understating `totalExpenses`
+  and inflating `netProfit`) rather than a deliberate strictness choice —
+  keep new enum columns consistent with this pattern.
   Invoices and quotes are both matched to an existing client via the shared
   `resolveClient()`/`clientMaps()` helpers: by `client_email` first, falling
   back to an exact `client_name` match if `client_email` is blank (import

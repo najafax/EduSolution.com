@@ -201,7 +201,7 @@ function processClients(rows, commit) {
 
 function validateExpenseRow(row, dateFormat) {
   const description = (row.description || '').trim();
-  const category = (row.category || 'other').trim() || 'other';
+  const category = (row.category || 'other').trim().toLowerCase() || 'other';
   const amount = parseNumber(row.amount);
   const expense_date = normalizeDate(row.expense_date, dateFormat);
 
@@ -339,7 +339,7 @@ function validateInvoiceRow(row, clientsByEmail, clientsByName, dateFormat) {
     if (!paidDate) return { ok: false, message: 'paid_date must be a valid date (e.g. YYYY-MM-DD)' };
   }
 
-  const paymentMethod = (row.payment_method || 'bank_transfer').trim() || 'bank_transfer';
+  const paymentMethod = (row.payment_method || 'bank_transfer').trim().toLowerCase() || 'bank_transfer';
   if (amountPaid > 0 && !PAYMENT_METHODS.includes(paymentMethod)) {
     return { ok: false, message: `payment_method must be one of: ${PAYMENT_METHODS.join(', ')}` };
   }
