@@ -17,6 +17,18 @@ function withComputedInvoice(invoice) {
   };
 }
 
+// Strips internal-only config that no client-facing document (the PDF or
+// this JSON view) ever actually renders — starting_balance is an internal
+// financial figure and session_timeout_minutes is a security policy value,
+// neither belongs in a response any client holding a public quote/invoice
+// link can read. Every other field here (business_name, address, tax_id,
+// bank_details, logo/signature/stamp images, etc.) is fine as-is: it's the
+// same data this same token can already pull via the PDF route.
+function publicSettings(settings) {
+  const { session_timeout_minutes, starting_balance, ...rest } = settings;
+  return rest;
+}
+
 function getQuoteByToken(token) {
   const quote = db.prepare('SELECT * FROM quotes WHERE public_token = ?').get(token);
   if (!quote) return null;
@@ -37,7 +49,7 @@ router.get('/quotes/:token', (req, res) => {
   const data = getQuoteByToken(req.params.token);
   if (!data) return res.status(404).json({ error: 'Quote not found' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
-  res.json({ ...data, settings });
+  res.json({ ...data, settings: publicSettings(settings) });
 });
 
 router.post('/quotes/:token/respond', (req, res) => {
@@ -85,7 +97,7 @@ router.get('/invoices/:token', (req, res) => {
   const data = getInvoiceByToken(req.params.token);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
-  res.json({ ...data, settings });
+  res.json({ ...data, settings: publicSettings(settings) });
 });
 
 router.get('/invoices/:token/pdf', async (req, res) => {

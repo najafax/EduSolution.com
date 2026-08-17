@@ -10,6 +10,7 @@ const { invoiceSendEmail, invoiceRemindEmail, receiptSendEmail } = require('../l
 const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
+const { renewLicense } = require('../lib/licenseRenewal');
 
 const router = Router();
 router.use(requireAuth);
@@ -258,6 +259,35 @@ router.delete('/:id', manage, (req, res) => {
   res.status(204).end();
 });
 
+// Cancels an invoice without deleting it — a void invoice is excluded from
+// financial totals/reports (see routes/financials.js, routes/reports.js)
+// but the record itself stays, unlike DELETE above. Deliberately its own
+// action route rather than a status value on PUT /:id: that route already
+// 409s once status is 'sent'/'paid' (a delivered/settled document can't be
+// edited), but voiding is exactly the escape hatch a sent invoice needs —
+// it has to work precisely where PUT refuses to. Only blocked when the
+// invoice is already void, already paid (voiding paid money needs a real
+// refund process, not a status flip), or has any recorded payments at all
+// (mirrors the DELETE guard above — a partially-paid invoice can't just
+// have its payments silently orphaned by voiding it).
+router.post('/:id/void', manage, (req, res) => {
+  const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Invoice not found' });
+  if (existing.status === 'void') {
+    return res.status(409).json({ error: 'This invoice is already void' });
+  }
+  if (existing.status === 'paid') {
+    return res.status(409).json({ error: 'This invoice has already been paid and cannot be voided' });
+  }
+  if (existing.amount_paid > 0) {
+    return res.status(409).json({ error: 'This invoice has recorded payments and cannot be voided' });
+  }
+
+  db.prepare(`UPDATE invoices SET status = 'void', updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
+  logActivity({ userName: req.user.name, action: 'voided', entityType: 'invoice', entityId: existing.id, entityLabel: existing.number });
+  res.json(getInvoiceWithItems(req.params.id));
+});
+
 router.get('/:id/pdf', view, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
@@ -286,6 +316,9 @@ router.get('/:id/send-preview', manage, (req, res) => {
 router.post('/:id/send', manage, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  if (data.invoice.status === 'void') {
+    return res.status(409).json({ error: 'This invoice has been voided and cannot be sent' });
+  }
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
 
   const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
@@ -325,6 +358,9 @@ router.get('/:id/remind-preview', manage, (req, res) => {
 router.post('/:id/remind', manage, async (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  if (data.invoice.status === 'void') {
+    return res.status(409).json({ error: 'This invoice has been voided' });
+  }
   if (data.invoice.balance_due <= 0) {
     return res.status(409).json({ error: 'This invoice is already fully paid' });
   }
@@ -436,7 +472,39 @@ router.post('/:id/payments', manage, (req, res) => {
 
   const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(result.lastInsertRowid);
   logActivity({ userName: req.user.name, action: 'recorded payment for', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: `${data.invoice.number} (${receiptNumber})` });
-  res.status(201).json({ payment, invoice: getInvoiceWithItems(req.params.id).invoice });
+
+  // Auto-renew any of this client's active licenses that this invoice was
+  // actually billing for — matched by a line item description naming the
+  // license exactly (trimmed, case-insensitive), not just "client has an
+  // invoice," so an unrelated invoice for the same client never touches a
+  // license it didn't bill. Only fires the moment the invoice is fully
+  // paid (newStatus === 'paid'), not on a partial payment — mirrors the
+  // "once they've paid, renew it" framing the manual Renew button already
+  // uses. Reuses the exact same renewLicense() the manual Renew button and
+  // routes/licenses.js's POST /:id/renew call, so an auto-renewal writes
+  // the same license_renewals row and resets last_reminder_sent_at
+  // identically to a human clicking "Renew".
+  const autoRenewedLicenses = [];
+  if (newStatus === 'paid') {
+    const descriptions = new Set(data.items.map((item) => (item.description || '').trim().toLowerCase()).filter(Boolean));
+    if (descriptions.size > 0) {
+      const clientLicenses = db.prepare("SELECT * FROM licenses WHERE client_id = ? AND status = 'active'").all(data.invoice.client_id);
+      for (const license of clientLicenses) {
+        if (!descriptions.has(license.name.trim().toLowerCase())) continue;
+        const nextExpiry = renewLicense(license, req.user.name);
+        logActivity({
+          userName: req.user.name,
+          action: 'auto-renewed via invoice payment for',
+          entityType: 'license',
+          entityId: license.id,
+          entityLabel: `${license.name} (${data.client.name}) → ${nextExpiry}`,
+        });
+        autoRenewedLicenses.push({ id: license.id, name: license.name, expiry_date: nextExpiry });
+      }
+    }
+  }
+
+  res.status(201).json({ payment, invoice: getInvoiceWithItems(req.params.id).invoice, autoRenewedLicenses });
 });
 
 router.get('/:id/payments/:paymentId/pdf', view, async (req, res) => {

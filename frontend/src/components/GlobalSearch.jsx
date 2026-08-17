@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const EMPTY_RESULTS = { clients: [], quotes: [], invoices: [], expenses: [] };
 
-export default function GlobalSearch({ onNavigate, className = 'max-w-xs' }) {
+export default function GlobalSearch({ onNavigate, className = 'max-w-xs', autoFocus = false }) {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -51,13 +51,14 @@ export default function GlobalSearch({ onNavigate, className = 'max-w-xs' }) {
       <input
         type="search"
         value={query}
+        autoFocus={autoFocus}
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
         placeholder="Search everything…"
-        className="min-h-11 w-full rounded-md border border-slate-300 py-2 pl-3 pr-9 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+        className="min-h-11 w-full rounded-md border border-slate-300 py-2 pl-3 pr-9 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
       />
       {query && (
         <button

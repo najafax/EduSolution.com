@@ -22,6 +22,17 @@ const STATUS_OPTIONS = [
   { value: 'void', label: 'Void' },
 ];
 
+// Left accent stripe on each mobile card (components/MobileListAccordion.jsx)
+// — same status meaning as StatusBadge's colors, just as a stripe instead
+// of a pill, so status reads before the row is even expanded.
+const ACCENT = {
+  draft: 'bg-slate-300 dark:bg-slate-600',
+  sent: 'bg-lagoon-500',
+  paid: 'bg-emerald-500',
+  void: 'bg-slate-300 dark:bg-slate-600',
+  overdue: 'bg-red-500',
+};
+
 export default function Invoices() {
   const { token, can } = useAuth();
   const navigate = useNavigate();
@@ -73,7 +84,7 @@ export default function Invoices() {
           {canManage && (
             <button
               onClick={() => setShowNewForm(true)}
-              className="flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+              className="flex min-h-11 items-center rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
             >
               New invoice
             </button>
@@ -121,7 +132,7 @@ export default function Invoices() {
                   {invoices.map((invoice) => (
                     <tr key={invoice.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <td className="whitespace-nowrap px-4 py-3">
-                        <Link to={`/invoices/${invoice.id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
+                        <Link to={`/invoices/${invoice.id}`} className="font-medium text-lagoon-600 hover:text-lagoon-500">
                           {invoice.number}
                         </Link>
                       </td>
@@ -138,18 +149,19 @@ export default function Invoices() {
               </table>
             </div>
 
-            <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+            <div className="flex flex-col gap-2.5 sm:hidden">
               {invoices.map((invoice) => (
                 <MobileListAccordion
                   key={invoice.id}
                   name="invoices-list"
+                  accent={ACCENT[invoice.is_overdue ? 'overdue' : invoice.status]}
                   summary={
                     <div className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <Link
                           to={`/invoices/${invoice.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-medium text-indigo-600 hover:text-indigo-500"
+                          className="font-medium text-lagoon-600 hover:text-lagoon-500"
                         >
                           {invoice.number}
                         </Link>

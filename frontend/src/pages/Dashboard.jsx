@@ -9,8 +9,15 @@ import Accordion from '../components/Accordion';
 import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import DashboardShortcutsEditor from '../components/DashboardShortcutsEditor';
-import { UsersIcon, InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, TrendUpIcon, TrendDownIcon } from '../components/icons';
+import { UsersIcon, InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, TrendUpIcon, TrendDownIcon, BankIcon } from '../components/icons';
 import { money } from '../lib/money';
+
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
 const SHORTCUTS = [
   { to: '/clients', label: 'Clients', module: 'clients' },
@@ -18,6 +25,7 @@ const SHORTCUTS = [
   { to: '/quotes', label: 'Quotes', module: 'quotes' },
   { to: '/invoices', label: 'Invoices', module: 'invoices' },
   { to: '/recurring-invoices', label: 'Recurring', module: 'recurring_invoices' },
+  { to: '/licenses', label: 'Licenses', module: 'licenses' },
   { to: '/expenses', label: 'Expenses', module: 'expenses' },
   { to: '/financials', label: 'Financials', module: 'financials' },
   { to: '/settings', label: 'Settings', module: 'settings' },
@@ -45,6 +53,7 @@ export default function Dashboard() {
     useDashboardShortcuts(permittedShortcuts);
 
   const isProfitable = summary && summary.netProfit >= 0;
+  const isPositiveBalance = summary && summary.bankBalance >= 0;
   const kpis = summary
     ? [
         { key: 'clients', label: 'Clients', value: summary.clientCount, icon: <UsersIcon />, tone: 'neutral' },
@@ -66,13 +75,23 @@ export default function Dashboard() {
           icon: isProfitable ? <TrendUpIcon /> : <TrendDownIcon />,
           tone: isProfitable ? 'positive' : 'negative',
         },
+        {
+          key: 'bankBalance',
+          label: 'Bank balance',
+          value: money(symbol, summary.bankBalance),
+          icon: <BankIcon />,
+          tone: isPositiveBalance ? 'positive' : 'negative',
+        },
       ]
     : [];
 
+  const firstName = user?.name?.split(' ')[0];
+
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Welcome, {user?.name}</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{user?.email}</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{greeting()}</p>
+      <h1 className="font-display text-3xl font-extrabold text-slate-900 dark:text-white">{firstName}</h1>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{settings?.business_name || user?.email}</p>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
@@ -112,7 +131,15 @@ export default function Dashboard() {
         <>
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {kpis.map((kpi) => (
-              <KpiCard key={kpi.key} label={kpi.label} value={kpi.value} sub={kpi.sub} icon={kpi.icon} tone={kpi.tone} />
+              <KpiCard
+                key={kpi.key}
+                label={kpi.label}
+                value={kpi.value}
+                sub={kpi.sub}
+                icon={kpi.icon}
+                tone={kpi.tone}
+                className={kpi.key === 'bankBalance' ? 'col-span-2 sm:col-span-3 lg:col-span-6' : ''}
+              />
             ))}
           </div>
 
@@ -137,7 +164,7 @@ export default function Dashboard() {
                   {summary.recentPayments.slice(0, 5).map((p) => (
                     <div key={p.id} className="flex flex-col gap-1 px-6 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <div>
-                        <Link to={`/invoices/${p.invoice_id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
+                        <Link to={`/invoices/${p.invoice_id}`} className="font-medium text-lagoon-600 hover:text-lagoon-500">
                           {p.invoice_number}
                         </Link>
                         <span className="ml-2 text-slate-500 dark:text-slate-400">{p.client_name}</span>

@@ -6,6 +6,7 @@ import SearchInput from '../components/SearchInput';
 import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import MobileListAccordion from '../components/MobileListAccordion';
+import { useConfirm } from '../lib/useConfirm';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', active: true };
 
@@ -41,6 +42,7 @@ export default function Users() {
   const [resetTargetId, setResetTargetId] = useState(null);
   const [resetPassword, setResetPassword] = useState('');
   const [resetSubmitting, setResetSubmitting] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     if (!canView) return;
@@ -120,7 +122,7 @@ export default function Users() {
   }
 
   async function handleDelete(user) {
-    if (!confirm(`Delete ${user.name}? This cannot be undone.`)) return;
+    if (!(await confirm({ title: `Delete ${user.name}?`, message: 'This cannot be undone.', confirmLabel: 'Delete' }))) return;
     setError('');
     try {
       await api.users.remove(user.id, token);
@@ -160,7 +162,7 @@ export default function Users() {
         {canManage && (
           <button
             onClick={startCreate}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+            className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
           >
             New user
           </button>
@@ -189,7 +191,7 @@ export default function Users() {
                 required
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
             <label className="block">
@@ -199,7 +201,7 @@ export default function Users() {
                 required
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
             {!editingId && (
@@ -211,7 +213,7 @@ export default function Users() {
                   minLength={8}
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 />
               </label>
             )}
@@ -220,7 +222,7 @@ export default function Users() {
               <select
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               >
                 <option value="staff">Staff</option>
                 <option value="admin">Admin</option>
@@ -284,7 +286,7 @@ export default function Users() {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
             >
               {submitting ? 'Saving…' : 'Save'}
             </button>
@@ -317,14 +319,14 @@ export default function Users() {
               minLength={8}
               value={resetPassword}
               onChange={(e) => setResetPassword(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
             />
           </label>
           <div className="flex gap-3">
             <button
               type="submit"
               disabled={resetSubmitting}
-              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
             >
               {resetSubmitting ? 'Saving…' : 'Set password'}
             </button>
@@ -382,12 +384,12 @@ export default function Users() {
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <button onClick={() => startEdit(u)} className="mr-3 text-indigo-600 hover:text-indigo-500">
+                          <button onClick={() => startEdit(u)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
                             Edit
                           </button>
                           <button
                             onClick={() => setResetTargetId(u.id)}
-                            className="mr-3 text-indigo-600 hover:text-indigo-500"
+                            className="mr-3 text-lagoon-600 hover:text-lagoon-500"
                           >
                             Reset password
                           </button>
@@ -404,7 +406,7 @@ export default function Users() {
               </table>
             </div>
 
-            <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+            <div className="flex flex-col gap-2.5 sm:hidden">
               {users.map((u) => (
                 <MobileListAccordion
                   key={u.id}
@@ -436,10 +438,10 @@ export default function Users() {
                   </div>
                   {canManage && (
                     <div className="flex flex-wrap gap-4 pt-1">
-                      <button onClick={() => startEdit(u)} className="text-indigo-600 hover:text-indigo-500">
+                      <button onClick={() => startEdit(u)} className="text-lagoon-600 hover:text-lagoon-500">
                         Edit
                       </button>
-                      <button onClick={() => setResetTargetId(u.id)} className="text-indigo-600 hover:text-indigo-500">
+                      <button onClick={() => setResetTargetId(u.id)} className="text-lagoon-600 hover:text-lagoon-500">
                         Reset password
                       </button>
                       {u.id !== currentUser.id && (
@@ -459,6 +461,8 @@ export default function Users() {
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New user" />}
+
+      {confirmDialog}
     </div>
   );
 }

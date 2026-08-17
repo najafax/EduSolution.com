@@ -73,7 +73,7 @@ function ProductPicker({ products, currencySymbol, onPick, placeholder }) {
           setOpen(true);
         }}
         onKeyDown={handleKeyDown}
-        className="min-h-11 w-full min-w-56 rounded-md border border-slate-300 px-3 py-2 text-base text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+        className="min-h-11 w-full min-w-56 rounded-md border border-slate-300 px-3 py-2 text-base text-slate-700 focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
       />
       {open && (
         <ul className="absolute z-10 mt-1 max-h-60 w-full min-w-56 overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
@@ -90,7 +90,7 @@ function ProductPicker({ products, currencySymbol, onPick, placeholder }) {
                   }}
                   onMouseEnter={() => setHighlighted(index)}
                   className={`flex w-full flex-col items-start px-3 py-2 text-left text-sm ${
-                    index === highlighted ? 'bg-indigo-50 dark:bg-indigo-950/50' : ''
+                    index === highlighted ? 'bg-lagoon-50 dark:bg-lagoon-950/50' : ''
                   }`}
                 >
                   <span className="text-slate-900 dark:text-white">
@@ -179,7 +179,7 @@ export default function LineItemsEditor({
               readOnly={catalogOnly}
               value={item.description}
               onChange={(e) => updateItem(index, { description: e.target.value })}
-              className={`col-span-12 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none sm:col-span-6 dark:border-slate-600 dark:text-white ${
+              className={`col-span-12 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none sm:col-span-6 dark:border-slate-600 dark:text-white ${
                 catalogOnly ? 'bg-slate-50 dark:bg-slate-800' : 'dark:bg-slate-900'
               }`}
             />
@@ -191,7 +191,7 @@ export default function LineItemsEditor({
               required
               value={item.quantity}
               onChange={(e) => updateItem(index, { quantity: e.target.value })}
-              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none sm:col-span-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none sm:col-span-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
             <input
               type="number"
@@ -201,7 +201,7 @@ export default function LineItemsEditor({
               required
               value={item.unit_price}
               onChange={(e) => updateItem(index, { unit_price: e.target.value })}
-              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none sm:col-span-3 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none sm:col-span-3 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
             <button
               type="button"

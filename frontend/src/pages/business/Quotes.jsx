@@ -23,6 +23,17 @@ const STATUS_OPTIONS = [
   { value: 'expired', label: 'Expired' },
 ];
 
+// Left accent stripe on each mobile card (components/MobileListAccordion.jsx)
+// — same status meaning as StatusBadge's colors, just as a stripe instead
+// of a pill, so status reads before the row is even expanded.
+const ACCENT = {
+  draft: 'bg-slate-300 dark:bg-slate-600',
+  sent: 'bg-lagoon-500',
+  accepted: 'bg-emerald-500',
+  declined: 'bg-red-500',
+  expired: 'bg-amber-500',
+};
+
 export default function Quotes() {
   const { token, can } = useAuth();
   const navigate = useNavigate();
@@ -74,7 +85,7 @@ export default function Quotes() {
           {canManage && (
             <button
               onClick={() => setShowNewForm(true)}
-              className="flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+              className="flex min-h-11 items-center rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
             >
               New quote
             </button>
@@ -121,7 +132,7 @@ export default function Quotes() {
                   {quotes.map((quote) => (
                     <tr key={quote.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <td className="whitespace-nowrap px-4 py-3">
-                        <Link to={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-500">
+                        <Link to={`/quotes/${quote.id}`} className="font-medium text-lagoon-600 hover:text-lagoon-500">
                           {quote.number}
                         </Link>
                       </td>
@@ -137,18 +148,19 @@ export default function Quotes() {
               </table>
             </div>
 
-            <div className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+            <div className="flex flex-col gap-2.5 sm:hidden">
               {quotes.map((quote) => (
                 <MobileListAccordion
                   key={quote.id}
                   name="quotes-list"
+                  accent={ACCENT[quote.status]}
                   summary={
                     <div className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <Link
                           to={`/quotes/${quote.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-medium text-indigo-600 hover:text-indigo-500"
+                          className="font-medium text-lagoon-600 hover:text-lagoon-500"
                         >
                           {quote.number}
                         </Link>

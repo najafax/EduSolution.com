@@ -58,7 +58,7 @@ function TemplateCard({ template, token, onChanged }) {
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{template.label}</h3>
         {template.isCustom && (
-          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+          <span className="rounded-full bg-lagoon-100 px-2 py-0.5 text-xs font-medium text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
             Customized
           </span>
         )}
@@ -70,7 +70,7 @@ function TemplateCard({ template, token, onChanged }) {
           type="text"
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+          className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
         />
       </label>
 
@@ -80,7 +80,7 @@ function TemplateCard({ template, token, onChanged }) {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           rows={5}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
         />
       </label>
 
@@ -101,7 +101,7 @@ function TemplateCard({ template, token, onChanged }) {
         <button
           onClick={handleSave}
           disabled={!dirty || busy}
-          className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-50"
         >
           {busy ? 'Saving…' : 'Save'}
         </button>

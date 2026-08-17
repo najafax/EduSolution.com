@@ -93,7 +93,29 @@ backend port in frontend code.
   `products.tax_rate` (see `routes/products.js` below), added after
   `products` already had real catalog rows in production — a plain
   `ALTER TABLE products ADD COLUMN tax_rate REAL NOT NULL DEFAULT 0`,
-  guarded by a `PRAGMA table_info(products)` check.
+  guarded by a `PRAGMA table_info(products)` check. Same pattern again for
+  `licenses.url` (see `routes/licenses.js` below) — this one is a cautionary
+  example of the rule this section opens with: a brand-new table only
+  needs a plain `CREATE TABLE IF NOT EXISTS` edit *the first time it's
+  created*, but the moment that table has shipped and a real deploy has
+  run against it even once, every column added afterward needs the
+  `ALTER TABLE` treatment regardless of how "new" the feature still feels —
+  `url` was added to the `licenses` `CREATE TABLE` statement directly
+  (reasoning, at the time, that the table itself was created earlier in the
+  same work session so surely had no production data yet), but the
+  Licenses feature had already been deployed by then, so every environment
+  that had pulled that earlier deploy still had a `licenses` table with no
+  `url` column — every write naming that column (manual create/edit,
+  `POST /api/import/licenses`) 500'd with "table licenses has no column
+  named url" until the follow-up `ALTER TABLE licenses ADD COLUMN url TEXT
+  NOT NULL DEFAULT ''`, guarded by the usual `PRAGMA table_info(licenses)`
+  check. Same pattern once more for `business_settings.starting_balance`
+  (see "Bank balance" in `routes/financials.js` below) — added directly to
+  the `ALTER TABLE` migration list this time, having learned the `licenses.url`
+  lesson above, since `business_settings`'s single row has had real
+  production data since the very first deploy. Same pattern again for
+  `expenses.payee` (see "Expense filters" in `routes/expenses.js` below) —
+  `expenses` has carried real rows since long before this column existed.
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
   <jwt>` header, then **re-fetches the live user row from the DB** (by the
   id in the JWT payload) rather than trusting the token's claims, and
@@ -111,8 +133,8 @@ backend port in frontend code.
 - `lib/permissions.js` — the single source of truth for the permission
   model. `MODULES` is the fixed list of gatable modules (`clients`,
   `products`, `quotes`, `invoices`, `expenses`, `recurring_invoices`,
-  `financials`, `activity`, `settings`, `users`, `import`) — kept as a
-  hardcoded list
+  `licenses`, `financials`, `activity`, `settings`, `users`, `import`) —
+  kept as a hardcoded list
   (rather than derived from route files) so a typo'd module name in a route
   fails closed instead of silently creating a new, ungrantable slot.
   `hasPermission(user, module, level)` short-circuits to `true` for
@@ -234,7 +256,10 @@ are deliberately untouched by either, always returning every row.
   header/footer, plus the one security policy value). `clients.js` also has
   `GET /export.csv` (registered before `GET /:id` so it isn't shadowed by
   the `:id` param). `PUT /` validates `session_timeout_minutes` is a whole
-  number between 1 and 480. `GET /` supports `?q=` (name/email) and
+  number between 1 and 480, and `starting_balance` is any finite number
+  (negative allowed — an overdraft on the day you started using the app is
+  a valid starting point, see "Bank balance" in `routes/financials.js`
+  below). `GET /` supports `?q=` (name/email) and
   `?page=` (see "Pagination convention" above).
 - `routes/products.js` — plain CRUD for `products` (name/description/
   unit_price/`tax_rate`), `GET /` supports `?q=` search and `?page=` (see
@@ -279,7 +304,60 @@ are deliberately untouched by either, always returning every row.
   `draft` is always editable. This only blocks the edit route itself —
   `/duplicate` (which creates a fresh draft copy) and recording a payment
   are unaffected, and deletion is still governed separately by the
-  existing "has recorded payments" guard below.
+  existing "has recorded payments" guard below. **Invoices only**, also:
+  `POST /:id/void` is the actual way an invoice becomes `void` — a
+  dedicated action route rather than a `status` value on the generic
+  `PUT /:id` above, because that route already 409s once `status` is
+  `sent`/`paid`, but voiding is precisely the escape hatch a *sent*
+  invoice needs (cancel a mistake, e.g. a client backed out) — it has to
+  work exactly where `PUT` refuses to. (`PUT /:id` still technically
+  accepts `status: 'void'` in its body too, but since it's blocked for
+  `sent`/`paid` invoices and the frontend never sends a `status` field at
+  all, that path is effectively dead — `POST /:id/void` is the only route
+  that matters in practice.) Blocked with 409 if the invoice is already
+  `void`, already `paid` (voiding real money needs a refund process, not a
+  status flip), or has *any* recorded payment at all — mirrors the
+  DELETE guard's "has recorded payments" check, so a partially-paid sent
+  invoice can't have its payments silently orphaned by voiding it.
+  Voiding also has ripple effects on the other invoice actions, all
+  enforced server-side: `POST /:id/send` and `POST /:id/remind` both 409
+  on a `void` invoice (there's no reason to email or nag a client about a
+  cancelled invoice), and `POST /:id/payments` already rejected `void`
+  the same as `draft` before this feature existed. A voided invoice is
+  excluded from `routes/financials.js`'s summary and the sales/tax PDF
+  reports in `routes/reports.js` (both filter `status != 'void'`), the
+  same way those already excluded nothing else — void is the only status
+  either of them filters out.
+- **License auto-renewal on invoice payment**: `POST /invoices/:id/payments`
+  auto-renews any of the invoice's client's *active* licenses that the
+  invoice was actually billing for, the moment the payment brings the
+  invoice fully to `status: 'paid'` (not on a partial payment) — matches
+  the "once they've paid, renew it" framing the manual Renew button already
+  uses (see `routes/licenses.js` above), just triggered by a payment
+  instead of a click. There's no `invoice_id` column on `licenses` linking
+  the two — matching is by content: each `invoice_items.description` is
+  trimmed/lowercased and checked against that client's active licenses'
+  `name` the same way, so a line item literally naming a license (e.g.
+  "LMS Pro Annual License") renews that specific license, and an invoice
+  for something unrelated (or naming a `cancelled` license, which is
+  excluded from the candidate query entirely) never touches any license at
+  all. Multiple matching line items still only renew a license once each;
+  an invoice can auto-renew more than one license if it bills for more than
+  one by name. The actual renewal — extend `expiry_date` by one billing
+  cycle, insert the `license_renewals` row, reset `last_reminder_sent_at`
+  — is `lib/licenseRenewal.js`'s `renewLicense()`, the exact same function
+  `routes/licenses.js`'s `POST /:id/renew` calls for a human clicking
+  "Renew"; extracting it there was what let this feature reuse it here with
+  no duplicated logic. Each auto-renewal gets its own `logActivity()` entry
+  (`action: 'auto-renewed via invoice payment for'`, attributed to whoever
+  recorded the payment — this is a direct consequence of their action, not
+  an unattended background job like `lib/scheduler.js`'s cron jobs, so it's
+  *not* logged as `'Automated'` the way those are) and is included in the
+  response's `autoRenewedLicenses` array (`{ id, name, expiry_date }[]`).
+  `InvoiceDetail.jsx`'s `handleRecordPayment()` reads that array and appends
+  "Also renewed: X, Y." to the existing "Payment recorded." notice when
+  non-empty, so the person recording the payment sees the side effect
+  immediately rather than discovering it later on the Licenses page.
 - **Email preview before sending**: every client-facing email this app
   sends from a button click (not the automated overdue-reminder digest —
   see `lib/scheduler.js` below, which stays fully automatic) goes through
@@ -287,17 +365,19 @@ are deliberately untouched by either, always returning every row.
   has a matching `GET .../<action>-preview` route — `GET
   /quotes/:id/send-preview`, `GET /invoices/:id/send-preview`, `GET
   /invoices/:id/remind-preview`, `GET
-  /invoices/:id/payments/:paymentId/receipt-preview` — all gated `manage`
+  /invoices/:id/payments/:paymentId/receipt-preview`, `GET
+  /licenses/:id/remind-preview` — all gated `manage`
   (same as the send routes themselves) that return `{ to, subject,
   message }`. `lib/emailTemplates.js` is the single source of that default
   text (`quoteSendEmail`/`invoiceSendEmail`/`invoiceRemindEmail`/
-  `receiptSendEmail`, each taking the relevant row(s) + `settings` +
-  `publicUrl` where applicable) — the preview route and the actual send
-  route call the *same* function, so what's shown for editing can never
-  drift from what would be sent if left unedited. The send routes
+  `receiptSendEmail`/`licenseRemindEmail`, each taking the relevant row(s) +
+  `settings` + `publicUrl` where applicable) — the preview route and the
+  actual send route call the *same* function, so what's shown for editing
+  can never drift from what would be sent if left unedited. The send routes
   (`POST /quotes/:id/send`, `POST /invoices/:id/send`, `POST
   /invoices/:id/remind`, `POST /invoices/:id/payments/:paymentId/send-
-  receipt`) now accept optional `subject`/`message` in the body —
+  receipt`, `POST /licenses/:id/remind`) now accept optional
+  `subject`/`message` in the body —
   a blank/whitespace-only value (or the field omitted entirely) falls back
   to `emailTemplates.js`'s default rather than sending an empty subject/
   body, so a programmatic caller that skips the preview step still gets
@@ -317,20 +397,51 @@ are deliberately untouched by either, always returning every row.
   action; `InvoiceDetail.jsx` uses one shared instance for all three of
   its send actions (send/remind/receipt), switched by an `emailModal`
   state object (`{ type: 'send' | 'remind' | 'receipt', paymentId? }`)
-  that picks which preview/send API calls to wire up.
+  that picks which preview/send API calls to wire up. An optional
+  `showAttachmentNote` prop (default `true`) toggles the "The PDF is
+  attached automatically" hint line — `Licenses.jsx` passes `false` for its
+  own reminder instance, since a license reminder has no PDF to attach
+  (see `routes/licenses.js` above).
 - `routes/expenses.js` — CRUD for `expenses` (category/description/amount/
-  expense_date/notes) plus `GET /` (`?q=` search, `?page=` — see
+  expense_date/`payee`/notes) plus `GET /` (`?q=` search, `?page=` — see
   "Pagination convention" above) and `GET /export.csv`. `GET /` also always
   returns `totalAmount` (`SUM(amount)` over every row matching the current
-  `?q=` filter, computed independently of `LIMIT`/`OFFSET`) alongside
+  filters, computed independently of `LIMIT`/`OFFSET`) alongside
   `expenses` — `Expenses.jsx`'s "Total" row reads this rather than summing
   the current page's `expenses` array, so the total stays the true
-  search-filtered grand total once pagination means that array is no longer
+  filtered grand total once pagination means that array is no longer
   the complete result set. `CATEGORIES` is a fixed list (`rent, utilities,
   supplies, salaries, shareholder payments, marketing, software, travel,
-  other`) served to the frontend for the category `<select>` — the same
-  list (`EXPENSE_CATEGORIES`) is duplicated in `routes/import.js` for CSV
-  import validation, so a category added here needs to be added there too.
+  currency exchange, other`) served to the frontend for the category
+  `<select>`/filter chips — the same list (`EXPENSE_CATEGORIES`) is
+  duplicated in `routes/import.js`
+  for CSV import validation, so a category added here needs to be added
+  there too. **Expense filters**: `GET /` also accepts `?category=` (exact
+  match against `CATEGORIES`) and `?payee=` (exact match against `payee`),
+  composing freely with each other and with `?q=` (which now also matches
+  `payee`, not just `description`/`category`) — the same "narrow the same
+  query" convention every other list route's filters already follow.
+  `payee` is a free-text, optional field (blank default) capturing who an
+  expense was paid to — a shareholder, an employee, a landlord, a vendor —
+  not a separate `payees` table, since this app has no shareholder/employee
+  entity of its own to reference; a business just types the same name
+  consistently across expenses. `distinctPayees()` returns every non-blank
+  `payee` value used so far (case-insensitive sort), served as `payees` on
+  every `GET /` response alongside `categories` — independent of whatever
+  filter is currently applied, same reasoning as `categories`, so the
+  payee filter's own dropdown always offers everyone ever paid, not just
+  who survived the current filter. `Expenses.jsx` renders `categories`
+  through the existing `StatusFilterChips` (reused as-is — a fixed list of
+  9 categories is exactly what that component already handles for status
+  filters elsewhere) and `payees` through `SearchableSelect` (an
+  open-ended, potentially-long list is what that component is for) with a
+  prepended `{ value: '', label: 'All payees' }` option; the payee filter
+  is only rendered once `payees.length > 0`, so a business that's never
+  used the field doesn't see a pointless "All payees"-only dropdown.
+  Payee is shown as its own column in the desktop table (falling back to
+  an em dash when blank) and, unlike `notes`, as its own mobile-accordion
+  detail row — but only when non-blank, so most expenses (which have no
+  payee) don't show an empty row.
 - `routes/recurring.js` — CRUD for `recurring_invoices` (+ their
   `recurring_invoice_items` template line items) mounted at
   `/api/recurring-invoices`. Frequency is `weekly|monthly|yearly`. `GET /`
@@ -341,14 +452,108 @@ are deliberately untouched by either, always returning every row.
   from current unit prices every time an invoice is actually generated (see
   `lib/scheduler.js` below), since prices may have changed since the
   template was saved.
+- `routes/licenses.js` — CRUD for `licenses` (a client's subscription/
+  license, not a document like an invoice — no PDF, no public token, no
+  numbering scheme). `status` only ever *stores* `active` | `cancelled`;
+  everything else a viewer cares about (`expired`, `expiring_soon`) is
+  *derived* at read time from `expiry_date` vs. today, the same
+  don't-store-what-you-can-compute approach `invoices.js`'s `withComputed()`
+  takes for `is_overdue`/`is_partially_paid` — every response carries both
+  the raw `status` and a computed `display_status` (`active` | `expiring_soon`
+  | `expired` | `cancelled`), and only `display_status` is what
+  `StatusBadge`/the mobile accent stripe render. `EXPIRY_WARNING_DAYS = 14`
+  is the one threshold controlling both when a still-active license starts
+  reading as `expiring_soon` and which licenses `lib/scheduler.js`'s
+  automated alert job (below) treats as candidates — duplicated as a literal
+  over there rather than imported (same acceptable-duplication call as
+  `EXPENSE_CATEGORIES` between `routes/expenses.js`/`routes/import.js`; keep
+  both in sync). `GET /` supports `?q=` (license name or client name) and
+  `?status=` (one of the four `display_status` values — `statusWhere()`
+  translates each into the actual SQL date comparison against `expiry_date`,
+  since only `cancelled` is a direct column match) composed with `?page=`
+  (see "Pagination convention" above). List order is `last_renewed_at DESC,
+  id DESC` — the most recently renewed license first, so the list surfaces
+  what's just been paid/renewed rather than what happens to expire soonest;
+  a license that's never been renewed has `last_renewed_at = NULL`, which
+  SQLite sorts last in `DESC` order by default, so those naturally fall to
+  the bottom with no extra `CASE` needed. (`GET /export.csv` below keeps its
+  own separate `expiry_date ASC` order — a downloaded report reads better
+  chronologically by expiry than by renewal recency.) `GET /summary` is
+  independent of
+  pagination/search — a `{ active, expiring_soon, expired, cancelled, total }`
+  count across every license, backing the KPI strip at the top of
+  `Licenses.jsx` — and `GET /export.csv`, both following the usual
+  conventions. **The core action**: `POST /:id/renew` is "the client paid,
+  extend it" — advances `expiry_date` by exactly one `billing_cycle`
+  (`monthly` or `yearly`, month-end-clamped the same way `lib/scheduler.js`'s
+  own `advanceDate()` handles Jan 31 → Feb) from the *current* `expiry_date`,
+  always landing on the same day-of-month as the original expiry — including
+  for a badly lapsed license (expired well over a cycle ago), where the new
+  expiry can itself still land in the past; that's preferred over quietly
+  renewing from today's date instead, which would produce a new expiry whose
+  day-of-month has nothing to do with the license's real billing cycle. A
+  license renewed while still lapsed just reads as `expired` again
+  (`display_status`, see below) until renewed once more. Blocked (409)
+  only when `status` is already `cancelled` — a cancelled license needs an
+  explicit edit back to `active` first, `renew` is for "still active, just
+  needs paying," not for un-cancelling. Renewing also clears
+  `last_reminder_sent_at` back to `NULL`, so a license that was reminded
+  right before renewal doesn't inherit a stale suppression window blocking
+  its *next* expiry cycle's alerts. The actual expiry-advancing/
+  `license_renewals`-writing logic lives in `lib/licenseRenewal.js`'s
+  `renewLicense()`, not inline in this route — it's also called from
+  `routes/invoices.js`'s `POST /:id/payments` for auto-renewal on a paid
+  invoice (see "License auto-renewal on invoice payment" below), so both
+  callers extend/record a renewal identically; this route's own job is just
+  the `cancelled` guard and the `logActivity()` call, since a human-clicked
+  renewal and an auto-renewal are logged under different `action` text.
+  **Email reminder**: `GET
+  /:id/remind-preview` + `POST /:id/remind` follow the exact "preview then
+  send" contract documented under "Email preview before sending" below —
+  `lib/emailTemplates.js`'s `licenseRemindEmail()` backs both, logged to
+  `email_log` as type `license_remind`. Unlike invoice/quote sends, there's
+  no PDF attachment (a license isn't a document), so the send route is
+  plain `sendMail({ to, subject, html })` with no buffer/attachment step.
+  Blocked (409) the same as renew when `status` is `cancelled`. Every
+  mutation (create/update/delete/renew/remind) calls `logActivity()`.
+  **Renewal history**: every `POST /:id/renew` above also inserts one row
+  into `license_renewals` (`license_id`, `previous_expiry_date`,
+  `new_expiry_date`, `renewed_by_name`, `renewed_at`), in the same
+  `db.transaction()` as the `licenses` `UPDATE` so the two never drift.
+  This is deliberately a separate table from `activity_log` (which already
+  gets its own one-line "renewed" entry per renewal, see `lib/activity.js`
+  below) — `activity_log`'s `entity_label` is a free-text summary string
+  meant for a global chronological feed, not something built to be queried
+  per-license or to expose the exact previous/new expiry pair as structured
+  data. `GET /:id/renewals` (`view`-gated, same as every other read on this
+  router) returns that license's own renewals newest-first with no
+  pagination — a single license's renewal count is inherently small (at
+  most one per billing cycle since the license existed). `url`
+  is an optional free-text field (no format validation beyond trimming,
+  stored/exported/imported alongside `notes` — same precedent: editable via
+  the form and included in CSV export/import, but not shown as its own list
+  or mobile-accordion column) for the client's activation/portal link;
+  nothing currently reads it back out — it's captured now so a future
+  activation-email template can interpolate it, not wired into
+  `lib/emailTemplates.js`'s `licenseRemindEmail()` yet.
 - `routes/public.js` — mounted at `/api/public`, the one route file **not**
   behind `requireAuth`. Looks quotes/invoices up by their `public_token`
   (a random 16-byte hex column generated on every quote/invoice create,
   duplicate, convert-to-invoice, and recurring-invoice generation) rather
   than by id, so a client with the link can view/download a document
   without an account. `GET /quotes/:token` and `GET /invoices/:token`
-  return the document + client + business settings; `GET .../pdf` streams
-  the same PDF the authenticated routes produce; `POST /quotes/:token/respond`
+  return the document + client + business settings — the settings row is
+  passed through `publicSettings()` first, which strips
+  `starting_balance` and `session_timeout_minutes` before the response is
+  sent: those are internal-only (a financial figure and a security policy
+  value, respectively), and unlike the rest of `business_settings` there's
+  no client-facing reason for either to be readable by anyone holding a
+  public link. Every other settings field is intentionally left as-is
+  (business name/address/tax ID/bank details/logo etc.) since it's the
+  same data the token's own PDF route (below) already renders; the PDF
+  routes fetch `settings` straight from the table with no filtering, since
+  `lib/pdf.js` never reads either excluded field anyway. `GET .../pdf`
+  streams the same PDF the authenticated routes produce; `POST /quotes/:token/respond`
   lets the client accept/decline (only while `status` is `draft`/`sent`;
   stores `quotes.client_response`/`client_responded_at` and updates
   `status`). The emails sent from `quotes.js`/`invoices.js` `/send` routes
@@ -370,8 +575,25 @@ are deliberately untouched by either, always returning every row.
   `netProfit` (`totalPaid - totalExpenses`). Same endpoint backs both
   `Dashboard` and `Financials` pages. Computed from `invoices`/`payments`/
   `clients`/`expenses` on every request, nothing is cached or denormalized
-  beyond `invoices.amount_paid`.
-- `routes/reports.js` (mounted at `/api/reports`) — four downloadable PDF
+  beyond `invoices.amount_paid`. **Bank balance**: `bankBalance` is
+  `business_settings.starting_balance` (admin-editable on the Settings page,
+  see `routes/settings.js` above) plus `netProfit` — the one number this
+  app can vouch for without a real bank feed: whatever balance you had the
+  day you set `starting_balance`, plus every payment collected and minus
+  every expense recorded since. It's a running proxy, not a live balance —
+  anything moving money outside the `payments`/`expenses` tables (a loan, a
+  tax remittance, an owner draw never logged as an expense) isn't
+  reflected, so it can drift from the real account over time if those go
+  unrecorded. `Dashboard.jsx`/`Financials.jsx` both render it as a `KpiCard`
+  (icon: `BankIcon`) alongside the other summary figures, tone flipping to
+  `negative` the same way `netProfit`'s own card does when the number goes
+  below zero (a startup deficit or heavy early spending). Rendered
+  full-width (`col-span-2 sm:col-span-3 lg:col-span-6` on Dashboard,
+  `col-span-2 lg:col-span-3` on Financials — matching each page's own grid
+  breakpoints) via `KpiCard`'s optional `className` prop, rather than
+  sharing a cell with the other KPIs, since it's the one figure meant to
+  read as a standalone headline rather than one stat among several.
+- `routes/reports.js` (mounted at `/api/reports`) — five downloadable PDF
   reports, each `GET /<type>/pdf?from=&to=` (`YYYY-MM-DD`, both required;
   400s if either is missing/malformed or `from` is after `to`). Gated on
   the same `requirePermission('financials', 'view')` as the Financials
@@ -394,11 +616,17 @@ are deliberately untouched by either, always returning every row.
   received, not invoiced), expenses are grouped by category the same way
   the expense report is, and net profit/loss is revenue minus total
   expenses — rendered as a green "NET PROFIT" or red "NET LOSS" bar
-  depending on the sign. None of these routes call `logActivity()` (same
+  depending on the sign. `GET /bank-balance/pdf` is the PDF counterpart to
+  `routes/financials.js`'s `bankBalance` (see below), just split at the
+  period boundary instead of computed "as of right now": opening balance
+  is `business_settings.starting_balance` plus every `payments`/`expenses`
+  row dated strictly *before* `from`, closing balance adds every row
+  *through* `to` (same inclusive `BETWEEN` convention the other reports
+  use) on top of that. None of these routes call `logActivity()` (same
   as the existing `:id/pdf` routes — a read-only download isn't a
   mutation) or accept `page`/`q` (each report is inherently a from/to
   filtered dump, not a paginated list).
-- `lib/reportPdf.js` — renders the four report PDFs above with `pdfkit`.
+- `lib/reportPdf.js` — renders the five report PDFs above with `pdfkit`.
   These are tabular/statement documents, not the bill-to/line-items/
   signature shape `lib/pdf.js` renders for quote/invoice/receipt — but
   share that module's page geometry, palette, and `money()`/image/buffer
@@ -416,7 +644,16 @@ are deliberately untouched by either, always returning every row.
   the closing figure — net profit is the one amount here that can go
   negative, so it's formatted with `signedMoney()` (mirrors the frontend's
   own `Financials.jsx` `money()` helper's sign handling) rather than the
-  shared `money()`, which never special-cases a sign.
+  shared `money()`, which never special-cases a sign. The bank balance
+  statement is the one report that reuses `drawSummaryBox` directly rather
+  than `drawStatementSection` — it's a four-line reconciliation (opening
+  balance, payments received, expenses, closing balance), not a
+  category-by-category breakdown, so a single right-aligned box says
+  everything a P&L-style two-section layout would, with less of it.
+  Opening/closing balance both go through `signedMoney()` since a
+  business's balance can start (and stay) negative; expenses render as a
+  negative value too (`signedMoney(-totalExpenses, symbol)`) so the box
+  reads as a literal running sum top to bottom.
 - `lib/totals.js` — `computeTotals(items, taxRate, discountType, discountValue)`
   validates a raw line-items payload and computes subtotal → discount → tax
   → total, in that order (tax applies to the post-discount amount).
@@ -450,25 +687,31 @@ are deliberately untouched by either, always returning every row.
   client-facing send action; see "Email preview before sending" above. Now
   admin-editable via the Email Center (`routes/emailCenter.js`/
   `pages/EmailCenter.jsx` below): `DEFAULT_TEMPLATES` holds the built-in
-  text for the 4 editable types (`quote_send`, `invoice_send`,
-  `invoice_remind`, `receipt_send`) as `{{placeholder}}` strings (e.g.
-  `Quote {{quote_number}} from {{business_name}}`); the `email_templates`
-  table (one row per `type`, primary-keyed on it — see `db/index.js`) holds
-  an optional admin override. `renderTemplate(str, vars)` does the
-  `{{key}}` substitution — an unknown placeholder is left as literal text
-  rather than blanked, so an admin typo is visible/debuggable instead of
-  silently vanishing. `buildEmail(type, to, vars)` picks the stored
-  override if one exists, else the default, renders both subject and
-  message, and is what the four exported functions
+  text for the 5 editable types (`quote_send`, `invoice_send`,
+  `invoice_remind`, `receipt_send`, `license_remind`) as `{{placeholder}}`
+  strings (e.g. `Quote {{quote_number}} from {{business_name}}`); the
+  `email_templates` table (one row per `type`, primary-keyed on it — see
+  `db/index.js`) holds an optional admin override. `renderTemplate(str,
+  vars)` does the `{{key}}` substitution — an unknown placeholder is left as
+  literal text rather than blanked, so an admin typo is visible/debuggable
+  instead of silently vanishing. `buildEmail(type, to, vars)` picks the
+  stored override if one exists, else the default, renders both subject and
+  message, and is what the five exported functions
   (`quoteSendEmail`/`invoiceSendEmail`/`invoiceRemindEmail`/
-  `receiptSendEmail`) now call internally — their signatures are unchanged,
-  so every existing call site (the preview/send routes in
-  `routes/quotes.js`/`routes/invoices.js`) needed no changes at all.
-  `PLACEHOLDERS` documents which `{{...}}` keys are valid per type (shown
-  as a hint in the Email Center UI); `TYPE_LABELS` is the human-readable
-  name per type. `getAllTemplates()`/`setTemplate(type, {subject,
+  `receiptSendEmail`/`licenseRemindEmail`) now call internally — their
+  signatures are unchanged, so every existing call site (the preview/send
+  routes in `routes/quotes.js`/`routes/invoices.js`/`routes/licenses.js`)
+  needed no changes at all when this template system was added; adding
+  `licenseRemindEmail` later needed no changes to `getAllTemplates()`/
+  `setTemplate()`/`resetTemplate()` below either, since they all iterate
+  `DEFAULT_TEMPLATES`' own keys generically — a 5th type just needed an
+  entry in `DEFAULT_TEMPLATES`/`PLACEHOLDERS`/`TYPE_LABELS` and it's
+  automatically picked up everywhere. `PLACEHOLDERS` documents which
+  `{{...}}` keys are valid per type (shown as a hint in the Email Center
+  UI); `TYPE_LABELS` is the human-readable name per type.
+  `getAllTemplates()`/`setTemplate(type, {subject,
   message})`/`resetTemplate(type)` are the admin-management functions
-  `routes/emailCenter.js` calls — `getAllTemplates()` returns all 4 types
+  `routes/emailCenter.js` calls — `getAllTemplates()` returns all 5 types
   with whichever text is currently effective (stored override or default)
   plus `isCustom` (so the frontend only shows "Reset to default" when
   there's actually an override to clear) and the raw
@@ -479,7 +722,17 @@ are deliberately untouched by either, always returning every row.
   human-triggered send, nobody reviews it before it goes out), so it never
   reads from this file; its sends are still recorded to the Email Center's
   sent log under a distinct `overdue_reminder` type, just not through
-  `buildEmail()`.
+  `buildEmail()`. The automated license-expiry alert
+  (`lib/scheduler.js`'s `runLicenseExpiryAlerts()`) is the **opposite**
+  case, deliberately: it calls `licenseRemindEmail()` — the very same
+  admin-editable template the manual "Remind" button uses — rather than
+  hardcoding its own text like the overdue-reminder digest does, so an
+  admin who customizes the license reminder wording gets that wording
+  whether a human clicked "Remind" or the cron job sent it automatically.
+  Its sends are still logged under their own distinct type
+  (`license_expiry_alert`, see `lib/emailLog.js` below) purely so the sent
+  log can tell "a human sent this" apart from "the cron job sent this,"
+  the same reason `overdue_reminder` is distinct from `invoice_remind`.
 - `lib/emailLog.js` — `logEmail({ type, to, subject, sentByName,
   entityType, entityId, entityLabel })` inserts one row into `email_log`
   (see `db/index.js`), backing the Email Center's sent log
@@ -488,15 +741,20 @@ are deliberately untouched by either, always returning every row.
   logs its own separate "sent"/"sent reminder for" entry per send action,
   but never captures recipient email or subject — this is additive, not a
   replacement, and every call site logs to both. Called after a
-  *successful* `sendMail()` only (never on a caught error) from all 4
+  *successful* `sendMail()` only (never on a caught error) from all 5
   manual send routes (`routes/quotes.js`'s `POST /:id/send`;
   `routes/invoices.js`'s `POST /:id/send`, `POST /:id/remind`, and
-  `POST /:id/payments/:paymentId/send-receipt`, logged as types
-  `quote_send`/`invoice_send`/`invoice_remind`/`receipt_send` respectively
-  — the same 4 types `emailTemplates.js` covers) and from the automated
-  overdue-reminder job (`lib/scheduler.js`'s `runOverdueReminders()`, type
-  `overdue_reminder`, `sentByName: 'Automated'`) — the one log entry type
-  with no editable template. `notifyStaffOfReminders()`'s internal opt-in
+  `POST /:id/payments/:paymentId/send-receipt`; `routes/licenses.js`'s
+  `POST /:id/remind` — logged as types
+  `quote_send`/`invoice_send`/`invoice_remind`/`receipt_send`/
+  `license_remind` respectively, the same 5 types `emailTemplates.js`
+  covers) and from the two automated jobs in `lib/scheduler.js`
+  (`runOverdueReminders()`, type `overdue_reminder`, and
+  `runLicenseExpiryAlerts()`, type `license_expiry_alert` — both
+  `sentByName: 'Automated'`) — the two log entry types with no *distinct*
+  editable template of their own (`license_expiry_alert` reuses
+  `license_remind`'s template as explained above; `overdue_reminder` has no
+  template at all). `notifyStaffOfReminders()`'s internal opt-in
   staff digest (also in `lib/scheduler.js`) is deliberately **not**
   logged here — it's an internal notification about client emails already
   logged, not itself a client-facing send.
@@ -514,15 +772,16 @@ are deliberately untouched by either, always returning every row.
   embedded commas/newlines/escaped quotes, \r\n or \n line endings) that
   backs `routes/import.js`.
 - `routes/import.js` — `POST /api/import/:type` (`type` is `clients`,
-  `expenses`, `invoices`, or `quotes`) bulk-imports historical data from CSV
-  text in the request body. Always validates every row first; `commit: false`
+  `expenses`, `invoices`, `quotes`, or `licenses`) bulk-imports historical
+  data from CSV text in the request body. Always validates every row first; `commit: false`
   (the default) is a dry-run that reports what *would* happen with no DB
   writes, `commit: true` actually inserts the valid rows and skips the
   invalid ones — the frontend always previews before offering to commit.
   Each row gets a `{ row, status: 'ok'|'error', message, preview }` result,
   so partial success is normal, not a failure state. Every date column
-  (`issue_date`, `due_date`/`expiry_date`, `paid_date`, `expense_date`) goes
-  through `normalizeDate()` rather than a strict `YYYY-MM-DD` regex —
+  (`issue_date`, `due_date`/`expiry_date`, `paid_date`, `expense_date`,
+  `start_date`) goes through `normalizeDate()` rather than a strict
+  `YYYY-MM-DD` regex —
   spreadsheet exports routinely produce `D/M/YYYY`-style dates (with `/`,
   `-`, or `.` separators), `YYYY/MM/DD`, 2-digit years, and even raw Excel
   serial-date numbers, and all of them normalize to the canonical form
@@ -533,7 +792,8 @@ are deliberately untouched by either, always returning every row.
   exactly that ambiguous case; a value where one part is >12 only has one
   valid reading regardless of `format`. `detectDateFormat()` derives that
   argument once per import batch (`processExpenses`/`processInvoices`/
-  `processQuotes` each call it before validating any row) by scanning every
+  `processQuotes`/`processLicenses` each call it before validating any row)
+  by scanning every
   date-ish value in the batch for unambiguous evidence — a value like
   `"4/23/2026"` can only be month/day (day=23), which pins down the format
   for every other, genuinely ambiguous value in the *same* batch too (e.g.
@@ -544,7 +804,15 @@ are deliberately untouched by either, always returning every row.
   batch has no unambiguous evidence either way. `parseNumber()` similarly
   strips thousands-separator commas and a leading currency symbol from
   `amount`/`tax_rate`/`amount_paid` so `"2,500"`/`"$2,500.00"` parse the
-  same as `"2500"`.
+  same as `"2500"`. Every enum-like column matched against a fixed list
+  (invoice/quote `status`, license `billing_cycle`/`status`, expense
+  `category`, invoice `payment_method`) is `.trim().toLowerCase()`'d before
+  the `includes()` check — expense `category` and invoice `payment_method`
+  originally weren't, a real bug (found when a user's spreadsheet used
+  Title Case like `"Rent"`/`"Cash"` and every one of those rows silently
+  failed validation and got skipped, quietly understating `totalExpenses`
+  and inflating `netProfit`) rather than a deliberate strictness choice —
+  keep new enum columns consistent with this pattern.
   Invoices and quotes are both matched to an existing client via the shared
   `resolveClient()`/`clientMaps()` helpers: by `client_email` first, falling
   back to an exact `client_name` match if `client_email` is blank (import
@@ -573,10 +841,58 @@ are deliberately untouched by either, always returning every row.
   real DB count, rather than re-querying per row — needed because preview
   mode never writes anything, so two same-year rows calling the DB-backed
   numbering function directly would collide on the same "next" number.
+  Licenses are matched to a client the same way, via the same
+  `resolveClient()`/`clientMaps()` helpers — the one other row type besides
+  invoices/quotes that references a client rather than being one. A row's
+  `billing_cycle` (`monthly`/`yearly`, blank defaults to `yearly`) and
+  `start_date` are required; a blank `expiry_date` defaults to
+  `start_date` + one billing cycle via `lib/licenseRenewal.js`'s
+  `advanceExpiry()` (the same shared function `routes/licenses.js`'s
+  `POST /:id/renew` and `routes/invoices.js`'s auto-renewal both call —
+  see "License auto-renewal on invoice payment" above), matching what the
+  New License form itself defaults to. `status` (`active`/`cancelled`, blank
+  defaults to `active`), `amount` (blank defaults to `0`), and an optional
+  `url` (free text, blank defaults to `''` — same field, same precedent, as
+  the manual form's "Activation URL," see `pages/business/Licenses.jsx`
+  below) are otherwise the only other columns — no line items, no document
+  number, no PDF, since a license isn't a document the way an invoice/quote
+  is. `created_by_name`
+  is left at its `''` default the same way invoice/quote imports leave it
+  blank, per `db/index.js`'s own note on that column being blank for
+  anything generated with no human directly filling out the form.
+  **Repeated rows for the same client + license name are folded into one
+  license's renewal history, not imported as separate licenses** — this is
+  the shape a business's actual historical export usually takes (one row
+  per past renewal period, same client, same license name, different
+  dates), and importing each row as its own license would both duplicate
+  the license and lose the fact that it was ever renewed. After per-row
+  validation, `processLicenses()` groups valid rows by `clientId` +
+  `name.toLowerCase()` (same trim+lowercase match `resolveClient()`/
+  `clientMaps()` already use for client name) and sorts each group by
+  `start_date` — the row with the *latest* `start_date` becomes the
+  license's current record (its `status`/`amount`/`billing_cycle`/`url`/
+  `notes` win, and the license's `start_date` is the *earliest* row's, not
+  the current row's, matching how `POST /:id/renew` itself never touches
+  `start_date`), and every earlier row becomes a `license_renewals` entry
+  (`previous_expiry_date`/`new_expiry_date` from that pair's consecutive
+  `expiry_date`s) exactly like a manual renewal writes — see
+  `routes/licenses.js`'s `POST /:id/renew` above. `renewed_at`/
+  `last_renewed_at` have no source column in the CSV, so they're
+  approximated as the newer row's `start_date` at midnight (`renewed_by_name`
+  stays at its `''` default, same as `created_by_name`). A license with no
+  duplicate rows behaves exactly as before (single insert, `last_renewed_at`
+  stays `NULL`) — grouping is a no-op for the common case. Each row still
+  gets its own line in the returned `results` (`"imported"` for the winning
+  row, `"imported as renewal history for row N (...)"` for the rest) so the
+  preview step shows exactly which rows will merge before anything commits.
   Whole commit runs in one `db.transaction()` since an invoice import
   writes to three tables (`invoices`, `invoice_items`, `payments`) per row
-  (two for quotes, no `payments` row). Logs one summary `activity_log`
-  entry per import ("bulk imported 42 clients from CSV"), not one per row.
+  (two for quotes, no `payments` row; licenses write one or two tables per
+  row depending on whether that row merges into an existing group).
+  `imported` counts every successfully-processed row (both new-license and
+  merged-into-history rows), not distinct license count. Logs one summary
+  `activity_log` entry per import ("bulk imported 42 clients from CSV"),
+  not one per row.
 - `lib/backup.js` — `runBackup()`: skips entirely if `BACKUP_S3_BUCKET`
   isn't set. Otherwise runs `VACUUM INTO` to write a consistent snapshot of
   the live database (safe against catching a WAL-mode write mid-flight,
@@ -593,10 +909,37 @@ are deliberately untouched by either, always returning every row.
   `restore.js` always downloads to a separate file and refuses to write
   directly over the live `DB_PATH` — swapping a restored file in is a
   deliberate manual step (stop the backend, replace the file, restart).
+- `backend/scripts/fix-license-renewal-dates.js` (`npm run fix-license-renewals`,
+  `--apply` to write — dry-run by default) — a one-off correction for data
+  written by the old, pre-fix `renewLicense()` (see "The core action" above),
+  which advanced a renewal from whichever was later, the license's
+  `expiry_date` or *today*, instead of always from the license's own
+  `expiry_date` — so renewing a lapsed license landed the new expiry on
+  today's day-of-month rather than the license's real billing day. Not a
+  blind bulk `UPDATE`: for each license it walks `license_renewals`
+  chronologically from the first row's `previous_expiry_date` (a trustworthy
+  snapshot, never itself computed by the buggy code) and recomputes what
+  each `new_expiry_date` — and, for any row after the first, that row's own
+  `previous_expiry_date` too, so a corrected chain stays internally
+  consistent and a re-run reads it as already-fixed rather than a fresh
+  discontinuity — *should* have been using the current (fixed)
+  `advanceExpiry()`. The moment a row's recorded `previous_expiry_date`
+  doesn't match what the prior step actually produced, that license's chain
+  is left untouched from that point on and reported as needing manual
+  review instead of guessed at, since the mismatch means something this
+  script can't explain happened in between (most plausibly a deliberate
+  manual `expiry_date` edit) — overwriting it would risk destroying real
+  data instead of fixing a bug. Only updates the license's *current*
+  `expiry_date` when it still equals exactly what the chain's last renewal
+  actually wrote (i.e. nothing has touched it since); otherwise it fixes the
+  history log only and leaves the live `expiry_date` flagged for a human to
+  check. Take a fresh backup first (`npm run backup`, or copy `data.sqlite3`
+  directly if self-hosted) before running with `--apply` — this writes to
+  real `licenses`/`license_renewals` rows.
 - `lib/scheduler.js` — `startScheduler()` (called once from `index.js`'s
-  `app.listen` callback) registers three `node-cron` jobs, all server-time:
+  `app.listen` callback) registers four `node-cron` jobs, all server-time:
   - `0 3 * * *` — `runBackup()` (see `lib/backup.js` above), scheduled
-    ahead of the other two jobs so a backup reflects state from before
+    ahead of the other jobs so a backup reflects state from before
     the day's automated invoice/reminder mutations.
   - `0 7 * * *` — `generateDueRecurringInvoices()`: for every
     `recurring_invoices` row with `active=1` and `next_run_date <= today`,
@@ -625,9 +968,27 @@ are deliberately untouched by either, always returning every row.
     it only runs after the SMTP-configured check above, it's naturally
     dormant (never even reached) when SMTP isn't set — no separate gate
     needed.
-  All three jobs are also exported directly (`runBackup`,
-  `generateDueRecurringInvoices`, `runOverdueReminders`) so they can be
-  invoked outside the cron schedule (tests, or a manual "run now" action).
+  - `15 8 * * *` — `runLicenseExpiryAlerts()`: staggered 15 minutes after
+    the overdue-reminder job purely so the two jobs' console output doesn't
+    interleave, not for any functional reason. Same shape as
+    `runOverdueReminders()` — skips entirely if `SMTP_HOST` isn't set,
+    same 7-day `last_reminder_sent_at` re-send suppression — but selects
+    `licenses` where `status = 'active'` and `expiry_date` is within
+    `routes/licenses.js`'s `EXPIRY_WARNING_DAYS` (14, duplicated here as a
+    literal — see that file's own comment) of today, which naturally
+    includes already-lapsed licenses too (a past `expiry_date` is always
+    `<=` today+14). Emails via `licenseRemindEmail()` — the same
+    admin-editable template the manual "Remind" button on `Licenses.jsx`
+    uses, see `lib/emailTemplates.js` above for why this is the one
+    automated job that reuses an editable template instead of hardcoding
+    its own text — with no PDF attachment (a license isn't a document).
+    Logged to `email_log` as type `license_expiry_alert`. No staff-digest
+    equivalent to `notifyStaffOfReminders()` for this job — that's scoped
+    to overdue invoices specifically, not extended here.
+  All four jobs are also exported directly (`runBackup`,
+  `generateDueRecurringInvoices`, `runOverdueReminders`,
+  `runLicenseExpiryAlerts`) so they can be invoked outside the cron
+  schedule (tests, or a manual "run now" action).
 
 Status/derived-field conventions worth knowing before touching this code:
 - Quote `status`: `draft | sent | accepted | declined | expired`, set
@@ -641,8 +1002,15 @@ Status/derived-field conventions worth knowing before touching this code:
   for the unauthenticated view) derives `is_overdue` and `is_partially_paid`
   from `status`/`due_date`/`amount_paid` on every read, so there's no cron
   job or background process keeping status in sync.
-- Deletes are guarded at the DB level in the route handlers, not via FK
-  constraints: a client with any quotes/invoices can't be deleted, and an
+- Deletes are guarded in the route handlers with friendly, checked-first
+  409s, not left to surface as a raw FK-constraint error: a client with
+  any quotes, invoices, recurring-invoice templates, or licenses can't be
+  deleted (`routes/clients.js`'s `DELETE /:id` checks all four —
+  `quotes`/`invoices`/`recurring_invoices`/`licenses` all have a
+  `NOT NULL REFERENCES clients(id)` with `foreign_keys = ON` actually
+  enforced at the DB level too, so this guard exists to turn what would
+  otherwise be an uncaught `SQLITE_CONSTRAINT_FOREIGNKEY` 500 into the same
+  clean 409 message every other delete guard in this app gives), and an
   invoice with any recorded payments can't be deleted.
 - `public_token` (random 16-byte hex, unique) exists on every quote and
   invoice row and is regenerated on duplicate/convert/recurring-generation
@@ -675,17 +1043,18 @@ Status/derived-field conventions worth knowing before touching this code:
   `requireAdmin`, its own `router.use()` chain independent of the
   `requirePermission`/module system entirely) — `POST /` bulk-deletes
   whichever tables the caller picks via a `categories` array (one or more
-  of `clients`, `quotes`, `invoices`, `recurring`, `expenses`, `products`,
-  `activity`), rather than an all-or-nothing clear. A `CATEGORIES` map
-  translates each picked key into the actual table(s) it touches (e.g.
-  `invoices` → `invoice_items`, `payments`, `invoices`); `clients` is the
-  one category that always pulls in more than its own table —
-  `quotes`/`invoices`/`recurring_invoices` (and their items/payments) too,
-  even if the caller only ticked "clients" — because `client_id` is a
-  `NOT NULL REFERENCES clients(id)` column on all three (see `db/index.js`),
-  so leaving them behind would silently orphan them: invisible to every
-  list page's `INNER JOIN` against `clients`, but still sitting in the
-  database forever. Every other category is safe to clear on its own. The
+  of `clients`, `quotes`, `invoices`, `recurring`, `licenses`, `expenses`,
+  `products`, `activity`), rather than an all-or-nothing clear. A
+  `CATEGORIES` map translates each picked key into the actual table(s) it
+  touches (e.g. `invoices` → `invoice_items`, `payments`, `invoices`);
+  `clients` is the one category that always pulls in more than its own
+  table — `quotes`/`invoices`/`recurring_invoices`/`licenses` (and their
+  items/payments) too, even if the caller only ticked "clients" — because
+  `client_id` is a `NOT NULL REFERENCES clients(id)` column on all four
+  (see `db/index.js`), so leaving them behind would silently orphan them:
+  invisible to every list page's `INNER JOIN` against `clients`, but still
+  sitting in the database forever. Every other category is safe to clear on
+  its own. The
   request 400s with "Select at least one type of data to delete" if
   `categories` is missing or empty, or if it contains no recognized key.
   The selected categories' tables are deleted in one transaction (foreign
@@ -711,7 +1080,7 @@ Status/derived-field conventions worth knowing before touching this code:
   (rendered only when `user.role === 'admin'`, re-checking the same
   condition the backend enforces rather than trusting a hidden button) is
   the only caller — a checkbox per category (`RESET_CATEGORIES`), with
-  checking "Clients" auto-checking and disabling its three dependent
+  checking "Clients" auto-checking and disabling its four dependent
   categories client-side (mirroring the backend's forced cascade, with an
   "Included automatically with Clients." hint rather than letting someone
   uncheck a category the backend would clear anyway) — plus a
@@ -929,7 +1298,20 @@ frontend stops holding/sending it.
   ("This invoice has been sent to the client / paid and can no longer be
   edited") — `Delete` is intentionally *not* gated by this, since deleting
   a sent-but-unpaid invoice is still allowed (governed separately by the
-  backend's "has recorded payments" guard). `InvoiceDetail.jsx`'s "Record
+  backend's "has recorded payments" guard). A separate `canVoid` check
+  (`status` is `draft` or `sent`, and `amount_paid === 0`) mirrors the
+  backend's `POST /:id/void` guard exactly, so the "Void" button never
+  shows for a click that would just 409 — it's deliberately independent of
+  `isLocked`/`canManage && !isLocked`, since voiding a `sent` invoice is
+  the one action allowed precisely where editing is locked. Voiding
+  `confirm()`s, then calls `api.invoices.void` and reloads; a
+  `status === 'void'` notice ("excluded from financial totals and
+  reports") renders next to the existing locked-status one. "Email to
+  client", "Send reminder", and the Payments card's "Record payment"
+  action are all additionally gated on `invoice.status !== 'void'` (the
+  first two on top of their own existing conditions) — voiding a client's
+  invoice shouldn't leave buttons around that would just error against the
+  backend guards described above. `InvoiceDetail.jsx`'s "Record
   payment" button (`togglePaymentForm`) pre-fills the form's Amount field
   with `invoice.balance_due` each time the form is *opened* (not on
   close) — paying off the full remaining balance is the common case, and
@@ -1013,6 +1395,48 @@ frontend stops holding/sending it.
   column in the list table.
   `Expenses.jsx` and `RecurringInvoices.jsx` also follow that pattern (no
   separate detail page — edit happens inline in the list).
+  `Licenses.jsx` (route `/licenses`) is the same list+inline-modal-form+FAB
+  pattern once more, with two additions on top: a KPI summary strip
+  (`KpiCard`s for Active/Expiring soon/Expired/Cancelled counts, from
+  `api.licenses.summary()` — independent of the list's own pagination/
+  search/`?status=` filter, called on load and refreshed after every
+  mutation via a local `loadSummary()`) and a `rowActions()` helper shared
+  between the desktop table's action cell and each mobile
+  `MobileListAccordion` card's expanded body, since both need the exact
+  same conditional Renew/Remind/Edit/Delete buttons and duplicating them
+  would drift. Renew and Remind buttons are conditioned on the row's raw
+  `status` (`active`/`cancelled`), not the computed `display_status` — a
+  lapsed-but-not-cancelled license (`display_status: 'expired'`) still
+  shows both, mirroring `routes/licenses.js`'s own guards exactly (Renew
+  is blocked only by `cancelled`, not by having already expired — that's
+  the whole point of a renew button). The "New license"/"Edit license"
+  modal's Status field (`active`/`cancelled`) only renders while editing
+  an existing license (`editingId` truthy) — a brand-new license is always
+  created `active`, there's nothing to toggle yet. Mobile cards get the
+  same accent-stripe treatment as `Invoices.jsx`/`Quotes.jsx`, keyed off
+  `display_status` via a local `ACCENT` map (emerald/amber/red/slate for
+  active/expiring_soon/expired/cancelled). Amounts use plain
+  `.toFixed(2)`, not `lib/money.js`'s compact formatter — per that file's
+  own scoping note, compacting is for Dashboard/Financials summary views,
+  not a list page reviewing individual records. A "History" action (in the
+  same `rowActions()` set as Renew/Remind/Edit/Delete, so it appears in
+  both the desktop table's action cell and each mobile card's expanded
+  body) opens a `Modal` listing that license's renewal log from `GET
+  /:id/renewals` — fetched fresh on open (no caching across opens, mirroring
+  `EmailPreviewModal`'s own "fetch on open" pattern rather than prefetching
+  history for every row up front), each entry showing just the renewal date
+  and the previous→new expiry it produced (`renewed_at.slice(0, 10)` for
+  the date, since `renewed_at` is a full datetime but every other date
+  shown in this app's UI is date-only), newest first, with a "No renewals
+  recorded yet." empty state for a license that's never been renewed.
+  The form's "Activation URL"
+  field (a plain `type="url"` input, spanning both grid columns like
+  "License name" above it) follows the same not-in-the-list-or-card
+  precedent as "Notes" below it — captured on create/edit and round-tripped
+  through `startEdit()`, but never rendered as its own column or accordion
+  row, since nothing currently reads it back beyond the form itself (see
+  `routes/licenses.js` above for why: it's there for a future activation-
+  email template to interpolate, not wired to one yet).
   `ActivityLog.jsx` is a simple paginated read-only list. `Import.jsx` (linked from `Settings.jsx`, not a top-level
   Navbar item — it's a rare-use admin tool) reads a chosen CSV file
   client-side via `FileReader`, calls `api.import.run(type, csv, commit,
@@ -1132,15 +1556,45 @@ frontend stops holding/sending it.
   one-line summary); use a plain stacked-card list only when every column
   is already essential and short enough to show at once with nothing left
   to hide (the Items-table case above is the only current example).
+  Each row is its own floating card (`rounded-2xl border shadow-sm`), not
+  a flat divided list — callers wrap their set of rows in `flex flex-col
+  gap-2.5` rather than `divide-y` (the mobile visual redesign pass, see
+  "Mobile design system" below). An optional `accent` prop (a Tailwind
+  `bg-*` class, e.g. `bg-red-500` for an overdue invoice) renders as a 4px
+  left stripe — `Invoices.jsx`/`Quotes.jsx`/`Licenses.jsx` are the callers
+  that pass it (via a local `ACCENT` map keyed by status, mirroring
+  `StatusBadge`'s own color semantics), everything else omits it since
+  Clients/Products/Users/etc. have no comparable per-row status dimension.
+  That stripe is
+  rendered on a plain wrapping `<div>` around `<details>`, not inside
+  `<details>` itself — Chrome 120+ wraps a `<details>`'s post-summary
+  content in an internal `::details-content` box that collapses to zero
+  height while closed, which silently breaks `inset-y-0`-style stretching
+  (or any percentage-height child) placed directly inside `<details>`; the
+  wrapping div sidesteps that native quirk while `<details>`/`<summary>`
+  still own the open/close behavior and the `name`-grouped exclusive-open
+  behavior described above unchanged.
 - `components/Modal.jsx` — the shared popup styling for every "New X" (and
-  reused "Edit X") entry form: the same dimmed backdrop + centered white
-  card treatment as `IdleTimeoutMonitor`'s "Still there?" warning, just
+  reused "Edit X") entry form, the Licenses "History" log, and every other
+  small popup in the app: the same dimmed backdrop + centered white card
+  treatment as `IdleTimeoutMonitor`'s "Still there?" warning, just
   wider/scrollable (`maxWidthClass`, default `max-w-lg`) to hold a form
   instead of a couple lines of text. Takes `{ open, onClose, title,
   children, maxWidthClass }`; closes on Escape or a click on the dimmed
   backdrop (via `document.body.style.overflow = 'hidden'` while open, so the
   page behind can't scroll), in addition to whatever the caller wires up
-  inside (a Cancel button, a successful save). `Clients.jsx`, `Products.jsx`,
+  inside (a Cancel button, a successful save). The backdrop is
+  `items-center` at every breakpoint, not just `sm:` and up — it used to be
+  `items-start` (pinned to the top of the viewport) below `sm`, but a
+  vertically centered popup is the expected default on mobile just as much
+  as desktop, so this app keeps that consistent everywhere rather than
+  special-casing small screens. When content is taller than the viewport,
+  `overflow-y-auto` on the backdrop still makes it scrollable — a form long
+  enough to overflow (e.g. `QuoteForm.jsx`/`InvoiceForm.jsx` with several
+  line items) simply loads scrolled to its own top rather than the backdrop
+  clipping it, so nothing above the fold becomes unreachable. Any new modal
+  treatment added later should keep this centered-by-default behavior
+  rather than reintroducing a top-aligned mobile layout. `Clients.jsx`, `Products.jsx`,
   `Expenses.jsx`, `RecurringInvoices.jsx`, and `Users.jsx` (both its
   create/edit form and its separate reset-password form) each wrap their
   existing inline `{showForm && (<form>...)}` block in `<Modal>` instead of
@@ -1167,6 +1621,38 @@ frontend stops holding/sending it.
   is — so editing still gets the full page (with its own URL, refresh-safe,
   bookmarkable) and `InvoiceForm.jsx`'s locked-status guard (see below)
   keeps working unmodified.
+- `components/ConfirmDialog.jsx` + `lib/useConfirm.js` — the one confirmation
+  prompt every destructive action in the app renders, replacing both the
+  browser's native `window.confirm()` (unstyled, ignores dark mode,
+  inconsistent across browsers) and, on `Clients.jsx`/`Expenses.jsx`, the
+  "delete immediately, offer a few seconds to undo via a toast" pattern
+  those two pages used to rely on as their *only* safety net (see
+  `lib/useUndoableDelete.js` below) — a mis-click there deleted the row
+  before anyone saw a prompt. Every Delete/Void/"clear selected data"
+  button in the app (`Clients.jsx`, `Products.jsx`, `Expenses.jsx`,
+  `RecurringInvoices.jsx`, `Licenses.jsx`, `Users.jsx`,
+  `QuoteDetail.jsx`, `InvoiceDetail.jsx`'s delete *and* void actions, and
+  `Import.jsx`'s `DangerZone`) now goes through the same
+  `const { confirm, confirmDialog } = useConfirm()` — `confirm({ title,
+  message, confirmLabel, cancelLabel, danger })` returns a Promise the same
+  way `window.confirm()` returns a boolean (`if (!(await confirm({...})))
+  return;`), resolving only once the person clicks Confirm/Cancel (Escape
+  and a backdrop click both count as Cancel) — and each caller renders
+  `{confirmDialog}` once in its JSX to mount the actual popup.
+  `ConfirmDialog.jsx` itself is presentational only (nothing calls it
+  directly) and reuses `Modal.jsx`/`IdleTimeoutMonitor`'s exact backdrop +
+  centered-card language, just with a two-button Confirm/Cancel footer
+  instead of form content — `danger` (default `true`, every current caller
+  destructive) picks red vs. `lagoon` for the Confirm button, matching the
+  red styling every Delete button/`DangerZone` already used. `Clients.jsx`/
+  `Expenses.jsx` now confirm *and* still call `deleteWithUndo` afterward —
+  belt and suspenders, not an either/or: the confirm step stops a mis-click
+  from doing anything at all, and the undo toast still covers "I confirmed
+  but changed my mind" a few seconds later. `Import.jsx`'s `DangerZone` is
+  unique in keeping *two* layers on top of each other — the existing
+  type-`DELETE`-to-confirm text input (`canConfirm`) still gates the button
+  itself, and clicking it now opens this same themed dialog as the second
+  layer, replacing what used to be a second, native `confirm()` call.
 - `components/Navbar.jsx` — `BUSINESS_LINKS` entries each carry a `module`
   (`null` for Dashboard, which is always visible); the rendered link list
   is filtered through `can(link.module, 'view')` so a restricted user never
@@ -1231,9 +1717,10 @@ frontend stops holding/sending it.
   on the same `financials` module as `/financials`) — a single from/to date
   range (`<input type="date">` pair, defaulting to `startOfMonthStr()`
   through `todayStr()` from `lib/date.js`) plus three quick-pick preset
-  buttons (This month/Last month/This year), shared by four report cards
-  (Sales, Tax, Profit & Loss, Expense) laid out with the same icon-circle +
-  label + description shape as `KpiCard`. Each card's "Download PDF" button
+  buttons (This month/Last month/This year), shared by five report cards
+  (Sales, Tax, Profit & Loss, Expense, Bank Balance Statement) laid out
+  with the same icon-circle + label + description shape as `KpiCard`. Each
+  card's "Download PDF" button
   calls its matching `api.reports.*Pdf(from, to, token)` — which, like
   `api.invoices.openPdf`/`api.quotes.openPdf`, goes through `lib/api.js`'s
   `openPdf()` rather than `request()` (binary response, opened as a blob
@@ -1245,6 +1732,94 @@ frontend stops holding/sending it.
   `vite.config.js` and `src/index.css`) — no `tailwind.config.js`/PostCSS
   setup exists or is needed for v4's Vite integration. Utility classes are
   used directly in JSX; there's no separate component-style layer.
+
+### Mobile design system
+
+A ground-up visual pass (palette, type, navigation, and card language),
+aimed primarily at the phone breakpoint since that's where the app is
+weakest as a plain responsive layout rather than a considered mobile
+experience — desktop inherits the same tokens/colors for consistency but
+keeps its existing layout.
+
+- `src/index.css`'s `@theme` block defines a `lagoon` color scale
+  (`--color-lagoon-50` … `--color-lagoon-950`, a deep turquoise teal fitting
+  a Maldives-based business) that replaced every `indigo-*` Tailwind class
+  app-wide at the same shade numbers (`indigo-600` → `lagoon-600`, etc.) —
+  a mechanical, 1:1 rename across every component and page, so `lagoon` is
+  now the single accent color used for buttons, links, active nav/tab
+  states, focus rings, the FAB, chart lines (`RevenueTrendChart.jsx`'s
+  `INVOICED_COLOR`, `StatusBreakdownChart.jsx`'s `sent` entry — both were
+  hardcoded hex, not Tailwind classes, so those were hand-updated to the
+  same `#0e7c86`), and `StatusBadge`'s `sent` pill (previously blue). The
+  same block also defines `--font-display: 'Sora', ui-sans-serif, system-ui,
+  sans-serif` (Tailwind v4 auto-generates the `font-display` utility from
+  any `--font-*` theme key) plus two `@font-face` rules pointing at
+  `/fonts/sora-700.woff2`/`sora-800.woff2` — self-hosted rather than a
+  Google Fonts CDN link (consistent with the PWA's no-CDN-dependency goal
+  below), subset to Latin, and listed in `vite.config.js`'s
+  `VitePWA({ includeAssets })` so the service worker precaches them for
+  offline use like every other static asset. `font-display` is used
+  sparingly — page titles/greetings and KPI figures — never body text.
+  `MeterBar.jsx`'s `color` prop was renamed from `indigo` to `lagoon` to
+  match (no external caller passed it explicitly, so this was a same-file
+  rename, not a breaking prop change).
+- `components/BottomNav.jsx` — a fixed, phone-only (`sm:hidden`) tab bar
+  that replaces `Navbar.jsx`'s hamburger drawer below the `sm` breakpoint
+  (tablets and up still get the hamburger — see `Navbar.jsx` below). Four
+  permanent tabs (`PRIMARY_TABS`: Home/Invoices/Quotes/Clients, each
+  filtered through `can(module, 'view')` the same way `Navbar.jsx`'s
+  `visibleLinks` is) plus a fifth "More" tab that opens a
+  `components/BottomSheet.jsx` listing everything else from `Navbar.jsx`'s
+  exported `BUSINESS_LINKS` (Products, Recurring, Expenses, Financials,
+  Reports, Activity, Users, Email Center when `user.role === 'admin'`,
+  Settings) plus "My account" and "Log out" — the same set the old mobile
+  drawer held. `App.jsx` renders `<BottomNav />` only when `user` is
+  truthy (mirroring `Navbar.jsx`'s own `{user ? ... }` split) and wraps the
+  routed `<Routes>` in a `pb-16 sm:pb-0` div so the fixed bar never covers
+  a page's last content or action buttons; `FloatingActionButton.jsx`'s
+  `bottom` offset was raised to `calc(5.5rem + env(safe-area-inset-bottom))`
+  for the same reason, and got the mockup's gradient (`from-lagoon-600
+  to-lagoon-700`) + `rounded-2xl` squircle treatment instead of a flat
+  circle.
+- `components/BottomSheet.jsx` — the mobile counterpart to `Modal.jsx`:
+  same open/backdrop-click/Escape/body-scroll-lock contract, but slides up
+  from the bottom with rounded top corners and a drag-handle bar instead of
+  a centered card, matching the native-mobile-app convention for a menu
+  triggered from a bottom tab. Currently used only by `BottomNav.jsx`'s
+  "More" tab, but is a generic `{ open, onClose, title, children }`
+  component like `Modal.jsx`, not hardcoded to that one caller.
+- `components/Navbar.jsx` now splits its previously-single `xl:hidden`
+  mobile treatment into two: a phone-only search icon toggle (`sm:hidden`)
+  that reveals an inline `GlobalSearch` row below the header (`GlobalSearch`
+  gained an `autoFocus` prop for this), since `BottomNav.jsx` replaced
+  phones' only other route to `GlobalSearch` (the hamburger drawer); and
+  the hamburger toggle itself + its dropdown drawer, now `hidden sm:flex`/
+  `hidden sm:block` — visible from `sm` up to `xl` (tablets) only, since
+  phones use `BottomNav.jsx` instead. `xl:flex` desktop nav is unchanged.
+- `components/KpiCard.jsx` picked up the mockup's card language:
+  `rounded-2xl` (was `rounded-lg`), a smaller `rounded-xl` icon chip (was a
+  circle), and the value rendered in `font-display font-extrabold
+  tabular-nums` instead of a plain `font-semibold` — same `tone`→color
+  contract as before (`neutral`/`positive`/`negative`/`warning`), just
+  restyled. `components/Accordion.jsx` picked up the same `rounded-2xl`
+  for visual consistency with `KpiCard`/`MobileListAccordion`'s cards.
+  `KpiCard` also takes an optional `className` (default `''`), appended to
+  the card's own classes — the one caller today is the Dashboard/Financials
+  "Bank balance" card's full-width grid span (see `routes/financials.js`
+  above), but any future card that needs to break out of the shared grid's
+  per-cell sizing can use the same prop rather than a one-off wrapper.
+- `pages/Dashboard.jsx` opens with a time-of-day greeting (`greeting()` —
+  "Good morning"/afternoon/evening by `new Date().getHours()`) above the
+  user's first name in `font-display`, with the business name (falling back
+  to the user's email if `business_settings` hasn't loaded yet) underneath
+  — replacing the previous plain "Welcome, {name}" + email line.
+- `pages/business/InvoiceDetail.jsx` gained a mobile-only (`sm:hidden`)
+  gradient hero card between the header actions and the existing Bill-to/
+  Details grid: total due in `font-display`, a paid-vs-total progress bar,
+  and a Paid/Balance split — desktop has no equivalent (its "Details" card
+  already surfaces balance due inline), this is purely a phone-first
+  "surface the number before the fold" addition and doesn't change any
+  desktop markup or the page's data flow.
 
 ### Responsive / PWA
 

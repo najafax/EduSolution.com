@@ -69,7 +69,7 @@ export default function Settings() {
               <select
                 value={form.pdf_template}
                 onChange={(e) => setForm((f) => ({ ...f, pdf_template: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
               >
                 <option value="modern">Modern — logo, colors, signature/stamp images</option>
                 <option value="minimal">Minimal — plain black &amp; white, text-only signature</option>
@@ -82,8 +82,22 @@ export default function Settings() {
               value={form.bank_details}
               onChange={(e) => setForm((f) => ({ ...f, bank_details: e.target.value }))}
               rows={2}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
             />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Starting bank balance</span>
+            <input
+              type="number"
+              step="0.01"
+              value={form.starting_balance}
+              onChange={(e) => setForm((f) => ({ ...f, starting_balance: e.target.value }))}
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
+            />
+            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+              Your account balance on the day you started using this app. Financials adds every payment
+              collected and subtracts every expense recorded since to show a running current balance.
+            </span>
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
@@ -95,7 +109,7 @@ export default function Settings() {
                 step="1"
                 value={form.session_timeout_minutes}
                 onChange={(e) => setForm((f) => ({ ...f, session_timeout_minutes: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
               />
             </label>
             <Field
@@ -133,7 +147,7 @@ export default function Settings() {
           <button
             type="submit"
             disabled={submitting}
-            className="min-h-11 self-start rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="min-h-11 self-start rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
           >
             {submitting ? 'Saving…' : 'Save'}
           </button>
@@ -166,7 +180,7 @@ function Field({ label, value, onChange, type = 'text' }) {
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+        className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
       />
     </label>
   );

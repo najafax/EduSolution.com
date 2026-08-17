@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
+import { useConfirm } from '../../lib/useConfirm';
 
 const TYPES = [
   { value: 'clients', label: 'Clients', columns: 'name*, email*, phone, address, notes' },
-  { value: 'expenses', label: 'Expenses', columns: 'category*, description*, amount*, expense_date*, notes' },
+  { value: 'expenses', label: 'Expenses', columns: 'category*, description*, amount*, expense_date*, payee, notes' },
   {
     value: 'invoices',
     label: 'Invoices (+ payments)',
@@ -17,11 +18,18 @@ const TYPES = [
     columns:
       'client_email or client_name (at least one)*, number, issue_date*, expiry_date, description, amount*, tax_rate, status, notes',
   },
+  {
+    value: 'licenses',
+    label: 'Licenses',
+    columns:
+      'client_email or client_name (at least one)*, name*, billing_cycle, amount, start_date*, expiry_date, status, url, notes',
+    note: "Multiple rows with the same client and license name are treated as one license's renewal history, not separate licenses — the row with the latest start_date becomes the current record, and every earlier row becomes a past renewal.",
+  },
 ];
 
 const TEMPLATES = {
   clients: 'name,email,phone,address,notes\nAcme School,jane@example.com,+960 7000000,"Male, Maldives",Sample notes\n',
-  expenses: 'category,description,amount,expense_date,notes\nrent,Office rent for March,15000,2026-03-01,\n',
+  expenses: 'category,description,amount,expense_date,payee,notes\nrent,Office rent for March,15000,2026-03-01,,\nshareholder payments,Q1 dividend,5000,2026-03-15,Jane Doe,\n',
   invoices:
     'client_email,client_name,number,issue_date,due_date,description,amount,tax_rate,amount_paid,paid_date,payment_method,status,notes\n' +
     'jane@example.com,,,2024-01-15,2024-01-29,Website design,2000,0,2000,2024-01-20,bank_transfer,,Fully paid example\n' +
@@ -30,6 +38,11 @@ const TEMPLATES = {
     'client_email,client_name,number,issue_date,expiry_date,description,amount,tax_rate,status,notes\n' +
     'jane@example.com,,,2024-01-15,2024-02-14,Website design proposal,2000,0,sent,Sent quote example\n' +
     ',Acme School,,2024-02-01,,Consulting package,1500,10,,Matched by client_name, status left blank (defaults to draft)\n',
+  licenses:
+    'client_email,client_name,name,billing_cycle,amount,start_date,expiry_date,status,url,notes\n' +
+    'jane@example.com,,LMS Pro Annual License,yearly,1100,2024-08-16,2025-08-16,active,,First year — earlier row, becomes renewal history\n' +
+    'jane@example.com,,LMS Pro Annual License,yearly,1200,2025-08-16,2026-08-16,active,https://lms.example.com/activate,Second year — latest start_date, becomes the current record\n' +
+    ',Acme School,API Access License,monthly,50,2026-06-01,,active,,Matched by client_name; expiry_date left blank (defaults to start_date + 1 billing cycle)\n',
 };
 
 function downloadTemplate(type) {
@@ -57,12 +70,13 @@ const RESET_CATEGORIES = [
   {
     key: 'clients',
     label: 'Clients',
-    hint: 'Also deletes every quote, invoice, payment, and recurring invoice tied to them.',
-    forces: ['quotes', 'invoices', 'recurring'],
+    hint: 'Also deletes every quote, invoice, payment, recurring invoice, and license tied to them.',
+    forces: ['quotes', 'invoices', 'recurring', 'licenses'],
   },
   { key: 'quotes', label: 'Quotes' },
   { key: 'invoices', label: 'Invoices & payments' },
   { key: 'recurring', label: 'Recurring invoice templates' },
+  { key: 'licenses', label: 'Licenses' },
   { key: 'expenses', label: 'Expenses' },
   { key: 'products', label: 'Product catalog' },
   { key: 'activity', label: 'Activity log' },
@@ -82,6 +96,7 @@ function DangerZone({ token }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   const canConfirm = confirmText === CONFIRM_PHRASE && selected.size > 0;
 
@@ -101,7 +116,14 @@ function DangerZone({ token }) {
 
   async function handleClear() {
     if (!canConfirm) return;
-    if (!confirm('This permanently deletes the selected data. This cannot be undone. Continue?')) return;
+    if (
+      !(await confirm({
+        title: 'Permanently delete this data?',
+        message: 'This cannot be undone.',
+        confirmLabel: 'Delete',
+      }))
+    )
+      return;
     setBusy(true);
     setError('');
     setResult(null);
@@ -179,6 +201,8 @@ function DangerZone({ token }) {
       >
         {busy ? 'Clearing…' : `Clear selected data${selected.size ? ` (${selected.size})` : ''}`}
       </button>
+
+      {confirmDialog}
     </div>
   );
 }
@@ -293,12 +317,12 @@ export default function Import() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Import historical data</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        Bring in existing clients, expenses, invoices (with payment history), or quotes from a CSV file. Preview
-        first to catch errors — nothing is saved until you confirm.
+        Bring in existing clients, expenses, invoices (with payment history), quotes, or licenses from a CSV file.
+        Preview first to catch errors — nothing is saved until you confirm.
       </p>
-      {(type === 'invoices' || type === 'quotes') && (
+      {(type === 'invoices' || type === 'quotes' || type === 'licenses') && (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-          Import clients first if you haven't already — each {type === 'invoices' ? 'invoice' : 'quote'} row is
+          Import clients first if you haven't already — each {type === 'invoices' ? 'invoice' : type === 'quotes' ? 'quote' : 'license'} row is
           matched to a client by email, or by exact client name if client_email is left blank.
         </p>
       )}
@@ -310,7 +334,7 @@ export default function Import() {
             onClick={() => handleTypeChange(t.value)}
             className={`min-h-11 rounded-md px-4 text-sm font-medium ${
               type === t.value
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-lagoon-600 text-white'
                 : 'border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800'
             }`}
           >
@@ -323,6 +347,7 @@ export default function Import() {
         <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Expected columns</p>
         <p className="mt-1 break-words font-mono text-xs text-slate-600 dark:text-slate-400">{current.columns}</p>
         <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">* required</p>
+        {current.note && <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{current.note}</p>}
         <button
           onClick={() => downloadTemplate(type)}
           className="mt-3 min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -337,7 +362,7 @@ export default function Import() {
               type="file"
               accept=".csv,text/csv"
               onChange={handleFile}
-              className="mt-1 block w-full text-sm text-slate-600 file:mr-4 file:min-h-11 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 dark:text-slate-400 dark:file:bg-indigo-950 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900"
+              className="mt-1 block w-full text-sm text-slate-600 file:mr-4 file:min-h-11 file:rounded-md file:border-0 file:bg-lagoon-50 file:px-4 file:text-sm file:font-medium file:text-lagoon-700 hover:file:bg-lagoon-100 dark:text-slate-400 dark:file:bg-lagoon-950 dark:file:text-lagoon-400 dark:hover:file:bg-lagoon-900"
             />
           </label>
           {fileName && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Selected: {fileName}</p>}
@@ -349,7 +374,7 @@ export default function Import() {
           <button
             onClick={handlePreview}
             disabled={!csvText || busy}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
           >
             {busy ? 'Working…' : 'Preview'}
           </button>

@@ -48,6 +48,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     logo_image = '',
     signatory_name = '',
     pdf_template = 'modern',
+    starting_balance = 0,
   } = req.body || {};
 
   const timeoutNum = Number(session_timeout_minutes);
@@ -56,6 +57,10 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
   }
   if (!PDF_TEMPLATES.has(pdf_template)) {
     return res.status(400).json({ error: `pdf_template must be one of: ${[...PDF_TEMPLATES].join(', ')}` });
+  }
+  const startingBalanceNum = Number(starting_balance);
+  if (!Number.isFinite(startingBalanceNum)) {
+    return res.status(400).json({ error: 'starting_balance must be a number' });
   }
 
   let signatureImage, stampImage, logoImage;
@@ -71,7 +76,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     `UPDATE business_settings
      SET business_name = ?, email = ?, phone = ?, address = ?, tax_id = ?, currency_symbol = ?, bank_details = ?,
          session_timeout_minutes = ?, signature_image = ?, stamp_image = ?, logo_image = ?, signatory_name = ?,
-         pdf_template = ?, updated_at = datetime('now')
+         pdf_template = ?, starting_balance = ?, updated_at = datetime('now')
      WHERE id = 1`,
   ).run(
     business_name,
@@ -87,6 +92,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     logoImage,
     signatory_name,
     pdf_template,
+    startingBalanceNum,
   );
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();

@@ -37,6 +37,11 @@ const DEFAULT_TEMPLATES = {
     subject: 'Receipt {{receipt_number}} from {{business_name}}',
     message: 'Hi {{client_name}},\n\nThanks for your payment. Please find your receipt attached.',
   },
+  license_remind: {
+    subject: '{{license_name}} — renewal reminder',
+    message:
+      'Hi {{client_name}},\n\nYour {{license_name}} license is due to expire on {{expiry_date}}. The renewal amount is {{amount}}.\n\nPlease get in touch or make payment to keep your license active without interruption.',
+  },
 };
 
 // Which placeholders are valid for each type, and a human label for the
@@ -66,6 +71,12 @@ const PLACEHOLDERS = {
     { key: 'receipt_number', label: 'Receipt number' },
     { key: 'business_name', label: 'Business name' },
   ],
+  license_remind: [
+    { key: 'client_name', label: 'Client name' },
+    { key: 'license_name', label: 'License name' },
+    { key: 'expiry_date', label: 'Expiry date' },
+    { key: 'amount', label: 'Renewal amount' },
+  ],
 };
 
 const TYPE_LABELS = {
@@ -73,6 +84,7 @@ const TYPE_LABELS = {
   invoice_send: 'Invoice sent',
   invoice_remind: 'Payment reminder',
   receipt_send: 'Payment receipt',
+  license_remind: 'License renewal reminder',
 };
 
 function renderTemplate(str, vars) {
@@ -129,6 +141,15 @@ function receiptSendEmail({ payment, client, settings }) {
   });
 }
 
+function licenseRemindEmail({ license, client, settings }) {
+  return buildEmail('license_remind', client.email, {
+    client_name: client.name,
+    license_name: license.name,
+    expiry_date: license.expiry_date,
+    amount: `${settings.currency_symbol}${license.amount.toFixed(2)}`,
+  });
+}
+
 // Admin management (routes/emailCenter.js). Returns every editable type with
 // its currently-effective subject/message (stored override or default) plus
 // `isCustom` so the frontend can show a "Reset to default" action only when
@@ -171,6 +192,7 @@ module.exports = {
   invoiceSendEmail,
   invoiceRemindEmail,
   receiptSendEmail,
+  licenseRemindEmail,
   getAllTemplates,
   setTemplate,
   resetTemplate,

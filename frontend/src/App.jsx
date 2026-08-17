@@ -1,8 +1,10 @@
 import { Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import BottomNav from './components/BottomNav';
 import ProtectedRoute from './components/ProtectedRoute';
 import IdleTimeoutMonitor from './components/IdleTimeoutMonitor';
 import CommandPalette from './components/CommandPalette';
+import { useAuth } from './context/AuthContext';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
@@ -21,6 +23,7 @@ import Invoices from './pages/business/Invoices';
 import InvoiceForm from './pages/business/InvoiceForm';
 import InvoiceDetail from './pages/business/InvoiceDetail';
 import RecurringInvoices from './pages/business/RecurringInvoices';
+import Licenses from './pages/business/Licenses';
 import Financials from './pages/business/Financials';
 import Reports from './pages/business/Reports';
 import ActivityLog from './pages/business/ActivityLog';
@@ -34,45 +37,53 @@ function Protected({ children }) {
 }
 
 export default function App() {
+  const { user } = useAuth();
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
       <Navbar />
       <IdleTimeoutMonitor />
       <CommandPalette />
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/q/:token" element={<PublicQuote />} />
-        <Route path="/i/:token" element={<PublicInvoice />} />
-        <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+      {/* BottomNav is phone-only (sm:hidden) and fixed, so logged-in pages
+          need bottom padding on phones or the tab bar covers their last
+          content/action buttons — see BottomNav.jsx. */}
+      <div className={user ? 'pb-16 sm:pb-0' : undefined}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/q/:token" element={<PublicQuote />} />
+          <Route path="/i/:token" element={<PublicInvoice />} />
+          <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
 
-        <Route path="/clients" element={<Protected><Clients /></Protected>} />
-        <Route path="/products" element={<Protected><Products /></Protected>} />
-        <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
-        <Route path="/settings" element={<Protected><Settings /></Protected>} />
-        <Route path="/import" element={<Protected><Import /></Protected>} />
+          <Route path="/clients" element={<Protected><Clients /></Protected>} />
+          <Route path="/products" element={<Protected><Products /></Protected>} />
+          <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
+          <Route path="/settings" element={<Protected><Settings /></Protected>} />
+          <Route path="/import" element={<Protected><Import /></Protected>} />
 
-        <Route path="/quotes" element={<Protected><Quotes /></Protected>} />
-        <Route path="/quotes/new" element={<Protected><QuoteForm /></Protected>} />
-        <Route path="/quotes/:id" element={<Protected><QuoteDetail /></Protected>} />
-        <Route path="/quotes/:id/edit" element={<Protected><QuoteForm /></Protected>} />
+          <Route path="/quotes" element={<Protected><Quotes /></Protected>} />
+          <Route path="/quotes/new" element={<Protected><QuoteForm /></Protected>} />
+          <Route path="/quotes/:id" element={<Protected><QuoteDetail /></Protected>} />
+          <Route path="/quotes/:id/edit" element={<Protected><QuoteForm /></Protected>} />
 
-        <Route path="/invoices" element={<Protected><Invoices /></Protected>} />
-        <Route path="/invoices/new" element={<Protected><InvoiceForm /></Protected>} />
-        <Route path="/invoices/:id" element={<Protected><InvoiceDetail /></Protected>} />
-        <Route path="/invoices/:id/edit" element={<Protected><InvoiceForm /></Protected>} />
+          <Route path="/invoices" element={<Protected><Invoices /></Protected>} />
+          <Route path="/invoices/new" element={<Protected><InvoiceForm /></Protected>} />
+          <Route path="/invoices/:id" element={<Protected><InvoiceDetail /></Protected>} />
+          <Route path="/invoices/:id/edit" element={<Protected><InvoiceForm /></Protected>} />
 
-        <Route path="/recurring-invoices" element={<Protected><RecurringInvoices /></Protected>} />
+          <Route path="/recurring-invoices" element={<Protected><RecurringInvoices /></Protected>} />
+          <Route path="/licenses" element={<Protected><Licenses /></Protected>} />
 
-        <Route path="/financials" element={<Protected><Financials /></Protected>} />
-        <Route path="/reports" element={<Protected><Reports /></Protected>} />
-        <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
-        <Route path="/users" element={<Protected><Users /></Protected>} />
-        <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
-        <Route path="/account" element={<Protected><MyAccount /></Protected>} />
-      </Routes>
+          <Route path="/financials" element={<Protected><Financials /></Protected>} />
+          <Route path="/reports" element={<Protected><Reports /></Protected>} />
+          <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
+          <Route path="/users" element={<Protected><Users /></Protected>} />
+          <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
+          <Route path="/account" element={<Protected><MyAccount /></Protected>} />
+        </Routes>
+      </div>
+      {user && <BottomNav />}
     </div>
   );
 }

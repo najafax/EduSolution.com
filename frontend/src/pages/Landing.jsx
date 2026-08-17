@@ -25,11 +25,11 @@ export default function Landing() {
 
   return (
     <div>
-      <section className="overflow-hidden border-b border-slate-200 bg-gradient-to-b from-indigo-50 via-white to-white dark:border-slate-800 dark:from-slate-900 dark:via-slate-950 dark:to-slate-950">
+      <section className="overflow-hidden border-b border-slate-200 bg-gradient-to-b from-lagoon-50 via-white to-white dark:border-slate-800 dark:from-slate-900 dark:via-slate-950 dark:to-slate-950">
         <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-24">
           <img src="/logo-symbol.png" alt="" className="mx-auto h-14 w-14" />
           <h1 className="mt-6 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
-            Welcome to <span className="text-indigo-600">Edu Solutions</span>
+            Welcome to <span className="text-lagoon-600">Edu Solutions</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base text-slate-600 sm:text-lg dark:text-slate-400">
             EduSolutions Maldives is a registered Educational Technology Consultancy business connecting and
@@ -39,14 +39,14 @@ export default function Landing() {
             {user ? (
               <Link
                 to="/dashboard"
-                className="flex min-h-11 items-center justify-center rounded-md bg-indigo-600 px-6 text-sm font-semibold text-white hover:bg-indigo-500"
+                className="flex min-h-11 items-center justify-center rounded-md bg-lagoon-600 px-6 text-sm font-semibold text-white hover:bg-lagoon-500"
               >
                 Go to dashboard
               </Link>
             ) : (
               <Link
                 to="/login"
-                className="flex min-h-11 items-center justify-center rounded-md bg-indigo-600 px-6 text-sm font-semibold text-white hover:bg-indigo-500"
+                className="flex min-h-11 items-center justify-center rounded-md bg-lagoon-600 px-6 text-sm font-semibold text-white hover:bg-lagoon-500"
               >
                 Log in
               </Link>
@@ -77,7 +77,7 @@ export default function Landing() {
           <div className="mt-10 grid gap-6 sm:grid-cols-3">
             {FEATURES.map((feature) => (
               <div key={feature.title} className="rounded-lg bg-white p-6 shadow-sm dark:bg-slate-900">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950/60 dark:text-lagoon-400">
                   <feature.icon />
                 </div>
                 <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">{feature.title}</h3>
@@ -98,23 +98,23 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="bg-indigo-600">
+      <section className="bg-lagoon-600">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-12 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left">
           <div>
             <h2 className="text-xl font-bold text-white sm:text-2xl">Ready to get started?</h2>
-            <p className="mt-1 text-sm text-indigo-100">Log in to manage your clients, quotes, and invoices.</p>
+            <p className="mt-1 text-sm text-lagoon-100">Log in to manage your clients, quotes, and invoices.</p>
           </div>
           {user ? (
             <Link
               to="/dashboard"
-              className="flex min-h-11 items-center justify-center rounded-md bg-white px-6 text-sm font-semibold text-indigo-600 hover:bg-indigo-50"
+              className="flex min-h-11 items-center justify-center rounded-md bg-white px-6 text-sm font-semibold text-lagoon-600 hover:bg-lagoon-50"
             >
               Go to dashboard
             </Link>
           ) : (
             <Link
               to="/login"
-              className="flex min-h-11 items-center justify-center rounded-md bg-white px-6 text-sm font-semibold text-indigo-600 hover:bg-indigo-50"
+              className="flex min-h-11 items-center justify-center rounded-md bg-white px-6 text-sm font-semibold text-lagoon-600 hover:bg-lagoon-50"
             >
               Log in
             </Link>
@@ -128,7 +128,7 @@ export default function Landing() {
           href="https://www.edusolutionsmv.com"
           target="_blank"
           rel="noreferrer"
-          className="mt-3 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-500"
+          className="mt-3 inline-block text-sm font-medium text-lagoon-600 hover:text-lagoon-500"
         >
           www.edusolutionsmv.com
         </a>

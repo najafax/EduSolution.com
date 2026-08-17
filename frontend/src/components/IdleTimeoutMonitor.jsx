@@ -104,7 +104,7 @@ export default function IdleTimeoutMonitor() {
           <button
             type="button"
             onClick={staySignedIn}
-            className="min-h-11 flex-1 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500"
+            className="min-h-11 flex-1 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
           >
             Stay signed in
           </button>

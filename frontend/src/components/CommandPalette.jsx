@@ -153,7 +153,7 @@ export default function CommandPalette() {
                 onMouseEnter={() => setActiveIndex(i)}
                 onClick={item.onSelect}
                 className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
-                  i === activeIndex ? 'bg-indigo-50 dark:bg-indigo-950/50' : ''
+                  i === activeIndex ? 'bg-lagoon-50 dark:bg-lagoon-950/50' : ''
                 }`}
               >
                 <span className="font-medium text-slate-900 dark:text-white">{item.label}</span>

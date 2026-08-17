@@ -350,4 +350,43 @@ function renderProfitLossPdf({ revenueTotal, expensesByCategory, totalExpenses, 
   return docToBuffer(doc, (d) => addPageFooter(d, settings));
 }
 
-module.exports = { renderSalesReportPdf, renderTaxReportPdf, renderExpenseReportPdf, renderProfitLossPdf };
+// Opening/closing balance, same starting_balance + net-of-payments-and-
+// expenses math as routes/financials.js's bankBalance, just anchored to
+// the period's `from`/`to` dates instead of "as of right now" — opening
+// balance is starting_balance plus everything recorded strictly before
+// `from`, closing balance is the same plus everything up to and including
+// `to`. A single drawSummaryBox (not two drawStatementSection blocks like
+// P&L) since this is a short four-line reconciliation, not a
+// category-by-category breakdown.
+function renderBankBalancePdf({ openingBalance, totalPayments, totalExpenses, closingBalance, from, to, settings }) {
+  const doc = newDoc();
+  const symbol = settings.currency_symbol || '$';
+  let y = drawReportHeader(doc, { title: 'BANK BALANCE STATEMENT', subtitle: `${from} to ${to}`, settings });
+
+  y = drawSummaryBox(
+    doc,
+    [
+      { label: 'Opening balance', value: signedMoney(openingBalance, symbol) },
+      { label: 'Payments received', value: money(totalPayments, symbol) },
+      { label: 'Expenses', value: signedMoney(-totalExpenses, symbol) },
+      { label: 'Closing balance', value: signedMoney(closingBalance, symbol), bold: true },
+    ],
+    y,
+    { dividerBeforeLast: true },
+  );
+
+  doc
+    .font('Helvetica')
+    .fontSize(8)
+    .fillColor(COLORS.muted)
+    .text(
+      "Opening balance is the starting balance set in Settings plus every payment received and expense recorded before this period. Not a live bank feed — money moving outside this app (loans, tax remittances, owner draws) isn't reflected.",
+      MARGIN,
+      y,
+      { width: CONTENT_WIDTH },
+    );
+
+  return docToBuffer(doc, (d) => addPageFooter(d, settings));
+}
+
+module.exports = { renderSalesReportPdf, renderTaxReportPdf, renderExpenseReportPdf, renderProfitLossPdf, renderBankBalancePdf };

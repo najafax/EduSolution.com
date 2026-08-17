@@ -8,7 +8,7 @@ import Modal from './Modal';
 // backend (the same template the send route falls back to), lets the user
 // edit subject/message, and only actually sends once they click "Send
 // email" — `onSend` does the real POST with the (possibly edited) values.
-export default function EmailPreviewModal({ open, onClose, title, loadPreview, onSend }) {
+export default function EmailPreviewModal({ open, onClose, title, loadPreview, onSend, showAttachmentNote = true }) {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -68,7 +68,7 @@ export default function EmailPreviewModal({ open, onClose, title, loadPreview, o
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
             />
           </label>
           <label className="block">
@@ -77,10 +77,12 @@ export default function EmailPreviewModal({ open, onClose, title, loadPreview, o
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={8}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
             />
           </label>
-          <p className="text-xs text-slate-500 dark:text-slate-400">The PDF is attached automatically — no need to mention it here.</p>
+          {showAttachmentNote && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">The PDF is attached automatically — no need to mention it here.</p>
+          )}
           <div className="mt-1 flex justify-end gap-2">
             <button
               type="button"
@@ -94,7 +96,7 @@ export default function EmailPreviewModal({ open, onClose, title, loadPreview, o
               type="button"
               onClick={handleSend}
               disabled={sending || !subject.trim() || !message.trim()}
-              className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
             >
               {sending ? 'Sending…' : 'Send email'}
             </button>

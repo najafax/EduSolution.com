@@ -6,6 +6,47 @@
    user's explicit Light/Dark choice override their OS setting. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Brand palette + display type (mobile redesign). `lagoon` is the app's one
+   accent color — replaces every former `indigo-*` class 1:1 at the same
+   shade numbers, so it's the single source of truth for the brand hue
+   rather than a parallel palette living only in some components. Chosen
+   for a Maldives-based business rather than defaulting to indigo/purple.
+   `--font-display` is Sora, self-hosted (see /public/fonts) so it works
+   offline once the PWA service worker has precached it — used sparingly,
+   only for page titles / KPI figures / the dashboard greeting, never body
+   text (see CLAUDE.md's PWA section for why webfonts aren't loaded from a
+   CDN here). */
+@theme {
+  --color-lagoon-50: #edf8f7;
+  --color-lagoon-100: #d2eeec;
+  --color-lagoon-200: #a6ddda;
+  --color-lagoon-300: #74c6c2;
+  --color-lagoon-400: #3fa9a6;
+  --color-lagoon-500: #1d8d8c;
+  --color-lagoon-600: #0e7c86;
+  --color-lagoon-700: #0b5a62;
+  --color-lagoon-800: #0a464c;
+  --color-lagoon-900: #0a3539;
+  --color-lagoon-950: #06282b;
+
+  --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
+}
+
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/sora-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/sora-800.woff2') format('woff2');
+}
+
 body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
@@ -31,4 +72,24 @@ body {
 }
 .dark .nav-links-scroll::-webkit-scrollbar-thumb {
   background-color: rgb(71 85 105);
+}
+
+/* BottomSheet.jsx's slide-up entrance. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.sheet-panel {
+  animation: sheet-up 0.18s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-panel {
+    animation: none;
+  }
 }

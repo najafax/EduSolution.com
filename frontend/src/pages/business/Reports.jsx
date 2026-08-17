@@ -33,6 +33,12 @@ const REPORT_TYPES = [
     description: 'Every expense recorded in the period, grouped by category with subtotals and a grand total.',
     run: api.reports.expensesPdf,
   },
+  {
+    key: 'bank-balance',
+    label: 'Bank balance statement',
+    description: 'Opening and closing balance for the period, from your starting balance plus payments received minus expenses recorded.',
+    run: api.reports.bankBalancePdf,
+  },
 ];
 
 // Quick-pick buttons — each returns a { from, to } pair. Kept as plain
@@ -92,7 +98,7 @@ export default function Reports() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Reports</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        Download a PDF report for any date range — sales, tax, profit &amp; loss, and expenses.
+        Download a PDF report for any date range — sales, tax, profit &amp; loss, expenses, and bank balance.
       </p>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -103,7 +109,7 @@ export default function Reports() {
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="mt-1 min-h-11 rounded-md border border-slate-300 px-3 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              className="mt-1 min-h-11 rounded-md border border-slate-300 px-3 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
             />
           </label>
           <label className="block">
@@ -112,7 +118,7 @@ export default function Reports() {
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="mt-1 min-h-11 rounded-md border border-slate-300 px-3 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              className="mt-1 min-h-11 rounded-md border border-slate-300 px-3 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
             />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -141,7 +147,7 @@ export default function Reports() {
         {REPORT_TYPES.map((report) => (
           <div key={report.key} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400">
                 <ReportIcon />
               </span>
               <div>
@@ -153,7 +159,7 @@ export default function Reports() {
               type="button"
               onClick={() => handleDownload(report)}
               disabled={busyKey === report.key}
-              className="mt-4 min-h-11 w-full rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+              className="mt-4 min-h-11 w-full rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
             >
               {busyKey === report.key ? 'Generating…' : 'Download PDF'}
             </button>

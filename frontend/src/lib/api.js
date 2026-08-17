@@ -127,6 +127,7 @@ export const api = {
     remindPreview: (id, token) => request(`/invoices/${id}/remind-preview`, { token }),
     remind: (id, payload, token) => request(`/invoices/${id}/remind`, { method: 'POST', body: payload, token }),
     duplicate: (id, token) => request(`/invoices/${id}/duplicate`, { method: 'POST', token }),
+    void: (id, token) => request(`/invoices/${id}/void`, { method: 'POST', token }),
     recordPayment: (id, payload, token) =>
       request(`/invoices/${id}/payments`, { method: 'POST', body: payload, token }),
     receiptPreview: (id, paymentId, token) =>
@@ -139,7 +140,7 @@ export const api = {
   },
 
   expenses: {
-    list: (token, { q, page } = {}) => request(`/expenses${qs({ q, page })}`, { token }),
+    list: (token, { q, page, category, payee } = {}) => request(`/expenses${qs({ q, page, category, payee })}`, { token }),
     create: (payload, token) => request('/expenses', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/expenses/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/expenses/${id}`, { method: 'DELETE', token }),
@@ -152,6 +153,20 @@ export const api = {
     create: (payload, token) => request('/recurring-invoices', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/recurring-invoices/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/recurring-invoices/${id}`, { method: 'DELETE', token }),
+  },
+
+  licenses: {
+    list: (token, { q, status, page } = {}) => request(`/licenses${qs({ q, status, page })}`, { token }),
+    summary: (token) => request('/licenses/summary', { token }),
+    get: (id, token) => request(`/licenses/${id}`, { token }),
+    create: (payload, token) => request('/licenses', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/licenses/${id}`, { method: 'PUT', body: payload, token }),
+    remove: (id, token) => request(`/licenses/${id}`, { method: 'DELETE', token }),
+    renew: (id, token) => request(`/licenses/${id}/renew`, { method: 'POST', token }),
+    renewals: (id, token) => request(`/licenses/${id}/renewals`, { token }),
+    remindPreview: (id, token) => request(`/licenses/${id}/remind-preview`, { token }),
+    remind: (id, payload, token) => request(`/licenses/${id}/remind`, { method: 'POST', body: payload, token }),
+    exportCsv: (token) => downloadFile('/licenses/export.csv', token, 'licenses.csv'),
   },
 
   activity: {
@@ -179,6 +194,7 @@ export const api = {
     taxPdf: (from, to, token) => openPdf(`/reports/tax/pdf${qs({ from, to })}`, token),
     expensesPdf: (from, to, token) => openPdf(`/reports/expenses/pdf${qs({ from, to })}`, token),
     profitLossPdf: (from, to, token) => openPdf(`/reports/profit-loss/pdf${qs({ from, to })}`, token),
+    bankBalancePdf: (from, to, token) => openPdf(`/reports/bank-balance/pdf${qs({ from, to })}`, token),
   },
 
   emailCenter: {

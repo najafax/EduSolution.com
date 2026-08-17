@@ -100,3 +100,96 @@ export function ReportIcon(props) {
     </svg>
   );
 }
+
+// Bottom-nav "Home" tab (components/BottomNav.jsx).
+export function HomeIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 9.5 10 3l7.5 6.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4.5 8.5V16a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V8.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// A folded-flag document — distinct silhouette from InvoiceIcon so a quote
+// (not yet billed) reads differently from an invoice at a glance in the
+// bottom nav / dashboard activity feed.
+export function QuoteIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M11 2.5H6a1 1 0 0 0-1 1V16a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6.5L11 2.5Z" strokeLinejoin="round" />
+      <path d="M11 2.5V6a.5.5 0 0 0 .5.5H15" strokeLinejoin="round" />
+      <path d="M7.5 10.5 9 12l3.5-3.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// Bottom-nav "More" tab: three dots, opens components/BottomSheet.jsx.
+export function MoreIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="4.5" cy="10" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="10" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="10" r="1.4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="m7.5 4.5 5.5 5.5-5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function SearchIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="9" cy="9" r="6" />
+      <path d="m17 17-3-3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function XIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 5l10 10M15 5 5 15" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// A shield with a checkmark — used for the Licenses module (nav link,
+// dashboard shortcut, KpiCard icons, EmptyState) since a license is
+// fundamentally "this client is currently authorized/covered."
+export function LicenseIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 2.5 4 5v5c0 4 2.6 6.7 6 7.5 3.4-.8 6-3.5 6-7.5V5l-6-2.5Z" strokeLinejoin="round" />
+      <path d="M7.2 9.8 9.3 12l3.5-4.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// A classic bank/columns pictogram — used for the Financials/Dashboard
+// "Bank balance" KPI card (see routes/financials.js's bankBalance).
+export function BankIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 8 10 3.5 17 8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 8.5h12v7H4Z" strokeLinejoin="round" />
+      <path d="M7 8.5v7M13 8.5v7M3 17h14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function LogoutIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M8 17H4.5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1H8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13 13.5 17 10l-4-3.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M17 10H7.5" strokeLinecap="round" />
+    </svg>
+  );
+}

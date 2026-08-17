@@ -45,6 +45,7 @@ db.exec(`
     logo_image TEXT NOT NULL DEFAULT '',
     signatory_name TEXT NOT NULL DEFAULT '',
     pdf_template TEXT NOT NULL DEFAULT 'modern',
+    starting_balance REAL NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -158,6 +159,7 @@ db.exec(`
     description TEXT NOT NULL,
     amount REAL NOT NULL,
     expense_date TEXT NOT NULL,
+    payee TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -217,6 +219,33 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS licenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL REFERENCES clients(id),
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    billing_cycle TEXT NOT NULL DEFAULT 'yearly',
+    amount REAL NOT NULL DEFAULT 0,
+    start_date TEXT NOT NULL,
+    expiry_date TEXT NOT NULL,
+    url TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    last_renewed_at TEXT,
+    last_reminder_sent_at TEXT,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS license_renewals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    license_id INTEGER NOT NULL REFERENCES licenses(id),
+    previous_expiry_date TEXT NOT NULL,
+    new_expiry_date TEXT NOT NULL,
+    renewed_by_name TEXT NOT NULL DEFAULT '',
+    renewed_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoices_client ON invoices(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
@@ -225,6 +254,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_recurring_items ON recurring_invoice_items(recurring_invoice_id);
   CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at);
   CREATE INDEX IF NOT EXISTS idx_email_log_created ON email_log(created_at);
+  CREATE INDEX IF NOT EXISTS idx_licenses_client ON licenses(client_id);
+  CREATE INDEX IF NOT EXISTS idx_licenses_expiry ON licenses(expiry_date);
 `);
 
 // Lightweight migration for columns added to `users` after this table
@@ -286,6 +317,13 @@ if (!settingsColumns.has('logo_image')) {
 // in production.
 if (!settingsColumns.has('pdf_template')) {
   db.exec(`ALTER TABLE business_settings ADD COLUMN pdf_template TEXT NOT NULL DEFAULT 'modern';`);
+}
+
+// Same pattern again: `starting_balance` (see "Bank balance" in
+// routes/financials.js below) added to business_settings after that
+// table's single row already existed in production.
+if (!settingsColumns.has('starting_balance')) {
+  db.exec(`ALTER TABLE business_settings ADD COLUMN starting_balance REAL NOT NULL DEFAULT 0;`);
 }
 
 // Same pattern again: `clients` used to have separate `name` (contact
@@ -350,6 +388,27 @@ if (!quoteColumns.has('created_by_name')) {
 const invoiceColumns = new Set(db.prepare('PRAGMA table_info(invoices)').all().map((c) => c.name));
 if (!invoiceColumns.has('created_by_name')) {
   db.exec(`ALTER TABLE invoices ADD COLUMN created_by_name TEXT NOT NULL DEFAULT '';`);
+}
+
+// Same pattern again: `url` added to `licenses` (the client's activation/
+// portal link, see routes/licenses.js) after that table already existed in
+// production with real license rows from an earlier deploy of the Licenses
+// feature — without this, every INSERT/UPDATE that names the `url` column
+// (manual create/edit, POST /api/import/licenses) 500s with "table licenses
+// has no column named url" against a database created before this column
+// was added.
+const licenseColumns = new Set(db.prepare('PRAGMA table_info(licenses)').all().map((c) => c.name));
+if (!licenseColumns.has('url')) {
+  db.exec(`ALTER TABLE licenses ADD COLUMN url TEXT NOT NULL DEFAULT '';`);
+}
+
+// Same pattern again: `payee` (who an expense was paid to — a shareholder,
+// an employee, a landlord, a vendor; see "Expense filters" in
+// routes/expenses.js below) added to `expenses` after that table already
+// existed in production with real expense rows.
+const expenseColumns = new Set(db.prepare('PRAGMA table_info(expenses)').all().map((c) => c.name));
+if (!expenseColumns.has('payee')) {
+  db.exec(`ALTER TABLE expenses ADD COLUMN payee TEXT NOT NULL DEFAULT '';`);
 }
 
 db.pragma('foreign_keys = ON');

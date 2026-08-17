@@ -7,7 +7,7 @@ import KpiCard from '../../components/KpiCard';
 import MeterBar from '../../components/MeterBar';
 import RevenueTrendChart from '../../components/RevenueTrendChart';
 import StatusBreakdownChart from '../../components/StatusBreakdownChart';
-import { InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, ExpenseIcon, TrendUpIcon, TrendDownIcon } from '../../components/icons';
+import { InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, ExpenseIcon, TrendUpIcon, TrendDownIcon, BankIcon } from '../../components/icons';
 import { money } from '../../lib/money';
 import MobileListAccordion from '../../components/MobileListAccordion';
 
@@ -39,6 +39,7 @@ export default function Financials() {
   const outstandingPct = summary.totalInvoiced > 0 ? (summary.totalOutstanding / summary.totalInvoiced) * 100 : 0;
   const marginPct = summary.totalPaid > 0 ? (summary.netProfit / summary.totalPaid) * 100 : null;
   const isProfitable = summary.netProfit >= 0;
+  const isPositiveBalance = summary.bankBalance >= 0;
 
   const cards = [
     {
@@ -87,6 +88,14 @@ export default function Financials() {
       icon: isProfitable ? <TrendUpIcon /> : <TrendDownIcon />,
       tone: isProfitable ? 'positive' : 'negative',
     },
+    {
+      key: 'bankBalance',
+      label: 'Bank balance',
+      value: money(symbol, summary.bankBalance),
+      sub: 'Starting balance + net profit',
+      icon: <BankIcon />,
+      tone: isPositiveBalance ? 'positive' : 'negative',
+    },
   ];
 
   return (
@@ -98,7 +107,15 @@ export default function Financials() {
 
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
         {cards.map((card) => (
-          <KpiCard key={card.key} label={card.label} value={card.value} sub={card.sub} icon={card.icon} tone={card.tone} />
+          <KpiCard
+            key={card.key}
+            label={card.label}
+            value={card.value}
+            sub={card.sub}
+            icon={card.icon}
+            tone={card.tone}
+            className={card.key === 'bankBalance' ? 'col-span-2 lg:col-span-3' : ''}
+          />
         ))}
       </div>
 
@@ -146,12 +163,12 @@ export default function Financials() {
                     {summary.recentPayments.map((p) => (
                       <tr key={p.id}>
                         <td className="whitespace-nowrap px-6 py-3 font-medium">
-                          <button type="button" onClick={() => handleDownloadReceipt(p.invoice_id, p.id)} className="text-indigo-600 hover:text-indigo-500">
+                          <button type="button" onClick={() => handleDownloadReceipt(p.invoice_id, p.id)} className="text-lagoon-600 hover:text-lagoon-500">
                             {p.receipt_number}
                           </button>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
-                          <Link to={`/invoices/${p.invoice_id}`} className="text-indigo-600 hover:text-indigo-500">
+                          <Link to={`/invoices/${p.invoice_id}`} className="text-lagoon-600 hover:text-lagoon-500">
                             {p.invoice_number}
                           </Link>
                         </td>
@@ -164,7 +181,7 @@ export default function Financials() {
                 </table>
               </div>
 
-              <div className="-mx-6 divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+              <div className="flex flex-col gap-2.5 sm:hidden">
                 {summary.recentPayments.map((p) => (
                   <MobileListAccordion
                     key={p.id}
@@ -175,7 +192,7 @@ export default function Financials() {
                           <Link
                             to={`/invoices/${p.invoice_id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="font-medium text-indigo-600 hover:text-indigo-500"
+                            className="font-medium text-lagoon-600 hover:text-lagoon-500"
                           >
                             {p.invoice_number}
                           </Link>
@@ -191,7 +208,7 @@ export default function Financials() {
                         <button
                           type="button"
                           onClick={() => handleDownloadReceipt(p.invoice_id, p.id)}
-                          className="text-indigo-600 hover:text-indigo-500"
+                          className="text-lagoon-600 hover:text-lagoon-500"
                         >
                           {p.receipt_number}
                         </button>

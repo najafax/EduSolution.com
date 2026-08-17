@@ -6,6 +6,7 @@ import { todayPlus } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
+import { useConfirm } from '../../lib/useConfirm';
 
 export default function QuoteDetail() {
   const { token, can } = useAuth();
@@ -22,6 +23,7 @@ export default function QuoteDetail() {
   const [showConvert, setShowConvert] = useState(false);
   const [dueDate, setDueDate] = useState(todayPlus(14));
   const [showSendPreview, setShowSendPreview] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     api.quotes
@@ -45,7 +47,7 @@ export default function QuoteDetail() {
   }
 
   async function handleDelete() {
-    if (!confirm('Delete this quote?')) return;
+    if (!(await confirm({ title: 'Delete this quote?', confirmLabel: 'Delete' }))) return;
     try {
       await api.quotes.remove(id, token);
       navigate('/quotes');
@@ -104,7 +106,7 @@ export default function QuoteDetail() {
             Download PDF
           </button>
           {canManage && (
-            <button onClick={() => setShowSendPreview(true)} disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
+            <button onClick={() => setShowSendPreview(true)} disabled={busy} className="min-h-11 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
               Email to client
             </button>
           )}
@@ -129,7 +131,7 @@ export default function QuoteDetail() {
       {quote.converted_invoice_id && (
         <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
           Converted to invoice —{' '}
-          <Link to={`/invoices/${quote.converted_invoice_id}`} className="text-indigo-600 hover:text-indigo-500">
+          <Link to={`/invoices/${quote.converted_invoice_id}`} className="text-lagoon-600 hover:text-lagoon-500">
             view invoice
           </Link>
           .
@@ -140,7 +142,7 @@ export default function QuoteDetail() {
         <form onSubmit={handleConvert} className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Invoice due date</span>
-            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-indigo-500 dark:border-slate-600">
+            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
               <input
                 type="date"
                 required
@@ -150,7 +152,7 @@ export default function QuoteDetail() {
               />
             </div>
           </label>
-          <button type="submit" disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
+          <button type="submit" disabled={busy} className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
             Create invoice
           </button>
         </form>
@@ -201,7 +203,7 @@ export default function QuoteDetail() {
 
             <div className="divide-y divide-slate-100 text-sm sm:hidden dark:divide-slate-800">
               {items.map((item) => (
-                <div key={item.id} className="flex items-start justify-between gap-3 px-6 py-3">
+                <div key={item.id} className="flex items-start justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="text-slate-900 dark:text-white">{item.description}</p>
                     <p className="text-slate-500 dark:text-slate-400">{item.quantity} × {symbol}{item.unit_price.toFixed(2)}</p>
@@ -245,6 +247,8 @@ export default function QuoteDetail() {
           load();
         }}
       />
+
+      {confirmDialog}
     </div>
   );
 }

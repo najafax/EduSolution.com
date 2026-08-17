@@ -34,7 +34,7 @@ export default function ResetPassword() {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center sm:px-6">
         <p className="text-sm text-red-600 dark:text-red-400">This reset link is missing its token.</p>
-        <Link to="/forgot-password" className="mt-4 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-500">
+        <Link to="/forgot-password" className="mt-4 inline-block text-sm font-medium text-lagoon-600 hover:text-lagoon-500">
           Request a new link
         </Link>
       </div>
@@ -58,7 +58,7 @@ export default function ResetPassword() {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
           />
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">At least 8 characters.</p>
         </div>
@@ -74,7 +74,7 @@ export default function ResetPassword() {
             required
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
           />
         </div>
 
@@ -83,7 +83,7 @@ export default function ResetPassword() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-2 min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="mt-2 min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-semibold text-white hover:bg-lagoon-500 disabled:opacity-60"
         >
           {submitting ? 'Updating…' : 'Update password'}
         </button>
