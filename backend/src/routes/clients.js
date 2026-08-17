@@ -85,10 +85,17 @@ router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Client not found' });
 
+  // Every one of these four tables has a NOT NULL REFERENCES clients(id)
+  // (see db/index.js) with foreign_keys=ON enforced — deleting a client
+  // that still has any of them would otherwise fail with an uncaught
+  // SQLITE_CONSTRAINT_FOREIGNKEY error (a raw 500) instead of this same
+  // friendly 409 the quotes/invoices case already had.
   const hasQuotes = db.prepare('SELECT 1 FROM quotes WHERE client_id = ? LIMIT 1').get(req.params.id);
   const hasInvoices = db.prepare('SELECT 1 FROM invoices WHERE client_id = ? LIMIT 1').get(req.params.id);
-  if (hasQuotes || hasInvoices) {
-    return res.status(409).json({ error: 'This client has quotes or invoices and cannot be deleted' });
+  const hasRecurring = db.prepare('SELECT 1 FROM recurring_invoices WHERE client_id = ? LIMIT 1').get(req.params.id);
+  const hasLicenses = db.prepare('SELECT 1 FROM licenses WHERE client_id = ? LIMIT 1').get(req.params.id);
+  if (hasQuotes || hasInvoices || hasRecurring || hasLicenses) {
+    return res.status(409).json({ error: 'This client has quotes, invoices, recurring invoices, or licenses and cannot be deleted' });
   }
 
   db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);

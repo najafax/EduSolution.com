@@ -963,8 +963,15 @@ Status/derived-field conventions worth knowing before touching this code:
   for the unauthenticated view) derives `is_overdue` and `is_partially_paid`
   from `status`/`due_date`/`amount_paid` on every read, so there's no cron
   job or background process keeping status in sync.
-- Deletes are guarded at the DB level in the route handlers, not via FK
-  constraints: a client with any quotes/invoices can't be deleted, and an
+- Deletes are guarded in the route handlers with friendly, checked-first
+  409s, not left to surface as a raw FK-constraint error: a client with
+  any quotes, invoices, recurring-invoice templates, or licenses can't be
+  deleted (`routes/clients.js`'s `DELETE /:id` checks all four —
+  `quotes`/`invoices`/`recurring_invoices`/`licenses` all have a
+  `NOT NULL REFERENCES clients(id)` with `foreign_keys = ON` actually
+  enforced at the DB level too, so this guard exists to turn what would
+  otherwise be an uncaught `SQLITE_CONSTRAINT_FOREIGNKEY` 500 into the same
+  clean 409 message every other delete guard in this app gives), and an
   invoice with any recorded payments can't be deleted.
 - `public_token` (random 16-byte hex, unique) exists on every quote and
   invoice row and is regenerated on duplicate/convert/recurring-generation
