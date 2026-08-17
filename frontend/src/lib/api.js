@@ -194,6 +194,7 @@ export const api = {
     taxPdf: (from, to, token) => openPdf(`/reports/tax/pdf${qs({ from, to })}`, token),
     expensesPdf: (from, to, token) => openPdf(`/reports/expenses/pdf${qs({ from, to })}`, token),
     profitLossPdf: (from, to, token) => openPdf(`/reports/profit-loss/pdf${qs({ from, to })}`, token),
+    bankBalancePdf: (from, to, token) => openPdf(`/reports/bank-balance/pdf${qs({ from, to })}`, token),
   },
 
   emailCenter: {

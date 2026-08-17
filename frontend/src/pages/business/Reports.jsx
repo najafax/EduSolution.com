@@ -33,6 +33,12 @@ const REPORT_TYPES = [
     description: 'Every expense recorded in the period, grouped by category with subtotals and a grand total.',
     run: api.reports.expensesPdf,
   },
+  {
+    key: 'bank-balance',
+    label: 'Bank balance statement',
+    description: 'Opening and closing balance for the period, from your starting balance plus payments received minus expenses recorded.',
+    run: api.reports.bankBalancePdf,
+  },
 ];
 
 // Quick-pick buttons — each returns a { from, to } pair. Kept as plain
@@ -92,7 +98,7 @@ export default function Reports() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Reports</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        Download a PDF report for any date range — sales, tax, profit &amp; loss, and expenses.
+        Download a PDF report for any date range — sales, tax, profit &amp; loss, expenses, and bank balance.
       </p>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">

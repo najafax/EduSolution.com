@@ -537,7 +537,7 @@ are deliberately untouched by either, always returning every row.
   (icon: `BankIcon`) alongside the other summary figures, tone flipping to
   `negative` the same way `netProfit`'s own card does when the number goes
   below zero (a startup deficit or heavy early spending).
-- `routes/reports.js` (mounted at `/api/reports`) — four downloadable PDF
+- `routes/reports.js` (mounted at `/api/reports`) — five downloadable PDF
   reports, each `GET /<type>/pdf?from=&to=` (`YYYY-MM-DD`, both required;
   400s if either is missing/malformed or `from` is after `to`). Gated on
   the same `requirePermission('financials', 'view')` as the Financials
@@ -560,11 +560,17 @@ are deliberately untouched by either, always returning every row.
   received, not invoiced), expenses are grouped by category the same way
   the expense report is, and net profit/loss is revenue minus total
   expenses — rendered as a green "NET PROFIT" or red "NET LOSS" bar
-  depending on the sign. None of these routes call `logActivity()` (same
+  depending on the sign. `GET /bank-balance/pdf` is the PDF counterpart to
+  `routes/financials.js`'s `bankBalance` (see below), just split at the
+  period boundary instead of computed "as of right now": opening balance
+  is `business_settings.starting_balance` plus every `payments`/`expenses`
+  row dated strictly *before* `from`, closing balance adds every row
+  *through* `to` (same inclusive `BETWEEN` convention the other reports
+  use) on top of that. None of these routes call `logActivity()` (same
   as the existing `:id/pdf` routes — a read-only download isn't a
   mutation) or accept `page`/`q` (each report is inherently a from/to
   filtered dump, not a paginated list).
-- `lib/reportPdf.js` — renders the four report PDFs above with `pdfkit`.
+- `lib/reportPdf.js` — renders the five report PDFs above with `pdfkit`.
   These are tabular/statement documents, not the bill-to/line-items/
   signature shape `lib/pdf.js` renders for quote/invoice/receipt — but
   share that module's page geometry, palette, and `money()`/image/buffer
@@ -582,7 +588,16 @@ are deliberately untouched by either, always returning every row.
   the closing figure — net profit is the one amount here that can go
   negative, so it's formatted with `signedMoney()` (mirrors the frontend's
   own `Financials.jsx` `money()` helper's sign handling) rather than the
-  shared `money()`, which never special-cases a sign.
+  shared `money()`, which never special-cases a sign. The bank balance
+  statement is the one report that reuses `drawSummaryBox` directly rather
+  than `drawStatementSection` — it's a four-line reconciliation (opening
+  balance, payments received, expenses, closing balance), not a
+  category-by-category breakdown, so a single right-aligned box says
+  everything a P&L-style two-section layout would, with less of it.
+  Opening/closing balance both go through `signedMoney()` since a
+  business's balance can start (and stay) negative; expenses render as a
+  negative value too (`signedMoney(-totalExpenses, symbol)`) so the box
+  reads as a literal running sum top to bottom.
 - `lib/totals.js` — `computeTotals(items, taxRate, discountType, discountValue)`
   validates a raw line-items payload and computes subtotal → discount → tax
   → total, in that order (tax applies to the post-discount amount).
@@ -1572,9 +1587,10 @@ frontend stops holding/sending it.
   on the same `financials` module as `/financials`) — a single from/to date
   range (`<input type="date">` pair, defaulting to `startOfMonthStr()`
   through `todayStr()` from `lib/date.js`) plus three quick-pick preset
-  buttons (This month/Last month/This year), shared by four report cards
-  (Sales, Tax, Profit & Loss, Expense) laid out with the same icon-circle +
-  label + description shape as `KpiCard`. Each card's "Download PDF" button
+  buttons (This month/Last month/This year), shared by five report cards
+  (Sales, Tax, Profit & Loss, Expense, Bank Balance Statement) laid out
+  with the same icon-circle + label + description shape as `KpiCard`. Each
+  card's "Download PDF" button
   calls its matching `api.reports.*Pdf(from, to, token)` — which, like
   `api.invoices.openPdf`/`api.quotes.openPdf`, goes through `lib/api.js`'s
   `openPdf()` rather than `request()` (binary response, opened as a blob
