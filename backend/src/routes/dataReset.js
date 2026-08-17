@@ -75,27 +75,34 @@ router.post('/', (req, res) => {
   }
 
   db.pragma('foreign_keys = OFF');
-  db.transaction(() => {
-    for (const t of tables) {
-      db.prepare(`DELETE FROM ${t}`).run();
-      db.prepare('DELETE FROM sqlite_sequence WHERE name = ?').run(t);
-    }
-    // Clean up nullable, unenforced cross-references (invoices.quote_id,
-    // quotes.converted_invoice_id, invoices.recurring_invoice_id — none of
-    // these carry a REFERENCES constraint, see db/index.js) left dangling
-    // when one side of a soft link is cleared without the other, so a
-    // surviving row never points at an id that no longer exists.
-    if (tablesToClear.has('quotes') && !tablesToClear.has('invoices')) {
-      db.prepare('UPDATE invoices SET quote_id = NULL WHERE quote_id IS NOT NULL').run();
-    }
-    if (tablesToClear.has('invoices') && !tablesToClear.has('quotes')) {
-      db.prepare('UPDATE quotes SET converted_invoice_id = NULL WHERE converted_invoice_id IS NOT NULL').run();
-    }
-    if (tablesToClear.has('recurring_invoices') && !tablesToClear.has('invoices')) {
-      db.prepare('UPDATE invoices SET recurring_invoice_id = NULL WHERE recurring_invoice_id IS NOT NULL').run();
-    }
-  })();
-  db.pragma('foreign_keys = ON');
+  try {
+    db.transaction(() => {
+      for (const t of tables) {
+        db.prepare(`DELETE FROM ${t}`).run();
+        db.prepare('DELETE FROM sqlite_sequence WHERE name = ?').run(t);
+      }
+      // Clean up nullable, unenforced cross-references (invoices.quote_id,
+      // quotes.converted_invoice_id, invoices.recurring_invoice_id — none of
+      // these carry a REFERENCES constraint, see db/index.js) left dangling
+      // when one side of a soft link is cleared without the other, so a
+      // surviving row never points at an id that no longer exists.
+      if (tablesToClear.has('quotes') && !tablesToClear.has('invoices')) {
+        db.prepare('UPDATE invoices SET quote_id = NULL WHERE quote_id IS NOT NULL').run();
+      }
+      if (tablesToClear.has('invoices') && !tablesToClear.has('quotes')) {
+        db.prepare('UPDATE quotes SET converted_invoice_id = NULL WHERE converted_invoice_id IS NOT NULL').run();
+      }
+      if (tablesToClear.has('recurring_invoices') && !tablesToClear.has('invoices')) {
+        db.prepare('UPDATE invoices SET recurring_invoice_id = NULL WHERE recurring_invoice_id IS NOT NULL').run();
+      }
+    })();
+  } finally {
+    // Guarantees FK enforcement is always restored even if the transaction
+    // above throws — otherwise a failed reset would silently leave every
+    // later request in this process running with foreign_keys OFF, which
+    // would also defeat routes/clients.js's own FK-backed delete guards.
+    db.pragma('foreign_keys = ON');
+  }
 
   const clearedSummary = Object.entries(before)
     .filter(([, count]) => count > 0)
