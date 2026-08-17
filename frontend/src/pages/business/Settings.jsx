@@ -85,6 +85,20 @@ export default function Settings() {
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
             />
           </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Starting bank balance</span>
+            <input
+              type="number"
+              step="0.01"
+              value={form.starting_balance}
+              onChange={(e) => setForm((f) => ({ ...f, starting_balance: e.target.value }))}
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none disabled:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800"
+            />
+            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+              Your account balance on the day you started using this app. Financials adds every payment
+              collected and subtracts every expense recorded since to show a running current balance.
+            </span>
+          </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Session timeout (minutes)</span>

@@ -109,7 +109,11 @@ backend port in frontend code.
   `POST /api/import/licenses`) 500'd with "table licenses has no column
   named url" until the follow-up `ALTER TABLE licenses ADD COLUMN url TEXT
   NOT NULL DEFAULT ''`, guarded by the usual `PRAGMA table_info(licenses)`
-  check.
+  check. Same pattern once more for `business_settings.starting_balance`
+  (see "Bank balance" in `routes/financials.js` below) — added directly to
+  the `ALTER TABLE` migration list this time, having learned the `licenses.url`
+  lesson above, since `business_settings`'s single row has had real
+  production data since the very first deploy.
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
   <jwt>` header, then **re-fetches the live user row from the DB** (by the
   id in the JWT payload) rather than trusting the token's claims, and
@@ -250,7 +254,10 @@ are deliberately untouched by either, always returning every row.
   header/footer, plus the one security policy value). `clients.js` also has
   `GET /export.csv` (registered before `GET /:id` so it isn't shadowed by
   the `:id` param). `PUT /` validates `session_timeout_minutes` is a whole
-  number between 1 and 480. `GET /` supports `?q=` (name/email) and
+  number between 1 and 480, and `starting_balance` is any finite number
+  (negative allowed — an overdraft on the day you started using the app is
+  a valid starting point, see "Bank balance" in `routes/financials.js`
+  below). `GET /` supports `?q=` (name/email) and
   `?page=` (see "Pagination convention" above).
 - `routes/products.js` — plain CRUD for `products` (name/description/
   unit_price/`tax_rate`), `GET /` supports `?q=` search and `?page=` (see
@@ -517,7 +524,19 @@ are deliberately untouched by either, always returning every row.
   `netProfit` (`totalPaid - totalExpenses`). Same endpoint backs both
   `Dashboard` and `Financials` pages. Computed from `invoices`/`payments`/
   `clients`/`expenses` on every request, nothing is cached or denormalized
-  beyond `invoices.amount_paid`.
+  beyond `invoices.amount_paid`. **Bank balance**: `bankBalance` is
+  `business_settings.starting_balance` (admin-editable on the Settings page,
+  see `routes/settings.js` above) plus `netProfit` — the one number this
+  app can vouch for without a real bank feed: whatever balance you had the
+  day you set `starting_balance`, plus every payment collected and minus
+  every expense recorded since. It's a running proxy, not a live balance —
+  anything moving money outside the `payments`/`expenses` tables (a loan, a
+  tax remittance, an owner draw never logged as an expense) isn't
+  reflected, so it can drift from the real account over time if those go
+  unrecorded. `Dashboard.jsx`/`Financials.jsx` both render it as a `KpiCard`
+  (icon: `BankIcon`) alongside the other summary figures, tone flipping to
+  `negative` the same way `netProfit`'s own card does when the number goes
+  below zero (a startup deficit or heavy early spending).
 - `routes/reports.js` (mounted at `/api/reports`) — four downloadable PDF
   reports, each `GET /<type>/pdf?from=&to=` (`YYYY-MM-DD`, both required;
   400s if either is missing/malformed or `from` is after `to`). Gated on

@@ -7,7 +7,7 @@ import KpiCard from '../../components/KpiCard';
 import MeterBar from '../../components/MeterBar';
 import RevenueTrendChart from '../../components/RevenueTrendChart';
 import StatusBreakdownChart from '../../components/StatusBreakdownChart';
-import { InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, ExpenseIcon, TrendUpIcon, TrendDownIcon } from '../../components/icons';
+import { InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, ExpenseIcon, TrendUpIcon, TrendDownIcon, BankIcon } from '../../components/icons';
 import { money } from '../../lib/money';
 import MobileListAccordion from '../../components/MobileListAccordion';
 
@@ -39,6 +39,7 @@ export default function Financials() {
   const outstandingPct = summary.totalInvoiced > 0 ? (summary.totalOutstanding / summary.totalInvoiced) * 100 : 0;
   const marginPct = summary.totalPaid > 0 ? (summary.netProfit / summary.totalPaid) * 100 : null;
   const isProfitable = summary.netProfit >= 0;
+  const isPositiveBalance = summary.bankBalance >= 0;
 
   const cards = [
     {
@@ -86,6 +87,14 @@ export default function Financials() {
       sub: marginPct !== null ? `${marginPct.toFixed(0)}% margin` : null,
       icon: isProfitable ? <TrendUpIcon /> : <TrendDownIcon />,
       tone: isProfitable ? 'positive' : 'negative',
+    },
+    {
+      key: 'bankBalance',
+      label: 'Bank balance',
+      value: money(symbol, summary.bankBalance),
+      sub: 'Starting balance + net profit',
+      icon: <BankIcon />,
+      tone: isPositiveBalance ? 'positive' : 'negative',
     },
   ];
 

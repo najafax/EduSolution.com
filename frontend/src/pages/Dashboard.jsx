@@ -9,7 +9,7 @@ import Accordion from '../components/Accordion';
 import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import DashboardShortcutsEditor from '../components/DashboardShortcutsEditor';
-import { UsersIcon, InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, TrendUpIcon, TrendDownIcon } from '../components/icons';
+import { UsersIcon, InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, TrendUpIcon, TrendDownIcon, BankIcon } from '../components/icons';
 import { money } from '../lib/money';
 
 function greeting() {
@@ -53,6 +53,7 @@ export default function Dashboard() {
     useDashboardShortcuts(permittedShortcuts);
 
   const isProfitable = summary && summary.netProfit >= 0;
+  const isPositiveBalance = summary && summary.bankBalance >= 0;
   const kpis = summary
     ? [
         { key: 'clients', label: 'Clients', value: summary.clientCount, icon: <UsersIcon />, tone: 'neutral' },
@@ -73,6 +74,13 @@ export default function Dashboard() {
           value: money(symbol, summary.netProfit),
           icon: isProfitable ? <TrendUpIcon /> : <TrendDownIcon />,
           tone: isProfitable ? 'positive' : 'negative',
+        },
+        {
+          key: 'bankBalance',
+          label: 'Bank balance',
+          value: money(symbol, summary.bankBalance),
+          icon: <BankIcon />,
+          tone: isPositiveBalance ? 'positive' : 'negative',
         },
       ]
     : [];

@@ -45,6 +45,7 @@ db.exec(`
     logo_image TEXT NOT NULL DEFAULT '',
     signatory_name TEXT NOT NULL DEFAULT '',
     pdf_template TEXT NOT NULL DEFAULT 'modern',
+    starting_balance REAL NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -315,6 +316,13 @@ if (!settingsColumns.has('logo_image')) {
 // in production.
 if (!settingsColumns.has('pdf_template')) {
   db.exec(`ALTER TABLE business_settings ADD COLUMN pdf_template TEXT NOT NULL DEFAULT 'modern';`);
+}
+
+// Same pattern again: `starting_balance` (see "Bank balance" in
+// routes/financials.js below) added to business_settings after that
+// table's single row already existed in production.
+if (!settingsColumns.has('starting_balance')) {
+  db.exec(`ALTER TABLE business_settings ADD COLUMN starting_balance REAL NOT NULL DEFAULT 0;`);
 }
 
 // Same pattern again: `clients` used to have separate `name` (contact

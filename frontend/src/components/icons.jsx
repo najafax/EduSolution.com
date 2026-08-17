@@ -172,6 +172,18 @@ export function LicenseIcon(props) {
   );
 }
 
+// A classic bank/columns pictogram — used for the Financials/Dashboard
+// "Bank balance" KPI card (see routes/financials.js's bankBalance).
+export function BankIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 8 10 3.5 17 8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 8.5h12v7H4Z" strokeLinejoin="round" />
+      <path d="M7 8.5v7M13 8.5v7M3 17h14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function LogoutIcon(props) {
   return (
     <svg {...base} {...props}>

@@ -48,6 +48,16 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
   const totalExpenses = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses').get().total;
   const netProfit = Math.round((totalPaid - totalExpenses) * 100) / 100;
 
+  // Not a real-time bank feed — just the one number this app can actually
+  // vouch for: whatever balance you had the day you set starting_balance
+  // (business_settings, see routes/settings.js), plus every payment
+  // collected since, minus every expense recorded since. Anything moving
+  // money outside those two tables (a loan, a tax remittance, an owner
+  // draw not logged as an expense) won't be reflected, so this is a
+  // running proxy, not a bank statement.
+  const startingBalance = db.prepare('SELECT starting_balance FROM business_settings WHERE id = 1').get()?.starting_balance || 0;
+  const bankBalance = Math.round((startingBalance + netProfit) * 100) / 100;
+
   const months = recentMonths(6);
   const invoicedByMonth = Object.fromEntries(months.map((m) => [m, 0]));
   for (const inv of invoices) {
@@ -87,6 +97,7 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
     clientCount,
     totalExpenses: Math.round(totalExpenses * 100) / 100,
     netProfit,
+    bankBalance,
     quoteCounts,
     invoiceCounts,
     monthlyTrend,
