@@ -476,12 +476,16 @@ are deliberately untouched by either, always returning every row.
   count across every license, backing the KPI strip at the top of
   `Licenses.jsx` — and `GET /export.csv`, both following the usual
   conventions. **The core action**: `POST /:id/renew` is "the client paid,
-  extend it" — advances `expiry_date` by one `billing_cycle` (`monthly` or
-  `yearly`, month-end-clamped the same way `lib/scheduler.js`'s own
-  `advanceDate()` handles Jan 31 → Feb) from *whichever is later*, the
-  current `expiry_date` or today: renewing early keeps the remaining time
-  instead of losing it, renewing a lapsed license extends from today instead
-  of compounding a backdated short window off the old expiry. Blocked (409)
+  extend it" — advances `expiry_date` by exactly one `billing_cycle`
+  (`monthly` or `yearly`, month-end-clamped the same way `lib/scheduler.js`'s
+  own `advanceDate()` handles Jan 31 → Feb) from the *current* `expiry_date`,
+  always landing on the same day-of-month as the original expiry — including
+  for a badly lapsed license (expired well over a cycle ago), where the new
+  expiry can itself still land in the past; that's preferred over quietly
+  renewing from today's date instead, which would produce a new expiry whose
+  day-of-month has nothing to do with the license's real billing cycle. A
+  license renewed while still lapsed just reads as `expired` again
+  (`display_status`, see below) until renewed once more. Blocked (409)
   only when `status` is already `cancelled` — a cancelled license needs an
   explicit edit back to `active` first, `renew` is for "still active, just
   needs paying," not for un-cancelling. Renewing also clears

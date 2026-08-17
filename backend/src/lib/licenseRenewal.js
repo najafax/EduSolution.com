@@ -1,7 +1,5 @@
 const db = require('../db');
 
-const today = () => new Date().toISOString().slice(0, 10);
-
 // Same month-end-clamped billing-cycle math lib/scheduler.js's own
 // advanceDate() applies for recurring invoices (e.g. Jan 31 + monthly
 // clamps to Feb 28/29 instead of rolling into March).
@@ -15,19 +13,21 @@ function advanceExpiry(dateStr, cycle) {
 }
 
 // The one place a license actually gets renewed — extends expiry_date by
-// one billing cycle from whichever is later, the current expiry_date or
-// today (renewing early keeps the remaining time instead of losing it,
-// renewing a lapsed license doesn't backdate a short window from the old
-// expiry), and writes the matching license_renewals row. Shared by
-// routes/licenses.js's POST /:id/renew (a human clicking "Renew") and
-// routes/invoices.js's POST /:id/payments (an invoice whose line items name
-// an active license auto-renews it the moment the invoice is paid in full)
-// so both paths extend/record a renewal identically — callers are
+// exactly one billing cycle from the *current* expiry_date, always landing
+// on the same day-of-month as the original expiry, and writes the matching
+// license_renewals row. This is true even for a badly lapsed license (e.g.
+// expired years ago) — the new expiry can still land in the past, in which
+// case the license simply reads as expired again until renewed once more;
+// that's preferred over silently renewing from today's date, which would
+// produce a new-expiry day-of-month unrelated to the license's real cycle.
+// Shared by routes/licenses.js's POST /:id/renew (a human clicking "Renew")
+// and routes/invoices.js's POST /:id/payments (an invoice whose line items
+// name an active license auto-renews it the moment the invoice is paid in
+// full) so both paths extend/record a renewal identically — callers are
 // responsible for their own guards (e.g. status !== 'cancelled') before
 // calling this.
 function renewLicense(license, renewedByName) {
-  const base = license.expiry_date > today() ? license.expiry_date : today();
-  const nextExpiry = advanceExpiry(base, license.billing_cycle);
+  const nextExpiry = advanceExpiry(license.expiry_date, license.billing_cycle);
 
   db.transaction(() => {
     db.prepare(
