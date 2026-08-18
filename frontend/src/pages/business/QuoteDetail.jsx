@@ -203,7 +203,7 @@ export default function QuoteDetail() {
 
             <div className="divide-y divide-slate-100 text-sm sm:hidden dark:divide-slate-800">
               {items.map((item) => (
-                <div key={item.id} className="flex items-start justify-between gap-3 py-3">
+                <div key={item.id} className="flex items-start justify-between gap-3 px-6 py-3">
                   <div className="min-w-0">
                     <p className="text-slate-900 dark:text-white">{item.description}</p>
                     <p className="text-slate-500 dark:text-slate-400">{item.quantity} × {symbol}{item.unit_price.toFixed(2)}</p>
@@ -213,16 +213,36 @@ export default function QuoteDetail() {
               ))}
             </div>
 
-            <div className="border-t border-slate-200 px-6 py-3 text-right text-sm dark:border-slate-700">
-              <p className="text-slate-600 dark:text-slate-400">Subtotal: {symbol}{quote.subtotal.toFixed(2)}</p>
-              {quote.discount_amount > 0 && (
-                <p className="text-slate-600 dark:text-slate-400">
-                  Discount {quote.discount_type === 'percentage' ? `(${quote.discount_value}%)` : ''}: -{symbol}
-                  {quote.discount_amount.toFixed(2)}
-                </p>
-              )}
-              {quote.tax_rate > 0 && <p className="text-slate-600 dark:text-slate-400">Tax ({quote.tax_rate}%): {symbol}{quote.tax_amount.toFixed(2)}</p>}
-              <p className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Total: {symbol}{quote.total.toFixed(2)}</p>
+            <div className="border-t border-slate-200 px-6 py-3 text-sm dark:border-slate-700">
+              {/* Each row is its own flex pair (label left, amount right)
+                  rather than one right-aligned line of "Label: amount" text
+                  — that older layout let the amount's horizontal position
+                  drift with each label's length, so the figures never
+                  actually lined up in a column. */}
+              <div className="ml-auto flex w-full max-w-xs flex-col gap-1">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-600 dark:text-slate-400">Subtotal</dt>
+                  <dd className="text-slate-600 dark:text-slate-400">{symbol}{quote.subtotal.toFixed(2)}</dd>
+                </div>
+                {quote.discount_amount > 0 && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-slate-600 dark:text-slate-400">
+                      Discount {quote.discount_type === 'percentage' ? `(${quote.discount_value}%)` : ''}
+                    </dt>
+                    <dd className="text-slate-600 dark:text-slate-400">-{symbol}{quote.discount_amount.toFixed(2)}</dd>
+                  </div>
+                )}
+                {quote.tax_rate > 0 && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-slate-600 dark:text-slate-400">Tax ({quote.tax_rate}%)</dt>
+                    <dd className="text-slate-600 dark:text-slate-400">{symbol}{quote.tax_amount.toFixed(2)}</dd>
+                  </div>
+                )}
+                <div className="mt-1 flex justify-between gap-4 text-base font-semibold text-slate-900 dark:text-white">
+                  <dt>Total</dt>
+                  <dd>{symbol}{quote.total.toFixed(2)}</dd>
+                </div>
+              </div>
             </div>
           </div>
         </Accordion>

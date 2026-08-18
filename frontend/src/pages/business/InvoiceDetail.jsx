@@ -282,7 +282,7 @@ export default function InvoiceDetail() {
                 so mobile just gets a stacked card per item instead. */}
             <div className="divide-y divide-slate-100 text-sm sm:hidden dark:divide-slate-800">
               {items.map((item) => (
-                <div key={item.id} className="flex items-start justify-between gap-3 py-3">
+                <div key={item.id} className="flex items-start justify-between gap-3 px-6 py-3">
                   <div className="min-w-0">
                     <p className="text-slate-900 dark:text-white">{item.description}</p>
                     <p className="text-slate-500 dark:text-slate-400">{item.quantity} × {symbol}{item.unit_price.toFixed(2)}</p>
@@ -292,18 +292,44 @@ export default function InvoiceDetail() {
               ))}
             </div>
 
-            <div className="border-t border-slate-200 px-6 py-3 text-right text-sm dark:border-slate-700">
-              <p className="text-slate-600 dark:text-slate-400">Subtotal: {symbol}{invoice.subtotal.toFixed(2)}</p>
-              {invoice.discount_amount > 0 && (
-                <p className="text-slate-600 dark:text-slate-400">
-                  Discount {invoice.discount_type === 'percentage' ? `(${invoice.discount_value}%)` : ''}: -{symbol}
-                  {invoice.discount_amount.toFixed(2)}
-                </p>
-              )}
-              {invoice.tax_rate > 0 && <p className="text-slate-600 dark:text-slate-400">Tax ({invoice.tax_rate}%): {symbol}{invoice.tax_amount.toFixed(2)}</p>}
-              <p className="text-slate-600 dark:text-slate-400">Total: {symbol}{invoice.total.toFixed(2)}</p>
-              <p className="text-slate-600 dark:text-slate-400">Paid: {symbol}{invoice.amount_paid.toFixed(2)}</p>
-              <p className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Balance due: {symbol}{invoice.balance_due.toFixed(2)}</p>
+            <div className="border-t border-slate-200 px-6 py-3 text-sm dark:border-slate-700">
+              {/* Each row is its own flex pair (label left, amount right)
+                  rather than one right-aligned line of "Label: amount" text
+                  — that older layout let the amount's horizontal position
+                  drift with each label's length ("Subtotal" vs "Paid"), so
+                  the figures never actually lined up in a column. */}
+              <div className="ml-auto flex w-full max-w-xs flex-col gap-1">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-600 dark:text-slate-400">Subtotal</dt>
+                  <dd className="text-slate-600 dark:text-slate-400">{symbol}{invoice.subtotal.toFixed(2)}</dd>
+                </div>
+                {invoice.discount_amount > 0 && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-slate-600 dark:text-slate-400">
+                      Discount {invoice.discount_type === 'percentage' ? `(${invoice.discount_value}%)` : ''}
+                    </dt>
+                    <dd className="text-slate-600 dark:text-slate-400">-{symbol}{invoice.discount_amount.toFixed(2)}</dd>
+                  </div>
+                )}
+                {invoice.tax_rate > 0 && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-slate-600 dark:text-slate-400">Tax ({invoice.tax_rate}%)</dt>
+                    <dd className="text-slate-600 dark:text-slate-400">{symbol}{invoice.tax_amount.toFixed(2)}</dd>
+                  </div>
+                )}
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-600 dark:text-slate-400">Total</dt>
+                  <dd className="text-slate-600 dark:text-slate-400">{symbol}{invoice.total.toFixed(2)}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-600 dark:text-slate-400">Paid</dt>
+                  <dd className="text-slate-600 dark:text-slate-400">{symbol}{invoice.amount_paid.toFixed(2)}</dd>
+                </div>
+                <div className="mt-1 flex justify-between gap-4 text-base font-semibold text-slate-900 dark:text-white">
+                  <dt>Balance due</dt>
+                  <dd>{symbol}{invoice.balance_due.toFixed(2)}</dd>
+                </div>
+              </div>
             </div>
           </div>
         </Accordion>
