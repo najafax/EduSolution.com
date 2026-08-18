@@ -64,7 +64,7 @@ export default function Licenses() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
-  const [busyId, setBusyId] = useState(null);
+  const [busy, setBusy] = useState(null); // { id, action } — tracks which row/action is in flight so buttons show the right busy label
   const [remindTarget, setRemindTarget] = useState(null);
   const [historyTarget, setHistoryTarget] = useState(null);
   const [renewals, setRenewals] = useState(null);
@@ -174,7 +174,7 @@ export default function Licenses() {
 
   async function handleRenew(id) {
     setError('');
-    setBusyId(id);
+    setBusy({ id, action: 'renew' });
     try {
       await api.licenses.renew(id, token);
       load();
@@ -182,8 +182,69 @@ export default function Licenses() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setBusyId(null);
+      setBusy(null);
     }
+  }
+
+  // Cancel/Reactivate go through the same generic PUT /:id the Edit form
+  // uses (there's no dedicated cancel route, unlike invoices' POST /:id/void)
+  // — `l` already carries every field PUT requires straight from the list
+  // response, so no extra GET /:id round-trip is needed first. Previously
+  // the only way to cancel a license was to open Edit and change the Status
+  // dropdown buried at the end of the form; these are the same one-click,
+  // confirm-then-act actions every other license/invoice lifecycle change
+  // in the app already gets (Renew, Void, Delete).
+  async function updateLicenseStatus(l, status, action) {
+    setError('');
+    setBusy({ id: l.id, action });
+    try {
+      await api.licenses.update(
+        l.id,
+        {
+          client_id: l.client_id,
+          name: l.name,
+          billing_cycle: l.billing_cycle,
+          amount: l.amount,
+          start_date: l.start_date,
+          expiry_date: l.expiry_date,
+          url: l.url,
+          notes: l.notes,
+          status,
+        },
+        token,
+      );
+      load();
+      loadSummary();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleCancel(l) {
+    if (
+      !(await confirm({
+        title: 'Cancel this license?',
+        message: `${l.name} (${l.client_name}) will no longer show as active and won't get expiry reminders. You can reactivate it later.`,
+        confirmLabel: 'Cancel license',
+      }))
+    )
+      return;
+    updateLicenseStatus(l, 'cancelled', 'cancel');
+  }
+
+  async function handleReactivate(l) {
+    if (
+      !(await confirm({
+        title: 'Reactivate this license?',
+        message: `${l.name} (${l.client_name}) will show as active again.`,
+        confirmLabel: 'Reactivate',
+        danger: false,
+      }))
+    )
+      return;
+    updateLicenseStatus(l, 'active', 'reactivate');
   }
 
   async function handleExport() {
@@ -208,15 +269,35 @@ export default function Licenses() {
   const symbol = settings?.currency_symbol || '$';
 
   function rowActions(l) {
+    const rowBusy = busy?.id === l.id;
+    const isBusy = (action) => rowBusy && busy.action === action;
     return (
       <>
         {l.status === 'active' && (
           <button
             onClick={() => handleRenew(l.id)}
-            disabled={busyId === l.id}
+            disabled={rowBusy}
             className="font-medium text-lagoon-600 hover:text-lagoon-500 disabled:opacity-50"
           >
-            {busyId === l.id ? 'Renewing…' : 'Renew'}
+            {isBusy('renew') ? 'Renewing…' : 'Renew'}
+          </button>
+        )}
+        {l.status === 'active' && (
+          <button
+            onClick={() => handleCancel(l)}
+            disabled={rowBusy}
+            className="text-orange-600 hover:text-orange-500 disabled:opacity-50 dark:text-orange-400"
+          >
+            {isBusy('cancel') ? 'Cancelling…' : 'Cancel'}
+          </button>
+        )}
+        {l.status === 'cancelled' && (
+          <button
+            onClick={() => handleReactivate(l)}
+            disabled={rowBusy}
+            className="text-emerald-600 hover:text-emerald-500 disabled:opacity-50 dark:text-emerald-400"
+          >
+            {isBusy('reactivate') ? 'Reactivating…' : 'Reactivate'}
           </button>
         )}
         {l.status !== 'cancelled' && (

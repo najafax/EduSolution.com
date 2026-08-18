@@ -133,6 +133,27 @@ async function runLicenseExpiryAlerts() {
   return { sent, skipped: false };
 }
 
+// `quotes.status` includes 'expired' as a valid, filterable value (see
+// routes/quotes.js's PUT /:id validStatuses and Quotes.jsx's own
+// STATUS_OPTIONS), but nothing else in the app ever sets it — there's no
+// status field anywhere in QuoteForm.jsx/QuoteDetail.jsx, and the only
+// other status transitions (sent → accepted/declined) happen via the
+// client's public-link response or POST /:id/convert-to-invoice. Without
+// this job, a quote that's past its expiry_date and was never responded to
+// just stays 'sent' forever, and the "Expired" filter/StatusBadge/
+// QuoteAnalytics breakdown can only ever show quotes brought in via CSV
+// import with that status pre-set. Only 'sent' quotes are eligible — a
+// 'draft' quote was never actually offered to a client, so there's nothing
+// for it to have expired *on*, and 'accepted'/'declined'/already-'expired'
+// quotes already have a real, final answer.
+function expireOverdueQuotes() {
+  const result = db
+    .prepare(`UPDATE quotes SET status = 'expired', updated_at = datetime('now') WHERE status = 'sent' AND expiry_date IS NOT NULL AND expiry_date < ?`)
+    .run(today());
+  console.log(`[quotes] Auto-expired ${result.changes} quote(s) past their expiry date`);
+  return { expired: result.changes };
+}
+
 function advanceDate(dateStr, frequency) {
   const d = new Date(`${dateStr}T00:00:00`);
   if (frequency === 'weekly') {
@@ -223,6 +244,16 @@ function startScheduler() {
   cron.schedule('0 7 * * *', () => {
     generateDueRecurringInvoices().catch((err) => console.error('[recurring] job failed:', err));
   });
+  // Daily at 07:30, between the recurring-invoice job above and the
+  // reminder jobs below — no SMTP dependency (this doesn't email anyone,
+  // just a status flip), so it always runs regardless of mail config.
+  cron.schedule('30 7 * * *', () => {
+    try {
+      expireOverdueQuotes();
+    } catch (err) {
+      console.error('[quotes] expire job failed:', err);
+    }
+  });
   // Daily at 08:00 server time.
   cron.schedule('0 8 * * *', () => {
     runOverdueReminders().catch((err) => console.error('[reminders] job failed:', err));
@@ -238,4 +269,11 @@ function startScheduler() {
   });
 }
 
-module.exports = { startScheduler, runOverdueReminders, generateDueRecurringInvoices, runLicenseExpiryAlerts, runBackup };
+module.exports = {
+  startScheduler,
+  runOverdueReminders,
+  generateDueRecurringInvoices,
+  runLicenseExpiryAlerts,
+  expireOverdueQuotes,
+  runBackup,
+};
