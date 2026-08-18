@@ -103,11 +103,11 @@ router.get('/profit-loss/pdf', async (req, res) => {
 });
 
 // Opening/closing balance for the period — same starting_balance +
-// payments-minus-expenses math as routes/financials.js's bankBalance, just
-// split at the period boundary instead of "as of right now": opening
-// balance is everything recorded strictly before `from`, closing balance
-// adds everything through `to` (inclusive, same BETWEEN convention every
-// other report here uses).
+// payments/contributions-minus-expenses math as routes/financials.js's
+// bankBalance, just split at the period boundary instead of "as of right
+// now": opening balance is everything recorded strictly before `from`,
+// closing balance adds everything through `to` (inclusive, same BETWEEN
+// convention every other report here uses).
 router.get('/bank-balance/pdf', async (req, res) => {
   const range = parseDateRange(req, res);
   if (!range) return;
@@ -115,15 +115,22 @@ router.get('/bank-balance/pdf', async (req, res) => {
   const startingBalance = getSettings().starting_balance || 0;
   const paidBefore = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at < ?').get(range.from).total;
   const expensesBefore = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date < ?').get(range.from).total;
-  const openingBalance = Math.round((startingBalance + paidBefore - expensesBefore) * 100) / 100;
+  const contributionsBefore = db
+    .prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM capital_contributions WHERE contribution_date < ?')
+    .get(range.from).total;
+  const openingBalance = Math.round((startingBalance + paidBefore + contributionsBefore - expensesBefore) * 100) / 100;
 
   const totalPayments = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at BETWEEN ? AND ?').get(range.from, range.to).total;
   const totalExpenses = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date BETWEEN ? AND ?').get(range.from, range.to).total;
-  const closingBalance = Math.round((openingBalance + totalPayments - totalExpenses) * 100) / 100;
+  const totalContributions = db
+    .prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM capital_contributions WHERE contribution_date BETWEEN ? AND ?')
+    .get(range.from, range.to).total;
+  const closingBalance = Math.round((openingBalance + totalPayments + totalContributions - totalExpenses) * 100) / 100;
 
   const buffer = await renderBankBalancePdf({
     openingBalance,
     totalPayments,
+    totalContributions,
     totalExpenses,
     closingBalance,
     from: range.from,

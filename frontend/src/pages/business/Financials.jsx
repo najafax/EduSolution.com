@@ -7,7 +7,7 @@ import KpiCard from '../../components/KpiCard';
 import MeterBar from '../../components/MeterBar';
 import RevenueTrendChart from '../../components/RevenueTrendChart';
 import StatusBreakdownChart from '../../components/StatusBreakdownChart';
-import { InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, ExpenseIcon, TrendUpIcon, TrendDownIcon, BankIcon } from '../../components/icons';
+import { InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, ExpenseIcon, TrendUpIcon, TrendDownIcon, BankIcon, UsersIcon } from '../../components/icons';
 import { money } from '../../lib/money';
 import MobileListAccordion from '../../components/MobileListAccordion';
 
@@ -89,10 +89,18 @@ export default function Financials() {
       tone: isProfitable ? 'positive' : 'negative',
     },
     {
+      key: 'capitalContributions',
+      label: 'Capital contributions',
+      value: money(symbol, summary.totalCapitalContributions),
+      sub: 'Owner/partner money put in',
+      icon: <UsersIcon />,
+      tone: 'neutral',
+    },
+    {
       key: 'bankBalance',
       label: 'Bank balance',
       value: money(symbol, summary.bankBalance),
-      sub: 'Starting balance + net profit',
+      sub: 'Starting balance + net profit + contributions',
       icon: <BankIcon />,
       tone: isPositiveBalance ? 'positive' : 'negative',
     },

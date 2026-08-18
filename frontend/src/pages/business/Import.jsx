@@ -78,6 +78,7 @@ const RESET_CATEGORIES = [
   { key: 'recurring', label: 'Recurring invoice templates' },
   { key: 'licenses', label: 'Licenses' },
   { key: 'expenses', label: 'Expenses' },
+  { key: 'capital_contributions', label: 'Capital contributions' },
   { key: 'products', label: 'Product catalog' },
   { key: 'activity', label: 'Activity log' },
 ];

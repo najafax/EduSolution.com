@@ -165,6 +165,25 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- Money an owner/partner puts INTO the business from personal funds — the
+  -- mirror image of an expenses row tagged 'shareholder payments' (money
+  -- taken OUT), but deliberately its own table rather than a negative
+  -- expense: an expense with a negative amount would corrupt every existing
+  -- expense total/report that assumes amount > 0, and "contribution" is a
+  -- distinct real-world event (a capital injection, not a business cost)
+  -- that deserves its own record shape rather than a sign trick. See
+  -- routes/capitalContributions.js.
+  CREATE TABLE IF NOT EXISTS capital_contributions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contributor_name TEXT NOT NULL,
+    amount REAL NOT NULL,
+    contribution_date TEXT NOT NULL,
+    notes TEXT NOT NULL DEFAULT '',
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS recurring_invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL REFERENCES clients(id),

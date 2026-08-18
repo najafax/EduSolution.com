@@ -36,7 +36,7 @@ const REPORT_TYPES = [
   {
     key: 'bank-balance',
     label: 'Bank balance statement',
-    description: 'Opening and closing balance for the period, from your starting balance plus payments received minus expenses recorded.',
+    description: 'Opening and closing balance for the period, from your starting balance plus payments received and capital contributions minus expenses recorded.',
     run: api.reports.bankBalancePdf,
   },
 ];

@@ -15,6 +15,7 @@ import Dashboard from './pages/Dashboard';
 import Clients from './pages/business/Clients';
 import Products from './pages/business/Products';
 import Expenses from './pages/business/Expenses';
+import CapitalContributions from './pages/business/CapitalContributions';
 import Settings from './pages/business/Settings';
 import Quotes from './pages/business/Quotes';
 import QuoteForm from './pages/business/QuoteForm';
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="/clients" element={<Protected><Clients /></Protected>} />
           <Route path="/products" element={<Protected><Products /></Protected>} />
           <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
+          <Route path="/capital-contributions" element={<Protected><CapitalContributions /></Protected>} />
           <Route path="/settings" element={<Protected><Settings /></Protected>} />
           <Route path="/import" element={<Protected><Import /></Protected>} />
 
