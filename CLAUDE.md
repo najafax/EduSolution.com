@@ -701,12 +701,16 @@ are deliberately untouched by either, always returning every row.
   `bankBalance` as a `KpiCard`
   (icon: `BankIcon`) alongside the other summary figures, tone flipping to
   `negative` the same way `netProfit`'s own card does when the number goes
-  below zero (a startup deficit or heavy early spending). Rendered
-  full-width (`col-span-2 sm:col-span-3 lg:col-span-6` on Dashboard,
-  `col-span-2 lg:col-span-3` on Financials — matching each page's own grid
-  breakpoints) via `KpiCard`'s optional `className` prop, rather than
-  sharing a cell with the other KPIs, since it's the one figure meant to
-  read as a standalone headline rather than one stat among several.
+  below zero (a startup deficit or heavy early spending). On `Dashboard.jsx`
+  it's still rendered full-width (`col-span-2 sm:col-span-3 lg:col-span-6`,
+  via `KpiCard`'s optional `className` prop) as a standalone headline below
+  the other shortcut-tile-adjacent KPIs. `Financials.jsx` instead renders
+  all 8 of its KPI cards — including `bankBalance` — in one uniform
+  `grid-cols-2` grid, same size, no card singled out for extra width; this
+  page is the deeper financial-detail view (vs. Dashboard's quick-glance
+  summary), so once `capitalContributions` brought the count to 8, an even
+  grid reads more like a real balance-sheet-style overview than one card
+  visually shouting over the rest.
 - `routes/reports.js` (mounted at `/api/reports`) — five downloadable PDF
   reports, each `GET /<type>/pdf?from=&to=` (`YYYY-MM-DD`, both required;
   400s if either is missing/malformed or `from` is after `to`). Gated on
@@ -1919,10 +1923,12 @@ keeps its existing layout.
   restyled. `components/Accordion.jsx` picked up the same `rounded-2xl`
   for visual consistency with `KpiCard`/`MobileListAccordion`'s cards.
   `KpiCard` also takes an optional `className` (default `''`), appended to
-  the card's own classes — the one caller today is the Dashboard/Financials
-  "Bank balance" card's full-width grid span (see `routes/financials.js`
-  above), but any future card that needs to break out of the shared grid's
-  per-cell sizing can use the same prop rather than a one-off wrapper.
+  the card's own classes — the one caller today is Dashboard's own "Bank
+  balance" card's full-width grid span (see `routes/financials.js` above;
+  `Financials.jsx` itself no longer singles any card out this way, see the
+  same note), but any future card that needs to break out of the shared
+  grid's per-cell sizing can use the same prop rather than a one-off
+  wrapper.
 - `pages/Dashboard.jsx` opens with a time-of-day greeting (`greeting()` —
   "Good morning"/afternoon/evening by `new Date().getHours()`) above the
   user's first name in `font-display`, with the business name (falling back

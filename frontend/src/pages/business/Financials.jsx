@@ -113,17 +113,9 @@ export default function Financials() {
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-2 gap-4">
         {cards.map((card) => (
-          <KpiCard
-            key={card.key}
-            label={card.label}
-            value={card.value}
-            sub={card.sub}
-            icon={card.icon}
-            tone={card.tone}
-            className={card.key === 'bankBalance' ? 'col-span-2 lg:col-span-3' : ''}
-          />
+          <KpiCard key={card.key} label={card.label} value={card.value} sub={card.sub} icon={card.icon} tone={card.tone} />
         ))}
       </div>
 
