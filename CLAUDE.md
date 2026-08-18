@@ -1097,6 +1097,34 @@ deliberately untouched by either, always returning every row.
   merged-into-history rows), not distinct license count. Logs one summary
   `activity_log` entry per import ("bulk imported 42 clients from CSV"),
   not one per row.
+  **A CSV row matching an already-existing license updates it in place
+  instead of inserting a duplicate** — `existingLicenseMap()` looks up
+  every current license by the same `clientId::name.toLowerCase()` key the
+  batch-grouping above already uses, built once per import call. This is
+  what makes an export → edit → re-import round trip (correcting an
+  amount, adding a URL, fixing a billing cycle via the Licenses page's own
+  "Export CSV"/"Export Excel" buttons, then re-importing the edited file)
+  actually safe: before this, every re-import — even of an unmodified
+  export — silently created a second license for the same client+name,
+  since the importer had no notion of "this already exists." The update
+  path (`UPDATE licenses SET status = ?, billing_cycle = ?, amount = ?,
+  expiry_date = ?, url = ?, notes = ?, ...`) deliberately never touches
+  `start_date` or `client_id` — an update is a correction to an existing
+  license, not a new one, so `start_date` keeps reflecting whenever the
+  license actually began, the same invariant the insert path and
+  `POST /:id/renew` already honor. `last_renewed_at` only changes when
+  this import batch actually added renewal history for that license
+  (`COALESCE(?, last_renewed_at)` keeps whatever was already stored
+  otherwise) — a plain field-correction re-import doesn't fake a renewal
+  that never happened. If the matched group itself has multiple rows (the
+  renewal-history-merge case above) *and* matches an existing license, the
+  earlier rows still become `license_renewals` entries exactly as before,
+  now chained onto the existing license's id instead of a freshly inserted
+  one. Results say `"updated existing license"` (`"ready to update
+  existing license"` in preview) instead of `"imported"` so the preview
+  step makes the distinction obvious before anything commits. If more than
+  one existing license somehow already shares a client+name (e.g. from
+  duplicates created before this matching existed), the highest id wins.
 - `lib/backup.js` — `runBackup()`: skips entirely if `BACKUP_S3_BUCKET`
   isn't set. Otherwise runs `VACUUM INTO` to write a consistent snapshot of
   the live database (safe against catching a WAL-mode write mid-flight,

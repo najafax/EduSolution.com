@@ -626,8 +626,25 @@ function validateLicenseRow(row, clientsByEmail, clientsByName, dateFormat) {
   };
 }
 
+// Keyed the same way processLicenses groups its own batch rows below
+// (client id + license name, trimmed/lowercased) so a CSV row matching an
+// *already-existing* license updates it instead of inserting a duplicate —
+// the whole point of an export → edit → re-import round trip. If more than
+// one existing license somehow shares the same client+name (e.g. from
+// duplicates created before this matching existed), the highest id wins,
+// since `Map.set` on the same key overwrites and rows come back id-ascending.
+function existingLicenseMap() {
+  const rows = db.prepare('SELECT id, client_id, name FROM licenses ORDER BY id ASC').all();
+  const map = new Map();
+  for (const row of rows) {
+    map.set(`${row.client_id}::${row.name.toLowerCase()}`, row.id);
+  }
+  return map;
+}
+
 function processLicenses(rows, commit) {
   const { clientsByEmail, clientsByName } = clientMaps();
+  const existingLicenses = existingLicenseMap();
   const dateFormat = detectDateFormat(rows.flatMap((r) => [r.start_date, r.expiry_date]));
   const results = new Array(rows.length);
   let imported = 0;
@@ -655,10 +672,21 @@ function processLicenses(rows, commit) {
   // reflecting the most recent state — while every earlier row becomes a
   // license_renewals entry (see routes/licenses.js's POST /:id/renew,
   // which writes this same table on every manual renewal) recording that
-  // period's previous→new expiry. The created license's own start_date is
-  // the *earliest* row's start_date (when the license actually began), not
-  // the current row's — matching how POST /:id/renew itself never touches
-  // start_date, only expiry_date.
+  // period's previous→new expiry. A freshly *inserted* license's own
+  // start_date is the *earliest* row's start_date (when the license
+  // actually began), not the current row's — matching how POST /:id/renew
+  // itself never touches start_date, only expiry_date.
+  //
+  // If a license with this exact client+name already exists (see
+  // existingLicenseMap() above), the current row *updates* that license in
+  // place instead of inserting a duplicate — this is what makes an export →
+  // edit → re-import round trip (correcting an amount, adding a URL, fixing
+  // a billing cycle on existing licenses) actually safe to do from the
+  // Licenses page's own "Export CSV"/"Export Excel" buttons, rather than
+  // silently doubling every license on re-import. The update deliberately
+  // never touches start_date — an update is a correction, not a new
+  // license, so start_date keeps reflecting whenever the license actually
+  // began, same reasoning as the insert path just above.
   const groups = new Map();
   for (const entry of valid) {
     const key = `${entry.values.clientId}::${entry.values.name.toLowerCase()}`;
@@ -674,6 +702,19 @@ function processLicenses(rows, commit) {
     `INSERT INTO licenses (client_id, name, status, billing_cycle, amount, start_date, expiry_date, url, notes, last_renewed_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
+  // Deliberately never touches start_date or client_id — an update is a
+  // correction to an already-existing license, and start_date represents
+  // when it actually began (the same "renew never touches start_date"
+  // invariant routes/licenses.js's POST /:id/renew and this file's own
+  // INSERT path above both already honor). last_renewed_at only changes
+  // when this batch actually added renewal history for the license
+  // (COALESCE keeps whatever was already stored otherwise), so a plain
+  // field-correction re-import doesn't fake a renewal that never happened.
+  const updateLicense = db.prepare(
+    `UPDATE licenses SET status = ?, billing_cycle = ?, amount = ?, expiry_date = ?, url = ?, notes = ?,
+       last_renewed_at = COALESCE(?, last_renewed_at), updated_at = datetime('now')
+     WHERE id = ?`,
+  );
   const insertRenewal = db.prepare(
     'INSERT INTO license_renewals (license_id, previous_expiry_date, new_expiry_date, renewed_at) VALUES (?, ?, ?, ?)',
   );
@@ -682,25 +723,41 @@ function processLicenses(rows, commit) {
     group.sort((a, b) => (a.values.startDate < b.values.startDate ? -1 : a.values.startDate > b.values.startDate ? 1 : 0));
     const current = group[group.length - 1];
     const history = group.slice(0, -1);
+    const existingId = existingLicenses.get(`${current.values.clientId}::${current.values.name.toLowerCase()}`);
 
     if (commit) {
       // Best-effort renewal timestamp: the exact time isn't in the CSV, so
       // approximate it with the new period's start_date, the same way this
       // whole row's dates are date-only already.
       const lastRenewedAt = history.length > 0 ? `${current.values.startDate} 00:00:00` : null;
-      const result = insertLicense.run(
-        current.values.clientId,
-        current.values.name,
-        current.values.status,
-        current.values.billingCycle,
-        current.values.amount,
-        group[0].values.startDate,
-        current.values.expiryDate,
-        current.values.url,
-        current.values.notes,
-        lastRenewedAt,
-      );
-      const licenseId = result.lastInsertRowid;
+      let licenseId;
+      if (existingId) {
+        updateLicense.run(
+          current.values.status,
+          current.values.billingCycle,
+          current.values.amount,
+          current.values.expiryDate,
+          current.values.url,
+          current.values.notes,
+          lastRenewedAt,
+          existingId,
+        );
+        licenseId = existingId;
+      } else {
+        const result = insertLicense.run(
+          current.values.clientId,
+          current.values.name,
+          current.values.status,
+          current.values.billingCycle,
+          current.values.amount,
+          group[0].values.startDate,
+          current.values.expiryDate,
+          current.values.url,
+          current.values.notes,
+          lastRenewedAt,
+        );
+        licenseId = result.lastInsertRowid;
+      }
       for (let i = 1; i < group.length; i++) {
         insertRenewal.run(licenseId, group[i - 1].values.expiryDate, group[i].values.expiryDate, `${group[i].values.startDate} 00:00:00`);
       }
@@ -708,7 +765,13 @@ function processLicenses(rows, commit) {
       results[current.index] = {
         row: current.rowNumber,
         status: 'ok',
-        message: history.length > 0 ? `imported — current record (${history.length} earlier row(s) merged as renewal history)` : 'imported',
+        message: existingId
+          ? history.length > 0
+            ? `updated existing license (${history.length} earlier row(s) merged as renewal history)`
+            : 'updated existing license'
+          : history.length > 0
+            ? `imported — current record (${history.length} earlier row(s) merged as renewal history)`
+            : 'imported',
         preview: current.values.name,
         id: licenseId,
       };
@@ -725,7 +788,13 @@ function processLicenses(rows, commit) {
       results[current.index] = {
         row: current.rowNumber,
         status: 'ok',
-        message: history.length > 0 ? `ready to import — current record (${history.length} earlier row(s) will merge as renewal history)` : 'ready to import',
+        message: existingId
+          ? history.length > 0
+            ? `ready to update existing license (${history.length} earlier row(s) will merge as renewal history)`
+            : 'ready to update existing license'
+          : history.length > 0
+            ? `ready to import — current record (${history.length} earlier row(s) will merge as renewal history)`
+            : 'ready to import',
         preview: current.values.name,
       };
       for (const h of history) {
