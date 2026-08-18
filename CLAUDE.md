@@ -442,6 +442,60 @@ are deliberately untouched by either, always returning every row.
   an em dash when blank) and, unlike `notes`, as its own mobile-accordion
   detail row — but only when non-blank, so most expenses (which have no
   payee) don't show an empty row.
+- `routes/capitalContributions.js` — CRUD for `capital_contributions`
+  (`contributor_name`/`amount`/`contribution_date`/`notes`), mounted at
+  `/api/capital-contributions`. This is the deliberate mirror of an
+  `expenses` row tagged `shareholder payments`: that category is money a
+  shareholder/partner *takes out* of the business; this table is money one
+  *puts in* (repaying a prior draw, or a fresh injection of personal
+  funds). It's a separate table rather than a negative-amount expense —
+  `expenses.amount` is validated `> 0` everywhere (route validation, every
+  report's SUM, the Expenses page's total row), and letting one category
+  go negative would mean auditing every one of those call sites for a sign
+  assumption, versus a same-shaped sibling table with its own always-
+  positive `amount`. Follows `routes/expenses.js`'s exact conventions:
+  `GET /` supports `?q=`/`?contributor=` (the `contributor_name` analog of
+  `payee`/`payeeFilter`, via the same `distinctContributors()`-backed
+  dropdown pattern) composed with `?page=` (see "Pagination convention"
+  above), always returns `totalAmount` (independent of pagination, same
+  reasoning as `expenses`'s own `totalAmount`), and has a matching
+  `GET /export.csv`. Gated by the existing `expenses` permission rather
+  than a new `MODULES` entry — same "reuse when the sensitivity level
+  already matches" call `routes/reports.js` makes reusing `financials`
+  (see below): this is the same kind of non-invoice cash-movement data
+  `expenses` already covers, and its outbound mirror (`shareholder
+  payments`) already lives there. `pages/business/CapitalContributions.jsx`
+  (route `/capital-contributions`, nav link "Capital" right after
+  "Expenses" in `Navbar.jsx`'s `BUSINESS_LINKS`, also gated on `expenses`)
+  is the same list+modal-form+FAB shape as `Expenses.jsx`, including the
+  confirm-then-undo-toast delete pattern (`lib/useConfirm.js` +
+  `lib/useUndoableDelete.js` together, see `components/ConfirmDialog.jsx`
+  above) and the standard desktop-table + `MobileListAccordion` mobile
+  split. Also included in `routes/dataReset.js`'s Danger Zone as its own
+  standalone category (`capital_contributions` — no cascading needed, no
+  other table references it) and `Import.jsx`'s matching checkbox list;
+  there's no CSV *import* type for it yet (only export), since the
+  original ask was recording new contributions going forward, not
+  backfilling historical ones — add one the same way `expenses` has one if
+  that's ever needed. **Financial impact**: `routes/financials.js`'s
+  `GET /summary` sums this table as `totalCapitalContributions` and adds it
+  into `bankBalance`, but deliberately *not* into `netProfit` — a capital
+  contribution is an owner/partner injecting personal money, not the
+  business earning it, so folding it into net profit would overstate how
+  profitable the business actually was. It still belongs in the bank
+  balance, since that cash really did land in the account; see
+  `routes/financials.js`'s own comment for the reasoning. `Financials.jsx`
+  renders it as its own `KpiCard` (icon: `UsersIcon`, tone `neutral`,
+  positioned right before the "Bank balance" card) so it reads as a
+  distinct line rather than being silently absorbed into another figure —
+  `bankBalance`'s own `sub` text was updated to "Starting balance + net
+  profit + contributions" to match. `routes/reports.js`'s
+  `GET /bank-balance/pdf` (and `lib/reportPdf.js`'s `renderBankBalancePdf`)
+  got the same treatment: opening/closing balance both add contributions
+  recorded in/before the range, and the PDF's summary box only renders a
+  "Capital contributions" row when the period's total is non-zero, so a
+  business that's never used this feature doesn't see a pointless `$0.00`
+  line on every statement.
 - `routes/recurring.js` — CRUD for `recurring_invoices` (+ their
   `recurring_invoice_items` template line items) mounted at
   `/api/recurring-invoices`. Frequency is `weekly|monthly|yearly`. `GET /`
@@ -630,14 +684,21 @@ are deliberately untouched by either, always returning every row.
   `clients`/`expenses` on every request, nothing is cached or denormalized
   beyond `invoices.amount_paid`. **Bank balance**: `bankBalance` is
   `business_settings.starting_balance` (admin-editable on the Settings page,
-  see `routes/settings.js` above) plus `netProfit` — the one number this
-  app can vouch for without a real bank feed: whatever balance you had the
-  day you set `starting_balance`, plus every payment collected and minus
-  every expense recorded since. It's a running proxy, not a live balance —
-  anything moving money outside the `payments`/`expenses` tables (a loan, a
-  tax remittance, an owner draw never logged as an expense) isn't
-  reflected, so it can drift from the real account over time if those go
-  unrecorded. `Dashboard.jsx`/`Financials.jsx` both render it as a `KpiCard`
+  see `routes/settings.js` above) plus `netProfit` plus
+  `totalCapitalContributions` (`SUM(capital_contributions.amount)`, see
+  `routes/capitalContributions.js` above) — the one number this app can
+  vouch for without a real bank feed: whatever balance you had the day you
+  set `starting_balance`, plus every payment and capital contribution
+  collected and minus every expense recorded since. `totalCapitalContributions`
+  is deliberately excluded from `netProfit` itself (an owner/partner
+  injecting personal money isn't the business earning it) but still counted
+  in `bankBalance` (that cash really did land in the account) — see
+  `routes/capitalContributions.js`'s own "Financial impact" note for why.
+  It's a running proxy, not a live balance — anything moving money outside
+  the `payments`/`expenses`/`capital_contributions` tables (a loan, a tax
+  remittance) isn't reflected, so it can drift from the real account over
+  time if those go unrecorded. `Dashboard.jsx`/`Financials.jsx` both render
+  `bankBalance` as a `KpiCard`
   (icon: `BankIcon`) alongside the other summary figures, tone flipping to
   `negative` the same way `netProfit`'s own card does when the number goes
   below zero (a startup deficit or heavy early spending). Rendered
@@ -672,10 +733,10 @@ are deliberately untouched by either, always returning every row.
   depending on the sign. `GET /bank-balance/pdf` is the PDF counterpart to
   `routes/financials.js`'s `bankBalance` (see below), just split at the
   period boundary instead of computed "as of right now": opening balance
-  is `business_settings.starting_balance` plus every `payments`/`expenses`
-  row dated strictly *before* `from`, closing balance adds every row
-  *through* `to` (same inclusive `BETWEEN` convention the other reports
-  use) on top of that. None of these routes call `logActivity()` (same
+  is `business_settings.starting_balance` plus every
+  `payments`/`capital_contributions`/`expenses` row dated strictly *before*
+  `from`, closing balance adds every row *through* `to` (same inclusive
+  `BETWEEN` convention the other reports use) on top of that. None of these routes call `logActivity()` (same
   as the existing `:id/pdf` routes — a read-only download isn't a
   mutation) or accept `page`/`q` (each report is inherently a from/to
   filtered dump, not a paginated list).
@@ -1097,7 +1158,8 @@ Status/derived-field conventions worth knowing before touching this code:
   `requirePermission`/module system entirely) — `POST /` bulk-deletes
   whichever tables the caller picks via a `categories` array (one or more
   of `clients`, `quotes`, `invoices`, `recurring`, `licenses`, `expenses`,
-  `products`, `activity`), rather than an all-or-nothing clear. A
+  `capital_contributions`, `products`, `activity`), rather than an
+  all-or-nothing clear. A
   `CATEGORIES` map translates each picked key into the actual table(s) it
   touches (e.g. `invoices` → `invoice_items`, `payments`, `invoices`);
   `clients` is the one category that always pulls in more than its own

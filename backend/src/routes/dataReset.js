@@ -29,6 +29,7 @@ const CATEGORIES = {
   recurring: ['recurring_invoice_items', 'recurring_invoices'],
   licenses: ['license_renewals', 'licenses'],
   expenses: ['expenses'],
+  capital_contributions: ['capital_contributions'],
   products: ['products'],
   activity: ['activity_log'],
 };
@@ -47,6 +48,7 @@ const TABLE_ORDER = [
   'license_renewals',
   'licenses',
   'expenses',
+  'capital_contributions',
   'clients',
   'products',
   'activity_log',

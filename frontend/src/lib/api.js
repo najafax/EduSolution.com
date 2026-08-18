@@ -147,6 +147,14 @@ export const api = {
     exportCsv: (token) => downloadFile('/expenses/export.csv', token, 'expenses.csv'),
   },
 
+  capitalContributions: {
+    list: (token, { q, page, contributor } = {}) => request(`/capital-contributions${qs({ q, page, contributor })}`, { token }),
+    create: (payload, token) => request('/capital-contributions', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/capital-contributions/${id}`, { method: 'PUT', body: payload, token }),
+    remove: (id, token) => request(`/capital-contributions/${id}`, { method: 'DELETE', token }),
+    exportCsv: (token) => downloadFile('/capital-contributions/export.csv', token, 'capital-contributions.csv'),
+  },
+
   recurringInvoices: {
     list: (token, { q, page } = {}) => request(`/recurring-invoices${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/recurring-invoices/${id}`, { token }),

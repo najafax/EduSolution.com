@@ -46,17 +46,23 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
   const clientCount = db.prepare('SELECT COUNT(*) AS c FROM clients').get().c;
 
   const totalExpenses = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses').get().total;
+  // Deliberately excluded from netProfit: a capital contribution is an
+  // owner/partner putting personal money into the business, not the
+  // business earning it — folding it in would make "net profit" claim the
+  // business was more profitable than it actually was. It still belongs in
+  // bankBalance below, since that cash really did land in the account.
   const netProfit = Math.round((totalPaid - totalExpenses) * 100) / 100;
+  const totalCapitalContributions = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM capital_contributions').get().total;
 
   // Not a real-time bank feed — just the one number this app can actually
   // vouch for: whatever balance you had the day you set starting_balance
   // (business_settings, see routes/settings.js), plus every payment
-  // collected since, minus every expense recorded since. Anything moving
-  // money outside those two tables (a loan, a tax remittance, an owner
-  // draw not logged as an expense) won't be reflected, so this is a
-  // running proxy, not a bank statement.
+  // collected and capital contribution recorded since, minus every expense
+  // recorded since. Anything moving money outside those tables (a loan, a
+  // tax remittance) won't be reflected, so this is a running proxy, not a
+  // bank statement.
   const startingBalance = db.prepare('SELECT starting_balance FROM business_settings WHERE id = 1').get()?.starting_balance || 0;
-  const bankBalance = Math.round((startingBalance + netProfit) * 100) / 100;
+  const bankBalance = Math.round((startingBalance + netProfit + totalCapitalContributions) * 100) / 100;
 
   const months = recentMonths(6);
   const invoicedByMonth = Object.fromEntries(months.map((m) => [m, 0]));
@@ -97,6 +103,7 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
     clientCount,
     totalExpenses: Math.round(totalExpenses * 100) / 100,
     netProfit,
+    totalCapitalContributions: Math.round(totalCapitalContributions * 100) / 100,
     bankBalance,
     quoteCounts,
     invoiceCounts,
