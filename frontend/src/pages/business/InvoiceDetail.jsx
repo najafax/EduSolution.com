@@ -282,7 +282,7 @@ export default function InvoiceDetail() {
                 so mobile just gets a stacked card per item instead. */}
             <div className="divide-y divide-slate-100 text-sm sm:hidden dark:divide-slate-800">
               {items.map((item) => (
-                <div key={item.id} className="flex items-start justify-between gap-3 py-3">
+                <div key={item.id} className="flex items-start justify-between gap-3 px-6 py-3">
                   <div className="min-w-0">
                     <p className="text-slate-900 dark:text-white">{item.description}</p>
                     <p className="text-slate-500 dark:text-slate-400">{item.quantity} × {symbol}{item.unit_price.toFixed(2)}</p>
