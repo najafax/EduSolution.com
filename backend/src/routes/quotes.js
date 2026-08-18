@@ -95,6 +95,84 @@ router.get('/export.csv', view, (req, res) => {
   res.send(csv);
 });
 
+// Year-over-year view, mirrors routes/licenses.js's own GET /analytics
+// (registered before GET /:id for the same "don't let :id swallow a literal
+// path" reason that route documents). For every year from the earliest
+// quote's issue_date through the current year (gap years included at zero,
+// never skipped), reports `created`/`amountQuoted` (by issue_date, every
+// status included — a quote has no void-equivalent status to exclude) and
+// `accepted`/`declined` (by COALESCE(client_responded_at, updated_at) — a
+// client responding via the public link stamps client_responded_at, see
+// routes/public.js's respond route; a status flipped manually by staff via
+// PUT /:id instead has no dedicated response timestamp, so falls back to
+// updated_at as the best available proxy for when the decision happened)
+// and `converted` (by the activity_log 'converted to invoice' entry
+// POST /:id/convert-to-invoice below writes).
+const round2 = (n) => Math.round(n * 100) / 100;
+
+router.get('/analytics', view, (req, res) => {
+  const quotes = db
+    .prepare('SELECT id, client_id, status, issue_date, total, client_responded_at, updated_at FROM quotes')
+    .all();
+  const convertedEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'quote' AND action = 'converted to invoice'").all();
+
+  const yearOf = (dateStr) => dateStr.slice(0, 4);
+  const decidedAt = (q) => q.client_responded_at || q.updated_at;
+  const currentYear = new Date().getFullYear();
+  const years = new Set([currentYear]);
+  [...quotes.map((q) => q.issue_date), ...quotes.map(decidedAt), ...convertedEvents.map((e) => e.created_at)].forEach((d) =>
+    years.add(Number(yearOf(d))),
+  );
+  const minYear = Math.min(...years);
+
+  const byYear = [];
+  for (let year = currentYear; year >= minYear; year--) {
+    const y = String(year);
+    const createdThisYear = quotes.filter((q) => yearOf(q.issue_date) === y);
+    byYear.push({
+      year,
+      created: createdThisYear.length,
+      amountQuoted: round2(createdThisYear.reduce((sum, q) => sum + q.total, 0)),
+      accepted: quotes.filter((q) => q.status === 'accepted' && yearOf(decidedAt(q)) === y).length,
+      declined: quotes.filter((q) => q.status === 'declined' && yearOf(decidedAt(q)) === y).length,
+      converted: convertedEvents.filter((e) => yearOf(e.created_at) === y).length,
+    });
+  }
+
+  const byStatus = db
+    .prepare('SELECT status, COUNT(*) AS c FROM quotes GROUP BY status')
+    .all()
+    .reduce((acc, row) => ({ ...acc, [row.status]: row.c }), { draft: 0, sent: 0, accepted: 0, declined: 0, expired: 0 });
+
+  const topClients = db
+    .prepare(
+      `SELECT clients.id, clients.name, COUNT(*) AS quote_count, COALESCE(SUM(quotes.total), 0) AS total_amount
+       FROM quotes JOIN clients ON clients.id = quotes.client_id
+       GROUP BY clients.id
+       ORDER BY total_amount DESC, quote_count DESC
+       LIMIT 5`,
+    )
+    .all();
+
+  const totalAccepted = byStatus.accepted;
+  const totalDeclined = byStatus.declined;
+  const decidedCount = totalAccepted + totalDeclined;
+
+  res.json({
+    byYear,
+    byStatus,
+    topClients,
+    totals: {
+      totalQuotes: quotes.length,
+      totalQuoted: round2(quotes.reduce((sum, q) => sum + q.total, 0)),
+      totalAccepted,
+      totalDeclined,
+      totalConverted: convertedEvents.length,
+      winRate: decidedCount > 0 ? round2((totalAccepted / decidedCount) * 100) : null,
+    },
+  });
+});
+
 router.post('/', manage, (req, res) => {
   const {
     client_id,

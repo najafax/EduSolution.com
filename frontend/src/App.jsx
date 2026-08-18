@@ -20,9 +20,11 @@ import Settings from './pages/business/Settings';
 import Quotes from './pages/business/Quotes';
 import QuoteForm from './pages/business/QuoteForm';
 import QuoteDetail from './pages/business/QuoteDetail';
+import QuoteAnalytics from './pages/business/QuoteAnalytics';
 import Invoices from './pages/business/Invoices';
 import InvoiceForm from './pages/business/InvoiceForm';
 import InvoiceDetail from './pages/business/InvoiceDetail';
+import InvoiceAnalytics from './pages/business/InvoiceAnalytics';
 import RecurringInvoices from './pages/business/RecurringInvoices';
 import Licenses from './pages/business/Licenses';
 import LicenseAnalytics from './pages/business/LicenseAnalytics';
@@ -66,11 +68,13 @@ export default function App() {
           <Route path="/import" element={<Protected><Import /></Protected>} />
 
           <Route path="/quotes" element={<Protected><Quotes /></Protected>} />
+          <Route path="/quotes/analytics" element={<Protected><QuoteAnalytics /></Protected>} />
           <Route path="/quotes/new" element={<Protected><QuoteForm /></Protected>} />
           <Route path="/quotes/:id" element={<Protected><QuoteDetail /></Protected>} />
           <Route path="/quotes/:id/edit" element={<Protected><QuoteForm /></Protected>} />
 
           <Route path="/invoices" element={<Protected><Invoices /></Protected>} />
+          <Route path="/invoices/analytics" element={<Protected><InvoiceAnalytics /></Protected>} />
           <Route path="/invoices/new" element={<Protected><InvoiceForm /></Protected>} />
           <Route path="/invoices/:id" element={<Protected><InvoiceDetail /></Protected>} />
           <Route path="/invoices/:id/edit" element={<Protected><InvoiceForm /></Protected>} />
