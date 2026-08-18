@@ -94,8 +94,13 @@ export default function InvoiceDetail() {
       const result = await api.invoices.recordPayment(id, { ...payment, amount: Number(payment.amount) }, token);
       setShowPayment(false);
       setPayment({ amount: '', method: 'bank_transfer', reference: '', notes: '', paid_at: todayStr() });
-      const renewedNames = (result.autoRenewedLicenses || []).map((l) => l.name);
-      setNotice(renewedNames.length > 0 ? `Payment recorded. Also renewed: ${renewedNames.join(', ')}.` : 'Payment recorded.');
+      const autoRenewed = result.autoRenewedLicenses || [];
+      const renewedNames = autoRenewed.filter((l) => !l.reactivated).map((l) => l.name);
+      const reactivatedNames = autoRenewed.filter((l) => l.reactivated).map((l) => l.name);
+      const notices = ['Payment recorded.'];
+      if (renewedNames.length > 0) notices.push(`Also renewed: ${renewedNames.join(', ')}.`);
+      if (reactivatedNames.length > 0) notices.push(`Also reactivated and renewed: ${reactivatedNames.join(', ')}.`);
+      setNotice(notices.join(' '));
       load();
     } catch (err) {
       setError(err.message);

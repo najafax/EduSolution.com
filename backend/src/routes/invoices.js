@@ -564,24 +564,52 @@ router.post('/:id/payments', manage, (req, res) => {
   const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(result.lastInsertRowid);
   logActivity({ userName: req.user.name, action: 'recorded payment for', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: `${data.invoice.number} (${receiptNumber})` });
 
-  // Auto-renew any of this client's active licenses that this invoice was
-  // actually billing for — matched by a line item description naming the
-  // license exactly (trimmed, case-insensitive), not just "client has an
-  // invoice," so an unrelated invoice for the same client never touches a
-  // license it didn't bill. Only fires the moment the invoice is fully
-  // paid (newStatus === 'paid'), not on a partial payment — mirrors the
-  // "once they've paid, renew it" framing the manual Renew button already
-  // uses. Reuses the exact same renewLicense() the manual Renew button and
-  // routes/licenses.js's POST /:id/renew call, so an auto-renewal writes
-  // the same license_renewals row and resets last_reminder_sent_at
-  // identically to a human clicking "Renew".
+  // Auto-renew any of this client's active *or cancelled* licenses that
+  // this invoice was actually billing for — matched by a line item
+  // description naming the license exactly (trimmed, case-insensitive),
+  // not just "client has an invoice," so an unrelated invoice for the same
+  // client never touches a license it didn't bill. Only fires the moment
+  // the invoice is fully paid (newStatus === 'paid'), not on a partial
+  // payment — mirrors the "once they've paid, renew it" framing the manual
+  // Renew button already uses. Reuses the exact same renewLicense() the
+  // manual Renew button and routes/licenses.js's POST /:id/renew call, so
+  // an auto-renewal writes the same license_renewals row and resets
+  // last_reminder_sent_at identically to a human clicking "Renew".
+  //
+  // A *cancelled* license is included in the candidate set (unlike the
+  // manual Renew button, which stays blocked on a cancelled license and
+  // requires an explicit Reactivate click first — see routes/licenses.js's
+  // POST /:id/renew) because a real payment against it is a stronger,
+  // unambiguous signal than a manual renew click ever is: the client is
+  // actively paying to keep using it right now, so reactivating on their
+  // behalf is the correct outcome, not friction to route around. It's
+  // reactivated (status set back to 'active') immediately before renewing,
+  // with its own `logActivity()` entry using the exact `action: 'reactivated'`
+  // string PUT /:id's own structured-change-tracking uses — not a
+  // payment-specific variant — so `GET /licenses/analytics`'s
+  // `reactivated`-per-year count (which matches on that literal string)
+  // picks this up the same as a manual status-flip edit; the "via invoice
+  // payment" context instead goes in `entity_label`, mirroring how the
+  // renewal's own log entry below already carries its context there rather
+  // than in the action string.
   const autoRenewedLicenses = [];
   if (newStatus === 'paid') {
     const descriptions = new Set(data.items.map((item) => (item.description || '').trim().toLowerCase()).filter(Boolean));
     if (descriptions.size > 0) {
-      const clientLicenses = db.prepare("SELECT * FROM licenses WHERE client_id = ? AND status = 'active'").all(data.invoice.client_id);
+      const clientLicenses = db.prepare("SELECT * FROM licenses WHERE client_id = ? AND status IN ('active', 'cancelled')").all(data.invoice.client_id);
       for (const license of clientLicenses) {
         if (!descriptions.has(license.name.trim().toLowerCase())) continue;
+        const wasCancelled = license.status === 'cancelled';
+        if (wasCancelled) {
+          db.prepare(`UPDATE licenses SET status = 'active', updated_at = datetime('now') WHERE id = ?`).run(license.id);
+          logActivity({
+            userName: req.user.name,
+            action: 'reactivated',
+            entityType: 'license',
+            entityId: license.id,
+            entityLabel: `${license.name} (${data.client.name}) — via invoice payment`,
+          });
+        }
         const nextExpiry = renewLicense(license, req.user.name);
         logActivity({
           userName: req.user.name,
@@ -590,7 +618,7 @@ router.post('/:id/payments', manage, (req, res) => {
           entityId: license.id,
           entityLabel: `${license.name} (${data.client.name}) → ${nextExpiry}`,
         });
-        autoRenewedLicenses.push({ id: license.id, name: license.name, expiry_date: nextExpiry });
+        autoRenewedLicenses.push({ id: license.id, name: license.name, expiry_date: nextExpiry, reactivated: wasCancelled });
       }
     }
   }
