@@ -1119,7 +1119,7 @@ are deliberately untouched by either, always returning every row.
   directly if self-hosted) before running with `--apply` — this writes to
   real `licenses`/`license_renewals` rows.
 - `lib/scheduler.js` — `startScheduler()` (called once from `index.js`'s
-  `app.listen` callback) registers four `node-cron` jobs, all server-time:
+  `app.listen` callback) registers five `node-cron` jobs, all server-time:
   - `0 3 * * *` — `runBackup()` (see `lib/backup.js` above), scheduled
     ahead of the other jobs so a backup reflects state from before
     the day's automated invoice/reminder mutations.
@@ -1134,6 +1134,27 @@ are deliberately untouched by either, always returning every row.
     auto-emailed — they're created as drafts for a human to review and send
     from the Invoices page. Per-row try/catch so one bad template doesn't
     block the rest.
+  - `30 7 * * *` — `expireOverdueQuotes()`: flips any quote still
+    `status = 'sent'` with a non-null `expiry_date` in the past to
+    `status = 'expired'`. This exists because `expired` is a real, stored,
+    filterable quote status (`Quotes.jsx`'s `STATUS_OPTIONS`, `PUT /:id`'s
+    `validStatuses`) that nothing else in the app ever sets — there's no
+    status field anywhere in `QuoteForm.jsx`/`QuoteDetail.jsx` (the only
+    other status transitions are `sent` via `POST /:id/send`, and
+    `accepted`/`declined` via the client's public-link response or
+    `POST /:id/convert-to-invoice`) — so without this job a quote past its
+    deadline that nobody responded to just stayed `sent` forever, and the
+    "Expired" filter/badge could only ever show quotes brought in with that
+    status via CSV import. Only `sent` quotes are eligible: a `draft` quote
+    was never actually offered to a client, so there's nothing for it to
+    have expired *on*, and `accepted`/`declined`/already-`expired` quotes
+    already have a real, final answer that shouldn't be overwritten. No
+    `SMTP_HOST` dependency (it's a plain status update, not an email), so
+    unlike the two reminder jobs below it always runs. Doesn't call
+    `logActivity()`, matching `generateDueRecurringInvoices()` just above —
+    neither of these two silent background mutations write to
+    `activity_log`, only the two email-sending jobs below do (via
+    `logEmail()`, a distinct log).
   - `0 8 * * *` — `runOverdueReminders()`: skips entirely if `SMTP_HOST`
     isn't set. Selects `invoices` where `status='sent'`,
     `amount_paid < total`, `due_date < today`, and
@@ -1167,16 +1188,20 @@ are deliberately untouched by either, always returning every row.
     Logged to `email_log` as type `license_expiry_alert`. No staff-digest
     equivalent to `notifyStaffOfReminders()` for this job — that's scoped
     to overdue invoices specifically, not extended here.
-  All four jobs are also exported directly (`runBackup`,
-  `generateDueRecurringInvoices`, `runOverdueReminders`,
-  `runLicenseExpiryAlerts`) so they can be invoked outside the cron
-  schedule (tests, or a manual "run now" action).
+  All five jobs are also exported directly (`runBackup`,
+  `generateDueRecurringInvoices`, `expireOverdueQuotes`,
+  `runOverdueReminders`, `runLicenseExpiryAlerts`) so they can be invoked
+  outside the cron schedule (tests, or a manual "run now" action).
 
 Status/derived-field conventions worth knowing before touching this code:
 - Quote `status`: `draft | sent | accepted | declined | expired`, set
-  explicitly by `PUT`/`/send`/`/convert-to-invoice`, or by the client via
+  explicitly by `PUT`/`/send`/`/convert-to-invoice`, by the client via
   `POST /api/public/quotes/:token/respond` (`accepted`/`declined`, also
-  stored in `client_response`/`client_responded_at`).
+  stored in `client_response`/`client_responded_at`), or by
+  `lib/scheduler.js`'s `expireOverdueQuotes()` job (`expired` — see that
+  file above; this is the only status value nothing in the UI ever sets
+  directly, so it's automatic-only, the same way licenses'
+  `expired`/`expiring_soon` are computed rather than manually chosen).
 - Invoice `status`: only `draft | sent | void | paid` are ever stored —
   `paid` is set automatically the moment `amount_paid >= total` inside the
   `POST /:id/payments` handler. "Overdue" and "partially paid" are **not**
@@ -1621,16 +1646,35 @@ frontend stops holding/sending it.
   mutation via a local `loadSummary()`) and a `rowActions()` helper shared
   between the desktop table's action cell and each mobile
   `MobileListAccordion` card's expanded body, since both need the exact
-  same conditional Renew/Remind/Edit/Delete buttons and duplicating them
-  would drift. Renew and Remind buttons are conditioned on the row's raw
-  `status` (`active`/`cancelled`), not the computed `display_status` — a
-  lapsed-but-not-cancelled license (`display_status: 'expired'`) still
-  shows both, mirroring `routes/licenses.js`'s own guards exactly (Renew
-  is blocked only by `cancelled`, not by having already expired — that's
-  the whole point of a renew button). The "New license"/"Edit license"
-  modal's Status field (`active`/`cancelled`) only renders while editing
-  an existing license (`editingId` truthy) — a brand-new license is always
-  created `active`, there's nothing to toggle yet. Mobile cards get the
+  same conditional Renew/Cancel/Reactivate/Remind/History/Edit/Delete
+  buttons and duplicating them would drift. Renew and Remind buttons are
+  conditioned on the row's raw `status` (`active`/`cancelled`), not the
+  computed `display_status` — a lapsed-but-not-cancelled license
+  (`display_status: 'expired'`) still shows both, mirroring
+  `routes/licenses.js`'s own guards exactly (Renew is blocked only by
+  `cancelled`, not by having already expired — that's the whole point of a
+  renew button). **Cancel**/**Reactivate** (`status === 'active'` /
+  `status === 'cancelled'` respectively) are one-click, confirm-then-act
+  actions — the same `useConfirm()` pattern every other lifecycle action in
+  the app uses — that PUT the full record back with only `status` flipped;
+  `l` (the list row) already carries every field `PUT /:id` requires, so no
+  extra `GET /:id` round-trip is needed first. These were added because
+  `cancelled` is a real, stored license status (`Licenses.jsx`'s own
+  `STATUS_OPTIONS` filter chip, `KpiCard`, `ACCENT` map) that, before this,
+  had no dedicated action anywhere — the *only* way to reach it was to open
+  Edit and change the Status dropdown buried at the end of the form, which
+  most people never discover is there. The Edit form's Status field
+  (`active`/`cancelled`, only rendered while editing an existing license —
+  `editingId` truthy, since a brand-new license is always created `active`)
+  still exists as a secondary path and is left unchanged; Cancel/Reactivate
+  don't replace it, they just make the same transition discoverable as a
+  real button instead of a hidden form field, matching how every other
+  status-changing action in the app (Void, Renew, Delete) already gets a
+  dedicated button rather than living only inside a generic edit form. A
+  shared `busy` state (`{ id, action }` rather than a bare id) tracks which
+  row *and which specific action* is in flight, so Renew/Cancel/Reactivate
+  on the same row each show their own correct busy label instead of all
+  three reacting to any one of them being clicked. Mobile cards get the
   same accent-stripe treatment as `Invoices.jsx`/`Quotes.jsx`, keyed off
   `display_status` via a local `ACCENT` map (emerald/amber/red/slate for
   active/expiring_soon/expired/cancelled). Amounts use plain
