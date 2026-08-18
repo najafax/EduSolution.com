@@ -42,6 +42,13 @@ export default function Navbar() {
     (link) => (!link.module || can(link.module, 'view')) && (!link.adminOnly || user?.role === 'admin'),
   );
 
+  // The public client-facing quote/invoice links (PublicQuote.jsx,
+  // PublicInvoice.jsx) render no header of their own and rely entirely on
+  // this shared Navbar — but they're meant for an external client with no
+  // account, so the "Log in" button there is just noise (or worse, an
+  // invitation to poke at staff-only auth) rather than a useful action.
+  const isPublicDocLink = location.pathname.startsWith('/q/') || location.pathname.startsWith('/i/');
+
   function handleLogout() {
     setMenuOpen(false);
     logout();
@@ -142,12 +149,14 @@ export default function Navbar() {
         ) : (
           <div className="flex items-center gap-2 sm:gap-4">
             <ThemeToggle />
-            <Link
-              to="/login"
-              className="flex min-h-11 items-center rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 sm:px-4"
-            >
-              Log in
-            </Link>
+            {!isPublicDocLink && (
+              <Link
+                to="/login"
+                className="flex min-h-11 items-center rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 sm:px-4"
+              >
+                Log in
+              </Link>
+            )}
           </div>
         )}
       </nav>

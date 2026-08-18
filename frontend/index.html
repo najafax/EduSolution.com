@@ -18,11 +18,14 @@
 
     <!-- Applies the dark class before the app mounts, avoiding a flash of
          the wrong theme (context/ThemeContext.jsx re-derives and keeps this
-         in sync afterward, including on system-preference changes). -->
+         in sync afterward, including on system-preference changes). Nothing
+         stored yet defaults to light — matches ThemeContext.jsx's own
+         'light' default, only 'dark' (explicit choice) or 'system' (explicit
+         choice, OS currently dark) ever paint dark on first load. -->
     <script>
       (function () {
         var stored = localStorage.getItem('edusolution_theme');
-        var isDark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var isDark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         if (isDark) document.documentElement.classList.add('dark');
       })();
     </script>

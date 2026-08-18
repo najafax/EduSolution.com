@@ -1313,6 +1313,31 @@ frontend stops holding/sending it.
   `ResetPassword.jsx`, which redirect from a public route with no
   competing `ProtectedRoute` redirect to race against).
 
+### Theme (light/dark mode)
+
+- `context/ThemeContext.jsx` holds a 3-way stored preference, `theme` —
+  `'light' | 'dark' | 'system'`, persisted to `localStorage`
+  (`edusolution_theme`) — and resolves it to `resolvedTheme` (always
+  `'light'` or `'dark'`, following the OS preference live via a
+  `matchMedia` listener when `theme === 'system'`) which toggles the
+  `dark` class on `<html>`. Components that just need to know which
+  palette is active read `resolvedTheme`; `ThemeToggle.jsx` is the only
+  place that offers the 3-way picker itself (`MODES = ['light', 'dark',
+  'system']`, cycled by one click). **A visitor with nothing stored yet
+  defaults to `'light'`**, not `'system'` — a first-time visitor on a
+  device set to OS dark mode would otherwise land on a dark app with no
+  indication that was ever a choice, since "system" was never something
+  they actually chose. `index.html`'s pre-mount inline script (applies the
+  `dark` class before React mounts, avoiding a flash of the wrong theme —
+  `ThemeContext.jsx` re-derives and keeps it in sync afterward) mirrors
+  this exactly: `isDark` is only ever true for `stored === 'dark'`, or
+  `stored === 'system'` *and* the OS prefers dark — nothing-stored falls
+  through to light, matching `ThemeContext.jsx`'s own default so the very
+  first paint and React's first render never disagree. The three-way
+  toggle itself is unaffected by this — anyone who explicitly picks Dark
+  or System still gets exactly that, stored and honored on every future
+  visit; only the unset, brand-new-visitor case changed.
+
 ### Frontend (`frontend/src/`)
 
 - `context/AuthContext.jsx` — the single source of truth for auth state.
@@ -1391,7 +1416,17 @@ frontend stops holding/sending it.
   quote/invoice by its `public_token` via `api.public.*`, with a "Download
   PDF" button and, on quotes still `draft`/`sent`, Accept/Decline buttons.
   These pages exist *outside* `ProtectedRoute` and never touch
-  `AuthContext`/`localStorage`.
+  `AuthContext`/`localStorage`. Both render no header of their own — they
+  rely entirely on the shared global `Navbar` (mounted unconditionally at
+  the app root, on every route). Navbar's own logged-out branch normally
+  shows a "Log in" button, but hides it specifically on these two routes
+  (`isPublicDocLink`, checked via `location.pathname.startsWith('/q/')` or
+  `'/i/'`) — a client opening one of these links has no account and no
+  reason to see an invitation into staff-only auth; every other public
+  route (`/`, `/login`, `/forgot-password`, `/reset-password`) is
+  unaffected and still shows it. `ThemeToggle` stays visible either way —
+  hiding it too would leave a client stuck on whichever theme happened to
+  resolve, with no way to switch.
 - `pages/business/` — the client/quote/invoice/payment/settings/financials/
   expenses/recurring-invoices/activity pages (see "Business module" below).
   Every page in this directory reads `can(module, 'manage')` from
@@ -1884,15 +1919,20 @@ keeps its existing layout.
   rename, not a breaking prop change).
 - `components/BottomNav.jsx` — a fixed, phone-only (`sm:hidden`) tab bar
   that replaces `Navbar.jsx`'s hamburger drawer below the `sm` breakpoint
-  (tablets and up still get the hamburger — see `Navbar.jsx` below). Four
-  permanent tabs (`PRIMARY_TABS`: Home/Invoices/Quotes/Clients, each
-  filtered through `can(module, 'view')` the same way `Navbar.jsx`'s
-  `visibleLinks` is) plus a fifth "More" tab that opens a
-  `components/BottomSheet.jsx` listing everything else from `Navbar.jsx`'s
-  exported `BUSINESS_LINKS` (Products, Recurring, Expenses, Financials,
-  Reports, Activity, Users, Email Center when `user.role === 'admin'`,
-  Settings) plus "My account" and "Log out" — the same set the old mobile
-  drawer held. `App.jsx` renders `<BottomNav />` only when `user` is
+  (tablets and up still get the hamburger — see `Navbar.jsx` below). Five
+  permanent tabs (`PRIMARY_TABS`: Home/Invoices/Quotes/Clients/Licenses,
+  each filtered through `can(module, 'view')` the same way `Navbar.jsx`'s
+  `visibleLinks` is — Licenses was added as a 5th primary tab rather than
+  folded into "More," since a license's expiry is time-sensitive enough
+  to check as often as an invoice/quote) plus a sixth "More" tab that opens
+  a `components/BottomSheet.jsx` listing everything else from `Navbar.jsx`'s
+  exported `BUSINESS_LINKS` (Products, Recurring, Expenses, Capital,
+  Financials, Reports, Activity, Users, Email Center when
+  `user.role === 'admin'`, Settings) plus "My account" and "Log out" — the
+  same set the old mobile drawer held (`moreLinks`' own filter already
+  excludes whatever's in `primaryHrefs`, so Licenses dropped out of "More"
+  automatically the moment it became a primary tab, no separate edit
+  needed there). `App.jsx` renders `<BottomNav />` only when `user` is
   truthy (mirroring `Navbar.jsx`'s own `{user ? ... }` split) and wraps the
   routed `<Routes>` in a `pb-16 sm:pb-0` div so the fixed bar never covers
   a page's last content or action buttons; `FloatingActionButton.jsx`'s
@@ -1900,6 +1940,34 @@ keeps its existing layout.
   for the same reason, and got the mockup's gradient (`from-lagoon-600
   to-lagoon-700`) + `rounded-2xl` squircle treatment instead of a flat
   circle.
+- `components/FloatingActionButton.jsx` is draggable, not just fixed
+  bottom-right — a user can drag it anywhere on screen and it stays there
+  across visits. It renders at its usual `right`/`bottom` CSS position
+  (`DEFAULT_STYLE`) until a `useLayoutEffect` measures where that actually
+  landed (`getBoundingClientRect()`, which already resolves the
+  `env(safe-area-inset-bottom)` in the CSS) and adopts that as an explicit
+  `{ x, y }` in state — converting to pixel-positioned `left`/`top` with no
+  visual jump, so dragging math never has to parse `calc()`/`env()` itself.
+  Pointer events (`onPointerDown`/`onPointerMove`/`onPointerUp`, with
+  `setPointerCapture` so a drag tracks correctly even off the button's own
+  bounds) update that position live and `clamp()` it to stay within
+  `EDGE_MARGIN` (8px) of the screen edges and `BOTTOM_RESERVE` (76px, a
+  fixed estimate of `BottomNav.jsx`'s own height + margin — this component
+  has no ref into that one) above the bottom nav, re-clamping on window
+  resize/orientation change too. A press only counts as a drag once
+  movement exceeds `DRAG_THRESHOLD` (6px); `justDraggedRef` is what makes
+  that distinction stick through to the `click` event that always follows
+  a `pointerup` — `handleClick` checks it first and, if a drag just
+  happened, calls `e.preventDefault()` (aborts the `<Link>`'s navigation)
+  and returns without ever calling the `onClick` prop (for pages like
+  `Clients.jsx` that open an inline form instead of routing) — so a real
+  drag repositions the button without also activating whatever it's a
+  shortcut for, while an actual tap (no meaningful movement) still fires
+  exactly as before. The landed position is written to `localStorage`
+  (`edusolution_fab_position`) only once a drag actually happened, read
+  back (and re-clamped, in case the viewport changed since) on mount —
+  so a user who never drags it never even touches that key, and the
+  button stays at its designed default forever.
 - `components/BottomSheet.jsx` — the mobile counterpart to `Modal.jsx`:
   same open/backdrop-click/Escape/body-scroll-lock contract, but slides up
   from the bottom with rounded top corners and a drag-handle bar instead of

@@ -16,8 +16,14 @@ function applyTheme(resolvedTheme) {
 // `resolvedTheme` is always 'light' or 'dark', resolving 'system' against
 // the OS preference — components that just need to know which palette is
 // active (rather than offer the three-way picker) should read this.
+// A visitor with nothing stored yet defaults to 'light', not 'system' — a
+// first-time visitor on a device set to dark mode would otherwise land on
+// a dark app with no indication that was ever a choice; the three-way
+// toggle (ThemeToggle.jsx) is still one tap away for anyone who wants dark
+// or to follow their OS. Index.html's pre-mount script mirrors this same
+// "nothing stored → light" default so the very first paint matches.
 export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState(() => localStorage.getItem(STORAGE_KEY) || 'system');
+  const [theme, setThemeState] = useState(() => localStorage.getItem(STORAGE_KEY) || 'light');
   const [resolvedTheme, setResolvedTheme] = useState(() => (theme === 'system' ? (systemPrefersDark() ? 'dark' : 'light') : theme));
 
   useEffect(() => {
