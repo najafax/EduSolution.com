@@ -3,9 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import BottomSheet from './BottomSheet';
 import { BUSINESS_LINKS } from './Navbar';
-import { HomeIcon, InvoiceIcon, QuoteIcon, UsersIcon, MoreIcon, ChevronRightIcon, LogoutIcon } from './icons';
+import { HomeIcon, InvoiceIcon, QuoteIcon, UsersIcon, LicenseIcon, MoreIcon, ChevronRightIcon, LogoutIcon } from './icons';
 
-// The four most-used destinations get a permanent bottom tab (phone-only —
+// The five most-used destinations get a permanent bottom tab (phone-only —
 // see App.jsx, this replaces the hamburger menu below the `sm` breakpoint
 // only; tablets/desktop keep Navbar.jsx's own nav). Everything else in
 // BUSINESS_LINKS, plus "My account" and "Log out" (same items the old
@@ -16,6 +16,7 @@ const PRIMARY_TABS = [
   { to: '/invoices', label: 'Invoices', module: 'invoices', Icon: InvoiceIcon },
   { to: '/quotes', label: 'Quotes', module: 'quotes', Icon: QuoteIcon },
   { to: '/clients', label: 'Clients', module: 'clients', Icon: UsersIcon },
+  { to: '/licenses', label: 'Licenses', module: 'licenses', Icon: LicenseIcon },
 ];
 
 export default function BottomNav() {
