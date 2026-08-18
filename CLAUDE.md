@@ -392,35 +392,49 @@ deliberately untouched by either, always returning every row.
   full-precision `.toFixed(2)` a single-record page like `InvoiceDetail.jsx`
   uses.
 - **License auto-renewal on invoice payment**: `POST /invoices/:id/payments`
-  auto-renews any of the invoice's client's *active* licenses that the
-  invoice was actually billing for, the moment the payment brings the
-  invoice fully to `status: 'paid'` (not on a partial payment) — matches
+  auto-renews any of the invoice's client's *active or cancelled* licenses
+  that the invoice was actually billing for, the moment the payment brings
+  the invoice fully to `status: 'paid'` (not on a partial payment) — matches
   the "once they've paid, renew it" framing the manual Renew button already
   uses (see `routes/licenses.js` above), just triggered by a payment
   instead of a click. There's no `invoice_id` column on `licenses` linking
   the two — matching is by content: each `invoice_items.description` is
-  trimmed/lowercased and checked against that client's active licenses'
-  `name` the same way, so a line item literally naming a license (e.g.
-  "LMS Pro Annual License") renews that specific license, and an invoice
-  for something unrelated (or naming a `cancelled` license, which is
-  excluded from the candidate query entirely) never touches any license at
-  all. Multiple matching line items still only renew a license once each;
-  an invoice can auto-renew more than one license if it bills for more than
-  one by name. The actual renewal — extend `expiry_date` by one billing
-  cycle, insert the `license_renewals` row, reset `last_reminder_sent_at`
-  — is `lib/licenseRenewal.js`'s `renewLicense()`, the exact same function
+  trimmed/lowercased and checked against that client's active-or-cancelled
+  licenses' `name` the same way, so a line item literally naming a license
+  (e.g. "LMS Pro Annual License") renews that specific license, and an
+  invoice for something unrelated never touches any license at all.
+  Multiple matching line items still only renew a license once each; an
+  invoice can auto-renew more than one license if it bills for more than
+  one by name. A matched license that's currently `cancelled` is
+  reactivated first (`status` flipped back to `active`, with its own
+  `logActivity()` entry using the exact `action: 'reactivated'` string
+  `PUT /:id`'s own structured-change-tracking uses — not a payment-specific
+  variant — so `GET /licenses/analytics`'s `reactivated`-per-year count,
+  which matches on that literal string, picks this up the same as a manual
+  status-flip edit; the "via invoice payment" context goes in
+  `entity_label` instead) before being renewed — deliberately different
+  from the manual Renew button, which stays blocked on a `cancelled`
+  license and requires an explicit Reactivate click first (see
+  `routes/licenses.js`'s `POST /:id/renew` above): a real payment is a
+  stronger, unambiguous signal than a renew click, so auto-reactivating on
+  the client's behalf is the correct outcome here, not friction to route
+  around. The actual renewal — extend `expiry_date` by one billing cycle,
+  insert the `license_renewals` row, reset `last_reminder_sent_at` — is
+  `lib/licenseRenewal.js`'s `renewLicense()`, the exact same function
   `routes/licenses.js`'s `POST /:id/renew` calls for a human clicking
   "Renew"; extracting it there was what let this feature reuse it here with
-  no duplicated logic. Each auto-renewal gets its own `logActivity()` entry
-  (`action: 'auto-renewed via invoice payment for'`, attributed to whoever
-  recorded the payment — this is a direct consequence of their action, not
-  an unattended background job like `lib/scheduler.js`'s cron jobs, so it's
-  *not* logged as `'Automated'` the way those are) and is included in the
-  response's `autoRenewedLicenses` array (`{ id, name, expiry_date }[]`).
-  `InvoiceDetail.jsx`'s `handleRecordPayment()` reads that array and appends
-  "Also renewed: X, Y." to the existing "Payment recorded." notice when
-  non-empty, so the person recording the payment sees the side effect
-  immediately rather than discovering it later on the Licenses page.
+  no duplicated logic. Each auto-renewal still gets its own separate
+  `logActivity()` entry (`action: 'auto-renewed via invoice payment for'`,
+  attributed to whoever recorded the payment — this is a direct consequence
+  of their action, not an unattended background job like
+  `lib/scheduler.js`'s cron jobs, so it's *not* logged as `'Automated'` the
+  way those are) and is included in the response's `autoRenewedLicenses`
+  array (`{ id, name, expiry_date, reactivated }[]`). `InvoiceDetail.jsx`'s
+  `handleRecordPayment()` splits that array on the `reactivated` flag and
+  appends "Also renewed: X." and/or "Also reactivated and renewed: Y." to
+  the existing "Payment recorded." notice, so the person recording the
+  payment sees the side effect immediately rather than discovering it later
+  on the Licenses page.
 - **Email preview before sending**: every client-facing email this app
   sends from a button click (not the automated overdue-reminder digest —
   see `lib/scheduler.js` below, which stays fully automatic) goes through
