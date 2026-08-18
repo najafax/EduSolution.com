@@ -103,6 +103,7 @@ export const api = {
 
   quotes: {
     list: (token, { status, q, page } = {}) => request(`/quotes${qs({ status, q, page })}`, { token }),
+    analytics: (token) => request('/quotes/analytics', { token }),
     get: (id, token) => request(`/quotes/${id}`, { token }),
     create: (payload, token) => request('/quotes', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/quotes/${id}`, { method: 'PUT', body: payload, token }),
@@ -118,6 +119,7 @@ export const api = {
 
   invoices: {
     list: (token, { status, q, page } = {}) => request(`/invoices${qs({ status, q, page })}`, { token }),
+    analytics: (token) => request('/invoices/analytics', { token }),
     get: (id, token) => request(`/invoices/${id}`, { token }),
     create: (payload, token) => request('/invoices', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/invoices/${id}`, { method: 'PUT', body: payload, token }),

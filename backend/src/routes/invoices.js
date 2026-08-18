@@ -118,6 +118,77 @@ router.get('/export.csv', view, (req, res) => {
   res.send(csv);
 });
 
+// Year-over-year view, mirrors routes/licenses.js's own GET /analytics
+// (registered before GET /:id for the same "don't let :id swallow a literal
+// path" reason that route documents). For every year from the earliest
+// invoice's issue_date through the current year (gap years included at
+// zero, never skipped), reports `issued`/`amountInvoiced` (by issue_date,
+// void excluded from the money figure the same way routes/financials.js
+// excludes it from totalInvoiced) and `paymentsReceived`/`amountCollected`
+// (by payments.paid_at — an exact cash figure, not an estimate, since
+// unlike license renewals every invoice payment already records its own
+// amount) and `voided` (by the activity_log 'voided' entry POST /:id/void
+// above writes).
+const round2 = (n) => Math.round(n * 100) / 100;
+
+router.get('/analytics', view, (req, res) => {
+  const invoices = db.prepare('SELECT id, client_id, status, issue_date, total, amount_paid FROM invoices').all();
+  const payments = db.prepare('SELECT invoice_id, amount, paid_at FROM payments').all();
+  const voidEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'invoice' AND action = 'voided'").all();
+
+  const yearOf = (dateStr) => dateStr.slice(0, 4);
+  const currentYear = new Date().getFullYear();
+  const years = new Set([currentYear]);
+  [...invoices.map((i) => i.issue_date), ...payments.map((p) => p.paid_at), ...voidEvents.map((v) => v.created_at)].forEach((d) =>
+    years.add(Number(yearOf(d))),
+  );
+  const minYear = Math.min(...years);
+
+  const byYear = [];
+  for (let year = currentYear; year >= minYear; year--) {
+    const y = String(year);
+    const issuedThisYear = invoices.filter((i) => yearOf(i.issue_date) === y);
+    const paymentsThisYear = payments.filter((p) => yearOf(p.paid_at) === y);
+    byYear.push({
+      year,
+      issued: issuedThisYear.length,
+      amountInvoiced: round2(issuedThisYear.filter((i) => i.status !== 'void').reduce((sum, i) => sum + i.total, 0)),
+      paymentsReceived: paymentsThisYear.length,
+      amountCollected: round2(paymentsThisYear.reduce((sum, p) => sum + p.amount, 0)),
+      voided: voidEvents.filter((v) => yearOf(v.created_at) === y).length,
+    });
+  }
+
+  const byStatus = db
+    .prepare('SELECT status, COUNT(*) AS c FROM invoices GROUP BY status')
+    .all()
+    .reduce((acc, row) => ({ ...acc, [row.status]: row.c }), { draft: 0, sent: 0, paid: 0, void: 0 });
+
+  const topClients = db
+    .prepare(
+      `SELECT clients.id, clients.name, COUNT(*) AS invoice_count, COALESCE(SUM(invoices.total), 0) AS total_amount
+       FROM invoices JOIN clients ON clients.id = invoices.client_id
+       WHERE invoices.status != 'void'
+       GROUP BY clients.id
+       ORDER BY total_amount DESC, invoice_count DESC
+       LIMIT 5`,
+    )
+    .all();
+
+  res.json({
+    byYear,
+    byStatus,
+    topClients,
+    totals: {
+      totalInvoices: invoices.length,
+      totalInvoiced: round2(invoices.filter((i) => i.status !== 'void').reduce((sum, i) => sum + i.total, 0)),
+      totalCollected: round2(payments.reduce((sum, p) => sum + p.amount, 0)),
+      totalOutstanding: round2(invoices.filter((i) => i.status === 'sent').reduce((sum, i) => sum + (i.total - i.amount_paid), 0)),
+      totalVoided: byStatus.void,
+    },
+  });
+});
+
 router.post('/', manage, (req, res) => {
   const {
     client_id,

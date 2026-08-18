@@ -328,6 +328,66 @@ are deliberately untouched by either, always returning every row.
   reports in `routes/reports.js` (both filter `status != 'void'`), the
   same way those already excluded nothing else — void is the only status
   either of them filters out.
+- **Invoice/quote analytics**: `GET /invoices/analytics` and
+  `GET /quotes/analytics` (both `view`-gated, each registered before its own
+  `GET /:id` for the same "don't let `:id` swallow a literal path" reason
+  `routes/licenses.js`'s own `GET /analytics` documents — these two are the
+  same year-over-year shape applied to invoices/quotes, built when that
+  page's pattern was asked for again on these two entities). For every year
+  from the earliest issue_date through the current year (gap years included
+  at zero, never skipped, same as licenses), `invoices.js` reports
+  `issued`/`amountInvoiced` (by `issue_date`; `amountInvoiced` excludes
+  `void` invoices, same convention `routes/financials.js`'s own
+  `totalInvoiced` and `routes/reports.js` already use) and
+  `paymentsReceived`/`amountCollected` (by `payments.paid_at`) — unlike
+  `routes/licenses.js`'s `revenueEstimate`, this is an **exact** figure, not
+  a proxy: every invoice payment already records its own real amount, so
+  there's no "value it at today's price" stand-in needed — plus `voided`
+  (by the `activity_log` `'voided'` entry `POST /:id/void` above writes).
+  `quotes.js` reports `created`/`amountQuoted` (by `issue_date`, every
+  status included — a quote has no void-equivalent status to exclude) and
+  `accepted`/`declined` (by `COALESCE(client_responded_at, updated_at)` — a
+  client responding via the public link stamps `client_responded_at` (see
+  `routes/public.js`'s respond route below), but a status flipped manually
+  by staff via `PUT /:id` instead has no dedicated response timestamp, so
+  falls back to `updated_at` as the best available proxy for when the
+  decision happened) and `converted` (by the `activity_log`
+  `'converted to invoice'` entry `POST /:id/convert-to-invoice` below
+  writes). Both also return a current-snapshot `byStatus` count map, a
+  `topClients` top-5 (by total invoiced/quoted amount, then count — the
+  license page's own `topClients` orders by count first since a license
+  count matters more there; here the money figure is the more natural
+  primary sort), and a `totals` block (all-time sums/counts) —
+  `quotes.js`'s totals additionally include `winRate`
+  (`accepted / (accepted + declined) * 100`, `null` when nothing's been
+  decided yet rather than a division-by-zero `NaN`).
+  `pages/business/InvoiceAnalytics.jsx` (route `/invoices/analytics`) and
+  `pages/business/QuoteAnalytics.jsx` (route `/quotes/analytics`) are the
+  frontend for these, both modeled directly on `pages/business/
+  LicenseAnalytics.jsx` (KPI strip via `KpiCard`, a grouped year-by-year bar
+  chart, a current-split breakdown panel, a year-by-year table, and a top-
+  clients table — desktop `hidden overflow-x-auto sm:block` tables +
+  `MobileListAccordion` `sm:hidden` mobile counterparts throughout, per
+  "Mobile design system" below) and linked from `Invoices.jsx`'s/
+  `Quotes.jsx`'s own header next to "Export CSV", same placement as
+  `Licenses.jsx`'s own "Analytics" link. Building a third page on this
+  exact shape is also what prompted pulling the shape itself out of
+  `LicenseAnalytics.jsx`'s local-only components into two shared ones —
+  `components/YearlyBarChart.jsx` (generalized from hardcoded
+  `newLicenses`/`renewals` fields to a `series` prop of exactly two
+  `{ key, label, color }` entries read off each `data` row) and
+  `components/BreakdownBars.jsx` (already fully generic in its original
+  local form, so this was a straight lift, no logic changes) — three real
+  duplicates of the same chart code was the threshold for promoting it,
+  matching every other shared component in this app (`KpiCard`,
+  `MobileListAccordion`, `Pagination`, etc.); `LicenseAnalytics.jsx` itself
+  was migrated to the shared components in the same change, with no visual
+  or behavioral difference. Money figures throughout both new pages go
+  through `lib/money.js`'s `money()` (the Dashboard/Financials-style
+  compact formatter — this is the same kind of summary view with several
+  large numbers shown together, so the same scoping call applies), not the
+  full-precision `.toFixed(2)` a single-record page like `InvoiceDetail.jsx`
+  uses.
 - **License auto-renewal on invoice payment**: `POST /invoices/:id/payments`
   auto-renews any of the invoice's client's *active* licenses that the
   invoice was actually billing for, the moment the payment brings the
@@ -635,14 +695,18 @@ are deliberately untouched by either, always returning every row.
   a `0` read as "nothing happened." That page follows the same
   permission-gate-at-the-top-of-the-component pattern as `Reports.jsx`
   (`can('licenses', 'view')`, not a dedicated module), a KPI strip via the
-  shared `KpiCard`, a grouped year-by-year bar chart modeled directly on
-  `components/RevenueTrendChart.jsx` (same shared-axis/hover-tooltip shape,
-  counts instead of money) but kept local to this page rather than
-  promoted to a shared component, a billing-cycle breakdown modeled on
-  `components/StatusBreakdownChart.jsx`'s horizontal-bar shape, and the
-  standard `hidden overflow-x-auto sm:block` desktop table +
-  `MobileListAccordion` `sm:hidden` mobile counterpart (see "Mobile design
-  system" below) for both the yearly table and the top-clients table.
+  shared `KpiCard`, a grouped year-by-year bar chart (`components/
+  YearlyBarChart.jsx`, same shared-axis/hover-tooltip shape as
+  `components/RevenueTrendChart.jsx` but counts instead of money — see
+  "Invoice/quote analytics" above for why this and the billing-cycle
+  breakdown below were later promoted out of this page into shared
+  components rather than staying local, once Invoice/Quote Analytics
+  needed the identical shape), a billing-cycle breakdown via
+  `components/BreakdownBars.jsx` (modeled on `components/
+  StatusBreakdownChart.jsx`'s horizontal-bar shape), and the standard
+  `hidden overflow-x-auto sm:block` desktop table + `MobileListAccordion`
+  `sm:hidden` mobile counterpart (see "Mobile design system" below) for
+  both the yearly table and the top-clients table.
 - `routes/public.js` — mounted at `/api/public`, the one route file **not**
   behind `requireAuth`. Looks quotes/invoices up by their `public_token`
   (a random 16-byte hex column generated on every quote/invoice create,
