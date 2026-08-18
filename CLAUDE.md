@@ -1947,15 +1947,38 @@ keeps its existing layout.
 The app is a responsive installable PWA (installable on iOS/Android home
 screens), configured via `vite-plugin-pwa` in `vite.config.js`:
 
-- The manifest (name, icons, `theme_color`, `display: standalone`) is
+- The manifest (name, icons, `theme_color`, `display`/`display_override`) is
   generated from the `manifest` option at build time — don't hand-edit a
   `manifest.webmanifest` file, it doesn't exist in source, only in `dist/`.
+  `display: 'standalone'` is the required, universally-supported base (hides
+  the browser's own URL bar/tabs, keeps the OS status bar); `display_override:
+  ['fullscreen', 'standalone']` asks browsers that support it to additionally
+  hide the status bar for full immersion first, falling back to the plain
+  `standalone` behavior anywhere that's unsupported or declined — mainly an
+  Android/desktop-install distinction, since iOS doesn't differentiate
+  fullscreen from standalone for installed web apps at all.
 - Icon source files live in `frontend/public/` (`favicon.svg`,
-  `pwa-192x192.png`, `pwa-512x512.png`, `maskable-icon-512x512.png`,
-  `apple-touch-icon.png`). The two `.svg` files are the design source; the
-  PNGs were rasterized from them (there's no build step that regenerates
-  PNGs from the SVGs — if the design changes, re-rasterize by hand and
-  replace the PNGs).
+  `favicon-32x32.png`, `pwa-192x192.png`, `pwa-512x512.png`,
+  `maskable-icon-512x512.png`, `apple-touch-icon.png`) — all derived from
+  `logo-symbol.png` (the real business mark, also used directly on
+  `Landing.jsx`; a matching `logo-wordmark.png` exists too but isn't used in
+  any icon, just as page-level branding), composited onto a white background
+  (matching the manifest's own `background_color`) and centered at a size
+  appropriate to each icon's role: ~66% of the canvas for the standard/
+  apple-touch icons, ~50% for the maskable icon (so the mark survives being
+  cropped into a circle/squircle/rounded-square by the OS — the maskable
+  spec's "safe zone" is roughly the inner 80%, and 50% leaves real margin),
+  and ~80% for the 32px favicon (a busier mark reads poorly that small, so
+  it gets a larger fraction of the tiny canvas than the bigger icons do).
+  `favicon.svg` embeds a modest-resolution (128px-wide) raster copy of the
+  same logo as a base64 `<image>` inside an SVG wrapper — not true vector
+  art (there's no vector source), but still lets browsers that prefer an SVG
+  favicon link pick it up; kept at 128px rather than a larger/crisper embed
+  purely to keep the file small, since a favicon is fetched on every page
+  load. None of this is generated at build time — if the logo changes,
+  regenerate each of these files by hand (crop `logo-symbol.png` to its
+  content bounding box, composite centered on the sized/backgrounded canvas)
+  and replace them; there's no script wired into the build for it.
 - iOS Safari doesn't read the manifest for install metadata, so
   `index.html` carries iOS-specific tags directly (`apple-touch-icon` link,
   `apple-mobile-web-app-capable`, etc.) — keep these in sync with the

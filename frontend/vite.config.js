@@ -22,7 +22,17 @@ export default defineConfig({
         short_name: 'EduSolution',
         description: 'Learning, simplified — courses, progress, and resources in one place.',
         start_url: '/',
+        // `display` is the required, universally-supported fallback (hides
+        // the browser chrome — URL bar, tabs — but keeps the OS status bar,
+        // e.g. clock/battery). `display_override` is tried first, in order,
+        // by browsers that support it: 'fullscreen' additionally hides the
+        // status bar for full immersion (Android/desktop installs mainly —
+        // iOS doesn't distinguish fullscreen from standalone for installed
+        // web apps, so this has no extra effect there), falling back to our
+        // existing 'standalone' behavior anywhere fullscreen isn't
+        // supported or the OS declines it, rather than replacing it outright.
         display: 'standalone',
+        display_override: ['fullscreen', 'standalone'],
         background_color: '#ffffff',
         theme_color: '#0e7c86',
         icons: [
