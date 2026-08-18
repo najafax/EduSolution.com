@@ -3,6 +3,7 @@ const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
+const { toXlsxBuffer } = require('../lib/xlsx');
 
 const router = Router();
 router.use(requireAuth);
@@ -30,17 +31,36 @@ router.get('/', view, (req, res) => {
   res.json({ clients, page, pageSize: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) });
 });
 
+// Shared by both export routes below so the CSV and XLSX downloads can
+// never drift apart — one row query, one column list, two serializers.
+function loadClientExport() {
+  return {
+    rows: db.prepare('SELECT * FROM clients ORDER BY name').all(),
+    columns: [
+      { label: 'Name', key: 'name' },
+      { label: 'Email', key: 'email' },
+      { label: 'Phone', key: 'phone' },
+      { label: 'Address', key: 'address' },
+      { label: 'Notes', key: 'notes' },
+    ],
+  };
+}
+
 router.get('/export.csv', view, (req, res) => {
-  const rows = db.prepare('SELECT * FROM clients ORDER BY name').all();
-  const csv = toCsv(rows, [
-    { label: 'Name', key: 'name' },
-    { label: 'Email', key: 'email' },
-    { label: 'Phone', key: 'phone' },
-    { label: 'Address', key: 'address' },
-    { label: 'Notes', key: 'notes' },
-  ]);
+  const { rows, columns } = loadClientExport();
+  const csv = toCsv(rows, columns);
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="clients.csv"' });
   res.send(csv);
+});
+
+router.get('/export.xlsx', view, async (req, res) => {
+  const { rows, columns } = loadClientExport();
+  const buffer = await toXlsxBuffer(rows, columns, 'Clients');
+  res.set({
+    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'Content-Disposition': 'attachment; filename="clients.xlsx"',
+  });
+  res.send(buffer);
 });
 
 router.post('/', manage, (req, res) => {

@@ -92,6 +92,7 @@ export const api = {
     update: (id, payload, token) => request(`/clients/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/clients/${id}`, { method: 'DELETE', token }),
     exportCsv: (token) => downloadFile('/clients/export.csv', token, 'clients.csv'),
+    exportXlsx: (token) => downloadFile('/clients/export.xlsx', token, 'clients.xlsx'),
   },
 
   products: {
@@ -115,6 +116,7 @@ export const api = {
     duplicate: (id, token) => request(`/quotes/${id}/duplicate`, { method: 'POST', token }),
     openPdf: (id, token) => openPdf(`/quotes/${id}/pdf`, token),
     exportCsv: (token) => downloadFile('/quotes/export.csv', token, 'quotes.csv'),
+    exportXlsx: (token) => downloadFile('/quotes/export.xlsx', token, 'quotes.xlsx'),
   },
 
   invoices: {
@@ -139,6 +141,7 @@ export const api = {
     openPdf: (id, token) => openPdf(`/invoices/${id}/pdf`, token),
     openReceiptPdf: (id, paymentId, token) => openPdf(`/invoices/${id}/payments/${paymentId}/pdf`, token),
     exportCsv: (token) => downloadFile('/invoices/export.csv', token, 'invoices.csv'),
+    exportXlsx: (token) => downloadFile('/invoices/export.xlsx', token, 'invoices.xlsx'),
   },
 
   expenses: {
@@ -147,6 +150,7 @@ export const api = {
     update: (id, payload, token) => request(`/expenses/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/expenses/${id}`, { method: 'DELETE', token }),
     exportCsv: (token) => downloadFile('/expenses/export.csv', token, 'expenses.csv'),
+    exportXlsx: (token) => downloadFile('/expenses/export.xlsx', token, 'expenses.xlsx'),
   },
 
   capitalContributions: {
@@ -155,6 +159,7 @@ export const api = {
     update: (id, payload, token) => request(`/capital-contributions/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/capital-contributions/${id}`, { method: 'DELETE', token }),
     exportCsv: (token) => downloadFile('/capital-contributions/export.csv', token, 'capital-contributions.csv'),
+    exportXlsx: (token) => downloadFile('/capital-contributions/export.xlsx', token, 'capital-contributions.xlsx'),
   },
 
   recurringInvoices: {
@@ -178,6 +183,7 @@ export const api = {
     remindPreview: (id, token) => request(`/licenses/${id}/remind-preview`, { token }),
     remind: (id, payload, token) => request(`/licenses/${id}/remind`, { method: 'POST', body: payload, token }),
     exportCsv: (token) => downloadFile('/licenses/export.csv', token, 'licenses.csv'),
+    exportXlsx: (token) => downloadFile('/licenses/export.xlsx', token, 'licenses.xlsx'),
   },
 
   activity: {

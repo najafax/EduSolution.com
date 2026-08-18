@@ -246,16 +246,19 @@ these files, vs. `activity.js`'s own `PAGE_SIZE = 30`), the same shape
 routes also accepts `?q=` (already existed on `clients`/`products`/
 `expenses`; added for this feature on `quotes`/`invoices`/`recurring`, which
 previously had zero backend search and did 100% client-side filtering) —
-`q` and `page` compose freely, and CSV export routes (`GET /export.csv`)
-are deliberately untouched by either, always returning every row.
+`q` and `page` compose freely, and export routes (`GET /export.csv`/
+`GET /export.xlsx` — see `lib/xlsx.js` above for why every export-capable
+route ships both formats from one shared row/column definition) are
+deliberately untouched by either, always returning every row.
 
 - `routes/clients.js`, `routes/settings.js` — plain CRUD for `clients`, and
   GET/PUT for the single-row `business_settings` table (business name,
   address, tax ID, currency symbol, bank details, `session_timeout_minutes`
   — see "Idle session timeout" below — this is what prints on every PDF's
   header/footer, plus the one security policy value). `clients.js` also has
-  `GET /export.csv` (registered before `GET /:id` so it isn't shadowed by
-  the `:id` param). `PUT /` validates `session_timeout_minutes` is a whole
+  `GET /export.csv`/`GET /export.xlsx` (both registered before `GET /:id`
+  so neither is shadowed by the `:id` param). `PUT /` validates
+  `session_timeout_minutes` is a whole
   number between 1 and 480, and `starting_balance` is any finite number
   (negative allowed — an overdraft on the day you started using the app is
   a valid starting point, see "Bank balance" in `routes/financials.js`
@@ -283,7 +286,7 @@ are deliberately untouched by either, always returning every row.
   (`GET /:id/pdf`), email send (`POST /:id/send`), `POST /:id/duplicate`
   (copies client/items/discount/tax/notes into a new `draft` with a fresh
   number, `public_token`, and today's date — invoice duplicate also resets
-  `due_date` to +14 days), and `GET /export.csv`. `GET /` supports
+  `due_date` to +14 days), and `GET /export.csv`/`GET /export.xlsx`. `GET /` supports
   `?status=`, plus `?q=` (matching document number, joined client name, and
   status — the same fields the frontend used to filter client-side before
   this route grew server-side search) and `?page=` (see "Pagination
@@ -464,7 +467,7 @@ are deliberately untouched by either, always returning every row.
   (see `routes/licenses.js` above).
 - `routes/expenses.js` — CRUD for `expenses` (category/description/amount/
   expense_date/`payee`/notes) plus `GET /` (`?q=` search, `?page=` — see
-  "Pagination convention" above) and `GET /export.csv`. `GET /` also always
+  "Pagination convention" above) and `GET /export.csv`/`GET /export.xlsx`. `GET /` also always
   returns `totalAmount` (`SUM(amount)` over every row matching the current
   filters, computed independently of `LIMIT`/`OFFSET`) alongside
   `expenses` — `Expenses.jsx`'s "Total" row reads this rather than summing
@@ -519,7 +522,7 @@ are deliberately untouched by either, always returning every row.
   dropdown pattern) composed with `?page=` (see "Pagination convention"
   above), always returns `totalAmount` (independent of pagination, same
   reasoning as `expenses`'s own `totalAmount`), and has a matching
-  `GET /export.csv`. Gated by the existing `expenses` permission rather
+  `GET /export.csv`/`GET /export.xlsx`. Gated by the existing `expenses` permission rather
   than a new `MODULES` entry — same "reuse when the sensitivity level
   already matches" call `routes/reports.js` makes reusing `financials`
   (see below): this is the same kind of non-invoice cash-movement data
@@ -590,14 +593,14 @@ are deliberately untouched by either, always returning every row.
   what's just been paid/renewed rather than what happens to expire soonest;
   a license that's never been renewed has `last_renewed_at = NULL`, which
   SQLite sorts last in `DESC` order by default, so those naturally fall to
-  the bottom with no extra `CASE` needed. (`GET /export.csv` below keeps its
-  own separate `expiry_date ASC` order — a downloaded report reads better
-  chronologically by expiry than by renewal recency.) `GET /summary` is
-  independent of
+  the bottom with no extra `CASE` needed. (`GET /export.csv`/`GET
+  /export.xlsx` below keep their own separate `expiry_date ASC` order — a
+  downloaded report reads better chronologically by expiry than by renewal
+  recency.) `GET /summary` is independent of
   pagination/search — a `{ active, expiring_soon, expired, cancelled, total }`
   count across every license, backing the KPI strip at the top of
-  `Licenses.jsx` — and `GET /export.csv`, both following the usual
-  conventions. **The core action**: `POST /:id/renew` is "the client paid,
+  `Licenses.jsx` — and `GET /export.csv`/`GET /export.xlsx`, both following
+  the usual conventions. **The core action**: `POST /:id/renew` is "the client paid,
   extend it" — advances `expiry_date` by exactly one `billing_cycle`
   (`monthly` or `yearly`, month-end-clamped the same way `lib/scheduler.js`'s
   own `advanceDate()` handles Jan 31 → Feb) from the *current* `expiry_date`,
@@ -953,6 +956,25 @@ are deliberately untouched by either, always returning every row.
   counterpart — a small state-machine parser (handles quoted fields with
   embedded commas/newlines/escaped quotes, \r\n or \n line endings) that
   backs `routes/import.js`.
+- `lib/xlsx.js` — `toXlsxBuffer(rows, columns, sheetName)`, the `.xlsx`
+  counterpart to `toCsv()` above, built on `exceljs` (the one real npm
+  dependency either serializer needs — CSV is simple enough to hand-roll,
+  a valid `.xlsx` isn't). Takes the exact same `columns` shape, so every
+  `GET /export.xlsx` route reuses the identical `rows`/`columns` its
+  `GET /export.csv` sibling already defines (each of the six export-capable
+  route files below factors both into a shared `load*Export()` function for
+  this reason — one query, one column list, two serializers, no risk of the
+  two formats drifting apart). Unlike `toCsv`, which stringifies every
+  value (CSV has no cell types), values here keep their real JS type — a
+  number is written as a numeric cell, not text — so opening the file in
+  Excel/Sheets gives real, sortable/summable numbers for money/quantity
+  columns instead of text that merely looks like numbers. No CSV-injection
+  guard is needed here the way `toCsv`'s leading-`'` prefix is: that guard
+  exists because a CSV field is just re-parsed text a spreadsheet app might
+  reinterpret as a formula, but `exceljs` writing a plain string assignment
+  produces an explicit string-typed cell, which Excel never reinterprets as
+  a formula regardless of its leading character. `writeBuffer()` is async
+  (unlike `toCsv`), so every `GET /export.xlsx` handler is an `async` route.
 - `routes/import.js` — `POST /api/import/:type` (`type` is `clients`,
   `expenses`, `invoices`, `quotes`, or `licenses`) bulk-imports historical
   data from CSV text in the request body. Always validates every row first; `commit: false`
@@ -1453,11 +1475,25 @@ frontend stops holding/sending it.
   binary, not JSON) — `openPdf()` fetches with the auth header, turns the
   response into a blob URL, and `window.open()`s it; a plain `<a href>`
   can't attach the Authorization header, which is why this exists.
-  `downloadFile()` is the equivalent for CSV/other exports that should
-  force a real download rather than open in a tab (throwaway `<a download>`
-  click). The `public` object (`getQuote`, `respondQuote`, `getInvoice`,
-  `openQuotePdf`, `openInvoicePdf`) hits `/api/public/...` and is the one
-  set of calls that never passes a token.
+  `downloadFile()` is the equivalent for CSV/Excel/other exports that
+  should force a real download rather than open in a tab (throwaway
+  `<a download>` click) — it's format-agnostic (just fetches a URL as a
+  blob and force-downloads it under a given filename), so it needed no
+  changes when Excel exports were added, only new `exportXlsx()` entries
+  alongside each resource's existing `exportCsv()`. Every list page that
+  has an "Export CSV" button (`Clients.jsx`, `Quotes.jsx`, `Invoices.jsx`,
+  `Expenses.jsx`, `CapitalContributions.jsx`, `Licenses.jsx` — see each
+  resource's own `GET /export.csv`/`GET /export.xlsx` pair above) has a
+  matching "Export Excel" button right next to it, wired to a
+  `handleExportXlsx()` sibling of that page's existing `handleExportCsv()`
+  (renamed from the original unqualified `handleExport()` once there were
+  two formats to disambiguate between). `Products.jsx` and
+  `RecurringInvoices.jsx` don't have either button — neither ever had a
+  CSV export, and adding Excel-only export to just those two would be an
+  inconsistent, half-applied pattern; add both formats together if export
+  is ever wanted there. The `public` object (`getQuote`, `respondQuote`,
+  `getInvoice`, `openQuotePdf`, `openInvoicePdf`) hits `/api/public/...`
+  and is the one set of calls that never passes a token.
 - `pages/` — one component per route (`Landing`, `Login`, `ForgotPassword`,
   `ResetPassword`, `Dashboard`, `Users`, `MyAccount`), wired up in
   `App.jsx` via `react-router-dom`. There is no `Signup` page or `/signup`

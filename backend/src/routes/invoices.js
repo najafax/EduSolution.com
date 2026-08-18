@@ -10,6 +10,7 @@ const { invoiceSendEmail, invoiceRemindEmail, receiptSendEmail } = require('../l
 const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
+const { toXlsxBuffer } = require('../lib/xlsx');
 const { renewLicense } = require('../lib/licenseRenewal');
 
 const router = Router();
@@ -92,30 +93,49 @@ router.get('/', view, (req, res) => {
   });
 });
 
+// Shared by both export routes below so the CSV and XLSX downloads can
+// never drift apart — one row query, one column list, two serializers.
+function loadInvoiceExport() {
+  return {
+    rows: db
+      .prepare(
+        `SELECT invoices.*, clients.name AS client_name
+         FROM invoices JOIN clients ON clients.id = invoices.client_id
+         ORDER BY invoices.issue_date DESC, invoices.id DESC`,
+      )
+      .all()
+      .map(withComputed),
+    columns: [
+      { label: 'Number', key: 'number' },
+      { label: 'Client', key: 'client_name' },
+      { label: 'Status', key: 'status' },
+      { label: 'Issue date', key: 'issue_date' },
+      { label: 'Due date', key: 'due_date' },
+      { label: 'Subtotal', key: 'subtotal' },
+      { label: 'Discount', key: 'discount_amount' },
+      { label: 'Tax', key: 'tax_amount' },
+      { label: 'Total', key: 'total' },
+      { label: 'Amount paid', key: 'amount_paid' },
+      { label: 'Balance due', key: 'balance_due' },
+    ],
+  };
+}
+
 router.get('/export.csv', view, (req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT invoices.*, clients.name AS client_name
-       FROM invoices JOIN clients ON clients.id = invoices.client_id
-       ORDER BY invoices.issue_date DESC, invoices.id DESC`,
-    )
-    .all()
-    .map(withComputed);
-  const csv = toCsv(rows, [
-    { label: 'Number', key: 'number' },
-    { label: 'Client', key: 'client_name' },
-    { label: 'Status', key: 'status' },
-    { label: 'Issue date', key: 'issue_date' },
-    { label: 'Due date', key: 'due_date' },
-    { label: 'Subtotal', key: 'subtotal' },
-    { label: 'Discount', key: 'discount_amount' },
-    { label: 'Tax', key: 'tax_amount' },
-    { label: 'Total', key: 'total' },
-    { label: 'Amount paid', key: 'amount_paid' },
-    { label: 'Balance due', key: 'balance_due' },
-  ]);
+  const { rows, columns } = loadInvoiceExport();
+  const csv = toCsv(rows, columns);
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="invoices.csv"' });
   res.send(csv);
+});
+
+router.get('/export.xlsx', view, async (req, res) => {
+  const { rows, columns } = loadInvoiceExport();
+  const buffer = await toXlsxBuffer(rows, columns, 'Invoices');
+  res.set({
+    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'Content-Disposition': 'attachment; filename="invoices.xlsx"',
+  });
+  res.send(buffer);
 });
 
 // Year-over-year view, mirrors routes/licenses.js's own GET /analytics
