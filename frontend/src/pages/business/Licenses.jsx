@@ -247,10 +247,19 @@ export default function Licenses() {
     updateLicenseStatus(l, 'active', 'reactivate');
   }
 
-  async function handleExport() {
+  async function handleExportCsv() {
     setError('');
     try {
       await api.licenses.exportCsv(token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleExportXlsx() {
+    setError('');
+    try {
+      await api.licenses.exportXlsx(token);
     } catch (err) {
       setError(err.message);
     }
@@ -335,10 +344,16 @@ export default function Licenses() {
             Analytics
           </Link>
           <button
-            onClick={handleExport}
+            onClick={handleExportCsv}
             className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Export CSV
+          </button>
+          <button
+            onClick={handleExportXlsx}
+            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Export Excel
           </button>
           {canManage && (
             <button

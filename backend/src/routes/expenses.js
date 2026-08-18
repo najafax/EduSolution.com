@@ -3,6 +3,7 @@ const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
+const { toXlsxBuffer } = require('../lib/xlsx');
 
 const router = Router();
 router.use(requireAuth);
@@ -69,18 +70,37 @@ router.get('/', view, (req, res) => {
   });
 });
 
+// Shared by both export routes below so the CSV and XLSX downloads can
+// never drift apart — one row query, one column list, two serializers.
+function loadExpenseExport() {
+  return {
+    rows: db.prepare('SELECT * FROM expenses ORDER BY expense_date DESC, id DESC').all(),
+    columns: [
+      { label: 'Date', key: 'expense_date' },
+      { label: 'Category', key: 'category' },
+      { label: 'Description', key: 'description' },
+      { label: 'Amount', key: 'amount' },
+      { label: 'Payee', key: 'payee' },
+      { label: 'Notes', key: 'notes' },
+    ],
+  };
+}
+
 router.get('/export.csv', view, (req, res) => {
-  const rows = db.prepare('SELECT * FROM expenses ORDER BY expense_date DESC, id DESC').all();
-  const csv = toCsv(rows, [
-    { label: 'Date', key: 'expense_date' },
-    { label: 'Category', key: 'category' },
-    { label: 'Description', key: 'description' },
-    { label: 'Amount', key: 'amount' },
-    { label: 'Payee', key: 'payee' },
-    { label: 'Notes', key: 'notes' },
-  ]);
+  const { rows, columns } = loadExpenseExport();
+  const csv = toCsv(rows, columns);
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="expenses.csv"' });
   res.send(csv);
+});
+
+router.get('/export.xlsx', view, async (req, res) => {
+  const { rows, columns } = loadExpenseExport();
+  const buffer = await toXlsxBuffer(rows, columns, 'Expenses');
+  res.set({
+    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'Content-Disposition': 'attachment; filename="expenses.xlsx"',
+  });
+  res.send(buffer);
 });
 
 function validate(body) {

@@ -3,6 +3,7 @@ const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
+const { toXlsxBuffer } = require('../lib/xlsx');
 
 // Money an owner/partner puts INTO the business — the deliberate mirror of
 // an expenses row tagged 'shareholder payments' (money taken OUT), but its
@@ -72,16 +73,35 @@ router.get('/', view, (req, res) => {
   });
 });
 
+// Shared by both export routes below so the CSV and XLSX downloads can
+// never drift apart — one row query, one column list, two serializers.
+function loadContributionExport() {
+  return {
+    rows: db.prepare('SELECT * FROM capital_contributions ORDER BY contribution_date DESC, id DESC').all(),
+    columns: [
+      { label: 'Date', key: 'contribution_date' },
+      { label: 'Contributor', key: 'contributor_name' },
+      { label: 'Amount', key: 'amount' },
+      { label: 'Notes', key: 'notes' },
+    ],
+  };
+}
+
 router.get('/export.csv', view, (req, res) => {
-  const rows = db.prepare('SELECT * FROM capital_contributions ORDER BY contribution_date DESC, id DESC').all();
-  const csv = toCsv(rows, [
-    { label: 'Date', key: 'contribution_date' },
-    { label: 'Contributor', key: 'contributor_name' },
-    { label: 'Amount', key: 'amount' },
-    { label: 'Notes', key: 'notes' },
-  ]);
+  const { rows, columns } = loadContributionExport();
+  const csv = toCsv(rows, columns);
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="capital-contributions.csv"' });
   res.send(csv);
+});
+
+router.get('/export.xlsx', view, async (req, res) => {
+  const { rows, columns } = loadContributionExport();
+  const buffer = await toXlsxBuffer(rows, columns, 'Capital contributions');
+  res.set({
+    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'Content-Disposition': 'attachment; filename="capital-contributions.xlsx"',
+  });
+  res.send(buffer);
 });
 
 function validate(body) {

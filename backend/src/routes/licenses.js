@@ -6,6 +6,7 @@ const { licenseRemindEmail } = require('../lib/emailTemplates');
 const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
+const { toXlsxBuffer } = require('../lib/xlsx');
 const { renewLicense } = require('../lib/licenseRenewal');
 
 const router = Router();
@@ -117,28 +118,47 @@ router.get('/summary', view, (req, res) => {
   res.json(summary);
 });
 
+// Shared by both export routes below so the CSV and XLSX downloads can
+// never drift apart — one row query, one column list, two serializers.
+function loadLicenseExport() {
+  return {
+    rows: db
+      .prepare(
+        `SELECT licenses.*, clients.name AS client_name
+         FROM licenses JOIN clients ON clients.id = licenses.client_id
+         ORDER BY licenses.expiry_date ASC, licenses.id DESC`,
+      )
+      .all()
+      .map(withComputed),
+    columns: [
+      { label: 'Client', key: 'client_name' },
+      { label: 'License', key: 'name' },
+      { label: 'Status', key: 'display_status' },
+      { label: 'Billing cycle', key: 'billing_cycle' },
+      { label: 'Amount', key: 'amount' },
+      { label: 'Start date', key: 'start_date' },
+      { label: 'Expiry date', key: 'expiry_date' },
+      { label: 'URL', key: 'url' },
+      { label: 'Last renewed', key: 'last_renewed_at' },
+    ],
+  };
+}
+
 router.get('/export.csv', view, (req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT licenses.*, clients.name AS client_name
-       FROM licenses JOIN clients ON clients.id = licenses.client_id
-       ORDER BY licenses.expiry_date ASC, licenses.id DESC`,
-    )
-    .all()
-    .map(withComputed);
-  const csv = toCsv(rows, [
-    { label: 'Client', key: 'client_name' },
-    { label: 'License', key: 'name' },
-    { label: 'Status', key: 'display_status' },
-    { label: 'Billing cycle', key: 'billing_cycle' },
-    { label: 'Amount', key: 'amount' },
-    { label: 'Start date', key: 'start_date' },
-    { label: 'Expiry date', key: 'expiry_date' },
-    { label: 'URL', key: 'url' },
-    { label: 'Last renewed', key: 'last_renewed_at' },
-  ]);
+  const { rows, columns } = loadLicenseExport();
+  const csv = toCsv(rows, columns);
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="licenses.csv"' });
   res.send(csv);
+});
+
+router.get('/export.xlsx', view, async (req, res) => {
+  const { rows, columns } = loadLicenseExport();
+  const buffer = await toXlsxBuffer(rows, columns, 'Licenses');
+  res.set({
+    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'Content-Disposition': 'attachment; filename="licenses.xlsx"',
+  });
+  res.send(buffer);
 });
 
 // Historical, year-over-year view — distinct from GET /summary's current-

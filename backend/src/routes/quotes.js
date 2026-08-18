@@ -10,6 +10,7 @@ const { quoteSendEmail } = require('../lib/emailTemplates');
 const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
+const { toXlsxBuffer } = require('../lib/xlsx');
 
 const router = Router();
 router.use(requireAuth);
@@ -72,27 +73,46 @@ router.get('/', view, (req, res) => {
   res.json({ quotes: rows, page, pageSize: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) });
 });
 
+// Shared by both export routes below so the CSV and XLSX downloads can
+// never drift apart — one row query, one column list, two serializers.
+function loadQuoteExport() {
+  return {
+    rows: db
+      .prepare(
+        `SELECT quotes.*, clients.name AS client_name
+         FROM quotes JOIN clients ON clients.id = quotes.client_id
+         ORDER BY quotes.issue_date DESC, quotes.id DESC`,
+      )
+      .all(),
+    columns: [
+      { label: 'Number', key: 'number' },
+      { label: 'Client', key: 'client_name' },
+      { label: 'Status', key: 'status' },
+      { label: 'Issue date', key: 'issue_date' },
+      { label: 'Expiry date', key: 'expiry_date' },
+      { label: 'Subtotal', key: 'subtotal' },
+      { label: 'Discount', key: 'discount_amount' },
+      { label: 'Tax', key: 'tax_amount' },
+      { label: 'Total', key: 'total' },
+    ],
+  };
+}
+
 router.get('/export.csv', view, (req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT quotes.*, clients.name AS client_name
-       FROM quotes JOIN clients ON clients.id = quotes.client_id
-       ORDER BY quotes.issue_date DESC, quotes.id DESC`,
-    )
-    .all();
-  const csv = toCsv(rows, [
-    { label: 'Number', key: 'number' },
-    { label: 'Client', key: 'client_name' },
-    { label: 'Status', key: 'status' },
-    { label: 'Issue date', key: 'issue_date' },
-    { label: 'Expiry date', key: 'expiry_date' },
-    { label: 'Subtotal', key: 'subtotal' },
-    { label: 'Discount', key: 'discount_amount' },
-    { label: 'Tax', key: 'tax_amount' },
-    { label: 'Total', key: 'total' },
-  ]);
+  const { rows, columns } = loadQuoteExport();
+  const csv = toCsv(rows, columns);
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="quotes.csv"' });
   res.send(csv);
+});
+
+router.get('/export.xlsx', view, async (req, res) => {
+  const { rows, columns } = loadQuoteExport();
+  const buffer = await toXlsxBuffer(rows, columns, 'Quotes');
+  res.set({
+    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'Content-Disposition': 'attachment; filename="quotes.xlsx"',
+  });
+  res.send(buffer);
 });
 
 // Year-over-year view, mirrors routes/licenses.js's own GET /analytics
