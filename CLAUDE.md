@@ -1846,33 +1846,29 @@ frontend stops holding/sending it.
   email template to interpolate, not wired to one yet).
   **Row actions as icon buttons**: `rowActions()`'s Renew/Cancel/Reactivate/
   Remind/History/Edit/Delete buttons render as compact icon-only buttons
-  (`h-9 w-9`, `rounded-md`, a visible border, and a tone-tinted hover fill
-  via a shared `ACTION_BTN`/`ACTION_TONE` pair) rather than bare colored
-  text — this page in particular can show up to 6 actions per row, so a
-  row of plain text links read as clutter rather than distinct actions.
-  Each button keeps a `title` (doubling as the busy-state label, e.g.
-  "Renewing…") and an `aria-label`, since the icon alone carries the
-  action's meaning for a sighted mouse user but not for anyone else; Renew
-  additionally spins its `RefreshIcon` while busy (`animate-spin`) as a
-  literal loading indicator, which a static icon like Cancel's `XIcon` or
-  Reactivate's `CheckCircleIcon` wouldn't read as meaningfully mid-action.
-  The header's own Analytics/Export CSV/Export Excel/New license buttons
-  gained a leading icon each too (`ReportIcon`, `DownloadIcon` ×2,
-  `PlusIcon`) rather than staying bare text, since they already look like
-  buttons (bordered/filled) and a matching icon is a small, low-risk
-  finishing touch. The New/Edit license modal's own Save/Cancel buttons
-  were deliberately left as plain text, unlike every button above — that
-  exact form-footer pattern is reused verbatim across every other
-  resource's create/edit modal (`Clients.jsx`, `Products.jsx`,
-  `Expenses.jsx`, etc.), so icon-ing it only here would make it the one
-  inconsistent modal footer in the app rather than a more polished one.
-  `components/icons.jsx` gained six new icons for this pass — `RefreshIcon`,
-  `BellIcon`, `HistoryIcon` (a clock with a back-arrow tail, deliberately
-  distinct from the plain `ClockIcon` already meaning "expiring soon" on
-  this same page's KPI strip), `PencilIcon`, `TrashIcon`, `DownloadIcon` —
-  plus `PlusIcon`, kept separate from `FloatingActionButton.jsx`'s own
-  private inline `PlusIcon` rather than consolidating the two, since that
-  refactor wasn't otherwise in scope here.
+  (`components/IconActionButton.jsx` — see "Icon action buttons" below)
+  rather than bare colored text — this page in particular can show up to 6
+  actions per row, so a row of plain text links read as clutter rather than
+  distinct actions; this was in fact where the whole app-wide icon-button
+  convention started, before being extracted into that shared component and
+  rolled out everywhere else. Each button keeps a `title` (doubling as the
+  busy-state label, e.g. "Renewing…") and an `aria-label`/`label`, since the
+  icon alone carries the action's meaning for a sighted mouse user but not
+  for anyone else; Renew additionally spins its `RefreshIcon` while busy
+  (`IconActionButton`'s `spinning` prop) as a literal loading indicator,
+  which a static icon like Cancel's `XIcon` or Reactivate's
+  `CheckCircleIcon` wouldn't read as meaningfully mid-action. The header's
+  own Analytics/Export CSV/Export Excel/New license buttons gained a
+  leading icon each too (`ReportIcon`, `DownloadIcon` ×2, `PlusIcon`)
+  rather than staying bare text. `components/icons.jsx` gained several new
+  icons for this pass — `RefreshIcon`, `BellIcon`, `HistoryIcon` (a clock
+  with a back-arrow tail, deliberately distinct from the plain `ClockIcon`
+  already meaning "expiring soon" on this same page's KPI strip),
+  `PencilIcon`, `TrashIcon`, `DownloadIcon`, `PlusIcon` (kept separate from
+  `FloatingActionButton.jsx`'s own private inline `PlusIcon` rather than
+  consolidating the two, since that refactor wasn't otherwise in scope),
+  `SendIcon`, and `DuplicateIcon` — see "Icon action buttons" below for the
+  full list and where each is used.
   `ActivityLog.jsx` is a simple paginated read-only list. `Import.jsx` (linked from `Settings.jsx`, not a top-level
   Navbar item — it's a rare-use admin tool) reads a chosen CSV file
   client-side via `FileReader`, calls `api.import.run(type, csv, commit,
@@ -2331,6 +2327,84 @@ keeps its existing layout.
   already surfaces balance due inline), this is purely a phone-first
   "surface the number before the fold" addition and doesn't change any
   desktop markup or the page's data flow.
+
+### Icon action buttons
+
+A standing, app-wide convention: every list/detail page's row and header
+action buttons carry an icon, not just text — started on
+`pages/business/Licenses.jsx` (see above for the fuller story of why),
+then rolled out to every other page with the same shape once the pattern
+proved out, rather than staying a one-off.
+
+- `components/IconActionButton.jsx` — the shared building block for
+  **row-level** actions (Edit/Delete/Renew/Duplicate/etc.): a compact
+  `h-9 w-9` icon-only button, `rounded-md` with a visible border and a
+  tone-tinted hover fill, so it reads as a real button rather than bare
+  colored text even at that size. Takes `{ icon, tone, title, label,
+  onClick, disabled, spinning, type }` — `tone` is one of `lagoon` /
+  `emerald` / `amber` / `orange` / `slate` / `red`, the same semantic
+  colors used everywhere else in the app (red = destructive, emerald =
+  positive, etc.); `title` doubles as the tooltip and, when `label` is
+  omitted, the `aria-label` too (pass `label` separately only when the
+  two need to differ, e.g. a title that changes to a busy-state message
+  like "Renewing…" while the accessible name should stay constant);
+  `spinning` adds `animate-spin` to the icon for a literal loading
+  indicator (used by Renew's `RefreshIcon` — see `Licenses.jsx` above for
+  why not every action's icon gets this treatment). Every list page's
+  desktop table action cell and mobile `MobileListAccordion` card use the
+  exact same `IconActionButton` calls (just wrapped in a `flex justify-
+  end gap-1.5` vs. a plain `flex gap-1.5 pt-1` container), so the two
+  breakpoints can never drift.
+- Row actions built on `IconActionButton`: `Licenses.jsx` (Renew/Cancel/
+  Reactivate/Remind/History/Edit/Delete — the original, most elaborate
+  case, see above), `Clients.jsx`/`Products.jsx`/`Expenses.jsx`/
+  `CapitalContributions.jsx`/`RecurringInvoices.jsx` (Edit/Delete, tone
+  `slate`/`red`), `Users.jsx` (Edit/Reset password/Delete — the new
+  `KeyIcon` is this page's one addition, since nothing else in the app
+  needed a "reset password" glyph), and `InvoiceDetail.jsx`'s Payments
+  table (Download/Email per receipt row, both tone `lagoon`).
+- **Header** action buttons (Analytics, Export CSV, Export Excel, New X)
+  and **detail-page** action buttons (Edit, Download PDF, Email to
+  client, Send reminder, Duplicate, Convert to invoice, Void, Delete,
+  Record payment) are a different shape — prominent, multi-word, already
+  visually button-styled (bordered or filled) before this convention
+  existed — so these keep their text and just gain a **leading icon**
+  inline in the same `<button>`/`<Link>` (`flex items-center gap-1.5`),
+  rather than switching to `IconActionButton`'s icon-only shape. Applied
+  to every list page's header row (`Clients.jsx`, `Products.jsx`,
+  `Expenses.jsx`, `CapitalContributions.jsx`, `RecurringInvoices.jsx`,
+  `Users.jsx`, `Quotes.jsx`, `Invoices.jsx`, `Licenses.jsx`) and both
+  document detail pages (`QuoteDetail.jsx`, `InvoiceDetail.jsx`).
+- **Deliberately left untouched**: every modal-form's Save/Cancel footer
+  (`Clients.jsx`, `Products.jsx`, `Expenses.jsx`,
+  `CapitalContributions.jsx`, `RecurringInvoices.jsx`, `Users.jsx` — both
+  its create/edit and reset-password forms, `Licenses.jsx`) and any other
+  plain form-submit button (e.g. `QuoteDetail.jsx`'s inline "Create
+  invoice" convert form). These are all the exact same shared
+  Save/Cancel-footer shape reused verbatim across every resource in the
+  app — icon-ing it on just one or two pages would make those the
+  inconsistent ones, not a polished addition — and a form's own submit
+  button reads as "submit this form," not a standalone action a user
+  scans for among several others, so it doesn't have the same
+  scannability problem the row/header buttons above were solving.
+  `Financials.jsx`'s receipt-download button and `Reports.jsx`'s
+  per-report "Download PDF" buttons are similarly out of scope: each is a
+  single, already clearly-labeled action embedded in its own context
+  (a data table cell, a dedicated report card), not one of several
+  same-row actions competing for scannability.
+- `components/icons.jsx` gained several icons across this rollout, all
+  following the file's existing 20×20/1.5px-stroke/`currentColor`
+  convention: `RefreshIcon` (Renew), `BellIcon` (Remind/Send reminder),
+  `HistoryIcon` (a clock with a back-arrow tail — deliberately distinct
+  from the plain `ClockIcon`, which already means "expiring soon"
+  elsewhere on `Licenses.jsx`), `PencilIcon` (Edit), `TrashIcon`
+  (Delete), `DownloadIcon` (Export/Download PDF/receipt download),
+  `PlusIcon` (New X/Record payment — kept separate from
+  `FloatingActionButton.jsx`'s own private inline `PlusIcon`, since
+  consolidating the two wasn't otherwise in scope), `KeyIcon` (Reset
+  password), `SendIcon` (Email to client/receipt — a paper plane,
+  distinct from `BellIcon`'s reminder-nudge meaning), and `DuplicateIcon`
+  (two overlapping documents, for Duplicate).
 
 ### Responsive / PWA
 

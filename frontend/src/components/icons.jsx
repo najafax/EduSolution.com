@@ -249,6 +249,16 @@ export function PencilIcon(props) {
   );
 }
 
+// A key — "reset password" (Users.jsx's Reset password action button).
+export function KeyIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="7" cy="13" r="3.5" />
+      <path d="M9.5 10.5 16 4M13.5 6 15.5 8M16 4l1.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // A trash can — "delete" (Licenses.jsx's Delete action button).
 export function TrashIcon(props) {
   return (
@@ -256,6 +266,29 @@ export function TrashIcon(props) {
       <path d="M4 6h12M8 6V4.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V6" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M5.5 6 6 16a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l.5-10" strokeLinejoin="round" />
       <path d="M8.5 9v5M11.5 9v5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// A paper plane — "send" (QuoteDetail.jsx/InvoiceDetail.jsx's "Email to
+// client" buttons, and the Payments table's per-receipt "Email" action),
+// distinct from BellIcon's "remind" — this is the send action itself, not
+// a reminder nudge.
+export function SendIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M17 3 2.5 9.2l5.3 2.1M17 3l-5.3 13.5-3.9-5.2M17 3 8 11.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// Two overlapping documents — "duplicate" (QuoteDetail.jsx/
+// InvoiceDetail.jsx's Duplicate buttons).
+export function DuplicateIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M7.5 3.5h7A1.5 1.5 0 0 1 16 5v7a1.5 1.5 0 0 1-1.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="4" y="7" width="9" height="10" rx="1.5" />
     </svg>
   );
 }
