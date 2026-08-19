@@ -1537,54 +1537,68 @@ frontend stops holding/sending it.
   `getInvoice`, `openQuotePdf`, `openInvoicePdf`) hits `/api/public/...`
   and is the one set of calls that never passes a token.
 - `pages/Login.jsx` (routes `/` **and** `/login`, both public, both render
-  this same component — see `App.jsx`) is the app's front door. There is
-  no separate Landing page — it existed briefly as its own marketing page
-  (a hero + feature grid + "how it works" + mission section), but this app
-  has no public signup (see `routes/auth.js` above), so realistically
-  every real visitor here is either signing in or already signed in; a
-  standalone marketing page that isn't where you actually log in was
-  friction, not value. Login absorbed all of that marketing content
-  instead, with the login form itself as the hero's primary element rather
-  than a "Log in" button pointing at a separate page. Two things this
-  merge changed in `Login` beyond just moving the JSX over: (1) an
-  already-authenticated visit — the Navbar brand link, a stale bookmark —
-  now redirects straight to `/dashboard` rather than showing a login form/
-  marketing page with nothing left to do there; `Login` checks `token`/
-  `loading` from `useAuth()` and renders `<Navigate to="/dashboard"
-  replace />` once resolved, the same loading/token pattern
-  `ProtectedRoute.jsx` uses (mirrored rather than shared, since the
-  redirect target and the "what to show while deciding" differ). (2) the
+  this same component — see `App.jsx`) is the app's front door — there is
+  no separate Landing page. This app has no public signup (see
+  `routes/auth.js` above), so realistically every real visitor here is
+  either signing in or already signed in; a standalone marketing page
+  that isn't where you actually log in was friction, not value. The login
+  form is the hero's primary element rather than a "Log in" button
+  pointing at a separate page, and an already-authenticated visit (the
+  Navbar brand link, a stale bookmark) redirects straight to `/dashboard`
+  instead of showing a login form/marketing page with nothing left to do
+  there — `Login` checks `token`/`loading` from `useAuth()` and renders
+  `<Navigate to="/dashboard" replace />` once resolved, the same
+  loading/token pattern `ProtectedRoute.jsx` uses (mirrored rather than
+  shared, since the redirect target and the "what to show while deciding"
+  differ). The actual form (email/password/forgot-password link/submit,
+  plus the idle-logout and post-reset-password notice banner) is
+  `LoginForm`, a local sub-component rendered inside `HeroLoginCard`
+  (a soft blurred-gradient-circle backdrop) — kept separate from the
+  exported `Login` component so the redirect-when-authenticated check
+  above doesn't have to sit inside (and re-render with) the form's own
+  state.
+
+  The page below the hero is intentionally light: a hero (eyebrow pill,
+  "Welcome to Edu Solutions" headline + `font-display` sub-headline,
+  business-description paragraph, "Visit edusolutionsmv.com" link,
+  `CheckCircleIcon` trust bullets), then a single EduPage panel, then an
+  "Our mission" section, then the closing wordmark/link section. The
   hero's two-column grid (stacked on mobile, `lg:grid-cols-2` side by side
   on desktop) puts the login form *first* in source order — so it's what a
   phone visitor sees before any marketing copy — and only reorders to
-  marketing-copy-left/form-right via `lg:order-1`/`lg:order-2` once
-  there's room for both side by side; this is a deliberate reversal of the
-  old Landing page's text-first mobile order, on the reasoning above that
-  most visitors here just want to sign in, not read about the product
-  first. Everything else carries over unchanged from the old Landing page:
-  the eyebrow pill ("Educational Technology Consultancy"), "Welcome to Edu
-  Solutions" headline plus `font-display` sub-headline, business-
-  description paragraph, "Visit edusolutionsmv.com" link, `CheckCircleIcon`
-  trust bullets (PDF invoicing, client self-serve links, automated
-  reminders, recurring billing, role-based access), the 6-card feature
-  grid (Clients, Quotes, Invoices, Payments & financials, Recurring &
-  reminders, License tracking — icon-chip tones borrowed from
-  `KpiCard.jsx`'s own `TONES` palette so color still means the same thing
-  it does on a real KPI card), the "How it works" 3-step section (Create →
-  Send → Get paid — `components/icons.jsx`'s `SendIcon`, added for this,
-  is the one icon with nothing else using it yet), the "Our mission"
-  section, and the closing wordmark/link section. The old Landing page's
-  CTA band ("Ready to get started? Log in") was dropped rather than
-  carried over — it would just be a second, redundant "Log in" pointing at
-  a form already visible at the top of the same page. The actual login
-  form (email/password/forgot-password link/submit, plus the idle-logout
-  and post-reset-password notice banner — unchanged from the original
-  standalone `Login.jsx`) is `LoginForm`, a local sub-component rendered
-  inside `HeroLoginCard` (the same soft blurred-gradient-circle treatment
-  the old `HeroPreview` used, now framing the real form instead of a mock
-  invoice card) — kept separate from the exported `Login` component so the
-  redirect-when-authenticated check above doesn't have to sit inside (and
-  re-render with) the form's own state.
+  copy-left/form-right via `lg:order-1`/`lg:order-2` once there's room for
+  both side by side, on the reasoning that most visitors here just want
+  to sign in, not read about the product first. A 6-card feature grid
+  (Clients/Quotes/Invoices/Payments & financials/Recurring & reminders/
+  License tracking) and a "How it works" 3-step section both existed here
+  at points but were removed outright rather than kept around unused —
+  `components/icons.jsx`'s `SendIcon` (only ever used by "How it works")
+  was deleted with it.
+
+  The EduPage panel is its own section (`bg-slate-50`, bordered
+  `rounded-2xl` card, centered `max-w-3xl`) rather than folded into
+  anything else: a mention of EduPage (aSc EduPage, `edupage.org`) — a
+  real, separate school-management platform (timetabling, attendance,
+  digital class registers, homework, e-learning), unrelated to the
+  billing tools this app itself provides. Its copy states the actual
+  business relationship directly — **"Edu Solutions Pvt Ltd is an
+  authorized distributor of EduPage products in the Maldives"** — a
+  specific, verified business fact that any future copy pass on this page
+  must keep verbatim rather than softening into vaguer phrasing. Icon is
+  `GraduationCapIcon` (`components/icons.jsx` — added because none of the
+  CRM/billing icons fit "a school platform," and reusing `UsersIcon`/
+  `LicenseIcon` here would borrow an icon that carries a different
+  meaning elsewhere in the app), under a "Technology partner" eyebrow,
+  with a "Learn more about EduPage" link out to `edupage.org`
+  (`target="_blank"`) — the genuine, verifiable product this refers to.
+
+  "Our mission" (eyebrow "About EduSolutions Maldives") sits on a plain
+  (non-`bg-slate-50`) background with its own `border-b`, so it doesn't
+  read as visually identical to the EduPage panel's `bg-slate-50` section
+  right above it. The old Landing page's CTA band ("Ready to get started?
+  Log in") was dropped rather than carried over — it would just be a
+  second, redundant "Log in" pointing at a form already visible at the
+  top of the same page.
 - `pages/` — one component per route (`Login`, `ForgotPassword`,
   `ResetPassword`, `Dashboard`, `Users`, `MyAccount`), wired up in
   `App.jsx` via `react-router-dom`. There is no `Signup` page or `/signup`

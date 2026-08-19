@@ -3,85 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { IDLE_LOGOUT_MESSAGE_KEY } from '../components/IdleTimeoutMonitor';
-import {
-  UsersIcon,
-  QuoteIcon,
-  InvoiceIcon,
-  BankIcon,
-  ClockIcon,
-  LicenseIcon,
-  SendIcon,
-  CheckCircleIcon,
-} from '../components/icons';
-
-// Icon-chip color per feature — reuses KpiCard's own tone palette (see
-// KpiCard.jsx's TONES) so "money" cards read emerald and "time-sensitive"
-// cards read amber the same way a real KpiCard would, rather than a
-// one-off palette invented just for this page. Clients/Quotes/Invoices/
-// Licenses stay lagoon (the app's neutral/brand hue) since they're core
-// modules, not a positive/warning signal in their own right.
-const TONE = {
-  lagoon: 'bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400',
-  emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
-  amber: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
-};
-
-const FEATURES = [
-  {
-    icon: UsersIcon,
-    tone: 'lagoon',
-    title: 'Clients',
-    description: "Keep every client's contact details, and their full quote and invoice history, in one place.",
-  },
-  {
-    icon: QuoteIcon,
-    tone: 'lagoon',
-    title: 'Quotes',
-    description: 'Send professional quotes your client can accept or decline online, then convert one to an invoice in a click.',
-  },
-  {
-    icon: InvoiceIcon,
-    tone: 'lagoon',
-    title: 'Invoices',
-    description: 'Generate polished PDF invoices, email them straight to a client, and track balances due automatically.',
-  },
-  {
-    icon: BankIcon,
-    tone: 'emerald',
-    title: 'Payments & financials',
-    description: 'Record payments as they land, watch your bank balance, and see revenue and profit at a glance.',
-  },
-  {
-    icon: ClockIcon,
-    tone: 'amber',
-    title: 'Recurring & reminders',
-    description: 'Recurring invoices generate themselves on schedule, and overdue reminders go out automatically.',
-  },
-  {
-    icon: LicenseIcon,
-    tone: 'lagoon',
-    title: 'License tracking',
-    description: "Track a client's software licenses, with expiry alerts and automatic renewal the moment they pay.",
-  },
-];
-
-const STEPS = [
-  {
-    icon: QuoteIcon,
-    title: 'Create',
-    description: 'Build a quote or invoice from your product catalog — line items, discounts, and tax computed for you.',
-  },
-  {
-    icon: SendIcon,
-    title: 'Send',
-    description: 'Email it as a PDF with a secure link your client can open, accept, or pay from — no account required.',
-  },
-  {
-    icon: CheckCircleIcon,
-    title: 'Get paid',
-    description: 'Record the payment and watch invoices, financials, and even license renewals update on their own.',
-  },
-];
+import { CheckCircleIcon, GraduationCapIcon } from '../components/icons';
 
 const TRUST_ITEMS = ['PDF invoicing', 'Client self-serve links', 'Automated reminders', 'Recurring billing', 'Role-based access'];
 
@@ -238,11 +160,12 @@ export default function Login() {
               Welcome to <span className="text-lagoon-600">Edu Solutions</span>
             </h1>
             <p className="mt-4 font-display text-lg font-bold text-slate-700 sm:text-xl dark:text-slate-300">
-              Quotes, invoices, and payments — handled for you.
+              From your first quote to the final payment — all handled in one place.
             </p>
             <p className="mx-auto mt-4 max-w-xl text-base text-slate-600 sm:text-lg lg:mx-0 dark:text-slate-400">
-              EduSolutions Maldives is a registered Educational Technology Consultancy business connecting and
-              adapting the latest edtech innovations to meet the evolving needs of 21st-century education.
+              EduSolutions Maldives is a registered Educational Technology Consultancy, bringing the latest edtech
+              innovations to schools and institutions across the Maldives to meet the evolving demands of
+              21st-century education.
             </p>
             <div className="mt-8 flex justify-center lg:justify-start">
               <a
@@ -268,76 +191,55 @@ export default function Login() {
 
       <section className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
         <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-              Everything your business needs in one place
-            </h2>
-            <p className="mt-3 text-sm text-slate-600 sm:text-base dark:text-slate-400">
-              EduSolution.com brings your clients, quotes, invoices, and payments together, so you can spend less
-              time on admin and more time on what matters.
-            </p>
-          </div>
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => (
-              <div
-                key={feature.title}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
-              >
-                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${TONE[feature.tone]}`}>
-                  <feature.icon />
-                </div>
-                <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">{feature.title}</h3>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{feature.description}</p>
+          {/* EduPage is a real, separate school-management platform (aSc
+              EduPage, edupage.org), not a module of this app — it gets its
+              own section rather than living inside the app's own feature
+              grid (removed; see git history for the 6-card "Clients/Quotes/
+              Invoices/Payments & financials/Recurring & reminders/License
+              tracking" grid that used to sit above this panel). */}
+          <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900 sm:p-8">
+            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400">
+                <GraduationCapIcon />
               </div>
-            ))}
+              <div className="flex-1">
+                <p className="text-xs font-bold tracking-wide text-lagoon-600 uppercase dark:text-lagoon-400">
+                  Technology partner
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                  Also serving schools through EduPage
+                </h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Edu Solutions Pvt Ltd is an authorized distributor of EduPage products in the Maldives. EduPage is
+                  a cloud-based school management platform used by schools around the world to handle timetabling,
+                  attendance, digital class registers, homework, and e-learning, while keeping teachers, students,
+                  and parents connected.
+                </p>
+              </div>
+              <a
+                href="https://www.edupage.org"
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-h-11 w-full shrink-0 items-center justify-center rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Learn more about EduPage
+              </a>
+            </div>
           </div>
         </div>
       </section>
 
       <section className="border-b border-slate-200 dark:border-slate-800">
-        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-              How it works
-            </h2>
-            <p className="mt-3 text-sm text-slate-600 sm:text-base dark:text-slate-400">
-              From first quote to final payment, in three steps.
-            </p>
-          </div>
-          <div className="mt-10 grid gap-8 sm:grid-cols-3 sm:gap-6">
-            {STEPS.map((step, index) => (
-              <div key={step.title} className="relative text-center sm:text-left">
-                {index < STEPS.length - 1 && (
-                  <div
-                    aria-hidden
-                    className="absolute top-6 left-[calc(50%+2.75rem)] hidden h-px w-[calc(100%-5.5rem)] bg-slate-200 sm:block dark:bg-slate-700"
-                  />
-                )}
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-lagoon-600 text-white shadow-sm shadow-lagoon-900/20 sm:mx-0">
-                  <step.icon width={22} height={22} />
-                </div>
-                <p className="mt-4 text-xs font-bold tracking-wide text-lagoon-600 uppercase dark:text-lagoon-400">
-                  Step {index + 1}
-                </p>
-                <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{step.title}</h3>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{step.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-slate-50 dark:bg-slate-900/50">
         <div className="mx-auto max-w-4xl px-4 py-14 text-center sm:px-6 sm:py-20">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-lagoon-200 bg-white px-3 py-1 text-xs font-semibold text-lagoon-700 dark:border-lagoon-800 dark:bg-slate-900 dark:text-lagoon-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-lagoon-200 bg-lagoon-50 px-3 py-1 text-xs font-semibold text-lagoon-700 dark:border-lagoon-800 dark:bg-lagoon-950/60 dark:text-lagoon-400">
             About EduSolutions Maldives
           </span>
           <h2 className="mt-5 font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             Our mission
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg dark:text-slate-400">
-            Our mission is to empower educational institutions with smart, scalable, and futuristic solutions that
-            drive excellence in teaching, learning, and administration.
+            We're committed to equipping educational institutions with smart, scalable, forward-looking solutions
+            that raise the standard of teaching, learning, and administration.
           </p>
         </div>
       </section>
