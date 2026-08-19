@@ -3,9 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { IDLE_LOGOUT_MESSAGE_KEY } from '../components/IdleTimeoutMonitor';
-import { CheckCircleIcon, GraduationCapIcon } from '../components/icons';
-
-const TRUST_ITEMS = ['PDF invoicing', 'Client self-serve links', 'Automated reminders', 'Recurring billing', 'Role-based access'];
+import { GraduationCapIcon } from '../components/icons';
 
 function LoginForm() {
   const { login } = useAuth();
@@ -159,9 +157,6 @@ export default function Login() {
             <h1 className="mt-5 font-display text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
               Welcome to <span className="text-lagoon-600">Edu Solutions</span>
             </h1>
-            <p className="mt-4 font-display text-lg font-bold text-slate-700 sm:text-xl dark:text-slate-300">
-              From your first quote to the final payment — all handled in one place.
-            </p>
             <p className="mx-auto mt-4 max-w-xl text-base text-slate-600 sm:text-lg lg:mx-0 dark:text-slate-400">
               EduSolutions Maldives is a registered Educational Technology Consultancy, bringing the latest edtech
               innovations to schools and institutions across the Maldives to meet the evolving demands of
@@ -176,14 +171,6 @@ export default function Login() {
               >
                 Visit edusolutionsmv.com
               </a>
-            </div>
-            <div className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-2 lg:justify-start">
-              {TRUST_ITEMS.map((item) => (
-                <span key={item} className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-                  <CheckCircleIcon width={14} height={14} className="text-lagoon-600 dark:text-lagoon-400" />
-                  {item}
-                </span>
-              ))}
             </div>
           </div>
         </div>
