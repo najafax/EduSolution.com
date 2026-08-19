@@ -2,7 +2,7 @@
 // appears at the bottom of every page (public and authenticated alike).
 // Deliberately slim: this is an internal business app, not a marketing
 // site, so it's one quiet closing line rather than a multi-column link
-// directory — Landing.jsx's own richer closing section (wordmark + link)
+// directory — Login.jsx's own richer closing section (wordmark + link)
 // stays as that page's own content, this renders right below it there too.
 // `className` (default '') lets App.jsx hide this on phones once a user is
 // logged in — see App.jsx's own comment on why, next to where it's passed.

@@ -6,7 +6,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import IdleTimeoutMonitor from './components/IdleTimeoutMonitor';
 import CommandPalette from './components/CommandPalette';
 import { useAuth } from './context/AuthContext';
-import Landing from './pages/Landing';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -58,7 +57,11 @@ export default function App() {
       <div className={`flex flex-1 flex-col ${user ? 'pb-16 sm:pb-0' : ''}`}>
         <div className="flex-1">
           <Routes>
-            <Route path="/" element={<Landing />} />
+            {/* Login is also the app's landing page — see pages/Login.jsx's
+                own comment for why there's no separate Landing component
+                anymore. Both paths render the same element so a bookmarked
+                or shared "/login" link keeps working unchanged. */}
+            <Route path="/" element={<Login />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
