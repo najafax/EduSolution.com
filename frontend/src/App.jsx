@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 import BottomNav from './components/BottomNav';
 import ProtectedRoute from './components/ProtectedRoute';
 import IdleTimeoutMonitor from './components/IdleTimeoutMonitor';
@@ -43,53 +44,67 @@ function Protected({ children }) {
 export default function App() {
   const { user } = useAuth();
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950">
+    <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950">
       <Navbar />
       <IdleTimeoutMonitor />
       <CommandPalette />
-      {/* BottomNav is phone-only (sm:hidden) and fixed, so logged-in pages
-          need bottom padding on phones or the tab bar covers their last
-          content/action buttons — see BottomNav.jsx. */}
-      <div className={user ? 'pb-16 sm:pb-0' : undefined}>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/q/:token" element={<PublicQuote />} />
-          <Route path="/i/:token" element={<PublicInvoice />} />
-          <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+      {/* flex-1 + flex-col here (rather than on the outer div) is what pins
+          Footer to the bottom of the viewport on short pages (e.g. Login)
+          while letting it flow naturally below content on tall ones —
+          the standard sticky-footer pattern. BottomNav is phone-only
+          (sm:hidden) and fixed, so logged-in pages still need the bottom
+          padding on phones or the tab bar covers Footer/the page's last
+          content — see BottomNav.jsx. */}
+      <div className={`flex flex-1 flex-col ${user ? 'pb-16 sm:pb-0' : ''}`}>
+        <div className="flex-1">
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/q/:token" element={<PublicQuote />} />
+            <Route path="/i/:token" element={<PublicInvoice />} />
+            <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
 
-          <Route path="/clients" element={<Protected><Clients /></Protected>} />
-          <Route path="/products" element={<Protected><Products /></Protected>} />
-          <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
-          <Route path="/capital-contributions" element={<Protected><CapitalContributions /></Protected>} />
-          <Route path="/settings" element={<Protected><Settings /></Protected>} />
-          <Route path="/import" element={<Protected><Import /></Protected>} />
+            <Route path="/clients" element={<Protected><Clients /></Protected>} />
+            <Route path="/products" element={<Protected><Products /></Protected>} />
+            <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
+            <Route path="/capital-contributions" element={<Protected><CapitalContributions /></Protected>} />
+            <Route path="/settings" element={<Protected><Settings /></Protected>} />
+            <Route path="/import" element={<Protected><Import /></Protected>} />
 
-          <Route path="/quotes" element={<Protected><Quotes /></Protected>} />
-          <Route path="/quotes/analytics" element={<Protected><QuoteAnalytics /></Protected>} />
-          <Route path="/quotes/new" element={<Protected><QuoteForm /></Protected>} />
-          <Route path="/quotes/:id" element={<Protected><QuoteDetail /></Protected>} />
-          <Route path="/quotes/:id/edit" element={<Protected><QuoteForm /></Protected>} />
+            <Route path="/quotes" element={<Protected><Quotes /></Protected>} />
+            <Route path="/quotes/analytics" element={<Protected><QuoteAnalytics /></Protected>} />
+            <Route path="/quotes/new" element={<Protected><QuoteForm /></Protected>} />
+            <Route path="/quotes/:id" element={<Protected><QuoteDetail /></Protected>} />
+            <Route path="/quotes/:id/edit" element={<Protected><QuoteForm /></Protected>} />
 
-          <Route path="/invoices" element={<Protected><Invoices /></Protected>} />
-          <Route path="/invoices/analytics" element={<Protected><InvoiceAnalytics /></Protected>} />
-          <Route path="/invoices/new" element={<Protected><InvoiceForm /></Protected>} />
-          <Route path="/invoices/:id" element={<Protected><InvoiceDetail /></Protected>} />
-          <Route path="/invoices/:id/edit" element={<Protected><InvoiceForm /></Protected>} />
+            <Route path="/invoices" element={<Protected><Invoices /></Protected>} />
+            <Route path="/invoices/analytics" element={<Protected><InvoiceAnalytics /></Protected>} />
+            <Route path="/invoices/new" element={<Protected><InvoiceForm /></Protected>} />
+            <Route path="/invoices/:id" element={<Protected><InvoiceDetail /></Protected>} />
+            <Route path="/invoices/:id/edit" element={<Protected><InvoiceForm /></Protected>} />
 
-          <Route path="/recurring-invoices" element={<Protected><RecurringInvoices /></Protected>} />
-          <Route path="/licenses" element={<Protected><Licenses /></Protected>} />
-          <Route path="/licenses/analytics" element={<Protected><LicenseAnalytics /></Protected>} />
+            <Route path="/recurring-invoices" element={<Protected><RecurringInvoices /></Protected>} />
+            <Route path="/licenses" element={<Protected><Licenses /></Protected>} />
+            <Route path="/licenses/analytics" element={<Protected><LicenseAnalytics /></Protected>} />
 
-          <Route path="/financials" element={<Protected><Financials /></Protected>} />
-          <Route path="/reports" element={<Protected><Reports /></Protected>} />
-          <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
-          <Route path="/users" element={<Protected><Users /></Protected>} />
-          <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
-          <Route path="/account" element={<Protected><MyAccount /></Protected>} />
-        </Routes>
+            <Route path="/financials" element={<Protected><Financials /></Protected>} />
+            <Route path="/reports" element={<Protected><Reports /></Protected>} />
+            <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
+            <Route path="/users" element={<Protected><Users /></Protected>} />
+            <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
+            <Route path="/account" element={<Protected><MyAccount /></Protected>} />
+          </Routes>
+        </div>
+        {/* Hidden on phones while logged in: BottomNav + each page's own
+            FloatingActionButton (fixed, sm:hidden) already own that screen
+            real estate there, and the FAB's fixed bottom offset lands right
+            in Footer's band on short-content pages (e.g. an empty list),
+            overlapping its copyright text — see FloatingActionButton.jsx.
+            Logged-out mobile pages (Login, Landing, public quote/invoice
+            links) have neither, so Footer stays visible there. */}
+        <Footer className={user ? 'hidden sm:block' : ''} />
       </div>
       {user && <BottomNav />}
     </div>

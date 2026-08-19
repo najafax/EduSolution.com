@@ -2169,6 +2169,45 @@ keeps its existing layout.
   the hamburger toggle itself + its dropdown drawer, now `hidden sm:flex`/
   `hidden sm:block` — visible from `sm` up to `xl` (tablets) only, since
   phones use `BottomNav.jsx` instead. `xl:flex` desktop nav is unchanged.
+- `components/Footer.jsx` — a small global closing bar (small
+  `/logo-symbol.png` mark + "EduSolution.com" wordmark on one side, a
+  dynamic `© {new Date().getFullYear()} EduSolutions Maldives. All rights
+  reserved.` — the year computed rather than a literal, so it never goes
+  stale — linking `https://www.edusolutionsmv.com`, the same real business
+  site `Landing.jsx`'s own closing section already links, on the other)
+  mounted once in `App.jsx` alongside `Navbar`/`BottomNav`, so it appears on
+  every route rather than being copy-pasted per page. This is deliberately
+  slim — one quiet line, not a multi-column marketing footer — since this
+  is an internal business app; `Landing.jsx`'s own richer closing section
+  (wordmark image + link) is untouched and stays that page's own content,
+  with the global `Footer` simply rendering right below it there too.
+  `App.jsx`'s root layout is the standard CSS sticky-footer flex pattern to
+  make this work on short pages without leaving a dangling gap: the outer
+  container is `flex min-h-screen flex-col`, and a `flex flex-1 flex-col`
+  wrapper (holding both the routed content, itself in its own `flex-1` div,
+  and `Footer`) is what pins `Footer` to the true bottom of the viewport on
+  a short page like `Login` while letting it flow naturally below content
+  on a tall one — verified by checking the footer's bottom edge lands
+  exactly at the viewport height on `Login`, not above or below it. That
+  wrapper keeps the existing `pb-16 sm:pb-0` bottom padding gate on
+  `user` — needed since `BottomNav` is `fixed` and phone-only, and without
+  it `BottomNav` would cover `Footer`/the page's last content on a logged-
+  in phone. `Footer` itself takes an optional `className` (default `''`),
+  and `App.jsx` passes `user ? 'hidden sm:block' : ''` — **on phones,
+  `Footer` only renders when logged out**. This isn't a phone/desktop
+  styling preference, it's fixing a real overlap: every list page's
+  `FloatingActionButton` (see above) is itself phone-only (`sm:hidden`) and
+  fixed at a constant bottom offset, and on a short-content logged-in page
+  (e.g. an empty Invoices/Clients list) that offset lands directly inside
+  `Footer`'s own band, so the FAB visually sat on top of the copyright text
+  — confirmed via a Playwright screenshot before this guard existed.
+  Logged-out phone pages (`Login`, `Landing`, `/q/:token`, `/i/:token`) have
+  neither `BottomNav` nor a FAB, so `Footer` stays visible there, and
+  desktop (`sm` and up) is unaffected either way since the FAB is already
+  hidden at that breakpoint. Tablet/desktop `Footer` visibility was
+  separately confirmed on `Dashboard` in dark mode, so the dark-mode
+  palette (`dark:border-slate-800 dark:bg-slate-900/50`) was checked too,
+  not just the light-mode default.
 - `components/KpiCard.jsx` picked up the mockup's card language:
   `rounded-2xl` (was `rounded-lg`), a smaller `rounded-xl` icon chip (was a
   circle), and the value rendered in `font-display font-extrabold
