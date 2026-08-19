@@ -184,7 +184,7 @@ export function BankIcon(props) {
   );
 }
 
-// A paper plane — "send" (Landing.jsx's "How it works" step 2: emailing a
+// A paper plane — "send" (Login.jsx's "How it works" step 2: emailing a
 // quote/invoice to a client), distinct from InvoiceIcon/QuoteIcon since
 // this represents the send action itself, not either document.
 export function SendIcon(props) {

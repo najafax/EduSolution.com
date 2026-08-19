@@ -1536,55 +1536,56 @@ frontend stops holding/sending it.
   is ever wanted there. The `public` object (`getQuote`, `respondQuote`,
   `getInvoice`, `openQuotePdf`, `openInvoicePdf`) hits `/api/public/...`
   and is the one set of calls that never passes a token.
-- `pages/Landing.jsx` (route `/`, public) was rebuilt from a bare hero +
-  3-card summary into a fuller marketing page, since it's the one page in
-  the app a first-time visitor actually lands on cold rather than being
-  routed to. The hero is now a two-column layout (stacked on mobile,
-  `lg:grid-cols-2` side by side on desktop): left is an eyebrow pill
-  ("Educational Technology Consultancy"), the existing "Welcome to Edu
-  Solutions" headline plus a new `font-display` sub-headline ("Quotes,
-  invoices, and payments — handled for you."), the existing business-
-  description paragraph, the existing Log in/dashboard + "Visit
-  edusolutionsmv.com" buttons, and a row of small `CheckCircleIcon` trust
-  bullets (PDF invoicing, client self-serve links, automated reminders,
-  recurring billing, role-based access — real shipped features, not
-  invented claims); right is `HeroPreview`, a local sub-component that
-  renders an actual product glimpse rather than a stock illustration — it
-  reuses the real `StatusBadge` and `KpiCard` components (imported, not
-  reimplemented) to build a mock invoice card ("INV-2026-014", a
-  `StatusBadge status="paid"`, a paid progress bar) with two `KpiCard`
-  stat tiles ("This month"/"Outstanding") stacked above it, so what a
-  visitor sees is literally the app's own card language with illustrative
-  example data, not a fabricated screenshot. Two soft blurred gradient
-  circles (`blur-3xl`, lagoon + emerald tinted, `dark:` variants) sit
-  behind it for depth. Below the hero: the existing 3-card feature section
-  is expanded to 6 cards, one per real module (Clients, Quotes, Invoices,
-  Payments & financials, Recurring & reminders, License tracking), each
-  using an existing icon from `components/icons.jsx` and an icon-chip tone
-  (`lagoon`/`emerald`/`amber`) copied from `KpiCard.jsx`'s own `TONES`
-  strings so a card's accent color carries the same meaning it would on a
-  real KPI card (emerald = money, amber = time-sensitive) rather than an
-  arbitrary per-card hue. A new "How it works" section (Create → Send →
-  Get paid, numbered — a real 3-step sequence, not a decorative counter)
-  sits between the feature grid and the existing "Our mission" section
-  (now given an "About EduSolutions Maldives" eyebrow pill and
-  `font-display` heading to match the hero's typographic treatment, copy
-  unchanged); the existing CTA band and closing wordmark/link section are
-  otherwise unchanged, just restyled (`font-display` headings) to match.
-  `components/icons.jsx` gained one new icon for this, `SendIcon` (a paper
-  plane, for the "Send" step) — same 20×20/1.5px-stroke/currentColor
-  convention as every other icon there, added because nothing existing
-  represented "send an email" specifically. `HeroPreview`'s stat-card pair
-  is `hidden sm:block` (omitted below `sm` — the invoice card alone is
-  plenty on a narrow phone) and stacked directly above the invoice card
-  with a slight `-rotate-1` rather than absolutely positioned/overlapping
-  it: an earlier version tried a layered "peeking out from behind" stack,
-  which either clipped a `KpiCard` label's text past the card edge (a
-  single word like "Outstanding" can't wrap without a space to break at)
-  or, once widened, ended up hiding almost the entire back card behind the
-  front one — the non-overlapping stacked layout sidesteps both problems
-  and reads just as intentional.
-- `pages/` — one component per route (`Landing`, `Login`, `ForgotPassword`,
+- `pages/Login.jsx` (routes `/` **and** `/login`, both public, both render
+  this same component — see `App.jsx`) is the app's front door. There is
+  no separate Landing page — it existed briefly as its own marketing page
+  (a hero + feature grid + "how it works" + mission section), but this app
+  has no public signup (see `routes/auth.js` above), so realistically
+  every real visitor here is either signing in or already signed in; a
+  standalone marketing page that isn't where you actually log in was
+  friction, not value. Login absorbed all of that marketing content
+  instead, with the login form itself as the hero's primary element rather
+  than a "Log in" button pointing at a separate page. Two things this
+  merge changed in `Login` beyond just moving the JSX over: (1) an
+  already-authenticated visit — the Navbar brand link, a stale bookmark —
+  now redirects straight to `/dashboard` rather than showing a login form/
+  marketing page with nothing left to do there; `Login` checks `token`/
+  `loading` from `useAuth()` and renders `<Navigate to="/dashboard"
+  replace />` once resolved, the same loading/token pattern
+  `ProtectedRoute.jsx` uses (mirrored rather than shared, since the
+  redirect target and the "what to show while deciding" differ). (2) the
+  hero's two-column grid (stacked on mobile, `lg:grid-cols-2` side by side
+  on desktop) puts the login form *first* in source order — so it's what a
+  phone visitor sees before any marketing copy — and only reorders to
+  marketing-copy-left/form-right via `lg:order-1`/`lg:order-2` once
+  there's room for both side by side; this is a deliberate reversal of the
+  old Landing page's text-first mobile order, on the reasoning above that
+  most visitors here just want to sign in, not read about the product
+  first. Everything else carries over unchanged from the old Landing page:
+  the eyebrow pill ("Educational Technology Consultancy"), "Welcome to Edu
+  Solutions" headline plus `font-display` sub-headline, business-
+  description paragraph, "Visit edusolutionsmv.com" link, `CheckCircleIcon`
+  trust bullets (PDF invoicing, client self-serve links, automated
+  reminders, recurring billing, role-based access), the 6-card feature
+  grid (Clients, Quotes, Invoices, Payments & financials, Recurring &
+  reminders, License tracking — icon-chip tones borrowed from
+  `KpiCard.jsx`'s own `TONES` palette so color still means the same thing
+  it does on a real KPI card), the "How it works" 3-step section (Create →
+  Send → Get paid — `components/icons.jsx`'s `SendIcon`, added for this,
+  is the one icon with nothing else using it yet), the "Our mission"
+  section, and the closing wordmark/link section. The old Landing page's
+  CTA band ("Ready to get started? Log in") was dropped rather than
+  carried over — it would just be a second, redundant "Log in" pointing at
+  a form already visible at the top of the same page. The actual login
+  form (email/password/forgot-password link/submit, plus the idle-logout
+  and post-reset-password notice banner — unchanged from the original
+  standalone `Login.jsx`) is `LoginForm`, a local sub-component rendered
+  inside `HeroLoginCard` (the same soft blurred-gradient-circle treatment
+  the old `HeroPreview` used, now framing the real form instead of a mock
+  invoice card) — kept separate from the exported `Login` component so the
+  redirect-when-authenticated check above doesn't have to sit inside (and
+  re-render with) the form's own state.
+- `pages/` — one component per route (`Login`, `ForgotPassword`,
   `ResetPassword`, `Dashboard`, `Users`, `MyAccount`), wired up in
   `App.jsx` via `react-router-dom`. There is no `Signup` page or `/signup`
   route — see `routes/auth.js` above for why. `Users.jsx` (route `/users`)
@@ -2222,11 +2223,11 @@ keeps its existing layout.
   dynamic `© {new Date().getFullYear()} EduSolutions Maldives. All rights
   reserved.` — the year computed rather than a literal, so it never goes
   stale — linking `https://www.edusolutionsmv.com`, the same real business
-  site `Landing.jsx`'s own closing section already links, on the other)
+  site `Login.jsx`'s own closing section already links, on the other)
   mounted once in `App.jsx` alongside `Navbar`/`BottomNav`, so it appears on
   every route rather than being copy-pasted per page. This is deliberately
   slim — one quiet line, not a multi-column marketing footer — since this
-  is an internal business app; `Landing.jsx`'s own richer closing section
+  is an internal business app; `Login.jsx`'s own richer closing section
   (wordmark image + link) is untouched and stays that page's own content,
   with the global `Footer` simply rendering right below it there too.
   `App.jsx`'s root layout is the standard CSS sticky-footer flex pattern to
@@ -2249,7 +2250,8 @@ keeps its existing layout.
   (e.g. an empty Invoices/Clients list) that offset lands directly inside
   `Footer`'s own band, so the FAB visually sat on top of the copyright text
   — confirmed via a Playwright screenshot before this guard existed.
-  Logged-out phone pages (`Login`, `Landing`, `/q/:token`, `/i/:token`) have
+  Logged-out phone pages (`Login` — which doubles as the app's landing
+  page, see `pages/Login.jsx` above — `/q/:token`, `/i/:token`) have
   neither `BottomNav` nor a FAB, so `Footer` stays visible there, and
   desktop (`sm` and up) is unaffected either way since the FAB is already
   hidden at that breakpoint. Tablet/desktop `Footer` visibility was
@@ -2302,7 +2304,7 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
   `favicon-32x32.png`, `pwa-192x192.png`, `pwa-512x512.png`,
   `maskable-icon-512x512.png`, `apple-touch-icon.png`) — all derived from
   `logo-symbol.png` (the real business mark, also used directly on
-  `Landing.jsx`; a matching `logo-wordmark.png` exists too but isn't used in
+  `Login.jsx`; a matching `logo-wordmark.png` exists too but isn't used in
   any icon, just as page-level branding), composited onto a white background
   (matching the manifest's own `background_color`) and centered at a size
   appropriate to each icon's role: ~66% of the canvas for the standard/
