@@ -1570,7 +1570,22 @@ frontend stops holding/sending it.
   grid (Clients, Quotes, Invoices, Payments & financials, Recurring &
   reminders, License tracking — icon-chip tones borrowed from
   `KpiCard.jsx`'s own `TONES` palette so color still means the same thing
-  it does on a real KPI card), the "How it works" 3-step section (Create →
+  it does on a real KPI card). Directly below that grid (same section,
+  same `bg-slate-50` background) sits one more panel, visually distinct
+  from the 6-card grid rather than folded into it as a 7th card: a mention
+  of EduPage (aSc EduPage, `edupage.org`) — a real, separate school-
+  management platform (timetabling, attendance, digital class registers,
+  homework, e-learning) that EduSolutions Maldives implements/supports for
+  schools as part of its consultancy work, alongside but independent of
+  the billing tools this app itself provides. Bordered `rounded-2xl` card,
+  a new `GraduationCapIcon` (`components/icons.jsx` — added because none
+  of the existing CRM/billing icons fit "a school platform," and reusing
+  `UsersIcon`/`LicenseIcon` here would borrow an icon that already carries
+  a different meaning elsewhere on this same page), a "Technology partner"
+  eyebrow, and a "Learn more about EduPage" link out to `edupage.org`
+  (`target="_blank"`) — the genuine, verifiable product this refers to,
+  not a fabricated or unverified claim. Then the "How it works" 3-step
+  section (Create →
   Send → Get paid — `components/icons.jsx`'s `SendIcon`, added for this,
   is the one icon with nothing else using it yet), the "Our mission"
   section, and the closing wordmark/link section. The old Landing page's

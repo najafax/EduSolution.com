@@ -12,6 +12,7 @@ import {
   LicenseIcon,
   SendIcon,
   CheckCircleIcon,
+  GraduationCapIcon,
 } from '../components/icons';
 
 // Icon-chip color per feature — reuses KpiCard's own tone palette (see
@@ -290,6 +291,41 @@ export default function Login() {
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{feature.description}</p>
               </div>
             ))}
+          </div>
+
+          {/* A supplementary mention, not a 7th grid card — EduPage is a
+              real, separate school-management platform (aSc EduPage,
+              edupage.org), not a module of this app, so it gets its own
+              visually distinct panel rather than blending into the FEATURES
+              grid above. */}
+          <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900 sm:p-8">
+            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400">
+                <GraduationCapIcon />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-bold tracking-wide text-lagoon-600 uppercase dark:text-lagoon-400">
+                  Technology partner
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                  We also bring EduPage to Maldivian schools
+                </h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Beyond the billing tools in this app, EduSolutions Maldives helps schools implement and get the
+                  most out of EduPage — a cloud-based school management platform used by schools worldwide for
+                  timetabling, attendance, digital class registers, homework, and e-learning, keeping teachers,
+                  students, and parents connected.
+                </p>
+              </div>
+              <a
+                href="https://www.edupage.org"
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-h-11 w-full shrink-0 items-center justify-center rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Learn more about EduPage
+              </a>
+            </div>
           </div>
         </div>
       </section>

@@ -195,6 +195,21 @@ export function SendIcon(props) {
   );
 }
 
+// A graduation cap — used once on Login.jsx for the EduPage partner
+// mention, since none of the CRM/billing icons above (Invoice, Quote,
+// Bank, etc.) fit "a school platform" and this is a distinct enough
+// concept to earn its own icon rather than borrowing one already carrying
+// a different meaning elsewhere (e.g. UsersIcon's "Clients").
+export function GraduationCapIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 3.5 18 7l-8 3.5L2 7l8-3.5Z" strokeLinejoin="round" />
+      <path d="M5.5 8.7v3.8c0 1.4 2 2.5 4.5 2.5s4.5-1.1 4.5-2.5V8.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M18 7v4.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function LogoutIcon(props) {
   return (
     <svg {...base} {...props}>
