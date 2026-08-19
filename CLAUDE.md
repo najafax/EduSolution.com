@@ -1610,7 +1610,24 @@ frontend stops holding/sending it.
   the old `HeroPreview` used, now framing the real form instead of a mock
   invoice card) — kept separate from the exported `Login` component so the
   redirect-when-authenticated check above doesn't have to sit inside (and
-  re-render with) the form's own state.
+  re-render with) the form's own state. All of the marketing prose on this
+  page (hero sub-headline, business-description paragraph, the features
+  section's heading/subheading and all 6 card descriptions, the EduPage
+  panel's heading and surrounding sentence, the mission statement) was
+  later reworded in a copy pass for fresher phrasing — this is wording
+  only, not a factual or structural change, so it's not itemized string by
+  string here; the one exception is the EduPage panel's core sentence
+  ("Edu Solutions Pvt Ltd is an authorized distributor of EduPage products
+  in the Maldives"), which stayed verbatim across that pass since it's a
+  specific business fact, not descriptive filler. The brand headline
+  ("Welcome to Edu Solutions"), the eyebrow category badges, the "Visit
+  edusolutionsmv.com" link text, the `TRUST_ITEMS` chips, the `FEATURES`
+  array's `title` fields (they match real nav/module labels — see
+  `components/Navbar.jsx`'s `BUSINESS_LINKS` — so they stay put rather
+  than drifting from the terms used everywhere else in the app), and the
+  `LoginForm` widget's own copy were all left as-is in that pass: the
+  first few are identity/category labels rather than prose, and the login
+  form is a functional auth widget, not landing-page marketing copy.
 - `pages/` — one component per route (`Login`, `ForgotPassword`,
   `ResetPassword`, `Dashboard`, `Users`, `MyAccount`), wired up in
   `App.jsx` via `react-router-dom`. There is no `Signup` page or `/signup`

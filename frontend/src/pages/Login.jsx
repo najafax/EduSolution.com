@@ -31,37 +31,37 @@ const FEATURES = [
     icon: UsersIcon,
     tone: 'lagoon',
     title: 'Clients',
-    description: "Keep every client's contact details, and their full quote and invoice history, in one place.",
+    description: "Store every client's details alongside their complete quote and invoice history.",
   },
   {
     icon: QuoteIcon,
     tone: 'lagoon',
     title: 'Quotes',
-    description: 'Send professional quotes your client can accept or decline online, then convert one to an invoice in a click.',
+    description: 'Send polished quotes clients can accept or decline online, then turn an accepted one into an invoice instantly.',
   },
   {
     icon: InvoiceIcon,
     tone: 'lagoon',
     title: 'Invoices',
-    description: 'Generate polished PDF invoices, email them straight to a client, and track balances due automatically.',
+    description: 'Create professional PDF invoices, email them directly to clients, and let balances due track themselves.',
   },
   {
     icon: BankIcon,
     tone: 'emerald',
     title: 'Payments & financials',
-    description: 'Record payments as they land, watch your bank balance, and see revenue and profit at a glance.',
+    description: 'Log payments the moment they arrive, and keep an eye on your bank balance, revenue, and profit at a glance.',
   },
   {
     icon: ClockIcon,
     tone: 'amber',
     title: 'Recurring & reminders',
-    description: 'Recurring invoices generate themselves on schedule, and overdue reminders go out automatically.',
+    description: 'Recurring invoices go out on schedule, and overdue reminders are sent without you lifting a finger.',
   },
   {
     icon: LicenseIcon,
     tone: 'lagoon',
     title: 'License tracking',
-    description: "Track a client's software licenses, with expiry alerts and automatic renewal the moment they pay.",
+    description: "Monitor client software licenses, with expiry alerts and automatic renewal the moment payment lands.",
   },
 ];
 
@@ -220,11 +220,12 @@ export default function Login() {
               Welcome to <span className="text-lagoon-600">Edu Solutions</span>
             </h1>
             <p className="mt-4 font-display text-lg font-bold text-slate-700 sm:text-xl dark:text-slate-300">
-              Quotes, invoices, and payments — handled for you.
+              From your first quote to the final payment — all handled in one place.
             </p>
             <p className="mx-auto mt-4 max-w-xl text-base text-slate-600 sm:text-lg lg:mx-0 dark:text-slate-400">
-              EduSolutions Maldives is a registered Educational Technology Consultancy business connecting and
-              adapting the latest edtech innovations to meet the evolving needs of 21st-century education.
+              EduSolutions Maldives is a registered Educational Technology Consultancy, bringing the latest edtech
+              innovations to schools and institutions across the Maldives to meet the evolving demands of
+              21st-century education.
             </p>
             <div className="mt-8 flex justify-center lg:justify-start">
               <a
@@ -252,11 +253,11 @@ export default function Login() {
         <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-              Everything your business needs in one place
+              One platform for the whole business
             </h2>
             <p className="mt-3 text-sm text-slate-600 sm:text-base dark:text-slate-400">
-              EduSolution.com brings your clients, quotes, invoices, and payments together, so you can spend less
-              time on admin and more time on what matters.
+              EduSolution.com keeps clients, quotes, invoices, and payments in sync, so admin takes minutes instead
+              of hours.
             </p>
           </div>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -289,13 +290,13 @@ export default function Login() {
                   Technology partner
                 </p>
                 <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
-                  We also bring EduPage to Maldivian schools
+                  Also serving schools through EduPage
                 </h3>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                  Edu Solutions Pvt Ltd is an authorized distributor of EduPage products in the Maldives — a
-                  cloud-based school management platform used by schools worldwide for timetabling, attendance,
-                  digital class registers, homework, and e-learning, keeping teachers, students, and parents
-                  connected.
+                  Edu Solutions Pvt Ltd is an authorized distributor of EduPage products in the Maldives. EduPage is
+                  a cloud-based school management platform used by schools around the world to handle timetabling,
+                  attendance, digital class registers, homework, and e-learning, while keeping teachers, students,
+                  and parents connected.
                 </p>
               </div>
               <a
@@ -320,8 +321,8 @@ export default function Login() {
             Our mission
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg dark:text-slate-400">
-            Our mission is to empower educational institutions with smart, scalable, and futuristic solutions that
-            drive excellence in teaching, learning, and administration.
+            We're committed to equipping educational institutions with smart, scalable, forward-looking solutions
+            that raise the standard of teaching, learning, and administration.
           </p>
         </div>
       </section>
