@@ -1575,20 +1575,31 @@ frontend stops holding/sending it.
   from the 6-card grid rather than folded into it as a 7th card: a mention
   of EduPage (aSc EduPage, `edupage.org`) — a real, separate school-
   management platform (timetabling, attendance, digital class registers,
-  homework, e-learning) that EduSolutions Maldives implements/supports for
-  schools as part of its consultancy work, alongside but independent of
-  the billing tools this app itself provides. Bordered `rounded-2xl` card,
-  a new `GraduationCapIcon` (`components/icons.jsx` — added because none
-  of the existing CRM/billing icons fit "a school platform," and reusing
-  `UsersIcon`/`LicenseIcon` here would borrow an icon that already carries
-  a different meaning elsewhere on this same page), a "Technology partner"
-  eyebrow, and a "Learn more about EduPage" link out to `edupage.org`
-  (`target="_blank"`) — the genuine, verifiable product this refers to,
-  not a fabricated or unverified claim. Then the "How it works" 3-step
-  section (Create →
-  Send → Get paid — `components/icons.jsx`'s `SendIcon`, added for this,
-  is the one icon with nothing else using it yet), the "Our mission"
-  section, and the closing wordmark/link section. The old Landing page's
+  homework, e-learning). Edu Solutions Pvt Ltd is an authorized distributor
+  of EduPage products in the Maldives — this panel says exactly that,
+  rather than the vaguer "helps schools implement" phrasing an earlier
+  draft used — alongside but independent of the billing tools this app
+  itself provides. Bordered `rounded-2xl` card, a new `GraduationCapIcon`
+  (`components/icons.jsx` — added because none of the existing CRM/billing
+  icons fit "a school platform," and reusing `UsersIcon`/`LicenseIcon` here
+  would borrow an icon that already carries a different meaning elsewhere
+  on this same page), a "Technology partner" eyebrow, and a "Learn more
+  about EduPage" link out to `edupage.org` (`target="_blank"`) — the
+  genuine, verifiable product this refers to, not a fabricated or
+  unverified claim. There is no "How it works" section — it existed
+  briefly (a 3-step Create → Send → Get paid sequence) but was removed;
+  `components/icons.jsx`'s `SendIcon`, added only for that section's
+  "Send" step, was deleted with it rather than left as unused dead code
+  (nothing else in the app used it). Directly after the EduPage panel is
+  the "Our mission" section — now back to a plain (non-`bg-slate-50`)
+  background with its own `border-b`, since with "How it works" gone it
+  would otherwise sit immediately below the feature grid's `bg-slate-50`
+  section with no visual separation between two same-colored blocks; its
+  eyebrow pill also switched from a white/`bg-slate-900` chip (which only
+  read correctly against a gray section background) to the same
+  `bg-lagoon-50`/`dark:bg-lagoon-950/60` chip style the hero's own eyebrow
+  pill uses, matching its new plain background — then the closing
+  wordmark/link section. The old Landing page's
   CTA band ("Ready to get started? Log in") was dropped rather than
   carried over — it would just be a second, redundant "Log in" pointing at
   a form already visible at the top of the same page. The actual login

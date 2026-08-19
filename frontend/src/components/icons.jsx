@@ -184,17 +184,6 @@ export function BankIcon(props) {
   );
 }
 
-// A paper plane — "send" (Login.jsx's "How it works" step 2: emailing a
-// quote/invoice to a client), distinct from InvoiceIcon/QuoteIcon since
-// this represents the send action itself, not either document.
-export function SendIcon(props) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M17 3 2.5 9.2l5.3 2.1M17 3l-5.3 13.5-3.9-5.2M17 3 8 11.9" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 // A graduation cap — used once on Login.jsx for the EduPage partner
 // mention, since none of the CRM/billing icons above (Invoice, Quote,
 // Bank, etc.) fit "a school platform" and this is a distinct enough

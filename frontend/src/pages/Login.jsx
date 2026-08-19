@@ -10,7 +10,6 @@ import {
   BankIcon,
   ClockIcon,
   LicenseIcon,
-  SendIcon,
   CheckCircleIcon,
   GraduationCapIcon,
 } from '../components/icons';
@@ -63,24 +62,6 @@ const FEATURES = [
     tone: 'lagoon',
     title: 'License tracking',
     description: "Track a client's software licenses, with expiry alerts and automatic renewal the moment they pay.",
-  },
-];
-
-const STEPS = [
-  {
-    icon: QuoteIcon,
-    title: 'Create',
-    description: 'Build a quote or invoice from your product catalog — line items, discounts, and tax computed for you.',
-  },
-  {
-    icon: SendIcon,
-    title: 'Send',
-    description: 'Email it as a PDF with a secure link your client can open, accept, or pay from — no account required.',
-  },
-  {
-    icon: CheckCircleIcon,
-    title: 'Get paid',
-    description: 'Record the payment and watch invoices, financials, and even license renewals update on their own.',
   },
 ];
 
@@ -311,10 +292,10 @@ export default function Login() {
                   We also bring EduPage to Maldivian schools
                 </h3>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                  Beyond the billing tools in this app, EduSolutions Maldives helps schools implement and get the
-                  most out of EduPage — a cloud-based school management platform used by schools worldwide for
-                  timetabling, attendance, digital class registers, homework, and e-learning, keeping teachers,
-                  students, and parents connected.
+                  Edu Solutions Pvt Ltd is an authorized distributor of EduPage products in the Maldives — a
+                  cloud-based school management platform used by schools worldwide for timetabling, attendance,
+                  digital class registers, homework, and e-learning, keeping teachers, students, and parents
+                  connected.
                 </p>
               </div>
               <a
@@ -331,41 +312,8 @@ export default function Login() {
       </section>
 
       <section className="border-b border-slate-200 dark:border-slate-800">
-        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-              How it works
-            </h2>
-            <p className="mt-3 text-sm text-slate-600 sm:text-base dark:text-slate-400">
-              From first quote to final payment, in three steps.
-            </p>
-          </div>
-          <div className="mt-10 grid gap-8 sm:grid-cols-3 sm:gap-6">
-            {STEPS.map((step, index) => (
-              <div key={step.title} className="relative text-center sm:text-left">
-                {index < STEPS.length - 1 && (
-                  <div
-                    aria-hidden
-                    className="absolute top-6 left-[calc(50%+2.75rem)] hidden h-px w-[calc(100%-5.5rem)] bg-slate-200 sm:block dark:bg-slate-700"
-                  />
-                )}
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-lagoon-600 text-white shadow-sm shadow-lagoon-900/20 sm:mx-0">
-                  <step.icon width={22} height={22} />
-                </div>
-                <p className="mt-4 text-xs font-bold tracking-wide text-lagoon-600 uppercase dark:text-lagoon-400">
-                  Step {index + 1}
-                </p>
-                <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{step.title}</h3>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{step.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-slate-50 dark:bg-slate-900/50">
         <div className="mx-auto max-w-4xl px-4 py-14 text-center sm:px-6 sm:py-20">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-lagoon-200 bg-white px-3 py-1 text-xs font-semibold text-lagoon-700 dark:border-lagoon-800 dark:bg-slate-900 dark:text-lagoon-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-lagoon-200 bg-lagoon-50 px-3 py-1 text-xs font-semibold text-lagoon-700 dark:border-lagoon-800 dark:bg-lagoon-950/60 dark:text-lagoon-400">
             About EduSolutions Maldives
           </span>
           <h2 className="mt-5 font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
