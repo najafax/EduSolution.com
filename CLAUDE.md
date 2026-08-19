@@ -1844,6 +1844,35 @@ frontend stops holding/sending it.
   row, since nothing currently reads it back beyond the form itself (see
   `routes/licenses.js` above for why: it's there for a future activation-
   email template to interpolate, not wired to one yet).
+  **Row actions as icon buttons**: `rowActions()`'s Renew/Cancel/Reactivate/
+  Remind/History/Edit/Delete buttons render as compact icon-only buttons
+  (`h-9 w-9`, `rounded-md`, a visible border, and a tone-tinted hover fill
+  via a shared `ACTION_BTN`/`ACTION_TONE` pair) rather than bare colored
+  text — this page in particular can show up to 6 actions per row, so a
+  row of plain text links read as clutter rather than distinct actions.
+  Each button keeps a `title` (doubling as the busy-state label, e.g.
+  "Renewing…") and an `aria-label`, since the icon alone carries the
+  action's meaning for a sighted mouse user but not for anyone else; Renew
+  additionally spins its `RefreshIcon` while busy (`animate-spin`) as a
+  literal loading indicator, which a static icon like Cancel's `XIcon` or
+  Reactivate's `CheckCircleIcon` wouldn't read as meaningfully mid-action.
+  The header's own Analytics/Export CSV/Export Excel/New license buttons
+  gained a leading icon each too (`ReportIcon`, `DownloadIcon` ×2,
+  `PlusIcon`) rather than staying bare text, since they already look like
+  buttons (bordered/filled) and a matching icon is a small, low-risk
+  finishing touch. The New/Edit license modal's own Save/Cancel buttons
+  were deliberately left as plain text, unlike every button above — that
+  exact form-footer pattern is reused verbatim across every other
+  resource's create/edit modal (`Clients.jsx`, `Products.jsx`,
+  `Expenses.jsx`, etc.), so icon-ing it only here would make it the one
+  inconsistent modal footer in the app rather than a more polished one.
+  `components/icons.jsx` gained six new icons for this pass — `RefreshIcon`,
+  `BellIcon`, `HistoryIcon` (a clock with a back-arrow tail, deliberately
+  distinct from the plain `ClockIcon` already meaning "expiring soon" on
+  this same page's KPI strip), `PencilIcon`, `TrashIcon`, `DownloadIcon` —
+  plus `PlusIcon`, kept separate from `FloatingActionButton.jsx`'s own
+  private inline `PlusIcon` rather than consolidating the two, since that
+  refactor wasn't otherwise in scope here.
   `ActivityLog.jsx` is a simple paginated read-only list. `Import.jsx` (linked from `Settings.jsx`, not a top-level
   Navbar item — it's a rare-use admin tool) reads a chosen CSV file
   client-side via `FileReader`, calls `api.import.run(type, csv, commit,

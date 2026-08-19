@@ -199,6 +199,91 @@ export function GraduationCapIcon(props) {
   );
 }
 
+// Two mirrored arc+arrowhead pairs forming a full circle — "renew/sync"
+// (Licenses.jsx's Renew action button).
+export function RefreshIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4.5 10a5.5 5.5 0 0 1 9.5-3.8l1 1" strokeLinecap="round" />
+      <path d="M13.5 4.5v3h-3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15.5 10a5.5 5.5 0 0 1-9.5 3.8l-1-1" strokeLinecap="round" />
+      <path d="M6.5 15.5v-3h3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// A notification bell — "remind" (Licenses.jsx's Remind action button;
+// distinct from SendIcon's paper-plane, which reads as the send action
+// itself rather than the reminder concept).
+export function BellIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 3.5a4 4 0 0 0-4 4v2.3c0 .8-.3 1.6-.9 2.2L4 13h12l-1.1-1.1a3 3 0 0 1-.9-2.2V7.5a4 4 0 0 0-4-4Z" strokeLinejoin="round" />
+      <path d="M8.3 15.5a1.8 1.8 0 0 0 3.4 0" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// A clock face with a counter-clockwise "back" arrow tail — "history"
+// (Licenses.jsx's History action button). Deliberately distinct from the
+// plain ClockIcon above, which already carries its own "time-sensitive/
+// expiring soon" meaning elsewhere on the same page (its KPI card) — this
+// one's extra arrow tail reads as "look back," not "time running out."
+export function HistoryIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 5.5v4.5l3 2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4.5 7A6 6 0 1 1 4 11" strokeLinecap="round" />
+      <path d="M4.5 4v3h3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// A pencil — "edit" (Licenses.jsx's Edit action button).
+export function PencilIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="m13.5 3.5 3 3L7 16H4v-3L13.5 3.5Z" strokeLinejoin="round" />
+      <path d="m11.5 5.5 3 3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// A trash can — "delete" (Licenses.jsx's Delete action button).
+export function TrashIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 6h12M8 6V4.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.5 6 6 16a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l.5-10" strokeLinejoin="round" />
+      <path d="M8.5 9v5M11.5 9v5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// A downward arrow into a tray — "export/download" (Licenses.jsx's Export
+// CSV/Excel buttons).
+export function DownloadIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 3v9.5M6.5 9 10 12.5 13.5 9" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 14.5V16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// A plus sign — "create new" (Licenses.jsx's "New license" header button).
+// Distinct from FloatingActionButton.jsx's own private PlusIcon, which
+// stays local to that component rather than importing this one, since the
+// FAB's is unrelated to any header button and refactoring it isn't part of
+// what introduced this shared icon.
+export function PlusIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 4v12M4 10h12" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function LogoutIcon(props) {
   return (
     <svg {...base} {...props}>

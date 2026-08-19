@@ -15,7 +15,21 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import KpiCard from '../../components/KpiCard';
-import { LicenseIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon } from '../../components/icons';
+import {
+  LicenseIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  AlertTriangleIcon,
+  RefreshIcon,
+  XIcon,
+  BellIcon,
+  HistoryIcon,
+  PencilIcon,
+  TrashIcon,
+  DownloadIcon,
+  PlusIcon,
+  ReportIcon,
+} from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 const STATUS_OPTIONS = [
@@ -33,6 +47,22 @@ const ACCENT = {
   expiring_soon: 'bg-amber-500',
   expired: 'bg-red-500',
   cancelled: 'bg-slate-300 dark:bg-slate-600',
+};
+
+// rowActions() row buttons are icon-only (see below) — each one's color
+// signals its intent the same way the rest of the app's semantic colors
+// do (red = destructive, emerald = positive, etc.), with a visible border
+// + hover fill so it reads as a button, not bare colored text.
+const ACTION_BTN =
+  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border disabled:pointer-events-none disabled:opacity-50';
+const ACTION_TONE = {
+  lagoon: 'border-lagoon-200 text-lagoon-600 hover:bg-lagoon-50 dark:border-lagoon-800 dark:text-lagoon-400 dark:hover:bg-lagoon-950',
+  orange: 'border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-950',
+  emerald:
+    'border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950',
+  amber: 'border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950',
+  slate: 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800',
+  red: 'border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950',
 };
 
 const EMPTY_FORM = {
@@ -286,42 +316,63 @@ export default function Licenses() {
           <button
             onClick={() => handleRenew(l.id)}
             disabled={rowBusy}
-            className="font-medium text-lagoon-600 hover:text-lagoon-500 disabled:opacity-50"
+            title={isBusy('renew') ? 'Renewing…' : 'Renew'}
+            aria-label="Renew license"
+            className={`${ACTION_BTN} ${ACTION_TONE.lagoon}`}
           >
-            {isBusy('renew') ? 'Renewing…' : 'Renew'}
+            <RefreshIcon width={16} height={16} className={isBusy('renew') ? 'animate-spin' : ''} />
           </button>
         )}
         {l.status === 'active' && (
           <button
             onClick={() => handleCancel(l)}
             disabled={rowBusy}
-            className="text-orange-600 hover:text-orange-500 disabled:opacity-50 dark:text-orange-400"
+            title={isBusy('cancel') ? 'Cancelling…' : 'Cancel license'}
+            aria-label="Cancel license"
+            className={`${ACTION_BTN} ${ACTION_TONE.orange}`}
           >
-            {isBusy('cancel') ? 'Cancelling…' : 'Cancel'}
+            <XIcon width={16} height={16} />
           </button>
         )}
         {l.status === 'cancelled' && (
           <button
             onClick={() => handleReactivate(l)}
             disabled={rowBusy}
-            className="text-emerald-600 hover:text-emerald-500 disabled:opacity-50 dark:text-emerald-400"
+            title={isBusy('reactivate') ? 'Reactivating…' : 'Reactivate'}
+            aria-label="Reactivate license"
+            className={`${ACTION_BTN} ${ACTION_TONE.emerald}`}
           >
-            {isBusy('reactivate') ? 'Reactivating…' : 'Reactivate'}
+            <CheckCircleIcon width={16} height={16} />
           </button>
         )}
         {l.status !== 'cancelled' && (
-          <button onClick={() => setRemindTarget(l)} className="text-amber-700 hover:text-amber-600 dark:text-amber-400">
-            Remind
+          <button
+            onClick={() => setRemindTarget(l)}
+            title="Send renewal reminder"
+            aria-label="Send renewal reminder"
+            className={`${ACTION_BTN} ${ACTION_TONE.amber}`}
+          >
+            <BellIcon width={16} height={16} />
           </button>
         )}
-        <button onClick={() => openHistory(l)} className="text-slate-600 hover:text-slate-500 dark:text-slate-300">
-          History
+        <button
+          onClick={() => openHistory(l)}
+          title="Renewal history"
+          aria-label="View renewal history"
+          className={`${ACTION_BTN} ${ACTION_TONE.slate}`}
+        >
+          <HistoryIcon width={16} height={16} />
         </button>
-        <button onClick={() => startEdit(l)} className="text-slate-600 hover:text-slate-500 dark:text-slate-300">
-          Edit
+        <button onClick={() => startEdit(l)} title="Edit" aria-label="Edit license" className={`${ACTION_BTN} ${ACTION_TONE.slate}`}>
+          <PencilIcon width={16} height={16} />
         </button>
-        <button onClick={() => handleDelete(l.id)} className="text-red-600 hover:text-red-500">
-          Delete
+        <button
+          onClick={() => handleDelete(l.id)}
+          title="Delete"
+          aria-label="Delete license"
+          className={`${ACTION_BTN} ${ACTION_TONE.red}`}
+        >
+          <TrashIcon width={16} height={16} />
         </button>
       </>
     );
@@ -339,27 +390,31 @@ export default function Licenses() {
         <div className="flex gap-2">
           <Link
             to="/licenses/analytics"
-            className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <ReportIcon width={16} height={16} />
             Analytics
           </Link>
           <button
             onClick={handleExportCsv}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <DownloadIcon width={16} height={16} />
             Export CSV
           </button>
           <button
             onClick={handleExportXlsx}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <DownloadIcon width={16} height={16} />
             Export Excel
           </button>
           {canManage && (
             <button
               onClick={startCreate}
-              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+              className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
             >
+              <PlusIcon width={16} height={16} />
               New license
             </button>
           )}
@@ -425,7 +480,7 @@ export default function Licenses() {
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
-                          <div className="flex justify-end gap-3">{rowActions(l)}</div>
+                          <div className="flex justify-end gap-1.5">{rowActions(l)}</div>
                         </td>
                       )}
                     </tr>
@@ -465,7 +520,7 @@ export default function Licenses() {
                     <dt className="text-slate-500 dark:text-slate-400">Billing</dt>
                     <dd className="capitalize text-slate-900 dark:text-white">{l.billing_cycle}</dd>
                   </div>
-                  {canManage && <div className="flex flex-wrap gap-4 pt-1">{rowActions(l)}</div>}
+                  {canManage && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(l)}</div>}
                 </MobileListAccordion>
               ))}
             </div>
