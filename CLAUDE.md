@@ -1559,19 +1559,23 @@ frontend stops holding/sending it.
   state.
 
   The page below the hero is intentionally light: a hero (eyebrow pill,
-  "Welcome to Edu Solutions" headline + `font-display` sub-headline,
-  business-description paragraph, "Visit edusolutionsmv.com" link,
-  `CheckCircleIcon` trust bullets), then a single EduPage panel, then an
+  "Welcome to Edu Solutions" headline, business-description paragraph,
+  "Visit edusolutionsmv.com" link), then a single EduPage panel, then an
   "Our mission" section, then the closing wordmark/link section. The
   hero's two-column grid (stacked on mobile, `lg:grid-cols-2` side by side
   on desktop) puts the login form *first* in source order — so it's what a
   phone visitor sees before any marketing copy — and only reorders to
   copy-left/form-right via `lg:order-1`/`lg:order-2` once there's room for
   both side by side, on the reasoning that most visitors here just want
-  to sign in, not read about the product first. A 6-card feature grid
+  to sign in, not read about the product first. A `font-display`
+  sub-headline ("From your first quote to the final payment — all handled
+  in one place.") and a row of `CheckCircleIcon` trust bullets (PDF
+  invoicing, client self-serve links, automated reminders, recurring
+  billing, role-based access) both sat under the headline at one point but
+  were cut for a tighter hero — along with the 6-card feature grid
   (Clients/Quotes/Invoices/Payments & financials/Recurring & reminders/
-  License tracking) and a "How it works" 3-step section both existed here
-  at points but were removed outright rather than kept around unused —
+  License tracking) and a "How it works" 3-step section that existed here
+  too. All were removed outright rather than kept around unused —
   `components/icons.jsx`'s `SendIcon` (only ever used by "How it works")
   was deleted with it.
 
