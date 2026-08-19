@@ -1536,6 +1536,54 @@ frontend stops holding/sending it.
   is ever wanted there. The `public` object (`getQuote`, `respondQuote`,
   `getInvoice`, `openQuotePdf`, `openInvoicePdf`) hits `/api/public/...`
   and is the one set of calls that never passes a token.
+- `pages/Landing.jsx` (route `/`, public) was rebuilt from a bare hero +
+  3-card summary into a fuller marketing page, since it's the one page in
+  the app a first-time visitor actually lands on cold rather than being
+  routed to. The hero is now a two-column layout (stacked on mobile,
+  `lg:grid-cols-2` side by side on desktop): left is an eyebrow pill
+  ("Educational Technology Consultancy"), the existing "Welcome to Edu
+  Solutions" headline plus a new `font-display` sub-headline ("Quotes,
+  invoices, and payments — handled for you."), the existing business-
+  description paragraph, the existing Log in/dashboard + "Visit
+  edusolutionsmv.com" buttons, and a row of small `CheckCircleIcon` trust
+  bullets (PDF invoicing, client self-serve links, automated reminders,
+  recurring billing, role-based access — real shipped features, not
+  invented claims); right is `HeroPreview`, a local sub-component that
+  renders an actual product glimpse rather than a stock illustration — it
+  reuses the real `StatusBadge` and `KpiCard` components (imported, not
+  reimplemented) to build a mock invoice card ("INV-2026-014", a
+  `StatusBadge status="paid"`, a paid progress bar) with two `KpiCard`
+  stat tiles ("This month"/"Outstanding") stacked above it, so what a
+  visitor sees is literally the app's own card language with illustrative
+  example data, not a fabricated screenshot. Two soft blurred gradient
+  circles (`blur-3xl`, lagoon + emerald tinted, `dark:` variants) sit
+  behind it for depth. Below the hero: the existing 3-card feature section
+  is expanded to 6 cards, one per real module (Clients, Quotes, Invoices,
+  Payments & financials, Recurring & reminders, License tracking), each
+  using an existing icon from `components/icons.jsx` and an icon-chip tone
+  (`lagoon`/`emerald`/`amber`) copied from `KpiCard.jsx`'s own `TONES`
+  strings so a card's accent color carries the same meaning it would on a
+  real KPI card (emerald = money, amber = time-sensitive) rather than an
+  arbitrary per-card hue. A new "How it works" section (Create → Send →
+  Get paid, numbered — a real 3-step sequence, not a decorative counter)
+  sits between the feature grid and the existing "Our mission" section
+  (now given an "About EduSolutions Maldives" eyebrow pill and
+  `font-display` heading to match the hero's typographic treatment, copy
+  unchanged); the existing CTA band and closing wordmark/link section are
+  otherwise unchanged, just restyled (`font-display` headings) to match.
+  `components/icons.jsx` gained one new icon for this, `SendIcon` (a paper
+  plane, for the "Send" step) — same 20×20/1.5px-stroke/currentColor
+  convention as every other icon there, added because nothing existing
+  represented "send an email" specifically. `HeroPreview`'s stat-card pair
+  is `hidden sm:block` (omitted below `sm` — the invoice card alone is
+  plenty on a narrow phone) and stacked directly above the invoice card
+  with a slight `-rotate-1` rather than absolutely positioned/overlapping
+  it: an earlier version tried a layered "peeking out from behind" stack,
+  which either clipped a `KpiCard` label's text past the card edge (a
+  single word like "Outstanding" can't wrap without a space to break at)
+  or, once widened, ended up hiding almost the entire back card behind the
+  front one — the non-overlapping stacked layout sidesteps both problems
+  and reads just as intentional.
 - `pages/` — one component per route (`Landing`, `Login`, `ForgotPassword`,
   `ResetPassword`, `Dashboard`, `Users`, `MyAccount`), wired up in
   `App.jsx` via `react-router-dom`. There is no `Signup` page or `/signup`
