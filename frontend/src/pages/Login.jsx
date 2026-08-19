@@ -3,67 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { IDLE_LOGOUT_MESSAGE_KEY } from '../components/IdleTimeoutMonitor';
-import {
-  UsersIcon,
-  QuoteIcon,
-  InvoiceIcon,
-  BankIcon,
-  ClockIcon,
-  LicenseIcon,
-  CheckCircleIcon,
-  GraduationCapIcon,
-} from '../components/icons';
-
-// Icon-chip color per feature — reuses KpiCard's own tone palette (see
-// KpiCard.jsx's TONES) so "money" cards read emerald and "time-sensitive"
-// cards read amber the same way a real KpiCard would, rather than a
-// one-off palette invented just for this page. Clients/Quotes/Invoices/
-// Licenses stay lagoon (the app's neutral/brand hue) since they're core
-// modules, not a positive/warning signal in their own right.
-const TONE = {
-  lagoon: 'bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400',
-  emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
-  amber: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
-};
-
-const FEATURES = [
-  {
-    icon: UsersIcon,
-    tone: 'lagoon',
-    title: 'Clients',
-    description: "Store every client's details alongside their complete quote and invoice history.",
-  },
-  {
-    icon: QuoteIcon,
-    tone: 'lagoon',
-    title: 'Quotes',
-    description: 'Send polished quotes clients can accept or decline online, then turn an accepted one into an invoice instantly.',
-  },
-  {
-    icon: InvoiceIcon,
-    tone: 'lagoon',
-    title: 'Invoices',
-    description: 'Create professional PDF invoices, email them directly to clients, and let balances due track themselves.',
-  },
-  {
-    icon: BankIcon,
-    tone: 'emerald',
-    title: 'Payments & financials',
-    description: 'Log payments the moment they arrive, and keep an eye on your bank balance, revenue, and profit at a glance.',
-  },
-  {
-    icon: ClockIcon,
-    tone: 'amber',
-    title: 'Recurring & reminders',
-    description: 'Recurring invoices go out on schedule, and overdue reminders are sent without you lifting a finger.',
-  },
-  {
-    icon: LicenseIcon,
-    tone: 'lagoon',
-    title: 'License tracking',
-    description: "Monitor client software licenses, with expiry alerts and automatic renewal the moment payment lands.",
-  },
-];
+import { CheckCircleIcon, GraduationCapIcon } from '../components/icons';
 
 const TRUST_ITEMS = ['PDF invoicing', 'Client self-serve links', 'Automated reminders', 'Recurring billing', 'Role-based access'];
 
@@ -251,36 +191,13 @@ export default function Login() {
 
       <section className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
         <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-              One platform for the whole business
-            </h2>
-            <p className="mt-3 text-sm text-slate-600 sm:text-base dark:text-slate-400">
-              EduSolution.com keeps clients, quotes, invoices, and payments in sync, so admin takes minutes instead
-              of hours.
-            </p>
-          </div>
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => (
-              <div
-                key={feature.title}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
-              >
-                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${TONE[feature.tone]}`}>
-                  <feature.icon />
-                </div>
-                <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">{feature.title}</h3>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{feature.description}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* A supplementary mention, not a 7th grid card — EduPage is a
-              real, separate school-management platform (aSc EduPage,
-              edupage.org), not a module of this app, so it gets its own
-              visually distinct panel rather than blending into the FEATURES
-              grid above. */}
-          <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900 sm:p-8">
+          {/* EduPage is a real, separate school-management platform (aSc
+              EduPage, edupage.org), not a module of this app — it gets its
+              own section rather than living inside the app's own feature
+              grid (removed; see git history for the 6-card "Clients/Quotes/
+              Invoices/Payments & financials/Recurring & reminders/License
+              tracking" grid that used to sit above this panel). */}
+          <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900 sm:p-8">
             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400">
                 <GraduationCapIcon />
