@@ -406,7 +406,7 @@ export default function Licenses() {
         </div>
       )}
 
-      <div className="mt-6 max-w-sm">
+      <div className="mt-6 sm:max-w-sm">
         <SearchInput value={search} onChange={setSearch} placeholder="Search licenses…" />
       </div>
       <div className="mt-3">

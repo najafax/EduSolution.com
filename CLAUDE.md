@@ -1921,12 +1921,27 @@ frontend stops holding/sending it.
   scroll kicks in a little sooner, never the reverse (the search box or the
   "Log out" button getting squeezed out).
 - `components/SearchInput.jsx` — the search box used by every business list
-  page (Clients/Products/Expenses/Quotes/Invoices/RecurringInvoices/Users).
-  Renders a leading search icon and, whenever `value` is non-empty, a
-  trailing `×` clear button (`aria-label="Clear search"`) that calls
-  `onChange('')` — the one place this behavior is implemented, so every
-  page using `SearchInput` gets it for free rather than each page wiring up
-  its own clear button.
+  page (Clients/Products/Expenses/CapitalContributions/Quotes/Invoices/
+  RecurringInvoices/Users/Licenses). Renders a leading search icon and,
+  whenever `value` is non-empty, a trailing `×` clear button
+  (`aria-label="Clear search"`) that calls `onChange('')` — the one place
+  this behavior is implemented, so every page using `SearchInput` gets it
+  for free rather than each page wiring up its own clear button. Its
+  wrapping `<div>` on every one of those pages is `sm:max-w-sm` (or
+  `flex-1 sm:max-w-sm` on `Expenses.jsx`/`CapitalContributions.jsx`, which
+  place it in a flex row next to a payee/contributor filter) — **not** a
+  bare `max-w-sm`. Below `sm` (640px) the box is full width, matching every
+  other element on the page (header buttons, list cards); at `sm` and up it
+  settles to the fixed 384px look. A bare `max-w-sm` looked fine on a
+  narrow phone (its content width already sits under 384px, so the cap
+  never actually bound) but visibly clipped the box short of the page's own
+  right margin on any phone wider than ~416px in portrait (large phones —
+  iPhone Pro Max and similar, and most phones in landscape) — the search
+  box stopped 384px from the left while the header buttons and list cards
+  around it still reached the true edge, a 14px-ish gap that read as a
+  layout bug rather than a deliberate size. Gating the cap behind `sm:`
+  fixes this the same way `Expenses.jsx`'s/`CapitalContributions.jsx`'s own
+  payee/contributor filter (`w-full max-w-xs sm:w-56`) already avoided it.
 - `lib/useDebouncedValue.js` — `useDebouncedValue(value, delayMs = 300)`
   returns a copy of `value` that only updates once `value` stops changing
   for `delayMs`. Every business list page's `search` state feeds this

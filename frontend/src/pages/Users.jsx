@@ -178,7 +178,7 @@ export default function Users() {
         full access.
       </p>
 
-      <div className="mt-4 max-w-sm">
+      <div className="mt-4 sm:max-w-sm">
         <SearchInput value={search} onChange={setSearch} placeholder="Search users…" />
       </div>
 

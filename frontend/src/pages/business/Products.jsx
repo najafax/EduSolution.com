@@ -119,7 +119,7 @@ export default function Products() {
         description, price, and tax instead of typing it from scratch each time.
       </p>
 
-      <div className="mt-4 max-w-sm">
+      <div className="mt-4 sm:max-w-sm">
         <SearchInput value={search} onChange={setSearch} placeholder="Search products…" />
       </div>
 

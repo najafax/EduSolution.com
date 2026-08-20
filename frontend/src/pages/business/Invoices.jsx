@@ -228,7 +228,7 @@ export default function Invoices() {
         </div>
       </div>
 
-      <div className="mt-4 max-w-sm">
+      <div className="mt-4 sm:max-w-sm">
         <SearchInput value={search} onChange={setSearch} placeholder="Search invoices…" />
       </div>
 
