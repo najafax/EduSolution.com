@@ -164,7 +164,7 @@ export default function CapitalContributions() {
       </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
-        <div className="max-w-sm flex-1">
+        <div className="flex-1 sm:max-w-sm">
           <SearchInput value={search} onChange={setSearch} placeholder="Search contributions…" />
         </div>
         {contributors.length > 0 && (
