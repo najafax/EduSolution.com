@@ -1901,6 +1901,25 @@ frontend stops holding/sending it.
   `onChange('')` — the one place this behavior is implemented, so every
   page using `SearchInput` gets it for free rather than each page wiring up
   its own clear button.
+- `lib/useDebouncedValue.js` — `useDebouncedValue(value, delayMs = 300)`
+  returns a copy of `value` that only updates once `value` stops changing
+  for `delayMs`. Every business list page's `search` state feeds this
+  (`const debouncedSearch = useDebouncedValue(search)`) and it's
+  `debouncedSearch`, not the raw `search`, that actually drives the fetch
+  (see `Pagination.jsx` below) — the `<SearchInput>` itself is still bound
+  to the raw, undebounced `search`/`setSearch`, so the input's own text
+  updates instantly on every keystroke with no typing lag. Before this
+  existed, every page's fetch ran directly off `search`, so each keystroke
+  fired its own request and flipped the list between its loading skeleton
+  (a fixed row count/height, see `Skeleton.jsx`) and the real, differently-
+  sized results — the page's content visibly jumped up and down while
+  someone was still typing. Debouncing means that swap happens once, after
+  the person pauses, instead of once per character. `GlobalSearch.jsx`
+  already had its own hand-rolled 250ms `setTimeout` debounce before this
+  and wasn't changed to use this hook — its debounce only delays the
+  dropdown's own fetch, nothing about its layout reflows while typing (the
+  results render into an `absolute`-positioned dropdown, not page flow), so
+  it never had this bug and didn't need the fix.
 - `components/Pagination.jsx` — the shared Previous/Next pager for every
   server-paginated list page, extracted from the pattern
   `pages/business/ActivityLog.jsx` established first. Takes
@@ -1908,11 +1927,11 @@ frontend stops holding/sending it.
   every paginated list endpoint's response carries (see "Pagination
   convention" above) — and renders nothing when `totalPages <= 1`. Every
   list page that fetches with a `page` state variable follows the same
-  shape: `useEffect` re-fetches on `[token, search, page]` change, a
-  separate `useEffect` resets `page` back to `1` whenever `search` changes
-  (so a new search always starts from page 1 instead of potentially landing
-  past the end of the filtered result set), and the response's pagination
-  fields are stored separately from the list itself (e.g.
+  shape: `useEffect` re-fetches on `[token, debouncedSearch, page]` change,
+  a separate `useEffect` resets `page` back to `1` whenever `debouncedSearch`
+  changes (so a new search always starts from page 1 instead of potentially
+  landing past the end of the filtered result set), and the response's
+  pagination fields are stored separately from the list itself (e.g.
   `pageInfo`) so `<Pagination>` only renders once a paginated response has
   actually come back (i.e. `pageInfo` stays `null` until a `page` param was
   sent and `totalPages` was present in the response).
@@ -2392,6 +2411,23 @@ proved out, rather than staying a one-off.
   `Expenses.jsx`, `CapitalContributions.jsx`, `RecurringInvoices.jsx`,
   `Users.jsx`, `Quotes.jsx`, `Invoices.jsx`, `Licenses.jsx`) and both
   document detail pages (`QuoteDetail.jsx`, `InvoiceDetail.jsx`).
+  **Every header button row wraps** (`className="flex flex-wrap gap-2"` on
+  the `<div>` holding the row) rather than staying on one unbreakable line
+  — the header buttons on `Quotes.jsx`/`Invoices.jsx`/`Licenses.jsx` in
+  particular (Analytics, Export CSV, Export Excel, New X — 4 buttons, the
+  most of any list page) overflowed past the page's own right padding on a
+  phone-width screen before this, pushing "New quote"/"New invoice"/
+  "New license" (and part of the row before it) outside the visible page
+  margin instead of wrapping onto a second line; `QuoteDetail.jsx`/
+  `InvoiceDetail.jsx`'s own action-button rows already wrapped
+  (`flex flex-wrap gap-2`) and never had this problem, so the list-page
+  header rows were brought in line with that existing pattern rather than
+  inventing a new one. `RecurringInvoices.jsx`'s outer header container
+  was also missing `flex-wrap` (`flex items-center justify-between` with no
+  `gap-3`, unlike every sibling list page's `flex flex-wrap items-center
+  justify-between gap-3`) — it never actually overflowed since that page's
+  header only ever holds one button, but was brought in line for the same
+  reason: one button away from the same bug otherwise.
 - **Deliberately left untouched**: every modal-form's Save/Cancel footer
   (`Clients.jsx`, `Products.jsx`, `Expenses.jsx`,
   `CapitalContributions.jsx`, `RecurringInvoices.jsx`, `Users.jsx` — both

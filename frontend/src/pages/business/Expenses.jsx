@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useUndoableDelete } from '../../lib/useUndoableDelete';
 import { useConfirm } from '../../lib/useConfirm';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { todayStr } from '../../lib/date';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
@@ -36,6 +37,7 @@ export default function Expenses() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [payeeFilter, setPayeeFilter] = useState('');
 
@@ -46,7 +48,7 @@ export default function Expenses() {
   function load() {
     setLoading(true);
     api.expenses
-      .list(token, { q: search, page, category: categoryFilter, payee: payeeFilter })
+      .list(token, { q: debouncedSearch, page, category: categoryFilter, payee: payeeFilter })
       .then(({ expenses, categories, payees, totalAmount, ...rest }) => {
         setExpenses(expenses);
         setCategories(categories);
@@ -58,10 +60,10 @@ export default function Expenses() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token, search, page, categoryFilter, payeeFilter]);
+  useEffect(load, [token, debouncedSearch, page, categoryFilter, payeeFilter]);
   useEffect(() => {
     setPage(1);
-  }, [search, categoryFilter, payeeFilter]);
+  }, [debouncedSearch, categoryFilter, payeeFilter]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -130,7 +132,7 @@ export default function Expenses() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Expenses</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={handleExportCsv}
             className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"

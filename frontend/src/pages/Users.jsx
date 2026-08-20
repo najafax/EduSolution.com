@@ -9,6 +9,7 @@ import MobileListAccordion from '../components/MobileListAccordion';
 import IconActionButton from '../components/IconActionButton';
 import { PlusIcon, PencilIcon, KeyIcon, TrashIcon } from '../components/icons';
 import { useConfirm } from '../lib/useConfirm';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', active: true };
 
@@ -32,6 +33,7 @@ export default function Users() {
   const [pageInfo, setPageInfo] = useState(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -49,7 +51,7 @@ export default function Users() {
   function load() {
     if (!canView) return;
     setLoading(true);
-    Promise.all([api.users.list(token, { q: search, page }), api.users.modules(token)])
+    Promise.all([api.users.list(token, { q: debouncedSearch, page }), api.users.modules(token)])
       .then(([{ users, ...rest }, { modules }]) => {
         setUsers(users);
         setPageInfo(rest.totalPages ? rest : null);
@@ -59,10 +61,10 @@ export default function Users() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token, canView, search, page]);
+  useEffect(load, [token, canView, debouncedSearch, page]);
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [debouncedSearch]);
 
   function startCreate() {
     setForm(EMPTY_FORM);

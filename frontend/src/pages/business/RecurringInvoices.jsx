@@ -13,6 +13,7 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import { PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 
 const EMPTY_FORM = {
   client_id: '',
@@ -33,6 +34,7 @@ export default function RecurringInvoices() {
   const [pageInfo, setPageInfo] = useState(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -48,7 +50,7 @@ export default function RecurringInvoices() {
   function load() {
     setLoading(true);
     api.recurringInvoices
-      .list(token, { q: search, page })
+      .list(token, { q: debouncedSearch, page })
       .then(({ recurringInvoices, ...rest }) => {
         setRecurring(recurringInvoices);
         setPageInfo(rest.totalPages ? rest : null);
@@ -57,10 +59,10 @@ export default function RecurringInvoices() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token, search, page]);
+  useEffect(load, [token, debouncedSearch, page]);
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [debouncedSearch]);
   useEffect(() => {
     api.clients.list(token).then(({ clients }) => setClients(clients));
     api.products.list(token).then(({ products }) => setProducts(products)).catch(() => {});
@@ -154,7 +156,7 @@ export default function RecurringInvoices() {
 
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Recurring invoices</h1>
         {canManage && (
           <button
