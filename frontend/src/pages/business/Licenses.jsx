@@ -187,11 +187,20 @@ export default function Licenses() {
     }
   }
 
-  async function handleRenew(id) {
+  async function handleRenew(l) {
+    if (
+      !(await confirm({
+        title: 'Renew this license?',
+        message: `${l.name} (${l.client_name}) will be extended by one billing cycle.`,
+        confirmLabel: 'Renew',
+        danger: false,
+      }))
+    )
+      return;
     setError('');
-    setBusy({ id, action: 'renew' });
+    setBusy({ id: l.id, action: 'renew' });
     try {
-      await api.licenses.renew(id, token);
+      await api.licenses.renew(l.id, token);
       load();
       loadSummary();
     } catch (err) {
@@ -301,7 +310,7 @@ export default function Licenses() {
           <IconActionButton
             icon={RefreshIcon}
             tone="lagoon"
-            onClick={() => handleRenew(l.id)}
+            onClick={() => handleRenew(l)}
             disabled={rowBusy}
             spinning={isBusy('renew')}
             title={isBusy('renew') ? 'Renewing…' : 'Renew'}

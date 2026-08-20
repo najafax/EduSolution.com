@@ -58,6 +58,15 @@ export default function QuoteDetail() {
   }
 
   async function handleDuplicate() {
+    if (
+      !(await confirm({
+        title: 'Duplicate this quote?',
+        message: 'Creates a new draft copy with a fresh number and issue date. You can edit it before sending.',
+        confirmLabel: 'Duplicate',
+        danger: false,
+      }))
+    )
+      return;
     setError('');
     setBusy(true);
     try {

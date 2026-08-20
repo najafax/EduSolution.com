@@ -2064,7 +2064,11 @@ frontend stops holding/sending it.
   button in the app (`Clients.jsx`, `Products.jsx`, `Expenses.jsx`,
   `RecurringInvoices.jsx`, `Licenses.jsx`, `Users.jsx`,
   `QuoteDetail.jsx`, `InvoiceDetail.jsx`'s delete *and* void actions, and
-  `Import.jsx`'s `DangerZone`) now goes through the same
+  `Import.jsx`'s `DangerZone`) — plus every other one-click action across
+  the app that fires a mutation immediately with no intervening form/modal
+  step of its own (`Licenses.jsx`'s Cancel/Reactivate/Renew, and the
+  Duplicate button on both `QuoteDetail.jsx` and `InvoiceDetail.jsx`) —
+  now goes through the same
   `const { confirm, confirmDialog } = useConfirm()` — `confirm({ title,
   message, confirmLabel, cancelLabel, danger })` returns a Promise the same
   way `window.confirm()` returns a boolean (`if (!(await confirm({...})))
@@ -2074,9 +2078,22 @@ frontend stops holding/sending it.
   `ConfirmDialog.jsx` itself is presentational only (nothing calls it
   directly) and reuses `Modal.jsx`/`IdleTimeoutMonitor`'s exact backdrop +
   centered-card language, just with a two-button Confirm/Cancel footer
-  instead of form content — `danger` (default `true`, every current caller
-  destructive) picks red vs. `lagoon` for the Confirm button, matching the
-  red styling every Delete button/`DangerZone` already used. `Clients.jsx`/
+  instead of form content — `danger` (default `true`) picks red vs.
+  `lagoon` for the Confirm button, matching the red styling every Delete
+  button/`DangerZone` already used; a caller whose action isn't actually
+  destructive passes `danger: false` for the `lagoon` treatment instead
+  (`Licenses.jsx`'s Reactivate/Renew, both Duplicate buttons — undoing a
+  reactivation, a renewal, or a duplicate is trivial, unlike Delete/Void/
+  Cancel, so these don't need the red "this is dangerous" framing even
+  though they still deserve the same are-you-sure pause against a
+  mis-click). Deliberately **not** wrapped in an extra `confirm()`, despite
+  also being one-click buttons: any action that already requires its own
+  multi-step interaction before it fires — filling in and submitting an
+  inline form (`QuoteDetail.jsx`'s "Convert to invoice",
+  `InvoiceDetail.jsx`'s "Record payment") or clicking "Send email" inside
+  `EmailPreviewModal` (every quote/invoice/license send-or-remind action) —
+  already has its own confirmation gate; stacking a native `confirm()` in
+  front of that would just be a second prompt for the same pause. `Clients.jsx`/
   `Expenses.jsx` now confirm *and* still call `deleteWithUndo` afterward —
   belt and suspenders, not an either/or: the confirm step stops a mis-click
   from doing anything at all, and the undo toast still covers "I confirmed
