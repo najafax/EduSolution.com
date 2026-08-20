@@ -28,7 +28,7 @@ export default function Footer({ className = '' }) {
             rel="noreferrer"
             className="font-medium hover:text-lagoon-600 dark:hover:text-lagoon-400"
           >
-            EduSolutions Maldives
+            Edu Solutions Pvt Ltd
           </a>
           . All rights reserved.
         </p>

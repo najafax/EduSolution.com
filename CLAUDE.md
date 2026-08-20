@@ -2319,10 +2319,13 @@ keeps its existing layout.
   phones use `BottomNav.jsx` instead. `xl:flex` desktop nav is unchanged.
 - `components/Footer.jsx` — a small global closing bar (small
   `/logo-symbol.png` mark + "EduSolution.com" wordmark on one side, a
-  dynamic `© {new Date().getFullYear()} EduSolutions Maldives. All rights
+  dynamic `© {new Date().getFullYear()} Edu Solutions Pvt Ltd. All rights
   reserved.` — the year computed rather than a literal, so it never goes
   stale — linking `https://www.edusolutionsmv.com`, the same real business
-  site `Login.jsx`'s own closing section already links, on the other)
+  site `Login.jsx`'s own closing section already links, on the other; the
+  registered company name, not the "EduSolutions Maldives" trading name
+  `Login.jsx`'s own copy uses elsewhere — a footer copyright line is the
+  one place in the app that specifically calls for the legal entity name)
   mounted once in `App.jsx` alongside `Navbar`/`BottomNav`, so it appears on
   every route rather than being copy-pasted per page. This is deliberately
   slim — one quiet line, not a multi-column marketing footer — since this
