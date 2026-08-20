@@ -38,7 +38,12 @@ export default function Clients() {
   const { confirm, confirmDialog } = useConfirm();
 
   function load() {
-    setLoading(true);
+    // Only show the loading skeleton on the very first load — once there's
+    // a list on screen, a refetch (search/page change) keeps the current
+    // rows visible until the new ones arrive instead of flashing to a
+    // fixed-row-count skeleton whose height matches neither the old nor new
+    // result count, which read as the page visibly jumping.
+    if (clients.length === 0) setLoading(true);
     api.clients
       .list(token, { q: debouncedSearch, page })
       .then(({ clients, ...rest }) => {
@@ -49,6 +54,7 @@ export default function Clients() {
       .finally(() => setLoading(false));
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [token, debouncedSearch, page]);
   useEffect(() => {
     setPage(1);

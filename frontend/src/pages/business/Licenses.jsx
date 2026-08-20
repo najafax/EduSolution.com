@@ -89,7 +89,12 @@ export default function Licenses() {
   const { confirm, confirmDialog } = useConfirm();
 
   function load() {
-    setLoading(true);
+    // Only show the loading skeleton on the very first load — once there's
+    // a list on screen, a refetch (search/filter/page change) keeps the
+    // current rows visible until the new ones arrive instead of flashing
+    // to a fixed-row-count skeleton whose height matches neither the old
+    // nor new result count, which read as the page visibly jumping.
+    if (licenses.length === 0) setLoading(true);
     api.licenses
       .list(token, { q: debouncedSearch, status, page })
       .then(({ licenses, ...rest }) => {
@@ -103,6 +108,7 @@ export default function Licenses() {
     api.licenses.summary(token).then(setSummary).catch(() => {});
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [token, debouncedSearch, status, page]);
   useEffect(() => {
     setPage(1);
