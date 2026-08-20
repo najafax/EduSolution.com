@@ -1529,7 +1529,16 @@ frontend stops holding/sending it.
   matching "Export Excel" button right next to it, wired to a
   `handleExportXlsx()` sibling of that page's existing `handleExportCsv()`
   (renamed from the original unqualified `handleExport()` once there were
-  two formats to disambiguate between). `Products.jsx` and
+  two formats to disambiguate between). The "Export Excel" button on each
+  of those 6 pages is `hidden sm:flex` — visible from `sm` up, hidden below
+  it — while its "Export CSV"/"Analytics"/"New X" siblings in the same
+  header row stay visible at every width; CSV is the one export format a
+  phone can actually do anything with (a `.csv` opens in whatever the OS
+  hands it to), while a `.xlsx` on a phone mostly just downloads a file
+  with no obvious next step, and a header row that already carries up to 4
+  buttons was tightest exactly on the narrow screens where the least-useful
+  one added the least value. Desktop is unaffected — same 4 buttons, same
+  order, same styling as before. `Products.jsx` and
   `RecurringInvoices.jsx` don't have either button — neither ever had a
   CSV export, and adding Excel-only export to just those two would be an
   inconsistent, half-applied pattern; add both formats together if export
