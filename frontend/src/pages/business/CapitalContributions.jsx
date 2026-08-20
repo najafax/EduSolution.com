@@ -48,7 +48,12 @@ export default function CapitalContributions() {
   const { confirm, confirmDialog } = useConfirm();
 
   function load() {
-    setLoading(true);
+    // Only show the loading skeleton on the very first load — once there's
+    // a list on screen, a refetch (search/filter/page change) keeps the
+    // current rows visible until the new ones arrive instead of flashing
+    // to a fixed-row-count skeleton whose height matches neither the old
+    // nor new result count, which read as the page visibly jumping.
+    if (contributions.length === 0) setLoading(true);
     api.capitalContributions
       .list(token, { q: debouncedSearch, page, contributor: contributorFilter })
       .then(({ contributions, contributors, totalAmount, ...rest }) => {
@@ -61,6 +66,7 @@ export default function CapitalContributions() {
       .finally(() => setLoading(false));
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [token, debouncedSearch, page, contributorFilter]);
   useEffect(() => {
     setPage(1);

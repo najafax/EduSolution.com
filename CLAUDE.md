@@ -1955,7 +1955,29 @@ frontend stops holding/sending it.
   (a fixed row count/height, see `Skeleton.jsx`) and the real, differently-
   sized results — the page's content visibly jumped up and down while
   someone was still typing. Debouncing means that swap happens once, after
-  the person pauses, instead of once per character. `GlobalSearch.jsx`
+  the person pauses, instead of once per character. **Debouncing alone
+  didn't fully fix it, though** — every list page's `load()` still called
+  `setLoading(true)` unconditionally on every refetch, including the one
+  debounced fetch that does fire, so the list still flashed real-content →
+  skeleton → real-content once per search (skeleton's `TableSkeleton`
+  always renders a fixed 5 rows, matching neither the old nor the new
+  result count). On a page whose content already exceeded one screen
+  (`Licenses.jsx` most visibly, with its KPI summary strip on top pushing
+  total height past the fold even with few rows) that extra skeleton-shaped
+  height swing was still a real, visible jump; pages with shorter content
+  just didn't visibly move since the whole page stayed under one viewport
+  regardless. Fixed by gating the `setLoading(true)` call on there being no
+  data yet — `if (licenses.length === 0) setLoading(true)` (and the
+  equivalent per page's own list variable) — so only the true first-ever
+  load shows the skeleton; every later refetch (search, filter, status,
+  page change) keeps the current rows on screen until the new ones arrive
+  and swaps directly, one clean transition instead of two. The
+  `useEffect(load, [...])` on every one of these pages needs a
+  `// eslint-disable-next-line react-hooks/exhaustive-deps` immediately
+  above it now, since `load` reads `licenses.length` (etc.) without it
+  being a declared dependency — deliberately: adding it would re-run the
+  effect (and refetch) every time the list itself changes, i.e. after every
+  successful fetch, an infinite-ish loop. `GlobalSearch.jsx`
   already had its own hand-rolled 250ms `setTimeout` debounce before this
   and wasn't changed to use this hook — its debounce only delays the
   dropdown's own fetch, nothing about its layout reflows while typing (the

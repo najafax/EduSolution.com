@@ -34,7 +34,12 @@ export default function Products() {
   const symbol = settings?.currency_symbol || '$';
 
   function load() {
-    setLoading(true);
+    // Only show the loading skeleton on the very first load — once there's
+    // a list on screen, a refetch (search/page change) keeps the current
+    // rows visible until the new ones arrive instead of flashing to a
+    // fixed-row-count skeleton whose height matches neither the old nor new
+    // result count, which read as the page visibly jumping.
+    if (products.length === 0) setLoading(true);
     api.products
       .list(token, { q: debouncedSearch, page })
       .then(({ products, ...rest }) => {
@@ -45,6 +50,7 @@ export default function Products() {
       .finally(() => setLoading(false));
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [token, debouncedSearch, page]);
   useEffect(() => {
     setPage(1);
