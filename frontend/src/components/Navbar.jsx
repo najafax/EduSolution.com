@@ -78,7 +78,7 @@ export default function Navbar() {
                 search/account/theme/logout stay put and the page never
                 grows a horizontal scrollbar. */}
             <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 xl:flex">
-              <GlobalSearch className="max-w-[110px] shrink-0 2xl:max-w-[220px]" />
+              <GlobalSearch className="max-w-[200px] shrink-0 2xl:max-w-[280px]" />
               <kbd
                 className="hidden shrink-0 rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-400 2xl:block dark:border-slate-600"
                 title="Press Cmd/Ctrl+K to open the command palette"

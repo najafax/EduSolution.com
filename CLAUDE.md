@@ -1894,15 +1894,32 @@ frontend stops holding/sending it.
   without being trusted with a bulk, unrecoverable delete.
 - `components/GlobalSearch.jsx` — a debounced (250ms) search box that calls
   `api.search.query()` and renders a grouped dropdown (clients/quotes/
-  invoices/expenses); clicking a result navigates there. Mounted twice in
-  `Navbar.jsx` — once in the desktop nav (narrower, `hidden lg:flex`) and
-  once inside the mobile slide-down menu — both instances exist in the DOM
-  simultaneously, so anything that queries this input in tests must scope
-  to the visible one. Has its own inline `×` clear button (same
-  `aria-label="Clear search"` pattern as `SearchInput.jsx`, but hand-rolled
-  since this component doesn't use `SearchInput` — it needs the dropdown-open
-  behavior `SearchInput` doesn't have) that appears whenever `query` is
-  non-empty and resets it to `''`.
+  invoices/expenses); clicking a result navigates there. Mounted three times
+  in `Navbar.jsx` — once in the desktop nav (`hidden ... xl:flex`, narrower
+  via a `className` override since the nav row also has to fit up to 15
+  links plus the account/theme/logout controls), once in the tablet
+  hamburger drawer, and once in the phone-only search toggle row (both of
+  the latter two keep the component's own default `max-w-xs`, uncapped by
+  the nav row's space pressure) — all three exist in the DOM simultaneously
+  regardless of which is currently visible, so anything that queries this
+  input in tests must scope to the visible one. Has its own inline `×` clear
+  button (same `aria-label="Clear search"` pattern as `SearchInput.jsx`, but
+  hand-rolled since this component doesn't use `SearchInput` — it needs the
+  dropdown-open behavior `SearchInput` doesn't have) that appears whenever
+  `query` is non-empty and resets it to `''`. **The desktop instance's
+  `className` was originally `max-w-[110px] shrink-0 2xl:max-w-[220px]`** —
+  narrow enough that the "Search everything…" placeholder rendered as an
+  illegible "Searc" fragment below the `2xl` breakpoint (1536px), the one
+  width band (`xl` to `2xl`, 1280–1535px) most desktop users actually sit
+  in. Bumped to `max-w-[200px] shrink-0 2xl:max-w-[280px]` — wide enough to
+  read the placeholder (and most typed queries) at every desktop width, not
+  just `2xl`+. The extra width comes out of `.nav-links-scroll`'s own
+  budget, not by breaking the row — that container already carries
+  `min-w-0 overflow-x-auto` specifically as the pressure-release valve for
+  "the nav has more links than fit" (see its own comment in `Navbar.jsx`),
+  so a wider search box just means the link strip's own internal horizontal
+  scroll kicks in a little sooner, never the reverse (the search box or the
+  "Log out" button getting squeezed out).
 - `components/SearchInput.jsx` — the search box used by every business list
   page (Clients/Products/Expenses/Quotes/Invoices/RecurringInvoices/Users).
   Renders a leading search icon and, whenever `value` is non-empty, a
