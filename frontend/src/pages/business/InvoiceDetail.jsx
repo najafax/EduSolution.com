@@ -64,6 +64,15 @@ export default function InvoiceDetail() {
   }
 
   async function handleDuplicate() {
+    if (
+      !(await confirm({
+        title: 'Duplicate this invoice?',
+        message: 'Creates a new draft copy with a fresh number and due date. You can edit it before sending.',
+        confirmLabel: 'Duplicate',
+        danger: false,
+      }))
+    )
+      return;
     setError('');
     setBusy(true);
     try {
