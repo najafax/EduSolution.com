@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useUndoableDelete } from '../../lib/useUndoableDelete';
 import { useConfirm } from '../../lib/useConfirm';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { todayStr } from '../../lib/date';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
@@ -39,6 +40,7 @@ export default function CapitalContributions() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [contributorFilter, setContributorFilter] = useState('');
 
   const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.capitalContributions.remove(id, token));
@@ -48,7 +50,7 @@ export default function CapitalContributions() {
   function load() {
     setLoading(true);
     api.capitalContributions
-      .list(token, { q: search, page, contributor: contributorFilter })
+      .list(token, { q: debouncedSearch, page, contributor: contributorFilter })
       .then(({ contributions, contributors, totalAmount, ...rest }) => {
         setContributions(contributions);
         setContributors(contributors);
@@ -59,10 +61,10 @@ export default function CapitalContributions() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token, search, page, contributorFilter]);
+  useEffect(load, [token, debouncedSearch, page, contributorFilter]);
   useEffect(() => {
     setPage(1);
-  }, [search, contributorFilter]);
+  }, [debouncedSearch, contributorFilter]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -134,7 +136,7 @@ export default function CapitalContributions() {
             Money an owner or partner has put into the business — separate from client revenue and expenses.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={handleExportCsv}
             className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"

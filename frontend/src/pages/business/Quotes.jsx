@@ -12,6 +12,7 @@ import EmptyState from '../../components/EmptyState';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon } from '../../components/icons';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import QuoteForm from './QuoteForm';
 
 const STATUS_OPTIONS = [
@@ -44,23 +45,24 @@ export default function Quotes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     api.quotes
-      .list(token, { q: search, page, status })
+      .list(token, { q: debouncedSearch, page, status })
       .then(({ quotes, ...rest }) => {
         setQuotes(quotes);
         setPageInfo(rest.totalPages ? rest : null);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [token, search, page, status]);
+  }, [token, debouncedSearch, page, status]);
   useEffect(() => {
     setPage(1);
-  }, [search, status]);
+  }, [debouncedSearch, status]);
 
   async function handleExportCsv() {
     setError('');
@@ -84,7 +86,7 @@ export default function Quotes() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quotes</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             to="/quotes/analytics"
             className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"

@@ -9,6 +9,7 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import { PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 
 const EMPTY_FORM = { name: '', description: '', unit_price: '', tax_rate: '' };
 
@@ -27,6 +28,7 @@ export default function Products() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const { confirm, confirmDialog } = useConfirm();
 
   const symbol = settings?.currency_symbol || '$';
@@ -34,7 +36,7 @@ export default function Products() {
   function load() {
     setLoading(true);
     api.products
-      .list(token, { q: search, page })
+      .list(token, { q: debouncedSearch, page })
       .then(({ products, ...rest }) => {
         setProducts(products);
         setPageInfo(rest.totalPages ? rest : null);
@@ -43,10 +45,10 @@ export default function Products() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token, search, page]);
+  useEffect(load, [token, debouncedSearch, page]);
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [debouncedSearch]);
   useEffect(() => {
     api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token]);

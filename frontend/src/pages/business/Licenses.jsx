@@ -32,6 +32,7 @@ import {
   ReportIcon,
 } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
@@ -69,6 +70,7 @@ export default function Licenses() {
   const [pageInfo, setPageInfo] = useState(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = useState('');
   const [summary, setSummary] = useState(null);
   const [clients, setClients] = useState([]);
@@ -89,7 +91,7 @@ export default function Licenses() {
   function load() {
     setLoading(true);
     api.licenses
-      .list(token, { q: search, status, page })
+      .list(token, { q: debouncedSearch, status, page })
       .then(({ licenses, ...rest }) => {
         setLicenses(licenses);
         setPageInfo(rest.totalPages ? rest : null);
@@ -101,10 +103,10 @@ export default function Licenses() {
     api.licenses.summary(token).then(setSummary).catch(() => {});
   }
 
-  useEffect(load, [token, search, status, page]);
+  useEffect(load, [token, debouncedSearch, status, page]);
   useEffect(() => {
     setPage(1);
-  }, [search, status]);
+  }, [debouncedSearch, status]);
   useEffect(() => {
     loadSummary();
     api.clients.list(token).then(({ clients }) => setClients(clients));
@@ -352,7 +354,7 @@ export default function Licenses() {
             Track active client licenses, renew them once paid, and stay ahead of expiries.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             to="/licenses/analytics"
             className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"

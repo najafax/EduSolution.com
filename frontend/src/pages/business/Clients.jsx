@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useUndoableDelete } from '../../lib/useUndoableDelete';
 import { useConfirm } from '../../lib/useConfirm';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
@@ -30,6 +31,7 @@ export default function Clients() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
 
   const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.clients.remove(id, token));
   const visibleClients = clients.filter((c) => !pendingIds.has(c.id));
@@ -38,7 +40,7 @@ export default function Clients() {
   function load() {
     setLoading(true);
     api.clients
-      .list(token, { q: search, page })
+      .list(token, { q: debouncedSearch, page })
       .then(({ clients, ...rest }) => {
         setClients(clients);
         setPageInfo(rest.totalPages ? rest : null);
@@ -47,10 +49,10 @@ export default function Clients() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [token, search, page]);
+  useEffect(load, [token, debouncedSearch, page]);
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [debouncedSearch]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -118,7 +120,7 @@ export default function Clients() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Clients</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={handleExportCsv}
             className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
