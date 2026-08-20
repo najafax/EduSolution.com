@@ -10,6 +10,8 @@ import SearchInput from '../../components/SearchInput';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import MobileListAccordion from '../../components/MobileListAccordion';
+import IconActionButton from '../../components/IconActionButton';
+import { PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 const EMPTY_FORM = {
@@ -157,8 +159,9 @@ export default function RecurringInvoices() {
         {canManage && (
           <button
             onClick={startCreate}
-            className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+            className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
           >
+            <PlusIcon width={16} height={16} />
             New template
           </button>
         )}
@@ -355,13 +358,17 @@ export default function RecurringInvoices() {
                         </span>
                       </td>
                       {canManage && (
-                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <button onClick={() => startEdit(row)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
-                            Edit
-                          </button>
-                          <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-500">
-                            Delete
-                          </button>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="flex justify-end gap-1.5">
+                            <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(row)} title="Edit" label="Edit template" />
+                            <IconActionButton
+                              icon={TrashIcon}
+                              tone="red"
+                              onClick={() => handleDelete(row.id)}
+                              title="Delete"
+                              label="Delete template"
+                            />
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -399,13 +406,15 @@ export default function RecurringInvoices() {
                     <dd className="text-slate-900 dark:text-white">{row.next_run_date}</dd>
                   </div>
                   {canManage && (
-                    <div className="flex gap-4 pt-1">
-                      <button onClick={() => startEdit(row)} className="text-lagoon-600 hover:text-lagoon-500">
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-500">
-                        Delete
-                      </button>
+                    <div className="flex gap-1.5 pt-1">
+                      <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(row)} title="Edit" label="Edit template" />
+                      <IconActionButton
+                        icon={TrashIcon}
+                        tone="red"
+                        onClick={() => handleDelete(row.id)}
+                        title="Delete"
+                        label="Delete template"
+                      />
                     </div>
                   )}
                 </MobileListAccordion>

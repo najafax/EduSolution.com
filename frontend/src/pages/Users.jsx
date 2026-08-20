@@ -6,6 +6,8 @@ import SearchInput from '../components/SearchInput';
 import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import MobileListAccordion from '../components/MobileListAccordion';
+import IconActionButton from '../components/IconActionButton';
+import { PlusIcon, PencilIcon, KeyIcon, TrashIcon } from '../components/icons';
 import { useConfirm } from '../lib/useConfirm';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', active: true };
@@ -162,8 +164,9 @@ export default function Users() {
         {canManage && (
           <button
             onClick={startCreate}
-            className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+            className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
           >
+            <PlusIcon width={16} height={16} />
             New user
           </button>
         )}
@@ -383,21 +386,19 @@ export default function Users() {
                         </span>
                       </td>
                       {canManage && (
-                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <button onClick={() => startEdit(u)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => setResetTargetId(u.id)}
-                            className="mr-3 text-lagoon-600 hover:text-lagoon-500"
-                          >
-                            Reset password
-                          </button>
-                          {u.id !== currentUser.id && (
-                            <button onClick={() => handleDelete(u)} className="text-red-600 hover:text-red-500">
-                              Delete
-                            </button>
-                          )}
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="flex justify-end gap-1.5">
+                            <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(u)} title="Edit" label="Edit user" />
+                            <IconActionButton
+                              icon={KeyIcon}
+                              tone="slate"
+                              onClick={() => setResetTargetId(u.id)}
+                              title="Reset password"
+                            />
+                            {u.id !== currentUser.id && (
+                              <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(u)} title="Delete" label="Delete user" />
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -437,17 +438,11 @@ export default function Users() {
                     <dd className="capitalize text-slate-900 dark:text-white">{u.role}</dd>
                   </div>
                   {canManage && (
-                    <div className="flex flex-wrap gap-4 pt-1">
-                      <button onClick={() => startEdit(u)} className="text-lagoon-600 hover:text-lagoon-500">
-                        Edit
-                      </button>
-                      <button onClick={() => setResetTargetId(u.id)} className="text-lagoon-600 hover:text-lagoon-500">
-                        Reset password
-                      </button>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(u)} title="Edit" label="Edit user" />
+                      <IconActionButton icon={KeyIcon} tone="slate" onClick={() => setResetTargetId(u.id)} title="Reset password" />
                       {u.id !== currentUser.id && (
-                        <button onClick={() => handleDelete(u)} className="text-red-600 hover:text-red-500">
-                          Delete
-                        </button>
+                        <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(u)} title="Delete" label="Delete user" />
                       )}
                     </div>
                   )}

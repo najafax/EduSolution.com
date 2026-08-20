@@ -15,7 +15,22 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import KpiCard from '../../components/KpiCard';
-import { LicenseIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon } from '../../components/icons';
+import IconActionButton from '../../components/IconActionButton';
+import {
+  LicenseIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  AlertTriangleIcon,
+  RefreshIcon,
+  XIcon,
+  BellIcon,
+  HistoryIcon,
+  PencilIcon,
+  TrashIcon,
+  DownloadIcon,
+  PlusIcon,
+  ReportIcon,
+} from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 const STATUS_OPTIONS = [
@@ -283,46 +298,47 @@ export default function Licenses() {
     return (
       <>
         {l.status === 'active' && (
-          <button
+          <IconActionButton
+            icon={RefreshIcon}
+            tone="lagoon"
             onClick={() => handleRenew(l.id)}
             disabled={rowBusy}
-            className="font-medium text-lagoon-600 hover:text-lagoon-500 disabled:opacity-50"
-          >
-            {isBusy('renew') ? 'Renewing…' : 'Renew'}
-          </button>
+            spinning={isBusy('renew')}
+            title={isBusy('renew') ? 'Renewing…' : 'Renew'}
+            label="Renew license"
+          />
         )}
         {l.status === 'active' && (
-          <button
+          <IconActionButton
+            icon={XIcon}
+            tone="orange"
             onClick={() => handleCancel(l)}
             disabled={rowBusy}
-            className="text-orange-600 hover:text-orange-500 disabled:opacity-50 dark:text-orange-400"
-          >
-            {isBusy('cancel') ? 'Cancelling…' : 'Cancel'}
-          </button>
+            title={isBusy('cancel') ? 'Cancelling…' : 'Cancel license'}
+            label="Cancel license"
+          />
         )}
         {l.status === 'cancelled' && (
-          <button
+          <IconActionButton
+            icon={CheckCircleIcon}
+            tone="emerald"
             onClick={() => handleReactivate(l)}
             disabled={rowBusy}
-            className="text-emerald-600 hover:text-emerald-500 disabled:opacity-50 dark:text-emerald-400"
-          >
-            {isBusy('reactivate') ? 'Reactivating…' : 'Reactivate'}
-          </button>
+            title={isBusy('reactivate') ? 'Reactivating…' : 'Reactivate'}
+            label="Reactivate license"
+          />
         )}
         {l.status !== 'cancelled' && (
-          <button onClick={() => setRemindTarget(l)} className="text-amber-700 hover:text-amber-600 dark:text-amber-400">
-            Remind
-          </button>
+          <IconActionButton
+            icon={BellIcon}
+            tone="amber"
+            onClick={() => setRemindTarget(l)}
+            title="Send renewal reminder"
+          />
         )}
-        <button onClick={() => openHistory(l)} className="text-slate-600 hover:text-slate-500 dark:text-slate-300">
-          History
-        </button>
-        <button onClick={() => startEdit(l)} className="text-slate-600 hover:text-slate-500 dark:text-slate-300">
-          Edit
-        </button>
-        <button onClick={() => handleDelete(l.id)} className="text-red-600 hover:text-red-500">
-          Delete
-        </button>
+        <IconActionButton icon={HistoryIcon} tone="slate" onClick={() => openHistory(l)} title="Renewal history" label="View renewal history" />
+        <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(l)} title="Edit" label="Edit license" />
+        <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(l.id)} title="Delete" label="Delete license" />
       </>
     );
   }
@@ -339,27 +355,31 @@ export default function Licenses() {
         <div className="flex gap-2">
           <Link
             to="/licenses/analytics"
-            className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <ReportIcon width={16} height={16} />
             Analytics
           </Link>
           <button
             onClick={handleExportCsv}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <DownloadIcon width={16} height={16} />
             Export CSV
           </button>
           <button
             onClick={handleExportXlsx}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <DownloadIcon width={16} height={16} />
             Export Excel
           </button>
           {canManage && (
             <button
               onClick={startCreate}
-              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+              className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
             >
+              <PlusIcon width={16} height={16} />
               New license
             </button>
           )}
@@ -425,7 +445,7 @@ export default function Licenses() {
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
-                          <div className="flex justify-end gap-3">{rowActions(l)}</div>
+                          <div className="flex justify-end gap-1.5">{rowActions(l)}</div>
                         </td>
                       )}
                     </tr>
@@ -465,7 +485,7 @@ export default function Licenses() {
                     <dt className="text-slate-500 dark:text-slate-400">Billing</dt>
                     <dd className="capitalize text-slate-900 dark:text-white">{l.billing_cycle}</dd>
                   </div>
-                  {canManage && <div className="flex flex-wrap gap-4 pt-1">{rowActions(l)}</div>}
+                  {canManage && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(l)}</div>}
                 </MobileListAccordion>
               ))}
             </div>

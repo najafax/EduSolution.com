@@ -7,6 +7,8 @@ import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import MobileListAccordion from '../../components/MobileListAccordion';
+import IconActionButton from '../../components/IconActionButton';
+import { PencilIcon, DownloadIcon, SendIcon, BellIcon, DuplicateIcon, XIcon, TrashIcon, PlusIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 const METHODS = ['bank_transfer', 'cash', 'card', 'cheque', 'other'];
@@ -164,35 +166,42 @@ export default function InvoiceDetail() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canManage && !isLocked && (
-            <Link to={`/invoices/${id}/edit`} className="min-h-11 flex items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <Link to={`/invoices/${id}/edit`} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              <PencilIcon width={16} height={16} />
               Edit
             </Link>
           )}
-          <button onClick={handleDownload} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+          <button onClick={handleDownload} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <DownloadIcon width={16} height={16} />
             Download PDF
           </button>
           {canManage && invoice.status !== 'void' && (
-            <button onClick={() => setEmailModal({ type: 'send' })} disabled={busy} className="min-h-11 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
+            <button onClick={() => setEmailModal({ type: 'send' })} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
+              <SendIcon width={16} height={16} />
               Email to client
             </button>
           )}
           {canManage && invoice.status !== 'void' && invoice.balance_due > 0 && (
-            <button onClick={() => setEmailModal({ type: 'remind' })} disabled={busy} className="min-h-11 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950">
+            <button onClick={() => setEmailModal({ type: 'remind' })} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950">
+              <BellIcon width={16} height={16} />
               Send reminder
             </button>
           )}
           {canManage && (
-            <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <button onClick={handleDuplicate} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              <DuplicateIcon width={16} height={16} />
               Duplicate
             </button>
           )}
           {canManage && canVoid && (
-            <button onClick={handleVoid} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <button onClick={handleVoid} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              <XIcon width={16} height={16} />
               Void
             </button>
           )}
           {canManage && (
-            <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
+            <button onClick={handleDelete} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
+              <TrashIcon width={16} height={16} />
               Delete
             </button>
           )}
@@ -349,8 +358,9 @@ export default function InvoiceDetail() {
             invoice.balance_due > 0 && (
               <button
                 onClick={togglePaymentForm}
-                className="min-h-11 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500"
+                className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500"
               >
+                <PlusIcon width={16} height={16} />
                 Record payment
               </button>
             )
@@ -440,15 +450,23 @@ export default function InvoiceDetail() {
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.paid_at}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.method.replace('_', ' ')}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{symbol}{p.amount.toFixed(2)}</td>
-                        <td className="whitespace-nowrap px-6 py-3 text-right">
-                          <button onClick={() => handleDownloadReceipt(p.id)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
-                            Download
-                          </button>
-                          {canManage && (
-                            <button onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })} className="text-lagoon-600 hover:text-lagoon-500">
-                              Email
-                            </button>
-                          )}
+                        <td className="whitespace-nowrap px-6 py-3">
+                          <div className="flex justify-end gap-1.5">
+                            <IconActionButton
+                              icon={DownloadIcon}
+                              tone="lagoon"
+                              onClick={() => handleDownloadReceipt(p.id)}
+                              title="Download receipt"
+                            />
+                            {canManage && (
+                              <IconActionButton
+                                icon={SendIcon}
+                                tone="lagoon"
+                                onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })}
+                                title="Email receipt"
+                              />
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -475,14 +493,15 @@ export default function InvoiceDetail() {
                       <dt className="text-slate-500 dark:text-slate-400">Method</dt>
                       <dd className="text-slate-900 dark:text-white">{p.method.replace('_', ' ')}</dd>
                     </div>
-                    <div className="flex gap-4 pt-1">
-                      <button onClick={() => handleDownloadReceipt(p.id)} className="text-lagoon-600 hover:text-lagoon-500">
-                        Download
-                      </button>
+                    <div className="flex gap-1.5 pt-1">
+                      <IconActionButton icon={DownloadIcon} tone="lagoon" onClick={() => handleDownloadReceipt(p.id)} title="Download receipt" />
                       {canManage && (
-                        <button onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })} className="text-lagoon-600 hover:text-lagoon-500">
-                          Email
-                        </button>
+                        <IconActionButton
+                          icon={SendIcon}
+                          tone="lagoon"
+                          onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })}
+                          title="Email receipt"
+                        />
                       )}
                     </div>
                   </MobileListAccordion>

@@ -14,7 +14,8 @@ import SearchableSelect from '../../components/SearchableSelect';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
-import { ExpenseIcon } from '../../components/icons';
+import IconActionButton from '../../components/IconActionButton';
+import { ExpenseIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
 
 const EMPTY_FORM = { category: 'other', description: '', amount: '', expense_date: todayStr(), payee: '', notes: '' };
 
@@ -132,21 +133,24 @@ export default function Expenses() {
         <div className="flex gap-2">
           <button
             onClick={handleExportCsv}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <DownloadIcon width={16} height={16} />
             Export CSV
           </button>
           <button
             onClick={handleExportXlsx}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <DownloadIcon width={16} height={16} />
             Export Excel
           </button>
           {canManage && (
             <button
               onClick={startCreate}
-              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+              className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
             >
+              <PlusIcon width={16} height={16} />
               New expense
             </button>
           )}
@@ -307,13 +311,17 @@ export default function Expenses() {
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{expense.description}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{expense.amount.toFixed(2)}</td>
                       {canManage && (
-                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <button onClick={() => startEdit(expense)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
-                            Edit
-                          </button>
-                          <button onClick={() => handleDelete(expense)} className="text-red-600 hover:text-red-500">
-                            Delete
-                          </button>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="flex justify-end gap-1.5">
+                            <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(expense)} title="Edit" label="Edit expense" />
+                            <IconActionButton
+                              icon={TrashIcon}
+                              tone="red"
+                              onClick={() => handleDelete(expense)}
+                              title="Delete"
+                              label="Delete expense"
+                            />
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -358,13 +366,15 @@ export default function Expenses() {
                       </div>
                     )}
                     {canManage && (
-                      <div className="flex gap-4 pt-1">
-                        <button onClick={() => startEdit(expense)} className="text-lagoon-600 hover:text-lagoon-500">
-                          Edit
-                        </button>
-                        <button onClick={() => handleDelete(expense)} className="text-red-600 hover:text-red-500">
-                          Delete
-                        </button>
+                      <div className="flex gap-1.5 pt-1">
+                        <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(expense)} title="Edit" label="Edit expense" />
+                        <IconActionButton
+                          icon={TrashIcon}
+                          tone="red"
+                          onClick={() => handleDelete(expense)}
+                          title="Delete"
+                          label="Delete expense"
+                        />
                       </div>
                     )}
                   </MobileListAccordion>

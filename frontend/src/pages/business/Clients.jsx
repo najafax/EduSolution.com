@@ -11,7 +11,8 @@ import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
-import { UsersIcon } from '../../components/icons';
+import IconActionButton from '../../components/IconActionButton';
+import { UsersIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', address: '', notes: '' };
 
@@ -120,21 +121,24 @@ export default function Clients() {
         <div className="flex gap-2">
           <button
             onClick={handleExportCsv}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <DownloadIcon width={16} height={16} />
             Export CSV
           </button>
           <button
             onClick={handleExportXlsx}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <DownloadIcon width={16} height={16} />
             Export Excel
           </button>
           {canManage && (
             <button
               onClick={startCreate}
-              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+              className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
             >
+              <PlusIcon width={16} height={16} />
               New client
             </button>
           )}
@@ -211,13 +215,11 @@ export default function Clients() {
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.email}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.phone || '—'}</td>
                       {canManage && (
-                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <button onClick={() => startEdit(client)} className="mr-3 text-lagoon-600 hover:text-lagoon-500">
-                            Edit
-                          </button>
-                          <button onClick={() => handleDelete(client)} className="text-red-600 hover:text-red-500">
-                            Delete
-                          </button>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="flex justify-end gap-1.5">
+                            <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(client)} title="Edit" label="Edit client" />
+                            <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(client)} title="Delete" label="Delete client" />
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -245,13 +247,9 @@ export default function Clients() {
                     <dd className="text-slate-900 dark:text-white">{client.phone || '—'}</dd>
                   </div>
                   {canManage && (
-                    <div className="flex gap-4 pt-1">
-                      <button onClick={() => startEdit(client)} className="text-lagoon-600 hover:text-lagoon-500">
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(client)} className="text-red-600 hover:text-red-500">
-                        Delete
-                      </button>
+                    <div className="flex gap-1.5 pt-1">
+                      <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(client)} title="Edit" label="Edit client" />
+                      <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(client)} title="Delete" label="Delete client" />
                     </div>
                   )}
                 </MobileListAccordion>

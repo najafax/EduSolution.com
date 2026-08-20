@@ -6,6 +6,7 @@ import { todayPlus } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
+import { PencilIcon, DownloadIcon, SendIcon, InvoiceIcon, DuplicateIcon, TrashIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 export default function QuoteDetail() {
@@ -98,30 +99,36 @@ export default function QuoteDetail() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canManage && (
-            <Link to={`/quotes/${id}/edit`} className="min-h-11 flex items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <Link to={`/quotes/${id}/edit`} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              <PencilIcon width={16} height={16} />
               Edit
             </Link>
           )}
-          <button onClick={handleDownload} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+          <button onClick={handleDownload} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <DownloadIcon width={16} height={16} />
             Download PDF
           </button>
           {canManage && (
-            <button onClick={() => setShowSendPreview(true)} disabled={busy} className="min-h-11 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
+            <button onClick={() => setShowSendPreview(true)} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
+              <SendIcon width={16} height={16} />
               Email to client
             </button>
           )}
           {canManage && canManageInvoices && !quote.converted_invoice_id && (
-            <button onClick={() => setShowConvert((v) => !v)} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <button onClick={() => setShowConvert((v) => !v)} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              <InvoiceIcon width={16} height={16} />
               Convert to invoice
             </button>
           )}
           {canManage && (
-            <button onClick={handleDuplicate} disabled={busy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <button onClick={handleDuplicate} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              <DuplicateIcon width={16} height={16} />
               Duplicate
             </button>
           )}
           {canManage && (
-            <button onClick={handleDelete} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
+            <button onClick={handleDelete} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
+              <TrashIcon width={16} height={16} />
               Delete
             </button>
           )}

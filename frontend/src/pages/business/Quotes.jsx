@@ -11,7 +11,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
-import { InvoiceIcon } from '../../components/icons';
+import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon } from '../../components/icons';
 import QuoteForm from './QuoteForm';
 
 const STATUS_OPTIONS = [
@@ -87,27 +87,31 @@ export default function Quotes() {
         <div className="flex gap-2">
           <Link
             to="/quotes/analytics"
-            className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <ReportIcon width={16} height={16} />
             Analytics
           </Link>
           <button
             onClick={handleExportCsv}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <DownloadIcon width={16} height={16} />
             Export CSV
           </button>
           <button
             onClick={handleExportXlsx}
-            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <DownloadIcon width={16} height={16} />
             Export Excel
           </button>
           {canManage && (
             <button
               onClick={() => setShowNewForm(true)}
-              className="flex min-h-11 items-center rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+              className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
             >
+              <PlusIcon width={16} height={16} />
               New quote
             </button>
           )}
