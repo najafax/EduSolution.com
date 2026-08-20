@@ -11,8 +11,11 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
-import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon } from '../../components/icons';
+import EmailPreviewModal from '../../components/EmailPreviewModal';
+import IconActionButton from '../../components/IconActionButton';
+import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, DuplicateIcon, TrashIcon } from '../../components/icons';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
+import { useConfirm } from '../../lib/useConfirm';
 import InvoiceForm from './InvoiceForm';
 
 const STATUS_OPTIONS = [
@@ -47,8 +50,11 @@ export default function Invoices() {
   const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
+  const [busy, setBusy] = useState(null); // { id, action } — tracks which row/action is in flight
+  const [emailModal, setEmailModal] = useState(null); // id of the invoice whose email preview is open, or null
+  const { confirm, confirmDialog } = useConfirm();
 
-  useEffect(() => {
+  function load() {
     setLoading(true);
     api.invoices
       .list(token, { q: debouncedSearch, page, status })
@@ -58,10 +64,113 @@ export default function Invoices() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [token, debouncedSearch, page, status]);
+  }
+
+  useEffect(load, [token, debouncedSearch, page, status]);
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, status]);
+
+  async function handleDownload(id) {
+    setError('');
+    try {
+      await api.invoices.openPdf(id, token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleDuplicate(invoice) {
+    if (
+      !(await confirm({
+        title: 'Duplicate this invoice?',
+        message: 'Creates a new draft copy with a fresh number and due date. You can edit it before sending.',
+        confirmLabel: 'Duplicate',
+        danger: false,
+      }))
+    )
+      return;
+    setError('');
+    setBusy({ id: invoice.id, action: 'duplicate' });
+    try {
+      const { invoice: created } = await api.invoices.duplicate(invoice.id, token);
+      navigate(`/invoices/${created.id}`);
+    } catch (err) {
+      setError(err.message);
+      setBusy(null);
+    }
+  }
+
+  async function handleDelete(invoice) {
+    if (!(await confirm({ title: 'Delete this invoice?', confirmLabel: 'Delete' }))) return;
+    setError('');
+    setBusy({ id: invoice.id, action: 'delete' });
+    try {
+      await api.invoices.remove(invoice.id, token);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function rowActions(invoice) {
+    const rowBusy = busy?.id === invoice.id;
+    const isBusy = (action) => rowBusy && busy.action === action;
+    const isLocked = invoice.status === 'sent' || invoice.status === 'paid';
+    return (
+      <>
+        {canManage && !isLocked && (
+          <IconActionButton
+            icon={PencilIcon}
+            tone="slate"
+            onClick={() => navigate(`/invoices/${invoice.id}/edit`)}
+            title="Edit"
+            label="Edit invoice"
+          />
+        )}
+        <IconActionButton
+          icon={DownloadIcon}
+          tone="lagoon"
+          onClick={() => handleDownload(invoice.id)}
+          title="Download PDF"
+          label="Download invoice PDF"
+        />
+        {canManage && invoice.status !== 'void' && (
+          <IconActionButton
+            icon={SendIcon}
+            tone="lagoon"
+            onClick={() => setEmailModal(invoice.id)}
+            title="Email to client"
+            label="Email invoice to client"
+          />
+        )}
+        {canManage && (
+          <IconActionButton
+            icon={DuplicateIcon}
+            tone="slate"
+            onClick={() => handleDuplicate(invoice)}
+            disabled={rowBusy}
+            spinning={isBusy('duplicate')}
+            title={isBusy('duplicate') ? 'Duplicating…' : 'Duplicate'}
+            label="Duplicate invoice"
+          />
+        )}
+        {canManage && (
+          <IconActionButton
+            icon={TrashIcon}
+            tone="red"
+            onClick={() => handleDelete(invoice)}
+            disabled={rowBusy}
+            spinning={isBusy('delete')}
+            title={isBusy('delete') ? 'Deleting…' : 'Delete'}
+            label="Delete invoice"
+          />
+        )}
+      </>
+    );
+  }
 
   async function handleExportCsv() {
     setError('');
@@ -132,7 +241,7 @@ export default function Invoices() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={['w-28', 'w-32', 'w-24', 'w-20', 'w-20', 'w-20']} />
+            <TableSkeleton rows={5} cols={['w-28', 'w-32', 'w-24', 'w-20', 'w-20', 'w-20', 'w-32']} />
           </div>
         ) : invoices.length === 0 ? (
           <EmptyState
@@ -153,6 +262,7 @@ export default function Invoices() {
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3 text-right">Total</th>
                     <th className="px-4 py-3 text-right">Balance due</th>
+                    <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -170,6 +280,9 @@ export default function Invoices() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{invoice.total.toFixed(2)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{invoice.balance_due.toFixed(2)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="flex justify-end gap-1.5">{rowActions(invoice)}</div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -210,6 +323,7 @@ export default function Invoices() {
                     <dt className="text-slate-500 dark:text-slate-400">Balance due</dt>
                     <dd className="text-slate-900 dark:text-white">{invoice.balance_due.toFixed(2)}</dd>
                   </div>
+                  <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(invoice)}</div>
                 </MobileListAccordion>
               ))}
             </div>
@@ -232,6 +346,19 @@ export default function Invoices() {
       </Modal>
 
       {canManage && !showNewForm && <FloatingActionButton onClick={() => setShowNewForm(true)} label="New invoice" />}
+
+      <EmailPreviewModal
+        open={emailModal !== null}
+        onClose={() => setEmailModal(null)}
+        title="Review email before sending"
+        loadPreview={() => api.invoices.sendPreview(emailModal, token)}
+        onSend={async ({ subject, message }) => {
+          await api.invoices.send(emailModal, { subject, message }, token);
+          load();
+        }}
+      />
+
+      {confirmDialog}
     </div>
   );
 }
