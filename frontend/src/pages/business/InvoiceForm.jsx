@@ -268,17 +268,17 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
           >
             {submitting ? 'Saving…' : 'Save invoice'}
           </button>
-          {embedded && (
-            <button
-              type="button"
-              onClick={() => {
-                if (confirmDiscard()) onCancel();
-              }}
-              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              Cancel
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (!confirmDiscard()) return;
+              if (embedded) onCancel();
+              else navigate(isEditing ? `/invoices/${id}` : '/invoices');
+            }}
+            className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Cancel
+          </button>
         </div>
       </form>
   );

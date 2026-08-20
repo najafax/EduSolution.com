@@ -2072,15 +2072,26 @@ frontend stops holding/sending it.
   `Quotes.jsx`/`Invoices.jsx`'s own "New quote"/"New invoice" buttons, which
   now open a `<Modal>` instead of linking to `/quotes/new`) they skip that
   page chrome and render just the `<form>`, take `id` from `idOverride`
-  instead of the route, gain a Cancel button that calls `onCancel`, and call
-  `onSuccess(quote)`/`onSuccess(invoice)` instead of navigating internally —
-  the list page's `onSuccess` closes the modal and navigates to the new
-  document's detail page itself, and `onCancel` just closes the modal. The
-  routed `/quotes/:id/edit`/`/invoices/:id/edit` pages are deliberately
-  **not** converted to open in a modal from the list — only the "New X" flow
-  is — so editing still gets the full page (with its own URL, refresh-safe,
+  instead of the route, and call `onSuccess(quote)`/`onSuccess(invoice)`
+  instead of navigating internally — the list page's `onSuccess` closes the
+  modal and navigates to the new document's detail page itself. The routed
+  `/quotes/:id/edit`/`/invoices/:id/edit` pages are deliberately **not**
+  converted to open in a modal from the list — only the "New X" flow is —
+  so editing still gets the full page (with its own URL, refresh-safe,
   bookmarkable) and `InvoiceForm.jsx`'s locked-status guard (see below)
-  keeps working unmodified.
+  keeps working unmodified. **The Cancel button next to Save is unconditional
+  now** — originally it only rendered `{embedded && (...)}`, so the routed
+  page had no way back except the browser's own Back button; a user who
+  opened `/quotes/:id/edit` (e.g. via the row-level Edit action on
+  `Quotes.jsx`/`Invoices.jsx`, see "Quote/invoice row actions" above) had no
+  in-page way to abandon the edit. Cancel's `onClick` now branches on
+  `embedded` itself: `if (!confirmDiscard()) return;` first either way (same
+  guard, unchanged), then `embedded ? onCancel() : navigate(isEditing ?
+  '/quotes/:id' : '/quotes')` (and the invoice equivalent) — editing
+  navigates back to the document's own detail page, creating navigates back
+  to the list, matching where Save itself would have sent you had the
+  routed form's own `onSuccess` fallback (`navigate(...)` in `handleSubmit`)
+  fired instead.
 - `components/ConfirmDialog.jsx` + `lib/useConfirm.js` — the one confirmation
   prompt every destructive action in the app renders, replacing both the
   browser's native `window.confirm()` (unstyled, ignores dark mode,
