@@ -1975,9 +1975,9 @@ frontend stops holding/sending it.
   with a bulk-delete button, backed by `lib/useUndoableDelete.js`), but
   multi-select delete was removed outright — deleting is single-row only
   now, via the existing per-row `Delete` button (`Clients.jsx`/
-  `Expenses.jsx`) or from the record's own detail page
-  (`Invoices.jsx`/`Quotes.jsx`, which never had a per-row list action to
-  begin with). `components/BulkActionBar.jsx` was deleted along with its
+  `Expenses.jsx`/`Quotes.jsx`/`Invoices.jsx` — see "Quote/invoice row
+  actions" below for the latter two, added after this bulk-select removal)
+  or from the record's own detail page. `components/BulkActionBar.jsx` was deleted along with its
   last caller. `lib/useUndoableDelete.js` itself is unrelated to bulk
   specifically — it's the delete-with-a-few-seconds-to-undo pattern
   `Clients.jsx`/`Expenses.jsx` still use for their single-row `Delete`
@@ -2406,8 +2406,59 @@ proved out, rather than staying a one-off.
   `CapitalContributions.jsx`/`RecurringInvoices.jsx` (Edit/Delete, tone
   `slate`/`red`), `Users.jsx` (Edit/Reset password/Delete — the new
   `KeyIcon` is this page's one addition, since nothing else in the app
-  needed a "reset password" glyph), and `InvoiceDetail.jsx`'s Payments
-  table (Download/Email per receipt row, both tone `lagoon`).
+  needed a "reset password" glyph), `InvoiceDetail.jsx`'s Payments
+  table (Download/Email per receipt row, both tone `lagoon`), and
+  `Quotes.jsx`/`Invoices.jsx` (Edit/Download PDF/Email to client/
+  Duplicate/Delete — see "Quote/invoice row actions" below).
+- **Quote/invoice row actions**: `Quotes.jsx` and `Invoices.jsx` originally
+  had no per-row actions at all — a list row was just data, and every
+  action (Edit, Download, Email, Duplicate, Delete) only existed on the
+  document's own detail page (see the bulk-select-removal note above).
+  Both list pages now carry a `rowActions(item)` helper, the exact same
+  shape as `Licenses.jsx`'s own — rendered once in the desktop table's
+  trailing action `<td>` (`flex justify-end gap-1.5`) and once inside each
+  row's `MobileListAccordion` expanded body (`flex flex-wrap gap-1.5
+  pt-1`), so mobile and desktop can never drift, per the shared-helper
+  convention described above. The action set is deliberately narrower than
+  the detail page's own button row: Edit/Download PDF/Email to client/
+  Duplicate/Delete only — actions that need more than a single click or a
+  simple confirm (Send reminder, Void, Convert to invoice, Record payment)
+  stay detail-page-only, reachable by tapping into the row. Edit
+  (`PencilIcon`, tone `slate`) navigates via `onClick={() =>
+  navigate(...)}` rather than a `<Link>`, since `IconActionButton` has no
+  link variant — same reasoning `Licenses.jsx`'s own edit action (which
+  opens a modal instead) never needed a `<Link>` either. Download PDF
+  (`DownloadIcon`, tone `lagoon`) is the one action with no `canManage`
+  gate, matching the detail page's own ungated "Download PDF" button — a
+  view-only user can still read a document, just not act on it. Email to
+  client (`SendIcon`, tone `lagoon`) opens the same `EmailPreviewModal`
+  pattern as the detail pages, one shared instance per list page keyed by
+  `emailModal` (the target row's id, or `null`) rather than a `{type,
+  paymentId}` object like `InvoiceDetail.jsx`'s — these two list pages only
+  ever trigger the one `send` email type, never `remind`/`receipt`, so a
+  bare id is enough. Duplicate (`DuplicateIcon`, tone `slate`) reuses the
+  same `confirm({..., danger: false})` guard the detail-page Duplicate
+  buttons already have (see `useConfirm`/`ConfirmDialog` above) and, on
+  success, navigates straight to the new draft's own detail page — not a
+  list refresh — the same behavior `QuoteDetail.jsx`/`InvoiceDetail.jsx`'s
+  own Duplicate already has, since a fresh duplicate is something to review
+  next, not just another row in the list. Delete (`TrashIcon`, tone `red`)
+  reuses the plain `confirm({title: 'Delete this quote/invoice?'})` guard
+  and reloads the list on success. Edit and Email to client are both
+  additionally gated to match the detail page's own rules:
+  `Invoices.jsx`'s Edit only shows when `!isLocked` (`status` isn't
+  `sent`/`paid`, computed inline per row — mirrors `InvoiceForm.jsx`'s own
+  guard) and Email to client is hidden once `status === 'void'` (mirrors
+  `InvoiceDetail.jsx`'s own `invoice.status !== 'void'` gate); `Quotes.jsx`
+  has neither restriction, matching `QuoteDetail.jsx`, which locks nothing.
+  A shared `busy: { id, action }` state (same shape as `Licenses.jsx`'s
+  own) tracks which row and which specific action is in flight, so
+  Duplicate/Delete on the same row each show their own correct
+  spinning/disabled state independent of each other; Download and Email
+  aren't tracked this way since one opens a new tab and the other opens a
+  modal, neither with a meaningful "busy" row state to show. Both pages'
+  `TableSkeleton` `cols` arrays gained a trailing entry for the new action
+  column.
 - **Header** action buttons (Analytics, Export CSV, Export Excel, New X)
   and **detail-page** action buttons (Edit, Download PDF, Email to
   client, Send reminder, Duplicate, Convert to invoice, Void, Delete,

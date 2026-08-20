@@ -11,8 +11,11 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
-import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon } from '../../components/icons';
+import EmailPreviewModal from '../../components/EmailPreviewModal';
+import IconActionButton from '../../components/IconActionButton';
+import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, DuplicateIcon, TrashIcon } from '../../components/icons';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
+import { useConfirm } from '../../lib/useConfirm';
 import QuoteForm from './QuoteForm';
 
 const STATUS_OPTIONS = [
@@ -48,8 +51,11 @@ export default function Quotes() {
   const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
+  const [busy, setBusy] = useState(null); // { id, action } — tracks which row/action is in flight
+  const [emailModal, setEmailModal] = useState(null); // id of the quote whose email preview is open, or null
+  const { confirm, confirmDialog } = useConfirm();
 
-  useEffect(() => {
+  function load() {
     setLoading(true);
     api.quotes
       .list(token, { q: debouncedSearch, page, status })
@@ -59,10 +65,112 @@ export default function Quotes() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [token, debouncedSearch, page, status]);
+  }
+
+  useEffect(load, [token, debouncedSearch, page, status]);
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, status]);
+
+  async function handleDownload(id) {
+    setError('');
+    try {
+      await api.quotes.openPdf(id, token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleDuplicate(quote) {
+    if (
+      !(await confirm({
+        title: 'Duplicate this quote?',
+        message: 'Creates a new draft copy with a fresh number and issue date. You can edit it before sending.',
+        confirmLabel: 'Duplicate',
+        danger: false,
+      }))
+    )
+      return;
+    setError('');
+    setBusy({ id: quote.id, action: 'duplicate' });
+    try {
+      const { quote: created } = await api.quotes.duplicate(quote.id, token);
+      navigate(`/quotes/${created.id}`);
+    } catch (err) {
+      setError(err.message);
+      setBusy(null);
+    }
+  }
+
+  async function handleDelete(quote) {
+    if (!(await confirm({ title: 'Delete this quote?', confirmLabel: 'Delete' }))) return;
+    setError('');
+    setBusy({ id: quote.id, action: 'delete' });
+    try {
+      await api.quotes.remove(quote.id, token);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function rowActions(quote) {
+    const rowBusy = busy?.id === quote.id;
+    const isBusy = (action) => rowBusy && busy.action === action;
+    return (
+      <>
+        {canManage && (
+          <IconActionButton
+            icon={PencilIcon}
+            tone="slate"
+            onClick={() => navigate(`/quotes/${quote.id}/edit`)}
+            title="Edit"
+            label="Edit quote"
+          />
+        )}
+        <IconActionButton
+          icon={DownloadIcon}
+          tone="lagoon"
+          onClick={() => handleDownload(quote.id)}
+          title="Download PDF"
+          label="Download quote PDF"
+        />
+        {canManage && (
+          <IconActionButton
+            icon={SendIcon}
+            tone="lagoon"
+            onClick={() => setEmailModal(quote.id)}
+            title="Email to client"
+            label="Email quote to client"
+          />
+        )}
+        {canManage && (
+          <IconActionButton
+            icon={DuplicateIcon}
+            tone="slate"
+            onClick={() => handleDuplicate(quote)}
+            disabled={rowBusy}
+            spinning={isBusy('duplicate')}
+            title={isBusy('duplicate') ? 'Duplicating…' : 'Duplicate'}
+            label="Duplicate quote"
+          />
+        )}
+        {canManage && (
+          <IconActionButton
+            icon={TrashIcon}
+            tone="red"
+            onClick={() => handleDelete(quote)}
+            disabled={rowBusy}
+            spinning={isBusy('delete')}
+            title={isBusy('delete') ? 'Deleting…' : 'Delete'}
+            label="Delete quote"
+          />
+        )}
+      </>
+    );
+  }
 
   async function handleExportCsv() {
     setError('');
@@ -133,7 +241,7 @@ export default function Quotes() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={['w-28', 'w-32', 'w-24', 'w-20', 'w-20']} />
+            <TableSkeleton rows={5} cols={['w-28', 'w-32', 'w-24', 'w-20', 'w-20', 'w-32']} />
           </div>
         ) : quotes.length === 0 ? (
           <EmptyState
@@ -153,6 +261,7 @@ export default function Quotes() {
                     <th className="px-4 py-3">Issued</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -169,6 +278,9 @@ export default function Quotes() {
                         <StatusBadge status={quote.status} />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{quote.total.toFixed(2)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="flex justify-end gap-1.5">{rowActions(quote)}</div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -205,6 +317,7 @@ export default function Quotes() {
                     <dt className="text-slate-500 dark:text-slate-400">Total</dt>
                     <dd className="text-slate-900 dark:text-white">{quote.total.toFixed(2)}</dd>
                   </div>
+                  <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(quote)}</div>
                 </MobileListAccordion>
               ))}
             </div>
@@ -227,6 +340,19 @@ export default function Quotes() {
       </Modal>
 
       {canManage && !showNewForm && <FloatingActionButton onClick={() => setShowNewForm(true)} label="New quote" />}
+
+      <EmailPreviewModal
+        open={emailModal !== null}
+        onClose={() => setEmailModal(null)}
+        title="Review email before sending"
+        loadPreview={() => api.quotes.sendPreview(emailModal, token)}
+        onSend={async ({ subject, message }) => {
+          await api.quotes.send(emailModal, { subject, message }, token);
+          load();
+        }}
+      />
+
+      {confirmDialog}
     </div>
   );
 }
