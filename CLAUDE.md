@@ -1636,16 +1636,41 @@ accept/decline).
   all assume a staff `user`/`permissions` shape a portal account doesn't
   have). `context/PortalAuthContext.jsx` mirrors `AuthContext.jsx`'s exact
   shape (persist a bearer token under its own `localStorage` key,
-  `edusolution_portal_token` — never `edusolution_token`, so a staff and a
-  portal session can coexist in the same browser without clobbering each
-  other — validate it against `GET /portal/me` on load, expose
-  `login`/`logout`) but also fetches `GET /portal/settings` alongside the
+  `edusolution_portal_token` — never `edusolution_token`, so a client
+  session can never accidentally read or overwrite a staff session's own
+  token, or vice versa — validate it against `GET /portal/me` on load,
+  expose `login`/`logout`) but also fetches `GET /portal/settings` alongside the
   account (on both the initial load effect and right after `login()`) and
   exposes it as `settings`, so every portal page can show a currency
   symbol/business name from one shared fetch rather than each page
   re-fetching it. `components/PortalProtectedRoute.jsx` mirrors
   `ProtectedRoute.jsx` exactly, just reading `PortalAuthContext` and
   redirecting to `/portal/login` instead of `/login`.
+- **Staff and portal sessions are mutually exclusive in the same
+  browser.** Separate `localStorage` keys mean neither auth check can ever
+  *read* the other's token (see `middleware/clientAuth.js`'s `type:
+  'client'` discriminator above), but that alone still let both tokens sit
+  in `localStorage` at once — e.g. an admin who was also testing the
+  portal in the same browser, or a shared/kiosk machine nobody logged out
+  of. In that state, someone on the portal who simply changed the URL to
+  the main app (`/dashboard`, `/clients`, etc.) would land in it —
+  `ProtectedRoute` only ever checks whether *a* staff token exists, with
+  no awareness that the person got there via a portal login rather than
+  a staff one; the access was really coming from the untouched staff
+  session sitting alongside it, not anything the portal login itself
+  granted, but it read exactly like the portal login had granted it. Both
+  `AuthContext.jsx`'s and `PortalAuthContext.jsx`'s `login()` now clear
+  the *other* context's token key before storing their own, so logging in
+  as one identity always ends any lingering session for the other in that
+  browser rather than merely not starting a new one; the same clear also
+  happens in each context's bootstrap `/me` effect once that session is
+  confirmed genuinely valid (not just at `login()` time), so a dual
+  session that already existed before this fix shipped — or one created
+  by any other means — gets torn down the next time either app is
+  actually used, without needing a fresh login to trigger it. A real
+  client only ever holds a portal token to begin with, so this is mostly
+  a hardening measure against the coexistence case above rather than
+  something a normal single-identity user would ever notice.
   `pages/portal/PortalApp.jsx` is the sub-app's own router+shell — mounted
   once at `App.jsx`'s `<Route path="/portal/*" element={<PortalApp />} />`
   (lazy-loaded like every other routed page, see "Route-level

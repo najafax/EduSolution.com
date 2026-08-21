@@ -10,6 +10,19 @@ import { api } from '../lib/api';
 // backend half of this same separation.
 const PortalAuthContext = createContext(null);
 const TOKEN_KEY = 'edusolution_portal_token';
+// The staff app's own token key (see AuthContext.jsx) — cleared on portal
+// login for the same reason AuthContext.jsx clears this key on staff
+// login: the two sessions are stored under separate keys so neither auth
+// check ever reads the other's token, but that alone still lets a
+// still-valid staff session in the same browser (an admin who was also
+// testing the portal, a shared/kiosk machine nobody logged out of) keep
+// working right alongside a fresh portal login — someone logging into the
+// portal here would then find that just changing the URL to the main app
+// "worked", even though it's really the untouched staff session doing
+// that, not anything the portal login granted. Logging in here ends any
+// lingering staff session in this browser rather than merely not
+// requesting one.
+const STAFF_TOKEN_KEY = 'edusolution_token';
 
 export function PortalAuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
@@ -29,6 +42,12 @@ export function PortalAuthProvider({ children }) {
     }
     Promise.all([api.portal.me(token), api.portal.getSettings(token).catch(() => ({ settings: null }))])
       .then(([{ account }, { settings }]) => {
+        // Confirmed this portal session is genuinely valid — purge any
+        // staff token riding along in the same browser (see
+        // STAFF_TOKEN_KEY above), same reasoning as AuthContext.jsx's own
+        // mirror-image purge: a dual session shouldn't linger just
+        // because nobody happened to log in fresh again.
+        localStorage.removeItem(STAFF_TOKEN_KEY);
         setAccount(account);
         setSettings(settings);
       })
@@ -42,6 +61,7 @@ export function PortalAuthProvider({ children }) {
   }, [token]);
 
   function login(nextToken, nextAccount) {
+    localStorage.removeItem(STAFF_TOKEN_KEY);
     localStorage.setItem(TOKEN_KEY, nextToken);
     setToken(nextToken);
     setAccount(nextAccount);

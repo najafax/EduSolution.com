@@ -3,6 +3,17 @@ import { api } from '../lib/api';
 
 const AuthContext = createContext(null);
 const TOKEN_KEY = 'edusolution_token';
+// The client portal's own token key (see PortalAuthContext.jsx) — staff and
+// portal sessions are deliberately kept in separate localStorage keys so
+// neither auth check ever reads the other's token, but logging in here
+// while a portal session happens to still be sitting in the same browser
+// (e.g. an admin who was also testing the portal, or a shared/kiosk
+// machine where a client never logged out) would otherwise let a
+// still-valid portal session keep working alongside a fresh staff one.
+// Since the backend already treats the two as mutually exclusive, this
+// browser should too — logging in as staff ends any lingering portal
+// session in this browser, not just prevents starting a new one.
+const PORTAL_TOKEN_KEY = 'edusolution_portal_token';
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
@@ -22,6 +33,13 @@ export function AuthProvider({ children }) {
     api
       .me(token)
       .then(({ user, permissions, sessionTimeoutMinutes }) => {
+        // Confirmed this staff session is genuinely valid — purge any
+        // portal token riding along in the same browser (see
+        // PORTAL_TOKEN_KEY above) rather than only doing this at login
+        // time, so a dual session created before this check existed (or
+        // by any other means) doesn't linger indefinitely just because
+        // nobody happened to log in fresh again.
+        localStorage.removeItem(PORTAL_TOKEN_KEY);
         setUser(user);
         setPermissions(permissions || {});
         setSessionTimeoutMinutes(sessionTimeoutMinutes ?? null);
@@ -37,6 +55,7 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   function login(nextToken, nextUser, nextPermissions, nextSessionTimeoutMinutes) {
+    localStorage.removeItem(PORTAL_TOKEN_KEY);
     localStorage.setItem(TOKEN_KEY, nextToken);
     setToken(nextToken);
     setUser(nextUser);
