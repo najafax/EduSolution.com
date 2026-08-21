@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -6,35 +7,53 @@ import ProtectedRoute from './components/ProtectedRoute';
 import IdleTimeoutMonitor from './components/IdleTimeoutMonitor';
 import CommandPalette from './components/CommandPalette';
 import { useAuth } from './context/AuthContext';
-import Login from './pages/Login';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import PublicQuote from './pages/PublicQuote';
-import PublicInvoice from './pages/PublicInvoice';
-import Dashboard from './pages/Dashboard';
-import Clients from './pages/business/Clients';
-import Products from './pages/business/Products';
-import Expenses from './pages/business/Expenses';
-import CapitalContributions from './pages/business/CapitalContributions';
-import Settings from './pages/business/Settings';
-import Quotes from './pages/business/Quotes';
-import QuoteForm from './pages/business/QuoteForm';
-import QuoteDetail from './pages/business/QuoteDetail';
-import QuoteAnalytics from './pages/business/QuoteAnalytics';
-import Invoices from './pages/business/Invoices';
-import InvoiceForm from './pages/business/InvoiceForm';
-import InvoiceDetail from './pages/business/InvoiceDetail';
-import InvoiceAnalytics from './pages/business/InvoiceAnalytics';
-import RecurringInvoices from './pages/business/RecurringInvoices';
-import Licenses from './pages/business/Licenses';
-import LicenseAnalytics from './pages/business/LicenseAnalytics';
-import Financials from './pages/business/Financials';
-import Reports from './pages/business/Reports';
-import ActivityLog from './pages/business/ActivityLog';
-import Import from './pages/business/Import';
-import Users from './pages/Users';
-import MyAccount from './pages/MyAccount';
-import EmailCenter from './pages/EmailCenter';
+
+// Every routed page is loaded on demand rather than bundled into one
+// eager chunk — Login previously had to wait on the entire app's JS
+// (Reports, Email Center, every analytics page, etc.) before it could even
+// render, and any single-line change to any one page invalidated that
+// whole bundle for every user on their next visit. Splitting by route means
+// the first load only pulls in what the current page actually needs, and a
+// deploy only invalidates the chunk(s) that actually changed. The PWA
+// service worker still precaches every chunk in the background after
+// install (see vite.config.js), so this doesn't change what's eventually
+// cached — it changes what has to arrive before the first paint.
+const Login = lazy(() => import('./pages/Login'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const PublicQuote = lazy(() => import('./pages/PublicQuote'));
+const PublicInvoice = lazy(() => import('./pages/PublicInvoice'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Clients = lazy(() => import('./pages/business/Clients'));
+const Products = lazy(() => import('./pages/business/Products'));
+const Expenses = lazy(() => import('./pages/business/Expenses'));
+const CapitalContributions = lazy(() => import('./pages/business/CapitalContributions'));
+const Settings = lazy(() => import('./pages/business/Settings'));
+const Quotes = lazy(() => import('./pages/business/Quotes'));
+const QuoteForm = lazy(() => import('./pages/business/QuoteForm'));
+const QuoteDetail = lazy(() => import('./pages/business/QuoteDetail'));
+const QuoteAnalytics = lazy(() => import('./pages/business/QuoteAnalytics'));
+const Invoices = lazy(() => import('./pages/business/Invoices'));
+const InvoiceForm = lazy(() => import('./pages/business/InvoiceForm'));
+const InvoiceDetail = lazy(() => import('./pages/business/InvoiceDetail'));
+const InvoiceAnalytics = lazy(() => import('./pages/business/InvoiceAnalytics'));
+const RecurringInvoices = lazy(() => import('./pages/business/RecurringInvoices'));
+const Licenses = lazy(() => import('./pages/business/Licenses'));
+const LicenseAnalytics = lazy(() => import('./pages/business/LicenseAnalytics'));
+const Financials = lazy(() => import('./pages/business/Financials'));
+const Reports = lazy(() => import('./pages/business/Reports'));
+const ActivityLog = lazy(() => import('./pages/business/ActivityLog'));
+const Import = lazy(() => import('./pages/business/Import'));
+const Users = lazy(() => import('./pages/Users'));
+const MyAccount = lazy(() => import('./pages/MyAccount'));
+const EmailCenter = lazy(() => import('./pages/EmailCenter'));
+
+// Same loading copy/markup ProtectedRoute already shows while resolving
+// auth, so a lazy chunk still loading (usually a blip, longer on a slow
+// connection) reads as the same kind of pause rather than a new pattern.
+function RouteFallback() {
+  return <div className="flex justify-center py-24 text-slate-500 dark:text-slate-400">Loading…</div>;
+}
 
 function Protected({ children }) {
   return <ProtectedRoute>{children}</ProtectedRoute>;
@@ -56,49 +75,51 @@ export default function App() {
           content — see BottomNav.jsx. */}
       <div className={`flex flex-1 flex-col ${user ? 'pb-16 sm:pb-0' : ''}`}>
         <div className="flex-1">
-          <Routes>
-            {/* Login is also the app's landing page — see pages/Login.jsx's
-                own comment for why there's no separate Landing component
-                anymore. Both paths render the same element so a bookmarked
-                or shared "/login" link keeps working unchanged. */}
-            <Route path="/" element={<Login />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/q/:token" element={<PublicQuote />} />
-            <Route path="/i/:token" element={<PublicInvoice />} />
-            <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              {/* Login is also the app's landing page — see pages/Login.jsx's
+                  own comment for why there's no separate Landing component
+                  anymore. Both paths render the same element so a bookmarked
+                  or shared "/login" link keeps working unchanged. */}
+              <Route path="/" element={<Login />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/q/:token" element={<PublicQuote />} />
+              <Route path="/i/:token" element={<PublicInvoice />} />
+              <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
 
-            <Route path="/clients" element={<Protected><Clients /></Protected>} />
-            <Route path="/products" element={<Protected><Products /></Protected>} />
-            <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
-            <Route path="/capital-contributions" element={<Protected><CapitalContributions /></Protected>} />
-            <Route path="/settings" element={<Protected><Settings /></Protected>} />
-            <Route path="/import" element={<Protected><Import /></Protected>} />
+              <Route path="/clients" element={<Protected><Clients /></Protected>} />
+              <Route path="/products" element={<Protected><Products /></Protected>} />
+              <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
+              <Route path="/capital-contributions" element={<Protected><CapitalContributions /></Protected>} />
+              <Route path="/settings" element={<Protected><Settings /></Protected>} />
+              <Route path="/import" element={<Protected><Import /></Protected>} />
 
-            <Route path="/quotes" element={<Protected><Quotes /></Protected>} />
-            <Route path="/quotes/analytics" element={<Protected><QuoteAnalytics /></Protected>} />
-            <Route path="/quotes/new" element={<Protected><QuoteForm /></Protected>} />
-            <Route path="/quotes/:id" element={<Protected><QuoteDetail /></Protected>} />
-            <Route path="/quotes/:id/edit" element={<Protected><QuoteForm /></Protected>} />
+              <Route path="/quotes" element={<Protected><Quotes /></Protected>} />
+              <Route path="/quotes/analytics" element={<Protected><QuoteAnalytics /></Protected>} />
+              <Route path="/quotes/new" element={<Protected><QuoteForm /></Protected>} />
+              <Route path="/quotes/:id" element={<Protected><QuoteDetail /></Protected>} />
+              <Route path="/quotes/:id/edit" element={<Protected><QuoteForm /></Protected>} />
 
-            <Route path="/invoices" element={<Protected><Invoices /></Protected>} />
-            <Route path="/invoices/analytics" element={<Protected><InvoiceAnalytics /></Protected>} />
-            <Route path="/invoices/new" element={<Protected><InvoiceForm /></Protected>} />
-            <Route path="/invoices/:id" element={<Protected><InvoiceDetail /></Protected>} />
-            <Route path="/invoices/:id/edit" element={<Protected><InvoiceForm /></Protected>} />
+              <Route path="/invoices" element={<Protected><Invoices /></Protected>} />
+              <Route path="/invoices/analytics" element={<Protected><InvoiceAnalytics /></Protected>} />
+              <Route path="/invoices/new" element={<Protected><InvoiceForm /></Protected>} />
+              <Route path="/invoices/:id" element={<Protected><InvoiceDetail /></Protected>} />
+              <Route path="/invoices/:id/edit" element={<Protected><InvoiceForm /></Protected>} />
 
-            <Route path="/recurring-invoices" element={<Protected><RecurringInvoices /></Protected>} />
-            <Route path="/licenses" element={<Protected><Licenses /></Protected>} />
-            <Route path="/licenses/analytics" element={<Protected><LicenseAnalytics /></Protected>} />
+              <Route path="/recurring-invoices" element={<Protected><RecurringInvoices /></Protected>} />
+              <Route path="/licenses" element={<Protected><Licenses /></Protected>} />
+              <Route path="/licenses/analytics" element={<Protected><LicenseAnalytics /></Protected>} />
 
-            <Route path="/financials" element={<Protected><Financials /></Protected>} />
-            <Route path="/reports" element={<Protected><Reports /></Protected>} />
-            <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
-            <Route path="/users" element={<Protected><Users /></Protected>} />
-            <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
-            <Route path="/account" element={<Protected><MyAccount /></Protected>} />
-          </Routes>
+              <Route path="/financials" element={<Protected><Financials /></Protected>} />
+              <Route path="/reports" element={<Protected><Reports /></Protected>} />
+              <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
+              <Route path="/users" element={<Protected><Users /></Protected>} />
+              <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
+              <Route path="/account" element={<Protected><MyAccount /></Protected>} />
+            </Routes>
+          </Suspense>
         </div>
         {/* Hidden on phones while logged in: BottomNav + each page's own
             FloatingActionButton (fixed, sm:hidden) already own that screen
