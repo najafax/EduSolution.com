@@ -464,6 +464,16 @@ if (!productColumns.has('tax_rate')) {
   db.exec(`ALTER TABLE products ADD COLUMN tax_rate REAL NOT NULL DEFAULT 0;`);
 }
 
+// Same pattern once more: `visible_in_portal` opts a product into the
+// client portal's "Request a quote" catalog picker (routes/clientPortal.js's
+// GET /products) — defaults to 0 (hidden) rather than 1, so every existing
+// product stays out of client view until an admin explicitly reviews and
+// opts it in, rather than the whole catalog suddenly becoming
+// client-visible the moment this shipped.
+if (!productColumns.has('visible_in_portal')) {
+  db.exec(`ALTER TABLE products ADD COLUMN visible_in_portal INTEGER NOT NULL DEFAULT 0;`);
+}
+
 // Same pattern again: `password_changed_at` added to `users` so existing
 // JWTs (issued before this column existed) can be invalidated the moment a
 // user resets or changes their password — see middleware/auth.js. Backfill

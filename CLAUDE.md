@@ -288,6 +288,22 @@ deliberately untouched by either, always returning every row.
   item is added (see `components/LineItemsEditor.jsx` below), not a live
   link, so editing or deleting a product never touches historical
   quotes/invoices. No delete guard is needed for the same reason.
+  `visible_in_portal` (boolean, defaults `false`/0 — same `ALTER TABLE`
+  migration pattern `tax_rate` itself used, added after `products` already
+  had real catalog rows) opts a product into the client portal's own
+  catalog (see `routes/clientPortal.js`'s `GET /products` below) — the
+  full catalog here is still what staff sees on `Products.jsx`/the
+  quote/invoice `LineItemsEditor` picker; only an admin-opted-in subset is
+  ever exposed to a client. Defaulting to hidden rather than visible was
+  deliberate: flipping the whole existing catalog client-visible the
+  moment this shipped would be a much bigger, more surprising change than
+  requiring each product to be explicitly reviewed and opted in one at a
+  time. `Products.jsx`'s create/edit form gets a "Visible in client
+  portal" checkbox (with a one-line explanation of what it does), and the
+  list (desktop table + `MobileListAccordion`) shows a small emerald
+  "Portal" badge next to a product's name when it's on — same
+  only-show-the-exception-case convention as `Clients.jsx`'s own
+  `PortalBadge` (nothing rendered for the common, unopted-in case).
 - `routes/quotes.js`, `routes/invoices.js` — CRUD plus PDF download
   (`GET /:id/pdf`), email send (`POST /:id/send`), `POST /:id/duplicate`
   (copies client/items/discount/tax/notes into a new `draft` with a fresh
@@ -1745,9 +1761,11 @@ accept/decline).
 A client's ask for a quote, submitted from the portal, reviewed by staff,
 and turned into a real quote — the loop being: client requests (by picking
 from the product catalog, describing something not in it, or both) →
-staff approves (by building and sending an actual priced quote) or
-declines → client sees the outcome in their portal and, once sent, can
-accept it the normal way → staff gets notified. This is deliberately a
+staff approves (by building an actual priced quote — the client can see
+it in their portal the instant it's linked, whether or not staff has
+separately clicked "Send" on it yet, see `CLIENT_VISIBLE_QUOTE` below) or
+declines → client sees the outcome in their portal and can accept it the
+normal way → staff gets notified. This is deliberately a
 separate `quote_requests`/`quote_request_items` pair of tables, not a
 `quotes` row with a new status — a request has no pricing, tax, or
 discount, and **a client is never trusted with a price, not even a
@@ -1776,40 +1794,52 @@ quote-creation flow, pre-filled with the request's own client/items
   guarded pattern as `notify_overdue` — see that column's own note above
   — since `users` already had real accounts) for the opt-in staff
   notification below.
-- `routes/clientPortal.js` gains `GET /products` — the full product
-  catalog (same rows `GET /api/products` serves staff, no per-client
-  filtering, single-business model), deliberately including `unit_price`
-  unlike every other stripped-down portal response: a client picking
-  items needs to see what things cost to make an informed pick, they just
-  can never set or change that number (see below). `POST /quote-requests`
+- `routes/clientPortal.js` gains `GET /products` — **not** the full
+  product catalog `GET /api/products` serves staff; scoped to
+  `WHERE visible_in_portal = 1` (see `products.visible_in_portal` above),
+  so a client only ever sees the subset an admin has explicitly opted in,
+  deliberately including `unit_price` unlike every other stripped-down
+  portal response: a client picking items needs to see what things cost
+  to make an informed pick, they just can never set or change that number
+  (see below). `POST /quote-requests`
   (`requireClientAuth`) accepts an optional `description` and an optional
   `items` array of `{ product_id, quantity }` — **`unit_price`/`amount`
   fields in the request body, if present, are silently ignored**; the
-  route re-validates each `product_id` against the live `products` table
-  (400 if it no longer exists) and writes only the product's *current*
-  name/id + the client's quantity into `quote_request_items`, inside a
+  route re-validates each `product_id` against the live `products` table,
+  scoped to `visible_in_portal = 1` too (400 if it no longer exists or was
+  never opted in — a client can't reference a hidden product by guessing
+  its id even though the picker never shows it) and writes only the
+  product's *current* name/id + the client's quantity into
+  `quote_request_items`, inside a
   `db.transaction()` alongside the `quote_requests` insert. 400s if
   neither `description` nor at least one valid item is given. Logs an
   activity entry with the same `"(client)"` action suffix the portal's
   quote-respond route uses. `GET /quote-requests` (the client's own
   requests, newest first, `LEFT JOIN`ed against `quotes` for
-  `quote_number`/`quote_status` so the portal can tell "a quote is being
-  prepared" — linked but still `draft` — apart from "your quote is ready"
-  — linked and no longer `draft` — without a second round-trip) batches
-  in each request's items via one `IN (...)` query rather than one query
-  per row. **This is also where `GET /quotes`/`GET /quotes/:id` (and by
-  extension the PDF/respond routes, which both call the same
-  `getClientQuote()`) gained a `status != 'draft'` filter they didn't need
-  before quote requests existed** — every quote used to reach `quotes`
-  through a human reviewing it first, so a client could never have seen a
-  draft; now that `POST /quote-requests/:id/link-quote` below creates a
-  fresh **draft** quote directly from a client's own request, that quote
-  must stay invisible in the portal until a staff member actually sends
-  it — the same moment it would have reached the client anyway via the
-  old "prepare it, then click Send" flow. A request's own `status` still
-  flips to `approved` the instant it's linked, independent of the quote's
-  own `draft`/`sent` status — see `PortalQuotes.jsx` below for how the two
-  are reconciled on screen.
+  `quote_number`/`quote_status`) batches in each request's items via one
+  `IN (...)` query rather than one query per row. **This is also where
+  `GET /quotes`/`GET /quotes/:id` (and by extension the PDF/respond
+  routes, which both call the same `getClientQuote()`) gained a
+  `CLIENT_VISIBLE_QUOTE` filter they didn't need before quote requests
+  existed** — every quote used to reach `quotes` through a human
+  reviewing it first, so a client could never have seen a draft; now that
+  `POST /quote-requests/:id/link-quote` below can create a fresh
+  **draft** quote directly from a client's own request, that same
+  `status != 'draft'` rule would otherwise hide it from the very client
+  who asked for it. `CLIENT_VISIBLE_QUOTE` is `status != 'draft' OR
+  EXISTS (SELECT 1 FROM quote_requests WHERE quote_requests.quote_id =
+  quotes.id)`: a quote with no linked request still needs the original
+  `status != 'draft'` rule (an ordinary quote staff is drafting up on
+  their own initiative is still "not ready for the client to see"), but a
+  quote that *is* linked to a request is visible the instant that link
+  happens, draft or not — linking only ever happens once a staff member
+  has decided to fulfill the request (see `POST /:id/link-quote` below),
+  so that decision itself is the "yes, here's your quote" moment as far
+  as the client's concerned, not the separate, possibly-much-later click
+  on "Send." A request's own `status` flips to `approved` the same
+  instant it's linked, so `PortalQuotes.jsx` below never has an
+  "approved but not yet visible" state to render a placeholder for — it
+  can link straight to the quote the moment `status === 'approved'`.
 - `routes/quoteRequests.js` (mounted at `/api/quote-requests`) is the
   staff-side review API — gated on the existing `quotes` permission rather
   than a new `MODULES` entry (same "reuse when sensitivity matches" call
@@ -1902,7 +1932,13 @@ quote-creation flow, pre-filled with the request's own client/items
   before navigating away — best-effort: if that call fails (e.g. someone
   else already declined the request in the meantime), the quote itself
   was still created successfully, so the failure surfaces as a toast
-  rather than stranding the user on the form.
+  rather than stranding the user on the form. A successful link instead
+  toasts "Quote created — the client can already see it in their
+  portal." — a distinct confirmation from the plain navigate-to-the-new-
+  quote that happens either way, since linking (not the later "Send"
+  click) is what actually makes the quote visible to the client (see
+  `CLIENT_VISIBLE_QUOTE` above), and that's easy for staff to miss
+  otherwise.
 - `pages/portal/PortalQuotes.jsx` gained a "Request a quote" button
   (header, `PlusIcon`) opening a `Modal` built around the same
   `LineItemsEditor` every quote/invoice form uses — `catalogOnly
@@ -1919,12 +1955,14 @@ quote-creation flow, pre-filled with the request's own client/items
   the existing "Sent to you" quotes list shows each request via the same
   `requestSummary()` helper `QuoteRequests.jsx` uses (item quantities/
   names, falling back to `description`), plus a `StatusBadge` and,
-  depending on state: nothing more for `pending`; "A quote is being
-  prepared for you." for `approved` with a still-`draft` linked quote; a
-  `Link` straight to `/portal/quotes/:quote_id` ("Your quote
-  (Q-2026-0001) is ready — view it") for `approved` once the linked quote
-  is no longer `draft`; the staff `decision_note` for `declined`. All
-  three lists (`quotes`, `requests`, the product catalog for the picker)
+  depending on state: nothing more for `pending`; a `Link` straight to
+  `/portal/quotes/:quote_id` ("Your quote (Q-2026-0001) is ready — view
+  it") for `approved` (which, per `CLIENT_VISIBLE_QUOTE` above, always
+  means the linked quote is already viewable — there's no separate
+  "still being prepared" placeholder state to render once `approved`,
+  since linking and portal-visibility happen in the same instant); the
+  staff `decision_note` for `declined`. All three lists (`quotes`,
+  `requests`, the product catalog for the picker)
   load independently on mount, so a freshly-submitted request or a
   newly-visible quote both refresh via the shared `load()` function after
   any action.

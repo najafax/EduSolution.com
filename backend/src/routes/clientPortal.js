@@ -235,25 +235,32 @@ router.get('/settings', requireClientAuth, (req, res) => {
   res.json({ settings: publicSettings(settings) });
 });
 
-// A `draft` quote is deliberately invisible here — draft is "staff is still
-// preparing this," not "ready for the client to see." Before quote
-// requests existed, every quote was created already reviewed by a human
-// (there was no other path into `quotes`), so this distinction never
-// mattered for the portal; now that POST /quote-requests/:id/link-quote
-// (routes/quoteRequests.js) creates a fresh draft quote directly from a
-// client's own request, a client could otherwise watch their request "get
-// approved" and then immediately see the still-being-priced draft. The
-// quote becomes visible here the same moment it would have been emailed to
-// them anyway — once a staff member sends it.
+// A `draft` quote is normally invisible here — draft is "staff is still
+// preparing this," not "ready for the client to see." That still holds for
+// a quote staff is drafting up from scratch on their own initiative. But a
+// quote created via POST /quote-requests/:id/link-quote
+// (routes/quoteRequests.js) is different: staff only reaches that flow by
+// choosing to fulfill a request the client themselves asked for, and
+// linking it *is* the "yes, here's your quote" moment as far as the client
+// is concerned — waiting for a separate, later "Send" click on top of that
+// would just be a confusing extra delay for something the client already
+// knows is coming. So the "stay invisible until reviewed" rule is scoped
+// to `EXISTS (... quote_requests ...)`: a quote with no linked request
+// still needs `status != 'draft'` same as before; a quote that *is* linked
+// to a request (quote_requests.quote_id only ever gets set once a staff
+// member links it — see routes/quoteRequests.js's POST /:id/link-quote) is
+// visible the instant that link happens, draft or not.
+const CLIENT_VISIBLE_QUOTE = "(status != 'draft' OR EXISTS (SELECT 1 FROM quote_requests WHERE quote_requests.quote_id = quotes.id))";
+
 router.get('/quotes', requireClientAuth, (req, res) => {
   const quotes = db
-    .prepare("SELECT * FROM quotes WHERE client_id = ? AND status != 'draft' ORDER BY issue_date DESC, id DESC")
+    .prepare(`SELECT * FROM quotes WHERE client_id = ? AND ${CLIENT_VISIBLE_QUOTE} ORDER BY issue_date DESC, id DESC`)
     .all(req.clientAccount.client_id);
   res.json({ quotes });
 });
 
 function getClientQuote(clientId, id) {
-  const quote = db.prepare("SELECT * FROM quotes WHERE id = ? AND client_id = ? AND status != 'draft'").get(id, clientId);
+  const quote = db.prepare(`SELECT * FROM quotes WHERE id = ? AND client_id = ? AND ${CLIENT_VISIBLE_QUOTE}`).get(id, clientId);
   if (!quote) return null;
   const items = db.prepare('SELECT * FROM quote_items WHERE quote_id = ? ORDER BY sort_order').all(quote.id);
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
@@ -388,15 +395,20 @@ router.get('/licenses', requireClientAuth, (req, res) => {
   res.json({ licenses });
 });
 
-// Read-only, full-catalog — same rows GET /api/products serves staff, no
-// per-client filtering (single-business model). Unlike every other portal
-// route, this deliberately includes `unit_price`: a client picking items
-// to request a quote for needs to see what things cost to make an
-// informed pick, they just can never set or edit that number themselves
-// (see POST /quote-requests below, which only ever accepts `product_id` +
+// Unlike GET /api/products (staff), this is *not* the full catalog —
+// only products an admin has explicitly opted in via `visible_in_portal`
+// (Products.jsx's "Visible in client portal" checkbox) are ever returned
+// here, so a client picking items to request a quote for only ever sees
+// what staff has decided is appropriate to show them, not every internal
+// line item in the catalog. Still no per-client filtering beyond that
+// (single-business model). Unlike every other portal route, this
+// deliberately includes `unit_price`: a client picking items to request a
+// quote for needs to see what things cost to make an informed pick, they
+// just can never set or edit that number themselves (see
+// POST /quote-requests below, which only ever accepts `product_id` +
 // `quantity` from the client and looks up the real price itself).
 router.get('/products', requireClientAuth, (req, res) => {
-  const products = db.prepare('SELECT * FROM products ORDER BY name').all();
+  const products = db.prepare('SELECT * FROM products WHERE visible_in_portal = 1 ORDER BY name').all();
   res.json({ products });
 });
 
@@ -426,7 +438,10 @@ router.post('/quote-requests', requireClientAuth, (req, res) => {
     if (!productId || !quantity || quantity <= 0) {
       return res.status(400).json({ error: 'Each item needs a valid product and a quantity greater than 0' });
     }
-    const product = db.prepare('SELECT id, name FROM products WHERE id = ?').get(productId);
+    // Scoped to visible_in_portal = 1 too, not just id — a product an
+    // admin hasn't opted into the portal shouldn't be requestable by
+    // guessing its id, even though the picker itself never shows it.
+    const product = db.prepare('SELECT id, name FROM products WHERE id = ? AND visible_in_portal = 1').get(productId);
     if (!product) {
       return res.status(400).json({ error: 'One of the selected products no longer exists' });
     }
