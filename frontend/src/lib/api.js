@@ -232,6 +232,11 @@ export const api = {
     log: (token, page = 1) => request(`/email-center/log?page=${page}`, { token }),
   },
 
+  campaigns: {
+    list: (token, page = 1) => request(`/campaigns?page=${page}`, { token }),
+    send: (payload, token) => request('/campaigns', { method: 'POST', body: payload, token }),
+  },
+
   users: {
     list: (token, { q, page } = {}) => request(`/users${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/users/${id}`, { token }),

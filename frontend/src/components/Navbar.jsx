@@ -16,6 +16,7 @@ import { SearchIcon, XIcon } from './icons';
 export const BUSINESS_LINKS = [
   { to: '/dashboard', label: 'Dashboard', module: null },
   { to: '/clients', label: 'Clients', module: 'clients' },
+  { to: '/campaigns', label: 'Campaigns', module: 'campaigns' },
   { to: '/products', label: 'Products', module: 'products' },
   { to: '/quotes', label: 'Quotes', module: 'quotes' },
   { to: '/quote-requests', label: 'Quote requests', module: 'quotes' },

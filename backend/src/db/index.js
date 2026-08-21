@@ -337,9 +337,35 @@ db.exec(`
     quantity REAL NOT NULL DEFAULT 1
   );
 
+  -- One row per bulk/promotional email send (see routes/campaigns.js) —
+  -- a summary record, not a per-recipient log. recipient_type is
+  -- 'all' (every client with an email on file) or 'selected' (an
+  -- explicit list, including the single-client shortcut from the
+  -- Clients page). recipient_count is how many were targeted;
+  -- sent_count/failed_count split that by outcome, since a bulk send
+  -- can partially fail (one client's address rejects mail) without the
+  -- whole campaign failing. Each individual successful send is also
+  -- logged to the existing email_log table (type: campaign) for the
+  -- per-recipient audit trail, the same way every other client-facing
+  -- send in this app double-logs to activity_log and email_log. This is
+  -- a brand-new table with no production data yet, so a plain CREATE
+  -- TABLE IF NOT EXISTS is enough.
+  CREATE TABLE IF NOT EXISTS campaigns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    recipient_type TEXT NOT NULL DEFAULT 'all',
+    recipient_count INTEGER NOT NULL DEFAULT 0,
+    sent_count INTEGER NOT NULL DEFAULT 0,
+    failed_count INTEGER NOT NULL DEFAULT 0,
+    sent_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_requests_client ON quote_requests(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_request_items_request ON quote_request_items(quote_request_id);
+  CREATE INDEX IF NOT EXISTS idx_campaigns_created ON campaigns(created_at);
   CREATE INDEX IF NOT EXISTS idx_invoices_client ON invoices(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
   CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON quote_items(quote_id);
