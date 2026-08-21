@@ -42,6 +42,11 @@ const DEFAULT_TEMPLATES = {
     message:
       'Hi {{client_name}},\n\nYour {{license_name}} license is due to expire on {{expiry_date}}. The renewal amount is {{amount}}.\n\nPlease get in touch or make payment to keep your license active without interruption.',
   },
+  portal_invite: {
+    subject: "You're invited to the {{business_name}} client portal",
+    message:
+      'Hi {{client_name}},\n\n{{business_name}} has set up online access to your quotes, invoices, and licenses. Click the link below to set your password and get started:\n\n{{portal_url}}\n\nThis link will expire in 7 days.',
+  },
 };
 
 // Which placeholders are valid for each type, and a human label for the
@@ -77,6 +82,11 @@ const PLACEHOLDERS = {
     { key: 'expiry_date', label: 'Expiry date' },
     { key: 'amount', label: 'Renewal amount' },
   ],
+  portal_invite: [
+    { key: 'client_name', label: 'Client name' },
+    { key: 'business_name', label: 'Business name' },
+    { key: 'portal_url', label: 'Portal invite link' },
+  ],
 };
 
 const TYPE_LABELS = {
@@ -85,6 +95,7 @@ const TYPE_LABELS = {
   invoice_remind: 'Payment reminder',
   receipt_send: 'Payment receipt',
   license_remind: 'License renewal reminder',
+  portal_invite: 'Portal invite',
 };
 
 function renderTemplate(str, vars) {
@@ -150,6 +161,14 @@ function licenseRemindEmail({ license, client, settings }) {
   });
 }
 
+function portalInviteEmail({ client, settings, portalUrl }) {
+  return buildEmail('portal_invite', client.email, {
+    client_name: client.name,
+    business_name: settings.business_name || 'us',
+    portal_url: portalUrl,
+  });
+}
+
 // Admin management (routes/emailCenter.js). Returns every editable type with
 // its currently-effective subject/message (stored override or default) plus
 // `isCustom` so the frontend can show a "Reset to default" action only when
@@ -193,6 +212,7 @@ module.exports = {
   invoiceRemindEmail,
   receiptSendEmail,
   licenseRemindEmail,
+  portalInviteEmail,
   getAllTemplates,
   setTemplate,
   resetTemplate,

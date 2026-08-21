@@ -265,6 +265,31 @@ db.exec(`
     renewed_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- A client's own login for the (upcoming) self-serve portal — deliberately
+  -- a separate table rather than columns bolted onto clients: this is an
+  -- auth concern, not business data (same reasoning user_permissions is
+  -- split from users), and clients.email isn't unique/required today, so
+  -- login identity needs its own constrained column. One row per client
+  -- (client_id UNIQUE) — a client portal account represents the
+  -- organization's single login, not a per-person account, matching how
+  -- clients itself always means the organization, not an individual.
+  -- password_hash stays NULL until the client actually accepts their invite
+  -- and sets a password; ON DELETE CASCADE mirrors the FK convention every
+  -- other clients-owned table already uses.
+  CREATE TABLE IF NOT EXISTS client_portal_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL UNIQUE REFERENCES clients(id) ON DELETE CASCADE,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT,
+    invite_token TEXT,
+    invite_token_expires TEXT,
+    reset_token TEXT,
+    reset_token_expires TEXT,
+    password_changed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoices_client ON invoices(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);

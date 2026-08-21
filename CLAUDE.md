@@ -1423,6 +1423,282 @@ Status/derived-field conventions worth knowing before touching this code:
   and reuses the `financials` module rather than declaring its own, since
   these reports surface the same data at the same sensitivity level.
 
+### Client portal (`backend/src/`, `frontend/src/`)
+
+A self-serve login for clients, separate from staff auth entirely — a
+client authenticates as their own account rather than through a
+per-document `public_token` link (see `routes/public.js` above). Built in
+four phases, all now shipped: phase 1 (schema + auth), phase 2 (the
+admin-facing invite flow), phase 3 (the portal's own frontend shell —
+login/accept-invite/forgot/reset-password pages, a protected-route
+wrapper, and a layout distinct from the staff app's), and phase 4
+(read-only views of the client's own quotes/invoices/licenses, plus quote
+accept/decline).
+
+- `client_portal_accounts` (in `db/index.js`, added fresh — no
+  production data existed yet, so this is a plain `CREATE TABLE IF NOT
+  EXISTS` edit, not an `ALTER TABLE` migration; see that file's own note
+  on when each approach applies) is a **separate table from `clients`**,
+  not columns bolted onto it — this is an auth concern, not business data
+  (the same reasoning `user_permissions` is split from `users`), and
+  `clients.email` is neither required nor unique today, so a login
+  identity needs its own constrained column. `client_id INTEGER NOT NULL
+  UNIQUE REFERENCES clients(id) ON DELETE CASCADE` — one row per client,
+  since a portal account represents the organization's single login, not
+  a per-person account, matching how `clients` itself always means the
+  organization rather than an individual (see "Business module" above).
+  `email` is `NOT NULL UNIQUE` (unlike `clients.email`) since it's the
+  actual login identity. `password_hash` stays `NULL` until the client
+  accepts their invite and sets a password (see below) — a row can exist
+  in an "invited but not yet activated" state. `invite_token`/
+  `invite_token_expires` and `reset_token`/`reset_token_expires` mirror
+  `users`' own reset-token columns exactly, just doubled up for the two
+  separate token purposes this table needs (an initial invite is
+  conceptually different from a later self-serve reset, even though both
+  are "set a password via a time-limited emailed link"). `active`
+  defaults to `1` and gates login the same way `users.active` does.
+  `password_changed_at TEXT NOT NULL DEFAULT (datetime('now'))` is the
+  same token-invalidation timestamp `users` has (see below).
+- `middleware/clientAuth.js`'s `requireClientAuth` is the client-portal
+  counterpart to `middleware/auth.js`'s `requireAuth` — same shape
+  (re-fetch the live row on every request rather than trusting the JWT,
+  reject on `active = 0`, reject a token issued before
+  `password_changed_at` so a stolen pre-reset token can't keep working for
+  the rest of its 7-day life), but keyed to `client_portal_accounts`
+  instead of `users`. **Staff and client-portal tokens are signed with the
+  same `JWT_SECRET`**, so a valid signature alone doesn't prove which kind
+  of token it is — a client token's `id` is a `client_portal_accounts` row
+  id, which could coincidentally match a real staff user's id in `users`.
+  Every token carries a `type: 'client'` claim precisely so the two
+  systems can tell each other's tokens apart despite the shared secret:
+  `requireClientAuth` rejects any token where `payload.type !== 'client'`,
+  and `requireAuth` (in `middleware/auth.js`) was updated to reject any
+  token where `payload.type === 'client'`, immediately after signature
+  verification and before it ever reaches the `users` lookup — this is a
+  deliberately symmetric, bidirectional check, not something bolted onto
+  one side only. Without it, a client-portal JWT with a numerically
+  colliding `id` could otherwise have authenticated as a staff user via
+  `requireAuth`'s plain `SELECT ... FROM users WHERE id = ?`. Staff tokens
+  themselves carry no explicit `type` claim (unchanged, to avoid touching
+  every existing staff token's shape) — `requireAuth`'s check is simply
+  "reject if this is a client token," not "require a staff type."
+- `routes/clientPortal.js`, mounted at `/api/portal` (in `index.js`, right
+  after `/api/public` — both are the app's non-staff-auth route groups).
+  `signClientToken()`/`publicAccount()` mirror `routes/auth.js`'s own
+  `signToken()`/`publicUser()` pattern — `publicAccount()` is the one
+  place that shapes what a portal account is ever sent to the client
+  (`id`, `clientId`, `clientName`, `email` — never `password_hash` or any
+  token column), same reasoning as `publicUser()`. **There is no signup
+  route here either**, same reasoning as `routes/auth.js`'s own "no
+  signup" — a portal account is only ever created by an admin inviting an
+  existing client, never by someone showing up with an email; that invite
+  endpoint is `routes/clients.js`'s `POST /:id/portal-invite` (see "Admin
+  invite flow" below). `POST /login`
+  (rate-limited via `portalLoginLimiter`) checks `email` case-insensitively
+  (lowercased before the query, since `client_portal_accounts.email` is
+  stored as given), returns a generic "Invalid email or password" for both
+  a nonexistent account and a wrong password (matching `routes/auth.js`'s
+  own login), but has one extra state `users` never has: a row with
+  `password_hash IS NULL` (invited, never activated) gets its own distinct
+  message — "This account has not been activated yet. Check your email for
+  an invite link." — checked *before* the password comparison, since
+  there's no hash to compare against yet. The `active = 0` check runs
+  *after* the password check (matching `routes/auth.js`'s own
+  `active`-after-credentials ordering), so a correct password on a
+  deactivated account gets the specific "This account has been
+  deactivated" message rather than a generic credentials error.
+  `POST /accept-invite` (rate-limited via `portalAcceptInviteLimiter`) is
+  the "set your password for the first time" endpoint a client's invite
+  email links to — validates the token exists and `invite_token_expires`
+  hasn't passed, requires an 8+ char password (`MIN_PASSWORD_LENGTH`, same
+  threshold `routes/auth.js` uses), hashes it, and clears both invite-token
+  columns (single-use, same as `users`' reset flow) while stamping
+  `password_changed_at`. `POST /forgot-password`/`POST /reset-password`
+  (rate-limited via `portalForgotPasswordLimiter`/
+  `portalResetPasswordLimiter`) are a straight mirror of
+  `routes/auth.js`'s own pair — same generic
+  always-the-same-response-either-way message (prevents account
+  enumeration), same 1-hour `RESET_TOKEN_TTL_MS`, same
+  clear-token-and-stamp-`password_changed_at` on success. `GET /me`
+  (`requireClientAuth`-gated) returns the current account via
+  `publicAccount()` — the portal's equivalent of `GET /api/auth/me`. `GET
+  /settings` (also `requireClientAuth`-gated) returns the same stripped
+  `publicSettings()` shape `routes/public.js` sends alongside a quote/
+  invoice — added so the portal frontend can show a currency symbol/
+  business name on its dashboard and list pages without a full quote/
+  invoice fetch just to reach its embedded `settings` (see
+  `PortalAuthContext.jsx` below, which fetches this once and shares it
+  across every portal page).
+- `middleware/rateLimit.js` gained four portal-specific limiter instances
+  — `portalLoginLimiter` (10/15min), `portalForgotPasswordLimiter`
+  (5/hour), `portalResetPasswordLimiter` (10/hour), and
+  `portalAcceptInviteLimiter` (10/hour) — deliberately separate instances
+  from the existing staff `loginLimiter`/`forgotPasswordLimiter`/
+  `resetPasswordLimiter` even though the numbers are identical, so a
+  burst of staff login attempts and a burst of client portal login
+  attempts don't share (and potentially exhaust) the same bucket for an
+  unrelated user population.
+- **Admin invite flow** (phase 2): `routes/clients.js` gains
+  `GET /:id/portal-invite-preview` and `POST /:id/portal-invite` (both
+  `manage`-gated, same as every other mutation on this router), plus a
+  computed `portal_status` field (`'none' | 'invited' | 'active' |
+  'deactivated'`, derived from the client's `client_portal_accounts` row
+  the same don't-store-what-you-can-compute way `invoices.js`'s
+  `withComputed()` derives `is_overdue`) added to both `GET /` (via a
+  `LEFT JOIN client_portal_accounts` — cheap at this app's single-business
+  scale, so no second round-trip is needed just to know whether to show
+  Invite/Resend/nothing per row) and `GET /:id`. `assertInviteEligible()`
+  is the shared guard — 400 if the client has no email on file (a portal
+  account's login identity is always the client's own `clients.email`;
+  there's no per-invite email override), 409 if a `client_portal_accounts`
+  row already exists *and* has a `password_hash` set (an active account
+  needs no new invite; reactivating a deactivated one is a later phase) —
+  called by both the read-only preview route and `ensurePortalInvite()`
+  (the POST route's version, which also re-checks the invite's target
+  email isn't already claimed by a *different* client's portal account,
+  and actually writes the row) so preview and send can never disagree on
+  whether an invite is allowed. Follows the exact "Email preview before
+  sending" contract every other client-facing send in this app follows
+  (see above) — with one necessary difference: unlike quote/invoice/
+  license sends, there's no pre-existing token to preview against on a
+  client's very first invite, so the preview route never persists
+  anything (matching every other `*-preview` route in the app staying
+  read-only) — it shows the client's *real* invite token only when an
+  unactivated invite already exists to resend, and a placeholder
+  otherwise; the POST route is what actually generates and persists the
+  real token that gets emailed. A fresh invite (`ensurePortalInvite()`)
+  either creates the `client_portal_accounts` row (email = the client's
+  own) or, when a still-unactivated one exists, refreshes its token/
+  expiry and re-syncs its email to the client's current one (in case it
+  changed since an earlier, never-accepted invite) — either way stamping a
+  7-day `invite_token_expires` (`INVITE_TOKEN_TTL_MS`), deliberately more
+  generous than `routes/clientPortal.js`'s own 1-hour self-serve reset
+  window: a first-time setup link has no "prove you still control this
+  inbox right now" urgency a reset link does, so there's no security
+  reason to rush the client. `lib/emailTemplates.js` gained a 6th editable
+  type, `portal_invite` (`DEFAULT_TEMPLATES`/`PLACEHOLDERS`/`TYPE_LABELS`,
+  same as every other type — see "Email preview before sending" above)
+  and its own `portalInviteEmail({ client, settings, portalUrl })`
+  function, called by both the preview and send routes so the templated
+  text can never drift between them; `routes/emailCenter.js`'s own
+  separate `TYPE_LABELS` (used for the sent log, not the template editor)
+  got the matching entry too. `Clients.jsx`'s row actions gained a
+  `SendIcon` "Invite to portal"/"Resend portal invite" button (label
+  switches on `portal_status`), shown only when `portal_status` is
+  `'none'` or `'invited'` — an `'active'` row has nothing to invite, and
+  reactivating a `'deactivated'` one isn't built yet — wired to the same
+  `EmailPreviewModal` pattern `Quotes.jsx`/`Invoices.jsx` use for their own
+  single-send-type row action. A small `PortalBadge` (amber "Invited",
+  emerald "Portal active", slate "Portal deactivated"; nothing rendered
+  for `'none'`, the common case) sits next to the client's email in both
+  the desktop table cell and the mobile `MobileListAccordion` summary, so
+  the state is visible without opening anything.
+- **Read views** (phase 4): `routes/clientPortal.js` gains `GET
+  /quotes`/`GET /quotes/:id`/`POST /quotes/:id/respond`/`GET
+  /quotes/:id/pdf` and the invoice/license equivalents, all
+  `requireClientAuth`-gated. **Every query is scoped to
+  `req.clientAccount.client_id`** — `getClientQuote()`/`getClientInvoice()`
+  both filter `WHERE id = ? AND client_id = ?`, so a client can never read
+  (or `respond` to) another client's document by guessing an id; a mismatch
+  404s exactly like a nonexistent id would, not a 403, so no information
+  about whether the id belongs to *someone* leaks either way. None of these
+  lists take `?page=`/`?q=` — unlike the staff-side global lists, a single
+  client's own document set is inherently small, so pagination isn't
+  needed yet (see routes/reports.js's own "don't build it until needed"
+  precedent). `withComputedInvoice()`/`withComputedLicense()` are this
+  router's own copies of `routes/invoices.js`'s/`routes/licenses.js`'s
+  identically-named functions — kept duplicated rather than imported, same
+  reasoning `EXPIRY_WARNING_DAYS` is duplicated between `routes/
+  licenses.js` and `lib/scheduler.js` (a different call site, its own
+  client-scoped row shape). `POST /quotes/:id/respond` is the portal's
+  version of `routes/public.js`'s own `POST /quotes/:token/respond` —
+  identical accept/decline contract (only while `draft`/`sent`, stamps
+  `client_response`/`client_responded_at`, logs an activity entry with the
+  `"(client)"` action suffix) — a client can respond to a quote either way,
+  through the portal now or the original emailed public link, and both
+  paths converge on the exact same stored state. `GET /invoices/:id`
+  additionally returns `payments` (`routes/public.js`'s own invoice view
+  doesn't, since a one-off document link has no ongoing account
+  relationship to show payment history against) and `GET
+  /invoices/:id/payments/:paymentId/pdf` streams that payment's receipt —
+  the portal's counterpart to `routes/invoices.js`'s own
+  `GET /:id/payments/:paymentId/pdf`. Licenses are list-only for now (`GET
+  /licenses`, no detail/renewal-history route) — enough for a client to see
+  what's active/expiring/expired at a glance; a per-license detail view
+  (mirroring the staff-side `GET /:id/renewals`) can be added the same way
+  if that turns out to be wanted.
+- **Portal frontend** (phase 3), `frontend/src/`: a fully self-contained
+  sub-app under `/portal/*`, deliberately independent of the staff app's
+  `AuthContext`/`Navbar`/`ProtectedRoute` — a client account has no
+  modules, permissions, or business-management links, so reusing any of
+  those would be both wrong (a client isn't a staff user) and broken (they
+  all assume a staff `user`/`permissions` shape a portal account doesn't
+  have). `context/PortalAuthContext.jsx` mirrors `AuthContext.jsx`'s exact
+  shape (persist a bearer token under its own `localStorage` key,
+  `edusolution_portal_token` — never `edusolution_token`, so a staff and a
+  portal session can coexist in the same browser without clobbering each
+  other — validate it against `GET /portal/me` on load, expose
+  `login`/`logout`) but also fetches `GET /portal/settings` alongside the
+  account (on both the initial load effect and right after `login()`) and
+  exposes it as `settings`, so every portal page can show a currency
+  symbol/business name from one shared fetch rather than each page
+  re-fetching it. `components/PortalProtectedRoute.jsx` mirrors
+  `ProtectedRoute.jsx` exactly, just reading `PortalAuthContext` and
+  redirecting to `/portal/login` instead of `/login`.
+  `pages/portal/PortalApp.jsx` is the sub-app's own router+shell — mounted
+  once at `App.jsx`'s `<Route path="/portal/*" element={<PortalApp />} />`
+  (lazy-loaded like every other routed page, see "Route-level
+  code-splitting" above) and wrapping its own nested `<Routes>` in
+  `PortalAuthProvider`. `App.jsx` itself computes `isPortalRoute =
+  useLocation().pathname.startsWith('/portal')` and skips rendering the
+  staff `Navbar`/`IdleTimeoutMonitor`/`CommandPalette`/`Footer`/`BottomNav`
+  entirely whenever it's true (each portal page renders its own header via
+  `PortalLayout.jsx`, which also renders its own `Footer` instance —
+  reusing the shared, staff-context-free `components/Footer.jsx`) — this is
+  the one place `App.jsx` branches on path rather than on auth state, since
+  the portal isn't just "logged out" or "logged in," it's a different app
+  entirely occupying the same domain. `pages/portal/PortalLayout.jsx` is
+  that header: brand/eyebrow, four nav links (Dashboard/Quotes/Invoices/
+  Licenses — collapsing to a horizontally-scrollable second row below `sm`,
+  not a hamburger drawer, since four links never need one), the client's
+  name, `ThemeToggle` (reused as-is — it only reads `ThemeContext`, no
+  staff-auth dependency), and a Log out button. The four unauthenticated
+  auth pages (`PortalLogin`/`PortalAcceptInvite`/`PortalForgotPassword`/
+  `PortalResetPassword`) share `pages/portal/PortalAuthCard.jsx`, a plain
+  centered-card shell — deliberately not `pages/Login.jsx`'s full
+  marketing-hero treatment, since a client landing on one of these came
+  from a direct invite/reset link with exactly one task to do, not
+  browsing the app's front door. `PortalLogin.jsx` redirects an
+  already-authenticated visit straight to `/portal/dashboard`, same pattern
+  as `Login.jsx`. `PortalAcceptInvite.jsx`/`PortalResetPassword.jsx` are
+  straight mirrors of `ResetPassword.jsx`'s token-from-query-string +
+  set-a-new-password shape, wired to `api.portal.acceptInvite`/
+  `api.portal.resetPassword` instead. `pages/portal/PortalDashboard.jsx`
+  fetches all three lists in parallel and shows three `KpiCard`s (quotes
+  awaiting response, outstanding invoice balance, active licenses) plus
+  three shortcut tiles. `PortalQuotes.jsx`/`PortalInvoices.jsx`/
+  `PortalLicenses.jsx` are simple card lists (not the staff list pages'
+  desktop-table + `MobileListAccordion` split) — a single client's own
+  document set is small enough that one responsive card layout serves both
+  breakpoints, so the added complexity of a separate desktop table isn't
+  worth it here the way it is for the staff-side global lists.
+  `PortalInvoices.jsx` gives an overdue invoice a red-tinted border and an
+  "overdue" `StatusBadge` (`invoice.is_overdue ? 'overdue' : invoice.status`
+  — the exact same ternary `Invoices.jsx` itself uses). `pages/portal/
+  PortalQuoteDetail.jsx`/`PortalInvoiceDetail.jsx` are adapted directly
+  from `pages/PublicQuote.jsx`/`PublicInvoice.jsx` (same bill-to/items-
+  table/totals layout, same Accept/Decline buttons gated on `['draft',
+  'sent'].includes(quote.status)`), wired to the portal's own auth token
+  and API calls instead of a `public_token` route param —
+  `PortalInvoiceDetail.jsx` additionally renders the Payments list `GET
+  /invoices/:id` now returns, each row with its own receipt-download
+  button. `lib/api.js`'s `portal` object holds every one of these calls
+  (`login`/`acceptInvite`/`forgotPassword`/`resetPassword`/`me`/
+  `getSettings`, plus `quotes`/`invoices`/`licenses` sub-objects) — the
+  unauthenticated ones take no token (same shape as the top-level
+  `api.login`/`api.forgotPassword`), everything else takes the portal
+  token from `PortalAuthContext`, never `AuthContext`'s own `token`.
+
 ### Idle session timeout
 
 Separate from the JWT's fixed 7-day expiry (see `middleware/auth.js` above),

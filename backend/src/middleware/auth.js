@@ -16,6 +16,16 @@ function requireAuth(req, res, next) {
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+  // Staff and client-portal tokens are signed with the same JWT_SECRET, so
+  // verifying the signature alone isn't enough to prove "this is a staff
+  // token" — a client token's `id` is a client_portal_accounts row id,
+  // which could coincidentally match a real staff user's id in `users`.
+  // Reject anything carrying the client-portal discriminator (see
+  // middleware/clientAuth.js's own reverse check) before it ever reaches
+  // the users lookup below.
+  if (payload.type === 'client') {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
 
   // Re-fetch the live row rather than trusting the JWT for anything beyond
   // "this token was validly issued for this user id" — role changes,

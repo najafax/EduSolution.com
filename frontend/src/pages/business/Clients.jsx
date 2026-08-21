@@ -13,9 +13,27 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
-import { UsersIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
+import EmailPreviewModal from '../../components/EmailPreviewModal';
+import { UsersIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, SendIcon } from '../../components/icons';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', address: '', notes: '' };
+
+// portal_status is computed server-side (routes/clients.js) from the
+// client's client_portal_accounts row — 'none' renders no badge at all
+// since it's the common, unremarkable case (most clients aren't on the
+// portal), matching how MobileListAccordion's own accent stripes only
+// mark out-of-the-ordinary rows elsewhere in the app.
+const PORTAL_BADGE = {
+  invited: { label: 'Invited', className: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+  active: { label: 'Portal active', className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
+  deactivated: { label: 'Portal deactivated', className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' },
+};
+
+function PortalBadge({ status }) {
+  const badge = PORTAL_BADGE[status];
+  if (!badge) return null;
+  return <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>;
+}
 
 export default function Clients() {
   const { token, can } = useAuth();
@@ -32,6 +50,7 @@ export default function Clients() {
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
+  const [emailModal, setEmailModal] = useState(null); // id of the client whose portal-invite preview is open, or null
 
   const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.clients.remove(id, token));
   const visibleClients = clients.filter((c) => !pendingIds.has(c.id));
@@ -120,6 +139,27 @@ export default function Clients() {
     } catch (err) {
       setError(err.message);
     }
+  }
+
+  // 'active'/'deactivated' clients get no invite action here — a live
+  // portal login already exists, and reactivating a deactivated one is a
+  // later phase (see CLAUDE.md's client portal rollout plan).
+  function rowActions(client) {
+    return (
+      <>
+        {canManage && (client.portal_status === 'none' || client.portal_status === 'invited') && (
+          <IconActionButton
+            icon={SendIcon}
+            tone="lagoon"
+            onClick={() => setEmailModal(client.id)}
+            title={client.portal_status === 'invited' ? 'Resend portal invite' : 'Invite to portal'}
+            label={client.portal_status === 'invited' ? 'Resend portal invite' : 'Invite client to portal'}
+          />
+        )}
+        {canManage && <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(client)} title="Edit" label="Edit client" />}
+        {canManage && <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(client)} title="Delete" label="Delete client" />}
+      </>
+    );
   }
 
   return (
@@ -220,14 +260,16 @@ export default function Clients() {
                   {visibleClients.map((client) => (
                     <tr key={client.id}>
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{client.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.email}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">
+                        <div className="flex items-center gap-2">
+                          {client.email}
+                          <PortalBadge status={client.portal_status} />
+                        </div>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.phone || '—'}</td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
-                          <div className="flex justify-end gap-1.5">
-                            <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(client)} title="Edit" label="Edit client" />
-                            <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(client)} title="Delete" label="Delete client" />
-                          </div>
+                          <div className="flex justify-end gap-1.5">{rowActions(client)}</div>
                         </td>
                       )}
                     </tr>
@@ -247,6 +289,7 @@ export default function Clients() {
                         <p className="font-medium text-slate-900 dark:text-white">{client.name}</p>
                         <p className="truncate text-slate-500 dark:text-slate-400">{client.email}</p>
                       </div>
+                      <PortalBadge status={client.portal_status} />
                     </div>
                   }
                 >
@@ -254,12 +297,7 @@ export default function Clients() {
                     <dt className="text-slate-500 dark:text-slate-400">Phone</dt>
                     <dd className="text-slate-900 dark:text-white">{client.phone || '—'}</dd>
                   </div>
-                  {canManage && (
-                    <div className="flex gap-1.5 pt-1">
-                      <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(client)} title="Edit" label="Edit client" />
-                      <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(client)} title="Delete" label="Delete client" />
-                    </div>
-                  )}
+                  {canManage && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(client)}</div>}
                 </MobileListAccordion>
               ))}
             </div>
@@ -270,6 +308,19 @@ export default function Clients() {
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New client" />}
+
+      <EmailPreviewModal
+        open={emailModal !== null}
+        onClose={() => setEmailModal(null)}
+        title="Review invite email before sending"
+        loadPreview={() => api.clients.portalInvitePreview(emailModal, token)}
+        onSend={async ({ subject, message }) => {
+          await api.clients.portalInvite(emailModal, { subject, message }, token);
+          toast('Portal invite sent.', { type: 'success' });
+          load();
+        }}
+        showAttachmentNote={false}
+      />
 
       {confirmDialog}
     </div>
