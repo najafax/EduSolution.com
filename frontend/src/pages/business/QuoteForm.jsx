@@ -162,6 +162,12 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
         if (requestId) {
           try {
             await api.quoteRequests.linkQuote(requestId, quote.id, token);
+            // Linking is what makes the quote visible in the client's
+            // portal (see routes/clientPortal.js's CLIENT_VISIBLE_QUOTE) —
+            // immediately, not only once someone later clicks "Send" — so
+            // this is worth a distinct confirmation from the plain
+            // navigate-to-the-new-quote that happens either way below.
+            toast('Quote created — the client can already see it in their portal.', { type: 'success' });
           } catch (err) {
             // The quote itself was created successfully — don't strand the
             // user on this form over a failure to link it back to the

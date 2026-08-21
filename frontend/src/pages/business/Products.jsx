@@ -11,7 +11,19 @@ import { PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 
-const EMPTY_FORM = { name: '', description: '', unit_price: '', tax_rate: '' };
+const EMPTY_FORM = { name: '', description: '', unit_price: '', tax_rate: '', visible_in_portal: false };
+
+// visible_in_portal is opt-in (see db/index.js's own migration note) — most
+// products stay invisible here, so the badge is only shown for the
+// out-of-the-ordinary case where a product IS opted in, same reasoning
+// Clients.jsx's own PortalBadge only renders for a non-'none' portal_status.
+function PortalVisibleBadge() {
+  return (
+    <span className="inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+      Portal
+    </span>
+  );
+}
 
 export default function Products() {
   const { token, can } = useAuth();
@@ -71,6 +83,7 @@ export default function Products() {
       description: product.description,
       unit_price: product.unit_price,
       tax_rate: product.tax_rate,
+      visible_in_portal: Boolean(product.visible_in_portal),
     });
     setEditingId(product.id);
     setShowForm(true);
@@ -180,6 +193,21 @@ export default function Products() {
               />
             </label>
           </div>
+          <div className="sm:col-span-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.visible_in_portal}
+                onChange={(e) => setForm((f) => ({ ...f, visible_in_portal: e.target.checked }))}
+                className="h-4 w-4 rounded border-slate-300 text-lagoon-600 focus:ring-lagoon-500"
+              />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Visible in client portal</span>
+            </label>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Lets clients pick this product when requesting a quote from their portal. Off by default — turn it on
+              per product you want clients to see.
+            </p>
+          </div>
           <div className="flex gap-3 sm:col-span-2">
             <button
               type="submit"
@@ -222,7 +250,12 @@ export default function Products() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {products.map((product) => (
                     <tr key={product.id}>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{product.name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">
+                        <div className="flex items-center gap-2">
+                          {product.name}
+                          {Boolean(product.visible_in_portal) && <PortalVisibleBadge />}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{product.description || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
                         {symbol}
@@ -258,7 +291,10 @@ export default function Products() {
                   name="products-list"
                   summary={
                     <div className="flex items-center justify-between gap-3">
-                      <p className="min-w-0 truncate font-medium text-slate-900 dark:text-white">{product.name}</p>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="truncate font-medium text-slate-900 dark:text-white">{product.name}</p>
+                        {Boolean(product.visible_in_portal) && <PortalVisibleBadge />}
+                      </div>
                       <p className="shrink-0 text-slate-900 dark:text-white">
                         {symbol}
                         {product.unit_price.toFixed(2)}

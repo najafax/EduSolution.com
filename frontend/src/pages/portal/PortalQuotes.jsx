@@ -116,14 +116,19 @@ export default function PortalQuotes() {
                 {request.items?.length > 0 && request.description && (
                   <p className="mt-1 text-slate-500 dark:text-slate-400">{request.description}</p>
                 )}
-                {request.status === 'approved' &&
-                  (request.quote_status && request.quote_status !== 'draft' ? (
-                    <Link to={`/portal/quotes/${request.quote_id}`} className="mt-1 inline-block font-medium text-lagoon-600 hover:text-lagoon-500">
-                      Your quote ({request.quote_number}) is ready — view it
-                    </Link>
-                  ) : (
-                    <p className="mt-1 text-slate-500 dark:text-slate-400">A quote is being prepared for you.</p>
-                  ))}
+                {/* A request's status flips to 'approved' the instant staff
+                    links a quote to it (routes/quoteRequests.js's own
+                    POST /:id/link-quote) — and that quote is visible here
+                    the same instant too (see routes/clientPortal.js's
+                    CLIENT_VISIBLE_QUOTE), whether or not staff has since
+                    also clicked "Send" on it. So 'approved' always means
+                    "go look," never "still being prepared" — there's no
+                    in-between state to render a placeholder for. */}
+                {request.status === 'approved' && request.quote_id && (
+                  <Link to={`/portal/quotes/${request.quote_id}`} className="mt-1 inline-block font-medium text-lagoon-600 hover:text-lagoon-500">
+                    Your quote ({request.quote_number}) is ready — view it
+                  </Link>
+                )}
                 {request.status === 'declined' && request.decision_note && (
                   <p className="mt-1 text-slate-500 dark:text-slate-400">{request.decision_note}</p>
                 )}

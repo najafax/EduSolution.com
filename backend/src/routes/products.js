@@ -30,7 +30,7 @@ router.get('/', view, (req, res) => {
 });
 
 router.post('/', manage, (req, res) => {
-  const { name, description = '', unit_price = 0, tax_rate = 0 } = req.body || {};
+  const { name, description = '', unit_price = 0, tax_rate = 0, visible_in_portal = false } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
   const priceNum = Number(unit_price);
   if (!Number.isFinite(priceNum) || priceNum < 0) {
@@ -42,8 +42,8 @@ router.post('/', manage, (req, res) => {
   }
 
   const result = db
-    .prepare('INSERT INTO products (name, description, unit_price, tax_rate) VALUES (?, ?, ?, ?)')
-    .run(name.trim(), description, priceNum, taxNum);
+    .prepare('INSERT INTO products (name, description, unit_price, tax_rate, visible_in_portal) VALUES (?, ?, ?, ?, ?)')
+    .run(name.trim(), description, priceNum, taxNum, visible_in_portal ? 1 : 0);
   const product = db.prepare('SELECT * FROM products WHERE id = ?').get(result.lastInsertRowid);
   logActivity({ userName: req.user.name, action: 'created', entityType: 'product', entityId: product.id, entityLabel: product.name });
   res.status(201).json({ product });
@@ -53,7 +53,7 @@ router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });
 
-  const { name, description = '', unit_price = 0, tax_rate = 0 } = req.body || {};
+  const { name, description = '', unit_price = 0, tax_rate = 0, visible_in_portal = false } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
   const priceNum = Number(unit_price);
   if (!Number.isFinite(priceNum) || priceNum < 0) {
@@ -65,8 +65,8 @@ router.put('/:id', manage, (req, res) => {
   }
 
   db.prepare(
-    `UPDATE products SET name = ?, description = ?, unit_price = ?, tax_rate = ?, updated_at = datetime('now') WHERE id = ?`,
-  ).run(name.trim(), description, priceNum, taxNum, req.params.id);
+    `UPDATE products SET name = ?, description = ?, unit_price = ?, tax_rate = ?, visible_in_portal = ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(name.trim(), description, priceNum, taxNum, visible_in_portal ? 1 : 0, req.params.id);
 
   const product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   logActivity({ userName: req.user.name, action: 'updated', entityType: 'product', entityId: product.id, entityLabel: product.name });
