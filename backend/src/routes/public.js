@@ -2,6 +2,7 @@ const { Router } = require('express');
 const db = require('../db');
 const { renderQuotePdf, renderInvoicePdf } = require('../lib/pdf');
 const { logActivity } = require('../lib/activity');
+const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
 
 const router = Router();
 
@@ -76,6 +77,13 @@ router.post('/quotes/:token/respond', (req, res) => {
     entityId: data.quote.id,
     entityLabel: data.quote.number,
   });
+
+  if (response === 'accepted') {
+    const updated = getQuoteByToken(req.params.token).quote;
+    notifyStaffOfQuoteAccepted({ quote: updated, client: data.client }).catch((err) =>
+      console.error('Failed to notify staff of quote acceptance:', err.message),
+    );
+  }
 
   res.json(getQuoteByToken(req.params.token));
 });

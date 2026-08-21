@@ -13,6 +13,7 @@ const {
 const { sendMail } = require('../lib/mailer');
 const { renderQuotePdf, renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
 const { logActivity } = require('../lib/activity');
+const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour, same window as staff resets
 const MIN_PASSWORD_LENGTH = 8;
@@ -234,15 +235,25 @@ router.get('/settings', requireClientAuth, (req, res) => {
   res.json({ settings: publicSettings(settings) });
 });
 
+// A `draft` quote is deliberately invisible here — draft is "staff is still
+// preparing this," not "ready for the client to see." Before quote
+// requests existed, every quote was created already reviewed by a human
+// (there was no other path into `quotes`), so this distinction never
+// mattered for the portal; now that POST /quote-requests/:id/link-quote
+// (routes/quoteRequests.js) creates a fresh draft quote directly from a
+// client's own request, a client could otherwise watch their request "get
+// approved" and then immediately see the still-being-priced draft. The
+// quote becomes visible here the same moment it would have been emailed to
+// them anyway — once a staff member sends it.
 router.get('/quotes', requireClientAuth, (req, res) => {
   const quotes = db
-    .prepare('SELECT * FROM quotes WHERE client_id = ? ORDER BY issue_date DESC, id DESC')
+    .prepare("SELECT * FROM quotes WHERE client_id = ? AND status != 'draft' ORDER BY issue_date DESC, id DESC")
     .all(req.clientAccount.client_id);
   res.json({ quotes });
 });
 
 function getClientQuote(clientId, id) {
-  const quote = db.prepare('SELECT * FROM quotes WHERE id = ? AND client_id = ?').get(id, clientId);
+  const quote = db.prepare("SELECT * FROM quotes WHERE id = ? AND client_id = ? AND status != 'draft'").get(id, clientId);
   if (!quote) return null;
   const items = db.prepare('SELECT * FROM quote_items WHERE quote_id = ? ORDER BY sort_order').all(quote.id);
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
@@ -287,6 +298,13 @@ router.post('/quotes/:id/respond', requireClientAuth, (req, res) => {
     entityId: data.quote.id,
     entityLabel: data.quote.number,
   });
+
+  if (response === 'accepted') {
+    const updated = getClientQuote(req.clientAccount.client_id, req.params.id).quote;
+    notifyStaffOfQuoteAccepted({ quote: updated, client: data.client }).catch((err) =>
+      console.error('Failed to notify staff of quote acceptance:', err.message),
+    );
+  }
 
   res.json(getClientQuote(req.clientAccount.client_id, req.params.id));
 });
@@ -368,6 +386,99 @@ router.get('/licenses', requireClientAuth, (req, res) => {
     .all(req.clientAccount.client_id)
     .map(withComputedLicense);
   res.json({ licenses });
+});
+
+// Read-only, full-catalog — same rows GET /api/products serves staff, no
+// per-client filtering (single-business model). Unlike every other portal
+// route, this deliberately includes `unit_price`: a client picking items
+// to request a quote for needs to see what things cost to make an
+// informed pick, they just can never set or edit that number themselves
+// (see POST /quote-requests below, which only ever accepts `product_id` +
+// `quantity` from the client and looks up the real price itself).
+router.get('/products', requireClientAuth, (req, res) => {
+  const products = db.prepare('SELECT * FROM products ORDER BY name').all();
+  res.json({ products });
+});
+
+function getRequestItems(requestId) {
+  return db.prepare('SELECT * FROM quote_request_items WHERE quote_request_id = ? ORDER BY id').all(requestId);
+}
+
+// A client's ask for a quote (see db/index.js's own note on
+// `quote_requests`/`quote_request_items`) — the counterpart to
+// routes/quoteRequests.js's staff-side review of the same rows.
+// `quote_number`/`quote_status` are joined in so the portal can show "a
+// quote is being prepared" (linked but still `draft`) versus "your quote
+// is ready" (linked and sent/accepted/etc.) without a second round-trip
+// per request.
+router.post('/quote-requests', requireClientAuth, (req, res) => {
+  const description = (req.body?.description || '').trim();
+  const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
+
+  // Never trust a client-supplied price or product name here — only the
+  // id and quantity come from the request body; everything else
+  // (description, whether the product even exists) is looked up fresh
+  // from the live catalog.
+  const items = [];
+  for (const raw of rawItems) {
+    const productId = Number(raw?.product_id);
+    const quantity = Number(raw?.quantity);
+    if (!productId || !quantity || quantity <= 0) {
+      return res.status(400).json({ error: 'Each item needs a valid product and a quantity greater than 0' });
+    }
+    const product = db.prepare('SELECT id, name FROM products WHERE id = ?').get(productId);
+    if (!product) {
+      return res.status(400).json({ error: 'One of the selected products no longer exists' });
+    }
+    items.push({ product_id: product.id, description: product.name, quantity });
+  }
+
+  if (!description && items.length === 0) {
+    return res.status(400).json({ error: 'Please add at least one product or describe what you need' });
+  }
+
+  const request = db.transaction(() => {
+    const result = db
+      .prepare('INSERT INTO quote_requests (client_id, description) VALUES (?, ?)')
+      .run(req.clientAccount.client_id, description);
+    const insertItem = db.prepare(
+      'INSERT INTO quote_request_items (quote_request_id, product_id, description, quantity) VALUES (?, ?, ?, ?)',
+    );
+    for (const item of items) {
+      insertItem.run(result.lastInsertRowid, item.product_id, item.description, item.quantity);
+    }
+    return db.prepare('SELECT * FROM quote_requests WHERE id = ?').get(result.lastInsertRowid);
+  })();
+
+  logActivity({
+    userName: req.clientAccount.client_name,
+    action: 'requested a quote (client)',
+    entityType: 'quote_request',
+    entityId: request.id,
+    entityLabel: req.clientAccount.client_name,
+  });
+  res.status(201).json({ request: { ...request, items: getRequestItems(request.id) } });
+});
+
+router.get('/quote-requests', requireClientAuth, (req, res) => {
+  const requests = db
+    .prepare(
+      `SELECT quote_requests.*, quotes.number AS quote_number, quotes.status AS quote_status
+       FROM quote_requests
+       LEFT JOIN quotes ON quotes.id = quote_requests.quote_id
+       WHERE quote_requests.client_id = ?
+       ORDER BY quote_requests.created_at DESC, quote_requests.id DESC`,
+    )
+    .all(req.clientAccount.client_id);
+  const requestIds = requests.map((r) => r.id);
+  const allItems = requestIds.length
+    ? db
+        .prepare(`SELECT * FROM quote_request_items WHERE quote_request_id IN (${requestIds.map(() => '?').join(',')}) ORDER BY id`)
+        .all(...requestIds)
+    : [];
+  res.json({
+    requests: requests.map((r) => ({ ...r, items: allItems.filter((i) => i.quote_request_id === r.id) })),
+  });
 });
 
 module.exports = router;

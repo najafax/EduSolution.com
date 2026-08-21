@@ -38,6 +38,7 @@ function publicUser(user) {
     email: user.email,
     role: user.role,
     notifyOverdue: Boolean(user.notify_overdue),
+    notifyQuoteResponses: Boolean(user.notify_quote_responses),
     createdAt: user.created_at,
   };
 }
@@ -190,11 +191,21 @@ router.post('/change-password', requireAuth, async (req, res) => {
   res.json({ message: 'Password updated.', token: signToken(user) });
 });
 
-// The only personal preference for now: opt in to a daily digest email
-// when the overdue-reminder job actually sends reminders (see lib/scheduler.js).
+// Two personal preferences: opt in to a daily digest email when the
+// overdue-reminder job actually sends reminders (see lib/scheduler.js), and
+// opt in to a notification whenever a client accepts a quote (see
+// lib/quoteAcceptedNotify.js). Both fields are optional in the body so a
+// caller updating one doesn't have to also resend the other's current
+// value — `?? existing` keeps whichever wasn't sent unchanged, rather than
+// silently resetting it to false.
 router.put('/preferences', requireAuth, (req, res) => {
-  const { notifyOverdue } = req.body || {};
-  db.prepare('UPDATE users SET notify_overdue = ? WHERE id = ?').run(notifyOverdue ? 1 : 0, req.user.id);
+  const existing = db.prepare('SELECT notify_overdue, notify_quote_responses FROM users WHERE id = ?').get(req.user.id);
+  const { notifyOverdue, notifyQuoteResponses } = req.body || {};
+  db.prepare('UPDATE users SET notify_overdue = ?, notify_quote_responses = ? WHERE id = ?').run(
+    (notifyOverdue ?? existing.notify_overdue) ? 1 : 0,
+    (notifyQuoteResponses ?? existing.notify_quote_responses) ? 1 : 0,
+    req.user.id,
+  );
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   res.json({ user: publicUser(user) });
 });

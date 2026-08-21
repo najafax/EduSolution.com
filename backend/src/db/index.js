@@ -290,7 +290,56 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- A client's ask for a quote, submitted from the portal — deliberately
+  -- not a quote itself (no pricing set by the client, no public_token, no
+  -- PDF): a client picks what they want from the product catalog (or
+  -- describes it in the description column when nothing in the catalog
+  -- fits), staff turns that into a real priced quote using the existing
+  -- quote-creation flow. description is now optional (was NOT NULL with
+  -- no default before quote_request_items existed) — a request can be
+  -- carried entirely by its catalog items instead. quote_id stays NULL
+  -- until a staff member actually creates that quote
+  -- (routes/quoteRequests.js's POST /:id/link-quote) — ON DELETE SET NULL
+  -- rather than CASCADE, so deleting the resulting quote later doesn't
+  -- silently destroy the record that a request was ever made, just its
+  -- link to that particular quote.
+  CREATE TABLE IF NOT EXISTS quote_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    quote_id INTEGER REFERENCES quotes(id) ON DELETE SET NULL,
+    decision_note TEXT NOT NULL DEFAULT '',
+    decided_by_name TEXT NOT NULL DEFAULT '',
+    decided_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- The catalog items a client picked while building a quote_requests row
+  -- — deliberately carries no price/amount column: a client is never
+  -- trusted with pricing, even read-only client-supplied numbers, so the
+  -- server only ever stores product_id + quantity here and looks up the
+  -- real (current) price itself, both for display and for QuoteForm.jsx's
+  -- pre-fill when staff builds the actual quote. product_id has no
+  -- REFERENCES constraint, same reason quote_items/invoice_items' own
+  -- product_id column doesn't (see that note above) — products.js allows
+  -- deleting a product outright with no reference check, and a FK here
+  -- would turn that into a 500 instead of leaving a harmless stale id.
+  -- description is a denormalized snapshot of the product's name at
+  -- request time, same reasoning quote_items/invoice_items snapshot
+  -- theirs — so the request still reads sensibly even if the product is
+  -- later renamed or deleted.
+  CREATE TABLE IF NOT EXISTS quote_request_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    quote_request_id INTEGER NOT NULL REFERENCES quote_requests(id) ON DELETE CASCADE,
+    product_id INTEGER,
+    description TEXT NOT NULL,
+    quantity REAL NOT NULL DEFAULT 1
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
+  CREATE INDEX IF NOT EXISTS idx_quote_requests_client ON quote_requests(client_id);
+  CREATE INDEX IF NOT EXISTS idx_quote_request_items_request ON quote_request_items(quote_request_id);
   CREATE INDEX IF NOT EXISTS idx_invoices_client ON invoices(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
   CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON quote_items(quote_id);
@@ -453,6 +502,14 @@ if (!licenseColumns.has('url')) {
 const expenseColumns = new Set(db.prepare('PRAGMA table_info(expenses)').all().map((c) => c.name));
 if (!expenseColumns.has('payee')) {
   db.exec(`ALTER TABLE expenses ADD COLUMN payee TEXT NOT NULL DEFAULT '';`);
+}
+
+// Same pattern again: `notify_quote_responses` added to `users` — the
+// opt-in preference (MyAccount.jsx, mirroring `notify_overdue`) for a
+// staff digest when a client accepts a quote via the portal or public link
+// (see lib/quoteAcceptedNotify.js) — after `users` already had real accounts.
+if (!userColumns.has('notify_quote_responses')) {
+  db.exec(`ALTER TABLE users ADD COLUMN notify_quote_responses INTEGER NOT NULL DEFAULT 0;`);
 }
 
 db.pragma('foreign_keys = ON');

@@ -2,37 +2,147 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePortalAuth } from '../../context/PortalAuthContext';
+import { useToast } from '../../context/ToastContext';
 import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
-import { QuoteIcon } from '../../components/icons';
+import Modal from '../../components/Modal';
+import LineItemsEditor from '../../components/LineItemsEditor';
+import { QuoteIcon, PlusIcon } from '../../components/icons';
+
+// A request's summary line: item quantities/names when the client picked
+// from the catalog, falling back to the free-text description for a
+// request with no items (or predating the catalog picker).
+function requestSummary(request) {
+  if (request.items && request.items.length > 0) {
+    return request.items.map((item) => `${item.quantity}× ${item.description}`).join(', ');
+  }
+  return request.description || '(no description)';
+}
 
 export default function PortalQuotes() {
   const { token, settings } = usePortalAuth();
+  const { toast } = useToast();
   const [quotes, setQuotes] = useState(null);
+  const [requests, setRequests] = useState(null);
+  const [products, setProducts] = useState([]);
   const [error, setError] = useState('');
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [items, setItems] = useState([]);
+  const [notes, setNotes] = useState('');
+  const [requestError, setRequestError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const symbol = settings?.currency_symbol || '$';
 
-  useEffect(() => {
+  function load() {
     api.portal.quotes
       .list(token)
       .then(({ quotes }) => setQuotes(quotes))
       .catch((err) => setError(err.message));
+    api.portal.quoteRequests
+      .list(token)
+      .then(({ requests }) => setRequests(requests))
+      .catch(() => {});
+  }
+
+  useEffect(load, [token]);
+  useEffect(() => {
+    api.portal.products
+      .list(token)
+      .then(({ products }) => setProducts(products))
+      .catch(() => {});
   }, [token]);
+
+  function openRequestForm() {
+    setItems([]);
+    setNotes('');
+    setRequestError('');
+    setShowRequestForm(true);
+  }
+
+  async function handleSubmitRequest(e) {
+    e.preventDefault();
+    setRequestError('');
+    if (items.length === 0 && !notes.trim()) {
+      setRequestError('Please add at least one item from the catalog, or describe what you need below.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // Only product_id + quantity are ever sent — LineItemsEditor's own
+      // unit_price here is read-only display data (see priceEditable below),
+      // never something the server trusts from a client.
+      await api.portal.quoteRequests.create(
+        { description: notes, items: items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })) },
+        token,
+      );
+      setShowRequestForm(false);
+      toast('Your quote request has been sent.', { type: 'success' });
+      load();
+    } catch (err) {
+      setRequestError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quotes</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quotes</h1>
+        <button
+          onClick={openRequestForm}
+          className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+        >
+          <PlusIcon width={16} height={16} />
+          Request a quote
+        </button>
+      </div>
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
+      {requests && requests.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Your requests</h2>
+          <div className="mt-2 flex flex-col gap-2">
+            {requests.map((request) => (
+              <div
+                key={request.id}
+                className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 flex-1 text-slate-700 dark:text-slate-300">{requestSummary(request)}</p>
+                  <StatusBadge status={request.status} />
+                </div>
+                {request.items?.length > 0 && request.description && (
+                  <p className="mt-1 text-slate-500 dark:text-slate-400">{request.description}</p>
+                )}
+                {request.status === 'approved' &&
+                  (request.quote_status && request.quote_status !== 'draft' ? (
+                    <Link to={`/portal/quotes/${request.quote_id}`} className="mt-1 inline-block font-medium text-lagoon-600 hover:text-lagoon-500">
+                      Your quote ({request.quote_number}) is ready — view it
+                    </Link>
+                  ) : (
+                    <p className="mt-1 text-slate-500 dark:text-slate-400">A quote is being prepared for you.</p>
+                  ))}
+                {request.status === 'declined' && request.decision_note && (
+                  <p className="mt-1 text-slate-500 dark:text-slate-400">{request.decision_note}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <h2 className="mt-6 text-sm font-semibold text-slate-700 dark:text-slate-300">Sent to you</h2>
+
       {!quotes ? (
-        <p className="mt-10 text-center text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+        <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">Loading…</p>
       ) : quotes.length === 0 ? (
-        <div className="mt-6 rounded-lg border border-slate-200 dark:border-slate-700">
+        <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700">
           <EmptyState icon={<QuoteIcon />} title="No quotes yet." message="Any quotes prepared for you will show up here." />
         </div>
       ) : (
-        <div className="mt-6 flex flex-col gap-2.5">
+        <div className="mt-2 flex flex-col gap-2.5">
           {quotes.map((quote) => (
             <Link
               key={quote.id}
@@ -54,6 +164,58 @@ export default function PortalQuotes() {
           ))}
         </div>
       )}
+
+      <Modal open={showRequestForm} onClose={() => setShowRequestForm(false)} title="Request a quote" maxWidthClass="max-w-xl">
+        <form onSubmit={handleSubmitRequest} className="flex flex-col gap-3">
+          <div>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Pick from our catalog</span>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              Prices shown are our current list prices for reference — your final quote may differ once we review your request.
+            </p>
+            <div className="mt-1">
+              <LineItemsEditor
+                items={items}
+                onChange={setItems}
+                currencySymbol={symbol}
+                products={products}
+                catalogOnly
+                priceEditable={false}
+                subtotalLabel="Estimated subtotal"
+              />
+            </div>
+          </div>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Anything else? (optional)</span>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Not seeing what you need in the catalog? Describe it here."
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
+          </label>
+
+          {requestError && <p className="text-sm text-red-600 dark:text-red-400">{requestError}</p>}
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowRequestForm(false)}
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+            >
+              {submitting ? 'Sending…' : 'Send request'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

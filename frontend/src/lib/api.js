@@ -121,6 +121,14 @@ export const api = {
     exportXlsx: (token) => downloadFile('/quotes/export.xlsx', token, 'quotes.xlsx'),
   },
 
+  quoteRequests: {
+    list: (token, { status, page } = {}) => request(`/quote-requests${qs({ status, page })}`, { token }),
+    get: (id, token) => request(`/quote-requests/${id}`, { token }),
+    decline: (id, note, token) => request(`/quote-requests/${id}/decline`, { method: 'POST', body: { note }, token }),
+    linkQuote: (id, quoteId, token) =>
+      request(`/quote-requests/${id}/link-quote`, { method: 'POST', body: { quote_id: quoteId }, token }),
+  },
+
   invoices: {
     list: (token, { status, q, page } = {}) => request(`/invoices${qs({ status, q, page })}`, { token }),
     analytics: (token) => request('/invoices/analytics', { token }),
@@ -275,6 +283,15 @@ export const api = {
 
     licenses: {
       list: (token) => request('/portal/licenses', { token }),
+    },
+
+    products: {
+      list: (token) => request('/portal/products', { token }),
+    },
+
+    quoteRequests: {
+      list: (token) => request('/portal/quote-requests', { token }),
+      create: (payload, token) => request('/portal/quote-requests', { method: 'POST', body: payload, token }),
     },
   },
 };

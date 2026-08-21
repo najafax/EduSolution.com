@@ -30,6 +30,7 @@ const Expenses = lazy(() => import('./pages/business/Expenses'));
 const CapitalContributions = lazy(() => import('./pages/business/CapitalContributions'));
 const Settings = lazy(() => import('./pages/business/Settings'));
 const Quotes = lazy(() => import('./pages/business/Quotes'));
+const QuoteRequests = lazy(() => import('./pages/business/QuoteRequests'));
 const QuoteForm = lazy(() => import('./pages/business/QuoteForm'));
 const QuoteDetail = lazy(() => import('./pages/business/QuoteDetail'));
 const QuoteAnalytics = lazy(() => import('./pages/business/QuoteAnalytics'));
@@ -107,6 +108,7 @@ export default function App() {
               <Route path="/import" element={<Protected><Import /></Protected>} />
 
               <Route path="/quotes" element={<Protected><Quotes /></Protected>} />
+              <Route path="/quote-requests" element={<Protected><QuoteRequests /></Protected>} />
               <Route path="/quotes/analytics" element={<Protected><QuoteAnalytics /></Protected>} />
               <Route path="/quotes/new" element={<Protected><QuoteForm /></Protected>} />
               <Route path="/quotes/:id" element={<Protected><QuoteDetail /></Protected>} />
