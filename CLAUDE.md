@@ -138,7 +138,8 @@ backend port in frontend code.
 - `lib/permissions.js` — the single source of truth for the permission
   model. `MODULES` is the fixed list of gatable modules (`clients`,
   `products`, `quotes`, `invoices`, `expenses`, `recurring_invoices`,
-  `licenses`, `financials`, `activity`, `settings`, `users`, `import`) —
+  `licenses`, `financials`, `activity`, `settings`, `users`, `import`,
+  `campaigns`) —
   kept as a hardcoded list
   (rather than derived from route files) so a typo'd module name in a route
   fails closed instead of silently creating a new, ungrantable slot.
@@ -1902,6 +1903,142 @@ quote-creation flow, pre-filled with the request's own client/items
   load independently on mount, so a freshly-submitted request or a
   newly-visible quote both refresh via the shared `load()` function after
   any action.
+
+### Campaigns (bulk/promotional emails)
+
+A newsletter/announcement send — the "send a customized email to clients,
+single or bulk, for promotions/newsletters" ask. Deliberately its own
+module rather than reusing `clients` or `email_center`'s admin-only gate:
+every other client-facing email in this app is transactional, tied to one
+recipient and one document (a quote, invoice, reminder, receipt, portal
+invite) — a campaign has no document behind it, is inherently one-to-many,
+and carries a different risk profile (one click can email the entire
+client base), so it gets its own `MODULES` entry (`campaigns`,
+`lib/permissions.js`) rather than folding into an existing grant the way
+`routes/reports.js`/`routes/capitalContributions.js`/`routes/
+quoteRequests.js` reuse `financials`/`expenses`/`quotes` — those all
+reuse an existing slot because the *sensitivity level* already matched;
+this one doesn't match anything else in the app closely enough to justify
+that shortcut.
+
+- `campaigns` (`db/index.js`, added fresh — a brand-new table, plain
+  `CREATE TABLE IF NOT EXISTS`) is a **summary record per send**, not a
+  per-recipient log — `id`, `subject`, `message`, `recipient_type`
+  (`all` | `selected`), `recipient_count` (how many were targeted),
+  `sent_count`/`failed_count` (a bulk send can partially fail — one
+  client's address bounces — without the whole campaign failing, so this
+  splits the outcome rather than a single pass/fail flag),
+  `sent_by_name`, `created_at`. Each individual **successful** send is
+  additionally logged to the existing `email_log` table (`type:
+  'campaign'`, `entity_type: 'client'`, `entity_id`/`entity_label` the
+  recipient) — the same double-logging (a summary to one table, each real
+  send to `email_log`) every other client-facing send in this app already
+  does, and the same "only log a send that actually succeeded" rule
+  `lib/emailLog.js` documents for every other caller. `routes/
+  emailCenter.js`'s `TYPE_LABELS` (the sent-log's human labels, not
+  `lib/emailTemplates.js`'s — a campaign has no editable global template,
+  see below) gained a `campaign: 'Promotional campaign'` entry so these
+  sends show correctly in the Email Center's own sent log too, even though
+  they also get their own dedicated history view on the Campaigns page.
+- `routes/campaigns.js` (mounted at `/api/campaigns`) — `GET /`
+  (`view`-gated) is always-paginated (`PAGE_SIZE = 20`, newest first),
+  matching `routes/emailCenter.js`'s own sent-log convention rather than
+  the business list routes' opt-in `?page=` (this is a chronological
+  history feed, not a pickable list — nothing needs the full unpaginated
+  array the way `SearchableSelect`-backed pickers do). `POST /`
+  (`manage`-gated) is the one send action, and is deliberately the *same*
+  route for both a bulk send and the Clients page's per-client single
+  send — see `resolveRecipients()`: `recipientType: 'all'` targets every
+  client with a non-blank email; `recipientType: 'selected'` (with a
+  `clientIds` array) targets exactly those clients, and the single-client
+  "Send email" shortcut on `Clients.jsx` is nothing more than `selected`
+  with one id — there's no separate single-send code path or endpoint.
+  Recipients are always resolved **server-side** from the `clients` table
+  by id, never trusted from a client-submitted email address — the
+  frontend only ever says *which* clients it means. 400s if `subject`/
+  `message` is blank, if `selected` was chosen with no `clientIds`, or if
+  the resolved recipient list is empty (nobody has an email on file).
+  Sends are **sequential**, not `Promise.all` — a bulk send shouldn't open
+  dozens of simultaneous SMTP connections, and at this app's
+  single-business scale (a handful to low hundreds of clients) the extra
+  wall-clock time is negligible; one recipient's rejected/invalid address
+  is caught per-iteration and doesn't abort the rest of the run. If the
+  very first `sendMail()` call fails with `EMAIL_NOT_CONFIGURED` (see
+  `lib/mailer.js`), the route 503s immediately with no `campaigns` row
+  written at all — same "abort cleanly, don't record a phantom send"
+  behavior every other email-sending route in this app already has for a
+  missing SMTP config. Every other per-recipient failure (a real send
+  attempt that errors) is instead counted in `failed_count` and returned
+  in the response's `failures` array (`{ client_id, name, error }`) so the
+  frontend can report *which* recipients didn't get it, and the campaign
+  row is still written — a partial failure is a normal outcome here, not
+  an error state. One `logActivity()` summary entry per send
+  (`action: 'sent campaign'`, `entity_label: '"<subject>" to N of M
+  recipients'`) — one row per campaign, not one per recipient, same
+  "summarize, don't spam the feed" precedent `routes/import.js`'s bulk
+  imports already set for `activity_log`.
+- **Unlike every other client-facing email in this app, a campaign has no
+  admin-editable default template** in `lib/emailTemplates.js` — there's
+  nothing to template: subject and message are original, one-off copy
+  written fresh for each send (a newsletter, a promotion), not a
+  recurring transactional message with a few `{{placeholder}}` values.
+  `components/CampaignComposeModal.jsx` is the shared compose UI (used by
+  both the Campaigns page's "New campaign" button and Clients.jsx's
+  per-row action below) and, unlike `EmailPreviewModal.jsx`, opens to a
+  **blank** subject/message rather than fetching a pre-filled default —
+  there is no `GET .../preview` route to call. A plain-text `<textarea>`
+  goes through the same `lib/mailer.js` `textToHtml()` every other
+  send in this app already uses (paragraph/line-break conversion,
+  URL auto-linkification, HTML-entity escaping) — no rich-text editor, no
+  attachments (a campaign has no PDF to attach, unlike a quote/invoice/
+  receipt send).
+- **Recipient picker**: when opened from the Campaigns page (no
+  `singleClient` prop), `CampaignComposeModal` fetches the full,
+  unpaginated `clients` list on open (`api.clients.list(token)` with no
+  `q`/`page` — the same "no page param means the whole array" convention
+  `LineItemsEditor`'s own product picker already relies on) and offers two
+  modes via a small pill toggle: **All clients** (every client with an
+  email — the common case, no picker needed) or **Select clients** (a
+  search-filterable checkbox list, `Select all`/`Clear` acting on whatever
+  the search currently matches rather than the full list, so narrowing
+  first then bulk-selecting is one motion instead of hand-ticking each
+  box). A live "This will be sent to N client(s)." line and the Send
+  button's own label (`Send` vs. `Send to N`) both track the resolved
+  count before the request is ever made. When opened from `Clients.jsx`'s
+  per-row action instead, `singleClient` is set and the whole picker is
+  skipped entirely — just a read-only "To: {name} ({email})" line — since
+  there's nothing to choose from a set of one.
+- `pages/business/Campaigns.jsx` (route `/campaigns`, `Navbar.jsx` link
+  right after Clients, gated on the new `campaigns` module) — a "New
+  campaign" header button opening the compose modal in bulk mode, and a
+  history feed below styled after `EmailCenter.jsx`'s own sent-log `<ul>`
+  (not a table — same reasoning, this is a chronological feed, not a
+  sortable/filterable record set), each entry showing the subject, a
+  2-line-clamped message preview, `recipient_type` in plain English ("All
+  clients" / "Selected clients"), the `sent_count`/`recipient_count`
+  split (with `failed_count` called out in red when non-zero), who sent
+  it, and when.
+- **Per-client single send**: `Clients.jsx` gained a "Send email" row
+  action (new `MegaphoneIcon` — deliberately distinct from the existing
+  `SendIcon` paper-plane already used on this exact page for the portal-
+  invite action a few pixels away, so the two don't read as the same
+  action twice in one row; see `components/icons.jsx`'s own comment on
+  why a campaign send is a broadcast, not a transactional document
+  delivery, and gets its own glyph app-wide) opening
+  `CampaignComposeModal` with `singleClient` set to that row, gated on
+  `can('campaigns', 'manage')` — a **separate** permission from
+  `can('clients', 'manage')`, since sending a promotional email and
+  editing a client's contact record are different capabilities a staff
+  member could hold independently. This is the one row action on this
+  page not gated by the page's own `clients` permission, so the desktop
+  table's trailing `<th>`/`<td>` and the mobile accordion's actions block
+  are both gated on `(canManage || canSendCampaigns)` rather than
+  `canManage` alone — otherwise a staff member granted `campaigns:manage`
+  but not `clients:manage` would never see the actions column at all,
+  even though `rowActions()` itself already checks each button's own
+  permission correctly. Hidden entirely for a client with no email on
+  file (nothing to send to), same as the portal-invite action's own
+  `client.email`-independent guards elsewhere on this page.
 
 ### Idle session timeout
 

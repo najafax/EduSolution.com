@@ -317,6 +317,23 @@ export function PlusIcon(props) {
   );
 }
 
+// A megaphone — "promotional/bulk email" (Clients.jsx's per-row "Send
+// campaign email" action, the Campaigns page's header/history entries),
+// deliberately distinct from SendIcon's paper plane, which this app already
+// uses everywhere for a single transactional document send (a quote,
+// invoice, receipt, or portal invite) — a campaign is a broadcast, not a
+// document delivery, so it gets its own glyph rather than reusing SendIcon
+// and reading as a duplicate action on the same row.
+export function MegaphoneIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 8.5v3a1 1 0 0 0 1 1h1.2L11 16v-11L5.2 7.5H4a1 1 0 0 0-1 1Z" strokeLinejoin="round" />
+      <path d="M11 5v11a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3Z" strokeLinejoin="round" />
+      <path d="M5.5 12.5 6 16a1 1 0 0 0 1 .9h1a1 1 0 0 0 1-1.1l-.3-2.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function LogoutIcon(props) {
   return (
     <svg {...base} {...props}>

@@ -23,6 +23,7 @@ const usersRoutes = require('./routes/users');
 const dataResetRoutes = require('./routes/dataReset');
 const reportsRoutes = require('./routes/reports');
 const emailCenterRoutes = require('./routes/emailCenter');
+const campaignsRoutes = require('./routes/campaigns');
 const { startScheduler } = require('./lib/scheduler');
 
 const app = express();
@@ -66,6 +67,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/data-reset', dataResetRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/email-center', emailCenterRoutes);
+app.use('/api/campaigns', campaignsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

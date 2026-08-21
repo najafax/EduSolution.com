@@ -48,6 +48,7 @@ const Import = lazy(() => import('./pages/business/Import'));
 const Users = lazy(() => import('./pages/Users'));
 const MyAccount = lazy(() => import('./pages/MyAccount'));
 const EmailCenter = lazy(() => import('./pages/EmailCenter'));
+const Campaigns = lazy(() => import('./pages/business/Campaigns'));
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'));
 
 // Same loading copy/markup ProtectedRoute already shows while resolving
@@ -101,6 +102,7 @@ export default function App() {
               <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
 
               <Route path="/clients" element={<Protected><Clients /></Protected>} />
+              <Route path="/campaigns" element={<Protected><Campaigns /></Protected>} />
               <Route path="/products" element={<Protected><Products /></Protected>} />
               <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
               <Route path="/capital-contributions" element={<Protected><CapitalContributions /></Protected>} />

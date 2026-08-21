@@ -14,7 +14,8 @@ import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
-import { UsersIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, SendIcon } from '../../components/icons';
+import CampaignComposeModal from '../../components/CampaignComposeModal';
+import { UsersIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, SendIcon, MegaphoneIcon } from '../../components/icons';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', address: '', notes: '' };
 
@@ -39,6 +40,7 @@ export default function Clients() {
   const { token, can } = useAuth();
   const { toast } = useToast();
   const canManage = can('clients', 'manage');
+  const canSendCampaigns = can('campaigns', 'manage');
   const [clients, setClients] = useState([]);
   const [pageInfo, setPageInfo] = useState(null);
   const [page, setPage] = useState(1);
@@ -51,6 +53,7 @@ export default function Clients() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
   const [emailModal, setEmailModal] = useState(null); // id of the client whose portal-invite preview is open, or null
+  const [campaignClient, setCampaignClient] = useState(null); // the client whose single-recipient campaign compose modal is open, or null
 
   const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.clients.remove(id, token));
   const visibleClients = clients.filter((c) => !pendingIds.has(c.id));
@@ -156,6 +159,15 @@ export default function Clients() {
             label={client.portal_status === 'invited' ? 'Resend portal invite' : 'Invite client to portal'}
           />
         )}
+        {canSendCampaigns && client.email && (
+          <IconActionButton
+            icon={MegaphoneIcon}
+            tone="lagoon"
+            onClick={() => setCampaignClient(client)}
+            title="Send email"
+            label={`Send email to ${client.name}`}
+          />
+        )}
         {canManage && <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(client)} title="Edit" label="Edit client" />}
         {canManage && <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(client)} title="Delete" label="Delete client" />}
       </>
@@ -235,7 +247,7 @@ export default function Clients() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={canManage ? ['w-32', 'w-40', 'w-24', 'w-16'] : ['w-32', 'w-40', 'w-24']} />
+            <TableSkeleton rows={5} cols={canManage || canSendCampaigns ? ['w-32', 'w-40', 'w-24', 'w-16'] : ['w-32', 'w-40', 'w-24']} />
           </div>
         ) : visibleClients.length === 0 ? (
           <EmptyState
@@ -253,7 +265,7 @@ export default function Clients() {
                     <th className="px-4 py-3">Client</th>
                     <th className="px-4 py-3">Email</th>
                     <th className="px-4 py-3">Phone</th>
-                    {canManage && <th className="px-4 py-3" />}
+                    {(canManage || canSendCampaigns) && <th className="px-4 py-3" />}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -267,7 +279,7 @@ export default function Clients() {
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.phone || '—'}</td>
-                      {canManage && (
+                      {(canManage || canSendCampaigns) && (
                         <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex justify-end gap-1.5">{rowActions(client)}</div>
                         </td>
@@ -297,7 +309,7 @@ export default function Clients() {
                     <dt className="text-slate-500 dark:text-slate-400">Phone</dt>
                     <dd className="text-slate-900 dark:text-white">{client.phone || '—'}</dd>
                   </div>
-                  {canManage && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(client)}</div>}
+                  {(canManage || canSendCampaigns) && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(client)}</div>}
                 </MobileListAccordion>
               ))}
             </div>
@@ -320,6 +332,14 @@ export default function Clients() {
           load();
         }}
         showAttachmentNote={false}
+      />
+
+      <CampaignComposeModal
+        open={campaignClient !== null}
+        onClose={() => setCampaignClient(null)}
+        token={token}
+        singleClient={campaignClient}
+        onSent={({ sentCount }) => toast(sentCount > 0 ? 'Email sent.' : 'Email failed to send.', { type: sentCount > 0 ? 'success' : 'error' })}
       />
 
       {confirmDialog}

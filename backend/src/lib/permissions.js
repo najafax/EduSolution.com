@@ -18,6 +18,7 @@ const MODULES = [
   'settings',
   'users',
   'import',
+  'campaigns',
 ];
 
 // Staff default-deny: a module with no row is { can_view: false, can_manage:
