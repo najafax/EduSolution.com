@@ -1423,6 +1423,117 @@ Status/derived-field conventions worth knowing before touching this code:
   and reuses the `financials` module rather than declaring its own, since
   these reports surface the same data at the same sensitivity level.
 
+### Client portal (`backend/src/`)
+
+A self-serve login for clients, separate from staff auth entirely — a
+client authenticates as their own account rather than through a
+per-document `public_token` link (see `routes/public.js` above). Being
+built in phases; this section covers phase 1 (schema + auth only, no
+portal-facing views yet — those routes exist but there's nothing behind
+`requireClientAuth` for a client to actually see beyond their own account
+info).
+
+- `client_portal_accounts` (in `db/index.js`, added fresh — no
+  production data existed yet, so this is a plain `CREATE TABLE IF NOT
+  EXISTS` edit, not an `ALTER TABLE` migration; see that file's own note
+  on when each approach applies) is a **separate table from `clients`**,
+  not columns bolted onto it — this is an auth concern, not business data
+  (the same reasoning `user_permissions` is split from `users`), and
+  `clients.email` is neither required nor unique today, so a login
+  identity needs its own constrained column. `client_id INTEGER NOT NULL
+  UNIQUE REFERENCES clients(id) ON DELETE CASCADE` — one row per client,
+  since a portal account represents the organization's single login, not
+  a per-person account, matching how `clients` itself always means the
+  organization rather than an individual (see "Business module" above).
+  `email` is `NOT NULL UNIQUE` (unlike `clients.email`) since it's the
+  actual login identity. `password_hash` stays `NULL` until the client
+  accepts their invite and sets a password (see below) — a row can exist
+  in an "invited but not yet activated" state. `invite_token`/
+  `invite_token_expires` and `reset_token`/`reset_token_expires` mirror
+  `users`' own reset-token columns exactly, just doubled up for the two
+  separate token purposes this table needs (an initial invite is
+  conceptually different from a later self-serve reset, even though both
+  are "set a password via a time-limited emailed link"). `active`
+  defaults to `1` and gates login the same way `users.active` does.
+  `password_changed_at TEXT NOT NULL DEFAULT (datetime('now'))` is the
+  same token-invalidation timestamp `users` has (see below).
+- `middleware/clientAuth.js`'s `requireClientAuth` is the client-portal
+  counterpart to `middleware/auth.js`'s `requireAuth` — same shape
+  (re-fetch the live row on every request rather than trusting the JWT,
+  reject on `active = 0`, reject a token issued before
+  `password_changed_at` so a stolen pre-reset token can't keep working for
+  the rest of its 7-day life), but keyed to `client_portal_accounts`
+  instead of `users`. **Staff and client-portal tokens are signed with the
+  same `JWT_SECRET`**, so a valid signature alone doesn't prove which kind
+  of token it is — a client token's `id` is a `client_portal_accounts` row
+  id, which could coincidentally match a real staff user's id in `users`.
+  Every token carries a `type: 'client'` claim precisely so the two
+  systems can tell each other's tokens apart despite the shared secret:
+  `requireClientAuth` rejects any token where `payload.type !== 'client'`,
+  and `requireAuth` (in `middleware/auth.js`) was updated to reject any
+  token where `payload.type === 'client'`, immediately after signature
+  verification and before it ever reaches the `users` lookup — this is a
+  deliberately symmetric, bidirectional check, not something bolted onto
+  one side only. Without it, a client-portal JWT with a numerically
+  colliding `id` could otherwise have authenticated as a staff user via
+  `requireAuth`'s plain `SELECT ... FROM users WHERE id = ?`. Staff tokens
+  themselves carry no explicit `type` claim (unchanged, to avoid touching
+  every existing staff token's shape) — `requireAuth`'s check is simply
+  "reject if this is a client token," not "require a staff type."
+- `routes/clientPortal.js`, mounted at `/api/portal` (in `index.js`, right
+  after `/api/public` — both are the app's non-staff-auth route groups).
+  `signClientToken()`/`publicAccount()` mirror `routes/auth.js`'s own
+  `signToken()`/`publicUser()` pattern — `publicAccount()` is the one
+  place that shapes what a portal account is ever sent to the client
+  (`id`, `clientId`, `clientName`, `email` — never `password_hash` or any
+  token column), same reasoning as `publicUser()`. **There is no signup
+  route here either**, same reasoning as `routes/auth.js`'s own "no
+  signup" — a portal account is only ever created by an admin inviting an
+  existing client, never by someone showing up with an email; that invite
+  endpoint (`POST /clients/:id/portal-invite`, plus the admin-facing UI to
+  trigger it) is phase 2, not yet built, so today a `client_portal_accounts`
+  row can only be created directly against the database. `POST /login`
+  (rate-limited via `portalLoginLimiter`) checks `email` case-insensitively
+  (lowercased before the query, since `client_portal_accounts.email` is
+  stored as given), returns a generic "Invalid email or password" for both
+  a nonexistent account and a wrong password (matching `routes/auth.js`'s
+  own login), but has one extra state `users` never has: a row with
+  `password_hash IS NULL` (invited, never activated) gets its own distinct
+  message — "This account has not been activated yet. Check your email for
+  an invite link." — checked *before* the password comparison, since
+  there's no hash to compare against yet. The `active = 0` check runs
+  *after* the password check (matching `routes/auth.js`'s own
+  `active`-after-credentials ordering), so a correct password on a
+  deactivated account gets the specific "This account has been
+  deactivated" message rather than a generic credentials error.
+  `POST /accept-invite` (rate-limited via `portalAcceptInviteLimiter`) is
+  the "set your password for the first time" endpoint a client's invite
+  email links to — validates the token exists and `invite_token_expires`
+  hasn't passed, requires an 8+ char password (`MIN_PASSWORD_LENGTH`, same
+  threshold `routes/auth.js` uses), hashes it, and clears both invite-token
+  columns (single-use, same as `users`' reset flow) while stamping
+  `password_changed_at`. `POST /forgot-password`/`POST /reset-password`
+  (rate-limited via `portalForgotPasswordLimiter`/
+  `portalResetPasswordLimiter`) are a straight mirror of
+  `routes/auth.js`'s own pair — same generic
+  always-the-same-response-either-way message (prevents account
+  enumeration), same 1-hour `RESET_TOKEN_TTL_MS`, same
+  clear-token-and-stamp-`password_changed_at` on success. `GET /me`
+  (`requireClientAuth`-gated) returns the current account via
+  `publicAccount()` — the portal's equivalent of `GET /api/auth/me`, and
+  currently the only thing an authenticated client can actually fetch,
+  since the portal's real content (quotes/invoices/licenses views) is a
+  later phase.
+- `middleware/rateLimit.js` gained four portal-specific limiter instances
+  — `portalLoginLimiter` (10/15min), `portalForgotPasswordLimiter`
+  (5/hour), `portalResetPasswordLimiter` (10/hour), and
+  `portalAcceptInviteLimiter` (10/hour) — deliberately separate instances
+  from the existing staff `loginLimiter`/`forgotPasswordLimiter`/
+  `resetPasswordLimiter` even though the numbers are identical, so a
+  burst of staff login attempts and a burst of client portal login
+  attempts don't share (and potentially exhaust) the same bucket for an
+  unrelated user population.
+
 ### Idle session timeout
 
 Separate from the JWT's fixed 7-day expiry (see `middleware/auth.js` above),
