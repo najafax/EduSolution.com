@@ -1714,6 +1714,195 @@ accept/decline).
   `api.login`/`api.forgotPassword`), everything else takes the portal
   token from `PortalAuthContext`, never `AuthContext`'s own `token`.
 
+### Quote requests (`backend/src/`, `frontend/src/`)
+
+A client's ask for a quote, submitted from the portal, reviewed by staff,
+and turned into a real quote — the loop being: client requests (by picking
+from the product catalog, describing something not in it, or both) →
+staff approves (by building and sending an actual priced quote) or
+declines → client sees the outcome in their portal and, once sent, can
+accept it the normal way → staff gets notified. This is deliberately a
+separate `quote_requests`/`quote_request_items` pair of tables, not a
+`quotes` row with a new status — a request has no pricing, tax, or
+discount, and **a client is never trusted with a price, not even a
+read-only one they merely selected** — the server only ever stores which
+product and how many, and looks up the real price itself wherever one is
+shown or used; a request only ever becomes a quote via the existing
+quote-creation flow, pre-filled with the request's own client/items
+(priced fresh from the live catalog)/description.
+
+- `quote_requests` (`db/index.js`, added fresh — a brand-new table, plain
+  `CREATE TABLE IF NOT EXISTS`) has `client_id`, `description` (now
+  optional — a request can be carried entirely by its catalog items
+  instead), `status` (`pending | approved | declined`), `quote_id`
+  (nullable, set once a staff member actually creates the resulting quote
+  — `ON DELETE SET NULL` rather than `CASCADE`, so deleting that quote
+  later doesn't erase the record that a request was ever made, just its
+  link to that specific quote), `decision_note` (shown to the client when
+  declined), `decided_by_name`/`decided_at`. `quote_request_items` (also
+  fresh) holds the catalog picks — `quote_request_id`, `product_id` (no
+  `REFERENCES` constraint, same reason `quote_items`/`invoice_items`'s own
+  `product_id` column doesn't — see that note above), `description` (a
+  denormalized snapshot of the product's name at request time, same
+  reasoning `quote_items`/`invoice_items` snapshot theirs), `quantity` —
+  **deliberately no price/amount column at all**. `users` also gains
+  `notify_quote_responses INTEGER NOT NULL DEFAULT 0` (`ALTER TABLE`, same
+  guarded pattern as `notify_overdue` — see that column's own note above
+  — since `users` already had real accounts) for the opt-in staff
+  notification below.
+- `routes/clientPortal.js` gains `GET /products` — the full product
+  catalog (same rows `GET /api/products` serves staff, no per-client
+  filtering, single-business model), deliberately including `unit_price`
+  unlike every other stripped-down portal response: a client picking
+  items needs to see what things cost to make an informed pick, they just
+  can never set or change that number (see below). `POST /quote-requests`
+  (`requireClientAuth`) accepts an optional `description` and an optional
+  `items` array of `{ product_id, quantity }` — **`unit_price`/`amount`
+  fields in the request body, if present, are silently ignored**; the
+  route re-validates each `product_id` against the live `products` table
+  (400 if it no longer exists) and writes only the product's *current*
+  name/id + the client's quantity into `quote_request_items`, inside a
+  `db.transaction()` alongside the `quote_requests` insert. 400s if
+  neither `description` nor at least one valid item is given. Logs an
+  activity entry with the same `"(client)"` action suffix the portal's
+  quote-respond route uses. `GET /quote-requests` (the client's own
+  requests, newest first, `LEFT JOIN`ed against `quotes` for
+  `quote_number`/`quote_status` so the portal can tell "a quote is being
+  prepared" — linked but still `draft` — apart from "your quote is ready"
+  — linked and no longer `draft` — without a second round-trip) batches
+  in each request's items via one `IN (...)` query rather than one query
+  per row. **This is also where `GET /quotes`/`GET /quotes/:id` (and by
+  extension the PDF/respond routes, which both call the same
+  `getClientQuote()`) gained a `status != 'draft'` filter they didn't need
+  before quote requests existed** — every quote used to reach `quotes`
+  through a human reviewing it first, so a client could never have seen a
+  draft; now that `POST /quote-requests/:id/link-quote` below creates a
+  fresh **draft** quote directly from a client's own request, that quote
+  must stay invisible in the portal until a staff member actually sends
+  it — the same moment it would have reached the client anyway via the
+  old "prepare it, then click Send" flow. A request's own `status` still
+  flips to `approved` the instant it's linked, independent of the quote's
+  own `draft`/`sent` status — see `PortalQuotes.jsx` below for how the two
+  are reconciled on screen.
+- `routes/quoteRequests.js` (mounted at `/api/quote-requests`) is the
+  staff-side review API — gated on the existing `quotes` permission rather
+  than a new `MODULES` entry (same "reuse when sensitivity matches" call
+  `routes/reports.js`/`routes/capitalContributions.js` already make
+  elsewhere: a request is a precursor to a real quote at the identical
+  sensitivity level). `GET /` (`view`) supports `?status=` and `?page=`
+  (opt-in pagination, same convention as every other list route — see
+  "Pagination convention" above), joins in `client_name` plus the linked
+  quote's `number`/`status` when present, and — same batched `IN (...)`
+  approach as the portal's own list route — attaches each request's
+  `items`. `POST /:id/decline` (`manage`) takes an optional `note` (shown
+  to the client), 409s if the request isn't still `pending`. **`POST
+  /:id/link-quote`** (`manage`) is the "approve" action — but it doesn't
+  create a quote itself; it's called by the frontend right after a staff
+  member saves a real, priced quote they built from the request (see
+  `QuoteForm.jsx` below), taking that quote's id in the body. Validates
+  the quote actually exists and belongs to the same client as the request
+  (400 otherwise — a request can't be satisfied by a quote for someone
+  else), 409s if the request isn't still `pending`, then stamps `status:
+  'approved'`, `quote_id`, `decided_by_name`/`decided_at`. Every mutation
+  calls `logActivity()` with the client's name in the label, same as the
+  rest of this app's quote/invoice actions.
+- `lib/quoteAcceptedNotify.js`'s `notifyStaffOfQuoteAccepted({ quote,
+  client })` — an opt-in staff digest (`notify_quote_responses`, mirrored
+  in `MyAccount.jsx` right next to the existing `notify_overdue` toggle),
+  same shape as `lib/scheduler.js`'s own `notifyStaffOfReminders()`: an
+  internal notification, not a client-facing send, so it deliberately
+  doesn't go through `lib/emailTemplates.js`'s editable-template system
+  and isn't recorded to `email_log` (same reasoning
+  `notifyStaffOfReminders()` itself documents). Skips entirely if
+  `SMTP_HOST` isn't set or nobody's opted in; best-effort per recipient
+  otherwise. Called — **never awaited**, just fired with a `.catch()` so a
+  slow or failed staff email can never delay or break the client's own
+  accept response — from both `routes/public.js`'s and
+  `routes/clientPortal.js`'s `POST .../respond` handlers, only when
+  `response === 'accepted'`. The email links straight to the quote's
+  staff-side detail page, where the existing "Convert to invoice" button
+  (`routes/quotes.js`'s `POST /:id/convert-to-invoice`, unchanged by this
+  feature) is what actually carries it into the invoicing flow — there
+  was already no status guard on that route, so nothing new was needed
+  there for "accepted → invoice" to just work. Quote numbering itself
+  (`lib/numbering.js`'s `nextQuoteNumber()`) is also completely unchanged
+  by any of this — a quote created from a request goes through the exact
+  same `POST /api/quotes` handler as any other quote, so it continues the
+  real per-year sequence rather than restarting.
+- `components/LineItemsEditor.jsx` gained two optional props, both
+  defaulting to their original behavior so every existing caller
+  (`QuoteForm.jsx`, `InvoiceForm.jsx`, `RecurringInvoices.jsx`) is
+  unaffected: `priceEditable` (default `true`) — when `false`, the unit
+  price renders as a plain read-only value instead of an `<input>` — and
+  `subtotalLabel` (default `'Subtotal'`). `PortalQuotes.jsx` below is the
+  one caller that sets both.
+- `pages/business/QuoteRequests.jsx` (route `/quote-requests`, `Navbar.jsx`
+  link right after "Quotes", same `quotes` module gate) is the staff
+  review list — `StatusFilterChips` (All/Pending/Approved/Declined), the
+  standard desktop-table + `MobileListAccordion` split, a `rowActions()`
+  helper shared between both breakpoints (same convention as
+  `Quotes.jsx`/`Invoices.jsx`'s own row actions). Its description column
+  is actually a `requestSummary()` helper — item quantities/names
+  (`"2× Laptop (Standard), 1× 3-Year Warranty Plan"`) when the request has
+  catalog items, falling back to the free-text `description` when it
+  doesn't; the mobile accordion body shows both (the summary, plus the
+  optional `description` as an "anything else" note) when a request has
+  both. A `pending` row gets two `IconActionButton`s: "Create quote from
+  this request" (tone `emerald`, `CheckCircleIcon`, navigates to
+  `/quotes/new?requestId=<id>` — there's no direct in-page approve action,
+  since a request has no pricing to approve *into*) and "Decline" (tone
+  `red`, `XIcon`, opens a small `Modal` with an optional note textarea
+  rather than a bare `confirm()`, since a decline note is real input, not
+  just a yes/no). A decided row instead shows a "View quote" link (when
+  linked) or nothing. `StatusBadge` gained `pending`/`approved` entries
+  for this (`declined` already existed, reused as-is).
+- `QuoteForm.jsx` reads an extra `?requestId=` query param on the routed
+  (non-`embedded`) `/quotes/new` path only — the "New quote" modal opened
+  from `Quotes.jsx` has no request context, so this is ignored entirely
+  when `embedded`. When present, an effect fetches that `quote_requests`
+  row *and* the full product catalog (independently of the effect above
+  that feeds `LineItemsEditor`'s own picker — a small, deliberate extra
+  fetch to keep this self-contained) to pre-fill `clientId`/`notes` and,
+  for each requested item, look up its *current* name/price by
+  `product_id` — never anything from the request itself, which never had
+  a price to begin with. A requested item whose product has since been
+  deleted falls back to its own denormalized `description` snapshot with
+  a `$0` price for staff to fill in manually — same as any other
+  pre-existing line item; `catalogOnly` only restricts how *new* items get
+  added, not editing ones already in state. Staff still reviews/adjusts
+  quantities and can add more from the catalog same as always
+  (`catalogOnly`). On a successful create, if `requestId` was set, the
+  form calls `api.quoteRequests.linkQuote(requestId, quote.id, token)`
+  before navigating away — best-effort: if that call fails (e.g. someone
+  else already declined the request in the meantime), the quote itself
+  was still created successfully, so the failure surfaces as a toast
+  rather than stranding the user on the form.
+- `pages/portal/PortalQuotes.jsx` gained a "Request a quote" button
+  (header, `PlusIcon`) opening a `Modal` built around the same
+  `LineItemsEditor` every quote/invoice form uses — `catalogOnly
+  priceEditable={false} subtotalLabel="Estimated subtotal"` — so a client
+  picks from the identical product catalog staff sees, with quantities
+  freely editable but price shown read-only (a plain value, not an
+  input), plus a caption clarifying the shown prices are current list
+  prices and the final quote may differ. An optional "Anything else?"
+  textarea below it covers what the catalog doesn't ("additional notes"
+  now, not the primary input it used to be before the catalog existed).
+  Submitting sends only `{ description, items: [{ product_id, quantity
+  }] }` — `LineItemsEditor`'s own `unit_price` in local state is display
+  data only, never part of the payload. A "Your requests" section above
+  the existing "Sent to you" quotes list shows each request via the same
+  `requestSummary()` helper `QuoteRequests.jsx` uses (item quantities/
+  names, falling back to `description`), plus a `StatusBadge` and,
+  depending on state: nothing more for `pending`; "A quote is being
+  prepared for you." for `approved` with a still-`draft` linked quote; a
+  `Link` straight to `/portal/quotes/:quote_id` ("Your quote
+  (Q-2026-0001) is ready — view it") for `approved` once the linked quote
+  is no longer `draft`; the staff `decision_note` for `declined`. All
+  three lists (`quotes`, `requests`, the product catalog for the picker)
+  load independently on mount, so a freshly-submitted request or a
+  newly-visible quote both refresh via the shared `load()` function after
+  any action.
+
 ### Idle session timeout
 
 Separate from the JWT's fixed 7-day expiry (see `middleware/auth.js` above),

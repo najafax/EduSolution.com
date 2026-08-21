@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard';
 import { todayStr, todayPlus } from '../../lib/date';
 import LineItemsEditor from '../../components/LineItemsEditor';
@@ -13,10 +14,24 @@ import SearchableSelect from '../../components/SearchableSelect';
 // without its own page chrome (outer container/heading) and reporting
 // success/cancellation via callbacks instead of navigating directly, so
 // the modal's caller decides what happens next.
+//
+// The routed `/quotes/new` case has one more entry point on top of that:
+// `?requestId=` (from QuoteRequests.jsx's "Create quote from this
+// request" row action) pre-fills the client and notes from that
+// pending quote_requests row, and — once the quote actually saves —
+// links the two together via POST /quote-requests/:id/link-quote. A
+// request carries no line items/pricing of its own (a client shouldn't be
+// setting prices), so this is the only way a request ever becomes a real
+// quote; there's no direct "approve" action on the backend. Ignored
+// entirely in the `embedded` case, since the "New quote" modal on
+// Quotes.jsx has no request context to prefill from.
 export default function QuoteForm({ embedded = false, idOverride, onSuccess, onCancel }) {
   const { token, can } = useAuth();
+  const { toast } = useToast();
   const params = useParams();
+  const [searchParams] = useSearchParams();
   const id = embedded ? idOverride : params.id;
+  const requestId = !embedded && !id ? searchParams.get('requestId') : null;
   const navigate = useNavigate();
   const isEditing = Boolean(id);
   const canManage = can('quotes', 'manage');
@@ -79,6 +94,40 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
       .finally(() => setLoading(false));
   }, [id, isEditing, token]);
 
+  useEffect(() => {
+    if (isEditing || !requestId) return;
+    // A client's requested items never carry a price (see
+    // routes/clientPortal.js's own POST /quote-requests — only product_id +
+    // quantity are ever accepted from them) — so this fetches the catalog
+    // fresh here too (independent of the effect above, which fills
+    // LineItemsEditor's own picker) purely to look up each item's current
+    // price/name by product_id, the same "price comes from the live
+    // catalog, not client input" rule the picker itself already follows.
+    // A request item whose product has since been deleted falls back to
+    // its own denormalized `description` snapshot with a $0 price for
+    // staff to fill in manually — same as any other pre-existing line item,
+    // catalogOnly only restricts how *new* items get added.
+    Promise.all([api.quoteRequests.get(requestId, token), api.products.list(token)])
+      .then(([{ request }, { products: catalog }]) => {
+        setClientId(String(request.client_id));
+        setNotes(request.description);
+        if (request.items && request.items.length > 0) {
+          setItems(
+            request.items.map((item) => {
+              const product = catalog.find((p) => p.id === item.product_id);
+              return {
+                description: product ? product.name : item.description,
+                quantity: item.quantity,
+                unit_price: product ? product.unit_price : 0,
+                product_id: product ? product.id : null,
+              };
+            }),
+          );
+        }
+      })
+      .catch((err) => setError(err.message));
+  }, [isEditing, requestId, token]);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
@@ -110,6 +159,18 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
       } else {
         const { quote } = await api.quotes.create(payload, token);
         setDirty(false);
+        if (requestId) {
+          try {
+            await api.quoteRequests.linkQuote(requestId, quote.id, token);
+          } catch (err) {
+            // The quote itself was created successfully — don't strand the
+            // user on this form over a failure to link it back to the
+            // request (e.g. someone else already decided it in the
+            // meantime). Surface it as a toast rather than blocking
+            // navigation to the new quote.
+            toast(`Quote created, but couldn't be linked to the request: ${err.message}`, { type: 'error' });
+          }
+        }
         if (onSuccess) onSuccess(quote);
         else navigate(`/quotes/${quote.id}`);
       }

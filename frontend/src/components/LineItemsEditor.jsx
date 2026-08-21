@@ -143,6 +143,15 @@ export default function LineItemsEditor({
   products = [],
   catalogOnly = false,
   onProductTaxRate,
+  // Off for the one caller that isn't building a real priced document —
+  // PortalQuotes.jsx's "Request a quote" builder, where a client picks
+  // from the catalog but is never trusted to set (or even nudge) a price;
+  // the unit price still shows, read-only, so picking is an informed
+  // choice, it just isn't an <input> anyone can type into. Every other
+  // caller (QuoteForm.jsx, InvoiceForm.jsx, RecurringInvoices.jsx) leaves
+  // this at its default and is unaffected.
+  priceEditable = true,
+  subtotalLabel = 'Subtotal',
 }) {
   function applyChange(nextItems) {
     onChange(nextItems);
@@ -193,16 +202,23 @@ export default function LineItemsEditor({
               onChange={(e) => updateItem(index, { quantity: e.target.value })}
               className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none sm:col-span-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Unit price"
-              required
-              value={item.unit_price}
-              onChange={(e) => updateItem(index, { unit_price: e.target.value })}
-              className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none sm:col-span-3 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-            />
+            {priceEditable ? (
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Unit price"
+                required
+                value={item.unit_price}
+                onChange={(e) => updateItem(index, { unit_price: e.target.value })}
+                className="col-span-4 min-h-11 rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none sm:col-span-3 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              />
+            ) : (
+              <div className="col-span-4 flex min-h-11 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-base text-slate-600 sm:col-span-3 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                {currencySymbol}
+                {Number(item.unit_price || 0).toFixed(2)}
+              </div>
+            )}
             <button
               type="button"
               onClick={() => removeItem(index)}
@@ -241,7 +257,7 @@ export default function LineItemsEditor({
       </div>
 
       <p className="mt-2 text-right text-sm text-slate-600 dark:text-slate-400">
-        Subtotal: <span className="font-medium text-slate-900 dark:text-white">{currencySymbol}{subtotal.toFixed(2)}</span>
+        {subtotalLabel}: <span className="font-medium text-slate-900 dark:text-white">{currencySymbol}{subtotal.toFixed(2)}</span>
       </p>
     </div>
   );
