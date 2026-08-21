@@ -57,8 +57,13 @@ backend port in frontend code.
 
 ### Backend (`backend/src/`)
 
-- `index.js` — Express app entry point: CORS (restricted to `CLIENT_ORIGIN`
-  from env), JSON body parsing, mounts routes under `/api`, 404 + error
+- `index.js` — Express app entry point: `compression()` (gzips every
+  response above the package's default 1kb threshold — JSON list payloads,
+  PDF downloads, etc.; the frontend's own static assets already get this
+  from Render's CDN, but this Node API service doesn't compress its own
+  responses unless told to, so this was added once the API side of the app
+  was audited for the same thing), CORS (restricted to `CLIENT_ORIGIN` from
+  env), JSON body parsing, mounts routes under `/api`, 404 + error
   handlers.
 - `db/index.js` — opens the SQLite file via `better-sqlite3` (a synchronous
   SQLite driver — no async/await needed for queries) and runs
@@ -2638,6 +2643,35 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
   `/api/*` so navigation fallback never intercepts API routes. There is no
   offline-data story beyond asset precaching — API calls always hit the
   network.
+- **Route-level code-splitting**: every page component `App.jsx` routes to
+  is loaded via `React.lazy(() => import(...))` rather than a static
+  top-of-file import, wrapped in one `<Suspense fallback={<RouteFallback
+  />}>` around the whole `<Routes>` block — `RouteFallback` reuses
+  `ProtectedRoute.jsx`'s own "Loading…" markup verbatim, so a chunk still in
+  flight reads as the same kind of pause the app already shows while
+  resolving auth, not a new pattern. Before this, all 26 routed pages
+  (Reports, Email Center, every analytics page, the PDF-adjacent code, all
+  of it) shipped in one ~562KB (131KB gzip) JS bundle that had to finish
+  downloading before even the Login page could render — and since it was
+  one bundle, any single-line change to any one page invalidated that whole
+  file's hash, forcing every returning user to re-download the entire thing
+  on their next visit regardless of which page they actually changed.
+  Splitting by route dropped the shared/initial chunk to ~262KB (81KB
+  gzip) with each page now its own few-KB chunk fetched on demand, and a
+  deploy now only invalidates the chunk(s) that actually changed. This
+  doesn't change what the service worker eventually precaches (see above —
+  it still walks the full asset list after install), only what has to
+  arrive before the very first paint and what a routine deploy invalidates.
+  `QuoteForm.jsx`/`InvoiceForm.jsx` are `import`ed both ways — lazily by
+  `App.jsx`'s own routes (`/quotes/new`, `/quotes/:id/edit`, etc.) and
+  statically by `Quotes.jsx`/`Invoices.jsx` for their embedded "New X"
+  modal (see `components/Modal.jsx` above) — Rollup resolves this
+  automatically into one shared chunk either caller pulls in, no manual
+  wiring needed. `vite.config.js` also gained a `preview.proxy` block
+  mirroring the existing `server.proxy` (`/api` → `localhost:4000`) — it
+  was missing before, so `npm run preview` (the one workflow command that
+  actually serves the real production build, the only way to verify
+  chunking like this end to end) had no backend connectivity at all.
 
 ### Auth flow end-to-end
 

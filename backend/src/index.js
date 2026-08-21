@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const clientsRoutes = require('./routes/clients');
@@ -30,6 +31,11 @@ const PORT = process.env.PORT || 4000;
 // key on req.ip, so without this they'd bucket every visitor together.
 app.set('trust proxy', 1);
 
+// Gzips every response above compression's default 1kb threshold (JSON list
+// payloads, PDF downloads, etc.) — the frontend's own static assets already
+// get this from Render's CDN, but this Node API service doesn't compress
+// its own responses unless told to.
+app.use(compression());
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
 // Default 100kb is too small for PUT /api/settings once it carries the
 // signature/stamp images (see routes/settings.js) — 2mb comfortably covers

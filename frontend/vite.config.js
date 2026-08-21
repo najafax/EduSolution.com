@@ -66,4 +66,12 @@ export default defineConfig({
       '/api': 'http://localhost:4000',
     },
   },
+  // Same proxy as the dev server, so `npm run preview` (serving the real
+  // production build locally) can also reach the local backend — without
+  // this, `/api/...` requests just 404 against the static preview server.
+  preview: {
+    proxy: {
+      '/api': 'http://localhost:4000',
+    },
+  },
 })
