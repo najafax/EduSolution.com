@@ -1428,10 +1428,12 @@ Status/derived-field conventions worth knowing before touching this code:
 A self-serve login for clients, separate from staff auth entirely — a
 client authenticates as their own account rather than through a
 per-document `public_token` link (see `routes/public.js` above). Being
-built in phases; this section covers phase 1 (schema + auth only, no
-portal-facing views yet — those routes exist but there's nothing behind
-`requireClientAuth` for a client to actually see beyond their own account
-info).
+built in phases; this section covers phase 1 (schema + auth only) and
+phase 2 (the admin-facing invite flow that actually creates a
+`client_portal_accounts` row for a real client) — there is still no
+portal-facing UI for the client themselves (that's phase 3): a client can
+accept an invite and log in, but there's nothing behind `requireClientAuth`
+for them to actually see beyond their own account info yet.
 
 - `client_portal_accounts` (in `db/index.js`, added fresh — no
   production data existed yet, so this is a plain `CREATE TABLE IF NOT
@@ -1533,6 +1535,61 @@ info).
   burst of staff login attempts and a burst of client portal login
   attempts don't share (and potentially exhaust) the same bucket for an
   unrelated user population.
+- **Admin invite flow** (phase 2): `routes/clients.js` gains
+  `GET /:id/portal-invite-preview` and `POST /:id/portal-invite` (both
+  `manage`-gated, same as every other mutation on this router), plus a
+  computed `portal_status` field (`'none' | 'invited' | 'active' |
+  'deactivated'`, derived from the client's `client_portal_accounts` row
+  the same don't-store-what-you-can-compute way `invoices.js`'s
+  `withComputed()` derives `is_overdue`) added to both `GET /` (via a
+  `LEFT JOIN client_portal_accounts` — cheap at this app's single-business
+  scale, so no second round-trip is needed just to know whether to show
+  Invite/Resend/nothing per row) and `GET /:id`. `assertInviteEligible()`
+  is the shared guard — 400 if the client has no email on file (a portal
+  account's login identity is always the client's own `clients.email`;
+  there's no per-invite email override), 409 if a `client_portal_accounts`
+  row already exists *and* has a `password_hash` set (an active account
+  needs no new invite; reactivating a deactivated one is a later phase) —
+  called by both the read-only preview route and `ensurePortalInvite()`
+  (the POST route's version, which also re-checks the invite's target
+  email isn't already claimed by a *different* client's portal account,
+  and actually writes the row) so preview and send can never disagree on
+  whether an invite is allowed. Follows the exact "Email preview before
+  sending" contract every other client-facing send in this app follows
+  (see above) — with one necessary difference: unlike quote/invoice/
+  license sends, there's no pre-existing token to preview against on a
+  client's very first invite, so the preview route never persists
+  anything (matching every other `*-preview` route in the app staying
+  read-only) — it shows the client's *real* invite token only when an
+  unactivated invite already exists to resend, and a placeholder
+  otherwise; the POST route is what actually generates and persists the
+  real token that gets emailed. A fresh invite (`ensurePortalInvite()`)
+  either creates the `client_portal_accounts` row (email = the client's
+  own) or, when a still-unactivated one exists, refreshes its token/
+  expiry and re-syncs its email to the client's current one (in case it
+  changed since an earlier, never-accepted invite) — either way stamping a
+  7-day `invite_token_expires` (`INVITE_TOKEN_TTL_MS`), deliberately more
+  generous than `routes/clientPortal.js`'s own 1-hour self-serve reset
+  window: a first-time setup link has no "prove you still control this
+  inbox right now" urgency a reset link does, so there's no security
+  reason to rush the client. `lib/emailTemplates.js` gained a 6th editable
+  type, `portal_invite` (`DEFAULT_TEMPLATES`/`PLACEHOLDERS`/`TYPE_LABELS`,
+  same as every other type — see "Email preview before sending" above)
+  and its own `portalInviteEmail({ client, settings, portalUrl })`
+  function, called by both the preview and send routes so the templated
+  text can never drift between them; `routes/emailCenter.js`'s own
+  separate `TYPE_LABELS` (used for the sent log, not the template editor)
+  got the matching entry too. `Clients.jsx`'s row actions gained a
+  `SendIcon` "Invite to portal"/"Resend portal invite" button (label
+  switches on `portal_status`), shown only when `portal_status` is
+  `'none'` or `'invited'` — an `'active'` row has nothing to invite, and
+  reactivating a `'deactivated'` one isn't built yet — wired to the same
+  `EmailPreviewModal` pattern `Quotes.jsx`/`Invoices.jsx` use for their own
+  single-send-type row action. A small `PortalBadge` (amber "Invited",
+  emerald "Portal active", slate "Portal deactivated"; nothing rendered
+  for `'none'`, the common case) sits next to the client's email in both
+  the desktop table cell and the mobile `MobileListAccordion` summary, so
+  the state is visible without opening anything.
 
 ### Idle session timeout
 

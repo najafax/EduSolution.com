@@ -93,6 +93,8 @@ export const api = {
     remove: (id, token) => request(`/clients/${id}`, { method: 'DELETE', token }),
     exportCsv: (token) => downloadFile('/clients/export.csv', token, 'clients.csv'),
     exportXlsx: (token) => downloadFile('/clients/export.xlsx', token, 'clients.xlsx'),
+    portalInvitePreview: (id, token) => request(`/clients/${id}/portal-invite-preview`, { token }),
+    portalInvite: (id, payload, token) => request(`/clients/${id}/portal-invite`, { method: 'POST', body: payload, token }),
   },
 
   products: {

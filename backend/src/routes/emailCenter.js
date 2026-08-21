@@ -24,6 +24,7 @@ const TYPE_LABELS = {
   invoice_remind: 'Payment reminder',
   receipt_send: 'Payment receipt',
   license_remind: 'License renewal reminder',
+  portal_invite: 'Portal invite',
   overdue_reminder: 'Automated overdue reminder',
   license_expiry_alert: 'Automated license expiry alert',
 };
