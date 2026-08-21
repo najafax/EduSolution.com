@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import BottomNav from './components/BottomNav';
@@ -47,6 +47,7 @@ const Import = lazy(() => import('./pages/business/Import'));
 const Users = lazy(() => import('./pages/Users'));
 const MyAccount = lazy(() => import('./pages/MyAccount'));
 const EmailCenter = lazy(() => import('./pages/EmailCenter'));
+const PortalApp = lazy(() => import('./pages/portal/PortalApp'));
 
 // Same loading copy/markup ProtectedRoute already shows while resolving
 // auth, so a lazy chunk still loading (usually a blip, longer on a slow
@@ -61,11 +62,19 @@ function Protected({ children }) {
 
 export default function App() {
   const { user } = useAuth();
+  // The client portal (pages/portal/PortalApp.jsx) is a self-contained
+  // sub-app with its own auth, routing, and layout (including its own top
+  // bar) — it must never render inside the staff Navbar/BottomNav/Footer
+  // shell below, which reads AuthContext/`can()` and would be both wrong
+  // (a client isn't a staff user) and broken (those components assume a
+  // staff `user`/`permissions` shape a portal account doesn't have).
+  const isPortalRoute = useLocation().pathname.startsWith('/portal');
+
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950">
-      <Navbar />
-      <IdleTimeoutMonitor />
-      <CommandPalette />
+      {!isPortalRoute && <Navbar />}
+      {!isPortalRoute && <IdleTimeoutMonitor />}
+      {!isPortalRoute && <CommandPalette />}
       {/* flex-1 + flex-col here (rather than on the outer div) is what pins
           Footer to the bottom of the viewport on short pages (e.g. Login)
           while letting it flow naturally below content on tall ones —
@@ -73,7 +82,7 @@ export default function App() {
           (sm:hidden) and fixed, so logged-in pages still need the bottom
           padding on phones or the tab bar covers Footer/the page's last
           content — see BottomNav.jsx. */}
-      <div className={`flex flex-1 flex-col ${user ? 'pb-16 sm:pb-0' : ''}`}>
+      <div className={`flex flex-1 flex-col ${user && !isPortalRoute ? 'pb-16 sm:pb-0' : ''}`}>
         <div className="flex-1">
           <Suspense fallback={<RouteFallback />}>
             <Routes>
@@ -87,6 +96,7 @@ export default function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/q/:token" element={<PublicQuote />} />
               <Route path="/i/:token" element={<PublicInvoice />} />
+              <Route path="/portal/*" element={<PortalApp />} />
               <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
 
               <Route path="/clients" element={<Protected><Clients /></Protected>} />
@@ -128,9 +138,11 @@ export default function App() {
             overlapping its copyright text — see FloatingActionButton.jsx.
             Logged-out mobile pages (Login, Landing, public quote/invoice
             links) have neither, so Footer stays visible there. */}
-        <Footer className={user ? 'hidden sm:block' : ''} />
+        {/* The portal renders its own Footer instance inside PortalLayout —
+            skip the staff one entirely rather than showing it twice. */}
+        {!isPortalRoute && <Footer className={user ? 'hidden sm:block' : ''} />}
       </div>
-      {user && <BottomNav />}
+      {!isPortalRoute && user && <BottomNav />}
     </div>
   );
 }

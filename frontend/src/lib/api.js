@@ -244,4 +244,37 @@ export const api = {
     openQuotePdf: (publicToken) => openPdf(`/public/quotes/${publicToken}/pdf`),
     openInvoicePdf: (publicToken) => openPdf(`/public/invoices/${publicToken}/pdf`),
   },
+
+  // The client portal — a client's own login (see routes/clientPortal.js),
+  // entirely separate from staff auth above. login/acceptInvite/
+  // forgotPassword/resetPassword take no token (same shape as the
+  // unauthenticated calls at the top of this object); everything else is
+  // gated by the portal's own bearer token, kept by PortalAuthContext, not
+  // AuthContext's `token`.
+  portal: {
+    login: (payload) => request('/portal/login', { method: 'POST', body: payload }),
+    acceptInvite: (payload) => request('/portal/accept-invite', { method: 'POST', body: payload }),
+    forgotPassword: (email) => request('/portal/forgot-password', { method: 'POST', body: { email } }),
+    resetPassword: (token, password) => request('/portal/reset-password', { method: 'POST', body: { token, password } }),
+    me: (token) => request('/portal/me', { token }),
+    getSettings: (token) => request('/portal/settings', { token }),
+
+    quotes: {
+      list: (token) => request('/portal/quotes', { token }),
+      get: (id, token) => request(`/portal/quotes/${id}`, { token }),
+      respond: (id, response, token) => request(`/portal/quotes/${id}/respond`, { method: 'POST', body: { response }, token }),
+      openPdf: (id, token) => openPdf(`/portal/quotes/${id}/pdf`, token),
+    },
+
+    invoices: {
+      list: (token) => request('/portal/invoices', { token }),
+      get: (id, token) => request(`/portal/invoices/${id}`, { token }),
+      openPdf: (id, token) => openPdf(`/portal/invoices/${id}/pdf`, token),
+      openReceiptPdf: (id, paymentId, token) => openPdf(`/portal/invoices/${id}/payments/${paymentId}/pdf`, token),
+    },
+
+    licenses: {
+      list: (token) => request('/portal/licenses', { token }),
+    },
+  },
 };

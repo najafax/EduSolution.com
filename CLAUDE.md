@@ -1423,17 +1423,17 @@ Status/derived-field conventions worth knowing before touching this code:
   and reuses the `financials` module rather than declaring its own, since
   these reports surface the same data at the same sensitivity level.
 
-### Client portal (`backend/src/`)
+### Client portal (`backend/src/`, `frontend/src/`)
 
 A self-serve login for clients, separate from staff auth entirely — a
 client authenticates as their own account rather than through a
-per-document `public_token` link (see `routes/public.js` above). Being
-built in phases; this section covers phase 1 (schema + auth only) and
-phase 2 (the admin-facing invite flow that actually creates a
-`client_portal_accounts` row for a real client) — there is still no
-portal-facing UI for the client themselves (that's phase 3): a client can
-accept an invite and log in, but there's nothing behind `requireClientAuth`
-for them to actually see beyond their own account info yet.
+per-document `public_token` link (see `routes/public.js` above). Built in
+four phases, all now shipped: phase 1 (schema + auth), phase 2 (the
+admin-facing invite flow), phase 3 (the portal's own frontend shell —
+login/accept-invite/forgot/reset-password pages, a protected-route
+wrapper, and a layout distinct from the staff app's), and phase 4
+(read-only views of the client's own quotes/invoices/licenses, plus quote
+accept/decline).
 
 - `client_portal_accounts` (in `db/index.js`, added fresh — no
   production data existed yet, so this is a plain `CREATE TABLE IF NOT
@@ -1492,9 +1492,8 @@ for them to actually see beyond their own account info yet.
   route here either**, same reasoning as `routes/auth.js`'s own "no
   signup" — a portal account is only ever created by an admin inviting an
   existing client, never by someone showing up with an email; that invite
-  endpoint (`POST /clients/:id/portal-invite`, plus the admin-facing UI to
-  trigger it) is phase 2, not yet built, so today a `client_portal_accounts`
-  row can only be created directly against the database. `POST /login`
+  endpoint is `routes/clients.js`'s `POST /:id/portal-invite` (see "Admin
+  invite flow" below). `POST /login`
   (rate-limited via `portalLoginLimiter`) checks `email` case-insensitively
   (lowercased before the query, since `client_portal_accounts.email` is
   stored as given), returns a generic "Invalid email or password" for both
@@ -1522,10 +1521,14 @@ for them to actually see beyond their own account info yet.
   enumeration), same 1-hour `RESET_TOKEN_TTL_MS`, same
   clear-token-and-stamp-`password_changed_at` on success. `GET /me`
   (`requireClientAuth`-gated) returns the current account via
-  `publicAccount()` — the portal's equivalent of `GET /api/auth/me`, and
-  currently the only thing an authenticated client can actually fetch,
-  since the portal's real content (quotes/invoices/licenses views) is a
-  later phase.
+  `publicAccount()` — the portal's equivalent of `GET /api/auth/me`. `GET
+  /settings` (also `requireClientAuth`-gated) returns the same stripped
+  `publicSettings()` shape `routes/public.js` sends alongside a quote/
+  invoice — added so the portal frontend can show a currency symbol/
+  business name on its dashboard and list pages without a full quote/
+  invoice fetch just to reach its embedded `settings` (see
+  `PortalAuthContext.jsx` below, which fetches this once and shares it
+  across every portal page).
 - `middleware/rateLimit.js` gained four portal-specific limiter instances
   — `portalLoginLimiter` (10/15min), `portalForgotPasswordLimiter`
   (5/hour), `portalResetPasswordLimiter` (10/hour), and
@@ -1590,6 +1593,111 @@ for them to actually see beyond their own account info yet.
   for `'none'`, the common case) sits next to the client's email in both
   the desktop table cell and the mobile `MobileListAccordion` summary, so
   the state is visible without opening anything.
+- **Read views** (phase 4): `routes/clientPortal.js` gains `GET
+  /quotes`/`GET /quotes/:id`/`POST /quotes/:id/respond`/`GET
+  /quotes/:id/pdf` and the invoice/license equivalents, all
+  `requireClientAuth`-gated. **Every query is scoped to
+  `req.clientAccount.client_id`** — `getClientQuote()`/`getClientInvoice()`
+  both filter `WHERE id = ? AND client_id = ?`, so a client can never read
+  (or `respond` to) another client's document by guessing an id; a mismatch
+  404s exactly like a nonexistent id would, not a 403, so no information
+  about whether the id belongs to *someone* leaks either way. None of these
+  lists take `?page=`/`?q=` — unlike the staff-side global lists, a single
+  client's own document set is inherently small, so pagination isn't
+  needed yet (see routes/reports.js's own "don't build it until needed"
+  precedent). `withComputedInvoice()`/`withComputedLicense()` are this
+  router's own copies of `routes/invoices.js`'s/`routes/licenses.js`'s
+  identically-named functions — kept duplicated rather than imported, same
+  reasoning `EXPIRY_WARNING_DAYS` is duplicated between `routes/
+  licenses.js` and `lib/scheduler.js` (a different call site, its own
+  client-scoped row shape). `POST /quotes/:id/respond` is the portal's
+  version of `routes/public.js`'s own `POST /quotes/:token/respond` —
+  identical accept/decline contract (only while `draft`/`sent`, stamps
+  `client_response`/`client_responded_at`, logs an activity entry with the
+  `"(client)"` action suffix) — a client can respond to a quote either way,
+  through the portal now or the original emailed public link, and both
+  paths converge on the exact same stored state. `GET /invoices/:id`
+  additionally returns `payments` (`routes/public.js`'s own invoice view
+  doesn't, since a one-off document link has no ongoing account
+  relationship to show payment history against) and `GET
+  /invoices/:id/payments/:paymentId/pdf` streams that payment's receipt —
+  the portal's counterpart to `routes/invoices.js`'s own
+  `GET /:id/payments/:paymentId/pdf`. Licenses are list-only for now (`GET
+  /licenses`, no detail/renewal-history route) — enough for a client to see
+  what's active/expiring/expired at a glance; a per-license detail view
+  (mirroring the staff-side `GET /:id/renewals`) can be added the same way
+  if that turns out to be wanted.
+- **Portal frontend** (phase 3), `frontend/src/`: a fully self-contained
+  sub-app under `/portal/*`, deliberately independent of the staff app's
+  `AuthContext`/`Navbar`/`ProtectedRoute` — a client account has no
+  modules, permissions, or business-management links, so reusing any of
+  those would be both wrong (a client isn't a staff user) and broken (they
+  all assume a staff `user`/`permissions` shape a portal account doesn't
+  have). `context/PortalAuthContext.jsx` mirrors `AuthContext.jsx`'s exact
+  shape (persist a bearer token under its own `localStorage` key,
+  `edusolution_portal_token` — never `edusolution_token`, so a staff and a
+  portal session can coexist in the same browser without clobbering each
+  other — validate it against `GET /portal/me` on load, expose
+  `login`/`logout`) but also fetches `GET /portal/settings` alongside the
+  account (on both the initial load effect and right after `login()`) and
+  exposes it as `settings`, so every portal page can show a currency
+  symbol/business name from one shared fetch rather than each page
+  re-fetching it. `components/PortalProtectedRoute.jsx` mirrors
+  `ProtectedRoute.jsx` exactly, just reading `PortalAuthContext` and
+  redirecting to `/portal/login` instead of `/login`.
+  `pages/portal/PortalApp.jsx` is the sub-app's own router+shell — mounted
+  once at `App.jsx`'s `<Route path="/portal/*" element={<PortalApp />} />`
+  (lazy-loaded like every other routed page, see "Route-level
+  code-splitting" above) and wrapping its own nested `<Routes>` in
+  `PortalAuthProvider`. `App.jsx` itself computes `isPortalRoute =
+  useLocation().pathname.startsWith('/portal')` and skips rendering the
+  staff `Navbar`/`IdleTimeoutMonitor`/`CommandPalette`/`Footer`/`BottomNav`
+  entirely whenever it's true (each portal page renders its own header via
+  `PortalLayout.jsx`, which also renders its own `Footer` instance —
+  reusing the shared, staff-context-free `components/Footer.jsx`) — this is
+  the one place `App.jsx` branches on path rather than on auth state, since
+  the portal isn't just "logged out" or "logged in," it's a different app
+  entirely occupying the same domain. `pages/portal/PortalLayout.jsx` is
+  that header: brand/eyebrow, four nav links (Dashboard/Quotes/Invoices/
+  Licenses — collapsing to a horizontally-scrollable second row below `sm`,
+  not a hamburger drawer, since four links never need one), the client's
+  name, `ThemeToggle` (reused as-is — it only reads `ThemeContext`, no
+  staff-auth dependency), and a Log out button. The four unauthenticated
+  auth pages (`PortalLogin`/`PortalAcceptInvite`/`PortalForgotPassword`/
+  `PortalResetPassword`) share `pages/portal/PortalAuthCard.jsx`, a plain
+  centered-card shell — deliberately not `pages/Login.jsx`'s full
+  marketing-hero treatment, since a client landing on one of these came
+  from a direct invite/reset link with exactly one task to do, not
+  browsing the app's front door. `PortalLogin.jsx` redirects an
+  already-authenticated visit straight to `/portal/dashboard`, same pattern
+  as `Login.jsx`. `PortalAcceptInvite.jsx`/`PortalResetPassword.jsx` are
+  straight mirrors of `ResetPassword.jsx`'s token-from-query-string +
+  set-a-new-password shape, wired to `api.portal.acceptInvite`/
+  `api.portal.resetPassword` instead. `pages/portal/PortalDashboard.jsx`
+  fetches all three lists in parallel and shows three `KpiCard`s (quotes
+  awaiting response, outstanding invoice balance, active licenses) plus
+  three shortcut tiles. `PortalQuotes.jsx`/`PortalInvoices.jsx`/
+  `PortalLicenses.jsx` are simple card lists (not the staff list pages'
+  desktop-table + `MobileListAccordion` split) — a single client's own
+  document set is small enough that one responsive card layout serves both
+  breakpoints, so the added complexity of a separate desktop table isn't
+  worth it here the way it is for the staff-side global lists.
+  `PortalInvoices.jsx` gives an overdue invoice a red-tinted border and an
+  "overdue" `StatusBadge` (`invoice.is_overdue ? 'overdue' : invoice.status`
+  — the exact same ternary `Invoices.jsx` itself uses). `pages/portal/
+  PortalQuoteDetail.jsx`/`PortalInvoiceDetail.jsx` are adapted directly
+  from `pages/PublicQuote.jsx`/`PublicInvoice.jsx` (same bill-to/items-
+  table/totals layout, same Accept/Decline buttons gated on `['draft',
+  'sent'].includes(quote.status)`), wired to the portal's own auth token
+  and API calls instead of a `public_token` route param —
+  `PortalInvoiceDetail.jsx` additionally renders the Payments list `GET
+  /invoices/:id` now returns, each row with its own receipt-download
+  button. `lib/api.js`'s `portal` object holds every one of these calls
+  (`login`/`acceptInvite`/`forgotPassword`/`resetPassword`/`me`/
+  `getSettings`, plus `quotes`/`invoices`/`licenses` sub-objects) — the
+  unauthenticated ones take no token (same shape as the top-level
+  `api.login`/`api.forgotPassword`), everything else takes the portal
+  token from `PortalAuthContext`, never `AuthContext`'s own `token`.
 
 ### Idle session timeout
 

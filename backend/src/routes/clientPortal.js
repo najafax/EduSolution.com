@@ -11,6 +11,8 @@ const {
   portalAcceptInviteLimiter,
 } = require('../middleware/rateLimit');
 const { sendMail } = require('../lib/mailer');
+const { renderQuotePdf, renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
+const { logActivity } = require('../lib/activity');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour, same window as staff resets
 const MIN_PASSWORD_LENGTH = 8;
@@ -170,6 +172,202 @@ router.post('/reset-password', portalResetPasswordLimiter, async (req, res) => {
 router.get('/me', requireClientAuth, (req, res) => {
   const account = getAccountWithClientName(req.clientAccount.id);
   res.json({ account: publicAccount(account) });
+});
+
+// --- Phase 3/4: read-only views of the client's own quotes/invoices/
+// licenses, plus a quote accept/decline action. Every query below is
+// scoped to `req.clientAccount.client_id` — there is no id-only lookup
+// anywhere in this section, so a client can never read (or act on)
+// another client's data by guessing an id. No pagination/search on any of
+// these lists: unlike the staff-side global lists, a single client's own
+// document set is inherently small, so the same don't-build-it-until-
+// needed call routes/reports.js's own docs make elsewhere.
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+// Mirrors routes/invoices.js's/routes/public.js's own withComputed() —
+// same computed balance_due/is_overdue/is_partially_paid fields, kept as
+// its own copy here (not imported) for the same reason EXPIRY_WARNING_DAYS
+// is duplicated between routes/licenses.js and lib/scheduler.js: this
+// router has its own client-scoped row shape, not routes/invoices.js's.
+function withComputedInvoice(invoice) {
+  const balanceDue = Math.round((invoice.total - invoice.amount_paid) * 100) / 100;
+  return {
+    ...invoice,
+    balance_due: balanceDue,
+    is_overdue: invoice.status === 'sent' && balanceDue > 0 && invoice.due_date < today(),
+    is_partially_paid: invoice.amount_paid > 0 && balanceDue > 0,
+  };
+}
+
+// Duplicated literal, same as routes/licenses.js's own EXPIRY_WARNING_DAYS
+// — keep both in sync.
+const EXPIRY_WARNING_DAYS = 14;
+function warningDate() {
+  return new Date(Date.now() + EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+function withComputedLicense(license) {
+  let displayStatus = license.status;
+  if (license.status === 'active') {
+    if (license.expiry_date < today()) displayStatus = 'expired';
+    else if (license.expiry_date <= warningDate()) displayStatus = 'expiring_soon';
+  }
+  return { ...license, display_status: displayStatus };
+}
+
+// Same field-stripping as routes/public.js's own publicSettings() — a
+// client account is no more trusted with starting_balance/
+// session_timeout_minutes than an anonymous public_token holder is.
+function publicSettings(settings) {
+  const { session_timeout_minutes, starting_balance, ...rest } = settings;
+  return rest;
+}
+
+// Same stripped shape as routes/public.js's own publicSettings() — a
+// client account is no more trusted with starting_balance/
+// session_timeout_minutes than an anonymous public_token holder is (see
+// publicSettings() below). Exists so the portal frontend can render a
+// business name/currency symbol on list pages and the dashboard without
+// re-fetching a full quote/invoice just to reach its embedded `settings`.
+router.get('/settings', requireClientAuth, (req, res) => {
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  res.json({ settings: publicSettings(settings) });
+});
+
+router.get('/quotes', requireClientAuth, (req, res) => {
+  const quotes = db
+    .prepare('SELECT * FROM quotes WHERE client_id = ? ORDER BY issue_date DESC, id DESC')
+    .all(req.clientAccount.client_id);
+  res.json({ quotes });
+});
+
+function getClientQuote(clientId, id) {
+  const quote = db.prepare('SELECT * FROM quotes WHERE id = ? AND client_id = ?').get(id, clientId);
+  if (!quote) return null;
+  const items = db.prepare('SELECT * FROM quote_items WHERE quote_id = ? ORDER BY sort_order').all(quote.id);
+  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
+  return { quote, items, client };
+}
+
+router.get('/quotes/:id', requireClientAuth, (req, res) => {
+  const data = getClientQuote(req.clientAccount.client_id, req.params.id);
+  if (!data) return res.status(404).json({ error: 'Quote not found' });
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  res.json({ ...data, settings: publicSettings(settings) });
+});
+
+// Same accept/decline contract as routes/public.js's own
+// POST /quotes/:token/respond — only while still draft/sent, stamps the
+// same client_response/client_responded_at columns quotes/analytics
+// already reads (see routes/quotes.js's GET /analytics). Logged under the
+// account's own client name, same "(client)" action suffix the public-link
+// version uses, so the two response paths read identically in the
+// activity feed regardless of which one a client actually used.
+router.post('/quotes/:id/respond', requireClientAuth, (req, res) => {
+  const data = getClientQuote(req.clientAccount.client_id, req.params.id);
+  if (!data) return res.status(404).json({ error: 'Quote not found' });
+  if (!['draft', 'sent'].includes(data.quote.status)) {
+    return res.status(409).json({ error: `This quote has already been ${data.quote.status}` });
+  }
+
+  const { response } = req.body || {};
+  if (!['accepted', 'declined'].includes(response)) {
+    return res.status(400).json({ error: 'response must be "accepted" or "declined"' });
+  }
+
+  db.prepare(
+    `UPDATE quotes SET status = ?, client_response = ?, client_responded_at = datetime('now'), updated_at = datetime('now')
+     WHERE id = ?`,
+  ).run(response, response, data.quote.id);
+
+  logActivity({
+    userName: data.client.name,
+    action: `${response} (client)`,
+    entityType: 'quote',
+    entityId: data.quote.id,
+    entityLabel: data.quote.number,
+  });
+
+  res.json(getClientQuote(req.clientAccount.client_id, req.params.id));
+});
+
+router.get('/quotes/:id/pdf', requireClientAuth, async (req, res) => {
+  const data = getClientQuote(req.clientAccount.client_id, req.params.id);
+  if (!data) return res.status(404).json({ error: 'Quote not found' });
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+
+  const buffer = await renderQuotePdf({ quote: data.quote, client: data.client, items: data.items, settings });
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `inline; filename="${data.quote.number}.pdf"`,
+  });
+  res.send(buffer);
+});
+
+router.get('/invoices', requireClientAuth, (req, res) => {
+  const invoices = db
+    .prepare('SELECT * FROM invoices WHERE client_id = ? ORDER BY issue_date DESC, id DESC')
+    .all(req.clientAccount.client_id)
+    .map(withComputedInvoice);
+  res.json({ invoices });
+});
+
+function getClientInvoice(clientId, id) {
+  const invoice = db.prepare('SELECT * FROM invoices WHERE id = ? AND client_id = ?').get(id, clientId);
+  if (!invoice) return null;
+  const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order').all(invoice.id);
+  const payments = db.prepare('SELECT * FROM payments WHERE invoice_id = ? ORDER BY paid_at').all(invoice.id);
+  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
+  return { invoice: withComputedInvoice(invoice), items, payments, client };
+}
+
+router.get('/invoices/:id', requireClientAuth, (req, res) => {
+  const data = getClientInvoice(req.clientAccount.client_id, req.params.id);
+  if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  res.json({ ...data, settings: publicSettings(settings) });
+});
+
+router.get('/invoices/:id/pdf', requireClientAuth, async (req, res) => {
+  const data = getClientInvoice(req.clientAccount.client_id, req.params.id);
+  if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+
+  const buffer = await renderInvoicePdf({ invoice: data.invoice, client: data.client, items: data.items, settings, payments: data.payments });
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `inline; filename="${data.invoice.number}.pdf"`,
+  });
+  res.send(buffer);
+});
+
+router.get('/invoices/:id/payments/:paymentId/pdf', requireClientAuth, async (req, res) => {
+  const data = getClientInvoice(req.clientAccount.client_id, req.params.id);
+  if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  const payment = db
+    .prepare('SELECT * FROM payments WHERE id = ? AND invoice_id = ?')
+    .get(req.params.paymentId, req.params.id);
+  if (!payment) return res.status(404).json({ error: 'Payment not found' });
+
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const buffer = await renderReceiptPdf({ payment, invoice: data.invoice, client: data.client, settings });
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `inline; filename="${payment.receipt_number}.pdf"`,
+  });
+  res.send(buffer);
+});
+
+// List-only for now — no per-license detail/renewal-history view yet (the
+// staff-side GET /:id/renewals equivalent), just enough for a client to see
+// what's active/expiring/expired at a glance. Same ordering as
+// routes/licenses.js's own GET / (most recently renewed first).
+router.get('/licenses', requireClientAuth, (req, res) => {
+  const licenses = db
+    .prepare('SELECT * FROM licenses WHERE client_id = ? ORDER BY last_renewed_at DESC, id DESC')
+    .all(req.clientAccount.client_id)
+    .map(withComputedLicense);
+  res.json({ licenses });
 });
 
 module.exports = router;
