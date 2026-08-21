@@ -1673,7 +1673,22 @@ accept/decline).
   as `Login.jsx`. `PortalAcceptInvite.jsx`/`PortalResetPassword.jsx` are
   straight mirrors of `ResetPassword.jsx`'s token-from-query-string +
   set-a-new-password shape, wired to `api.portal.acceptInvite`/
-  `api.portal.resetPassword` instead. `pages/portal/PortalDashboard.jsx`
+  `api.portal.resetPassword` instead. **`PortalAcceptInvite.jsx`'s error
+  state adds one thing `ResetPassword.jsx` doesn't need**: the backend
+  returns the exact same "This invite link is invalid or has expired"
+  message (`routes/clientPortal.js`'s `POST /accept-invite`) whether the
+  token was never valid, has genuinely passed its 7-day
+  `INVITE_TOKEN_TTL_MS`, or — the most common real-world case, since the
+  token is cleared the moment accept-invite succeeds — has already been
+  used once to set a password. That last case reads as a contradiction to
+  a client re-clicking their original invite email ("but it said 7 days"),
+  so matching on that exact string adds a second line pointing at
+  `/portal/login` ("already set up? log in") and `/portal/forgot-password`
+  ("or reset it") — `reset-password` sets `password_hash` the same
+  unconditional way `accept-invite` does, so it's a working recovery path
+  regardless of which of the three cases actually happened, with no need
+  for the backend to distinguish them or for a support conversation to
+  figure out which one it was. `pages/portal/PortalDashboard.jsx`
   fetches all three lists in parallel and shows three `KpiCard`s (quotes
   awaiting response, outstanding invoice balance, active licenses) plus
   three shortcut tiles. `PortalQuotes.jsx`/`PortalInvoices.jsx`/

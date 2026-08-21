@@ -1,7 +1,20 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import PortalAuthCard from './PortalAuthCard';
+
+// The backend (routes/clientPortal.js's POST /accept-invite) returns this
+// exact string whether the token was never valid, has genuinely passed its
+// 7-day expiry, or — the most common real-world cause, since the token is
+// cleared the moment accept-invite succeeds — has already been used to set
+// a password once already. That last case reads as confusing/wrong to a
+// client re-clicking an old email ("but the email said 7 days!"), so this
+// page adds a pointer to "Forgot password" specifically for this message
+// rather than the generic catch-all below — reset-password sets
+// password_hash the same unconditional way accept-invite does, so it's a
+// working fallback regardless of which of the three cases actually
+// happened, without the backend needing to distinguish them.
+const EXPIRED_MESSAGE = 'This invite link is invalid or has expired';
 
 // The client-portal counterpart to pages/ResetPassword.jsx — same token-
 // from-query-string + set-a-new-password shape, but for a first-time
@@ -78,7 +91,24 @@ export default function PortalAcceptInvite() {
           />
         </div>
 
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && (
+          <div>
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            {error === EXPIRED_MESSAGE && (
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                If you've already set a password with this link before, it's already been used — try{' '}
+                <Link to="/portal/login" className="font-medium text-lagoon-600 hover:text-lagoon-500">
+                  logging in
+                </Link>{' '}
+                instead, or use{' '}
+                <Link to="/portal/forgot-password" className="font-medium text-lagoon-600 hover:text-lagoon-500">
+                  Forgot password
+                </Link>{' '}
+                to set a new one.
+              </p>
+            )}
+          </div>
+        )}
 
         <button
           type="submit"
