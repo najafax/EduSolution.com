@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
@@ -54,10 +56,37 @@ const LINK_ICONS = {
 // than a separate top bar repeated on every page, the same shape most
 // dense B2B dashboards (Notion, Linear, Vercel) already use — it also
 // means no per-page changes were needed to adopt this layout.
-export default function Sidebar() {
+//
+// Below `xl:`, this same component doubles as the tablet/phone nav drawer
+// — Navbar.jsx's hamburger toggles `mobileOpen`, which switches this from
+// its default `hidden` state to a `fixed` slide-in panel (plus a backdrop)
+// rather than the flat link-list dropdown this app used before. The `xl:`
+// classes below are untouched either way, so the persistent desktop
+// sidebar keeps working exactly as it did — only the below-`xl:` styling
+// branches on `mobileOpen`.
+export default function Sidebar({ mobileOpen = false, onMobileClose }) {
   const { user, logout, can } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Same Escape-to-close + body-scroll-lock contract as Modal.jsx/
+  // BottomSheet.jsx — mobileOpen is only ever true for the tablet drawer
+  // instance (Navbar.jsx mounts this component fresh each time it opens),
+  // so there's no risk of this stepping on the persistent desktop sidebar,
+  // which never sets mobileOpen at all.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') onMobileClose?.();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen, onMobileClose]);
 
   if (!user) return null;
 
@@ -70,8 +99,13 @@ export default function Sidebar() {
   }
 
   function handleLogout() {
+    onMobileClose?.();
     logout();
     navigate('/');
+  }
+
+  function handleLinkClick() {
+    onMobileClose?.();
   }
 
   const initials = (user.name || user.email || '?')
@@ -82,58 +116,109 @@ export default function Sidebar() {
     .join('')
     .toUpperCase();
 
-  return (
-    <aside
-      className="hidden shrink-0 bg-lagoon-950 px-3 py-5 xl:sticky xl:top-0 xl:flex xl:h-screen xl:w-60 xl:flex-col"
-      style={{ paddingTop: 'calc(1.25rem + env(safe-area-inset-top))' }}
-    >
-      <Link to="/" className="mb-5 shrink-0 px-2 text-base font-semibold text-white">
-        EduSolution<span className="text-lagoon-300">.com</span>
-      </Link>
-
-      <div className="mb-3 shrink-0 px-1">
-        <GlobalSearch className="w-full" />
-      </div>
-
-      <nav className="nav-links-scroll flex flex-1 flex-col gap-0.5 overflow-y-auto">
-        {visibleLinks.map((link) => {
-          const Icon = LINK_ICONS[link.to] || HomeIcon;
-          const active = isActive(link.to);
-          return (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`flex min-h-9 shrink-0 items-center gap-2.5 rounded-lg px-3 text-[13.5px] font-medium ${
-                active ? 'bg-lagoon-600 text-white' : 'text-lagoon-100/80 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              <Icon width={17} height={17} className="shrink-0" />
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-1 pt-3">
-        <Link to="/account" className="flex min-w-0 items-center gap-2 rounded-lg py-1 hover:bg-white/5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
-            {initials}
-          </span>
-          <span className="min-w-0 truncate text-xs font-medium text-white">{user.name}</span>
-        </Link>
-        <div className="flex shrink-0 items-center gap-0.5">
-          <ThemeToggle className="!min-h-9 !min-w-9 !text-lagoon-200 hover:!bg-white/10 hover:!text-white" />
+  const content = (
+    <>
+      {/* Backdrop, mobile/tablet drawer mode only — clicking it closes the
+          drawer the same way Modal.jsx's own backdrop click does. Never
+          rendered at `xl:` since the drawer itself is inert there. */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-slate-900/50 xl:hidden"
+          onClick={onMobileClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`${mobileOpen ? 'fixed inset-y-0 left-0 z-40 flex w-72 flex-col' : 'hidden'} shrink-0 bg-lagoon-950 px-3 py-5 shadow-2xl xl:sticky xl:top-0 xl:z-auto xl:flex xl:h-screen xl:w-60 xl:flex-col xl:shadow-none`}
+        style={{ paddingTop: 'calc(1.25rem + env(safe-area-inset-top))' }}
+      >
+        <div className="mb-5 flex shrink-0 items-center justify-between px-2">
+          <Link to="/" onClick={handleLinkClick} className="text-base font-semibold text-white">
+            EduSolution<span className="text-lagoon-300">.com</span>
+          </Link>
+          {/* Close button, drawer mode only — the backdrop click and Escape
+              (see the effect above) also close it, but a visible control
+              matters here since there's no other affordance in-panel. */}
           <button
             type="button"
-            onClick={handleLogout}
-            aria-label="Log out"
-            title="Log out"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-lagoon-200 hover:bg-white/10 hover:text-white"
+            onClick={onMobileClose}
+            aria-label="Close menu"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-lagoon-200 hover:bg-white/10 hover:text-white xl:hidden"
           >
-            <LogoutIcon width={17} height={17} />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+            </svg>
           </button>
         </div>
-      </div>
-    </aside>
+
+        {/* GlobalSearch's own dark: styling is tuned for the app's themed
+            page background, not this permanently-dark bg-lagoon-950 panel —
+            stacked with the app's own dark theme it read as barely-visible
+            dark-on-dark. These overrides force a light input regardless of
+            app theme, since `!important` is needed to beat GlobalSearch's
+            own hardcoded classes (its `className` prop only reaches the
+            outer wrapper, not the nested <input>). */}
+        <div className="mb-3 shrink-0 px-1 [&_input]:!border-lagoon-200 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:!shadow-sm [&_input::placeholder]:!text-slate-400">
+          <GlobalSearch className="w-full" onNavigate={handleLinkClick} />
+        </div>
+
+        <nav className="nav-links-scroll flex flex-1 flex-col gap-0.5 overflow-y-auto">
+          {visibleLinks.map((link) => {
+            const Icon = LINK_ICONS[link.to] || HomeIcon;
+            const active = isActive(link.to);
+            return (
+              <Link
+                key={link.to}
+                to={link.to}
+                onClick={handleLinkClick}
+                className={`flex min-h-9 shrink-0 items-center gap-2.5 rounded-lg px-3 text-[13.5px] font-medium ${
+                  active ? 'bg-lagoon-600 text-white' : 'text-lagoon-100/80 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <Icon width={17} height={17} className="shrink-0" />
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-1 pt-3">
+          <Link
+            to="/account"
+            onClick={handleLinkClick}
+            className="flex min-w-0 items-center gap-2 rounded-lg py-1 hover:bg-white/5"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
+              {initials}
+            </span>
+            <span className="min-w-0 truncate text-xs font-medium text-white">{user.name}</span>
+          </Link>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <ThemeToggle className="!min-h-9 !min-w-9 !text-lagoon-200 hover:!bg-white/10 hover:!text-white" />
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Log out"
+              title="Log out"
+              className="flex h-9 w-9 items-center justify-center rounded-md text-lagoon-200 hover:bg-white/10 hover:text-white"
+            >
+              <LogoutIcon width={17} height={17} />
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
+
+  // Navbar.jsx's <header> has `backdrop-blur` (backdrop-filter), which per
+  // spec establishes a new containing block for `position: fixed`
+  // descendants — same as `filter` — so a fixed-position drawer nested
+  // inside it would position itself relative to the header's own (much
+  // shorter) box instead of the viewport. Portaling straight to
+  // document.body sidesteps that entirely. Only needed in drawer mode: the
+  // persistent desktop sidebar (mobileOpen false, rendered by App.jsx as a
+  // header-independent sibling) has no such ancestor and renders inline as
+  // before, so its position in the DOM — and anything relying on it,
+  // like the `.nav-links-scroll` CSS — is unaffected.
+  return mobileOpen ? createPortal(content, document.body) : content;
 }
