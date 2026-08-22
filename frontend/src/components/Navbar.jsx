@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
+import Sidebar from './Sidebar';
 import ThemeToggle from './ThemeToggle';
 import { SearchIcon, XIcon } from './icons';
 
@@ -34,15 +35,10 @@ export const BUSINESS_LINKS = [
 ];
 
 export default function Navbar() {
-  const { user, logout, can } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
-
-  const visibleLinks = BUSINESS_LINKS.filter(
-    (link) => (!link.module || can(link.module, 'view')) && (!link.adminOnly || user?.role === 'admin'),
-  );
 
   // The public client-facing quote/invoice links (PublicQuote.jsx,
   // PublicInvoice.jsx) render no header of their own and rely entirely on
@@ -50,16 +46,6 @@ export default function Navbar() {
   // account, so the "Log in" button there is just noise (or worse, an
   // invitation to poke at staff-only auth) rather than a useful action.
   const isPublicDocLink = location.pathname.startsWith('/q/') || location.pathname.startsWith('/i/');
-
-  function handleLogout() {
-    setMenuOpen(false);
-    logout();
-    navigate('/');
-  }
-
-  function isActive(to) {
-    return location.pathname === to || location.pathname.startsWith(`${to}/`);
-  }
 
   return (
     <header
@@ -78,7 +64,11 @@ export default function Navbar() {
                 hamburger itself only renders from `sm` up (tablets), while
                 the phone-only search toggle takes its place below `sm`
                 (GlobalSearch otherwise only appears inside this drawer, since
-                Sidebar.jsx now owns the desktop/xl+ search box). */}
+                Sidebar.jsx now owns the desktop/xl+ search box). Opening it
+                renders Sidebar itself as a slide-in drawer (see below) rather
+                than a separate flat link list, so the tablet nav is the same
+                component/links/icons as the persistent desktop sidebar, just
+                toggled instead of always-on. */}
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPhoneSearchOpen((v) => !v)}
@@ -131,36 +121,15 @@ export default function Navbar() {
         </div>
       )}
 
-      {user && menuOpen && (
-        <div className="hidden border-t border-slate-200 px-4 py-2 sm:block dark:border-slate-800">
-          <div className="py-2">
-            <GlobalSearch onNavigate={() => setMenuOpen(false)} />
-          </div>
-          {visibleLinks.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              onClick={() => setMenuOpen(false)}
-              className={`flex min-h-11 items-center text-sm font-medium ${isActive(link.to) ? 'text-lagoon-600' : 'text-slate-700 dark:text-slate-300'}`}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <Link
-            to="/account"
-            onClick={() => setMenuOpen(false)}
-            className={`flex min-h-11 items-center text-sm font-medium ${isActive('/account') ? 'text-lagoon-600' : 'text-slate-700 dark:text-slate-300'}`}
-          >
-            My account
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="flex min-h-11 w-full items-center text-sm font-medium text-red-600 dark:text-red-400"
-          >
-            Log out
-          </button>
-        </div>
-      )}
+      {/* Tablet menu, opened by the hamburger above: Sidebar itself in
+          drawer mode (see Sidebar.jsx's `mobileOpen` prop) rather than the
+          flat link-list dropdown this used to render — same links, same
+          icons, same account/theme/logout row as the persistent desktop
+          sidebar, just slid in over the page instead of always visible.
+          Only mounted while actually open, same as every other popup in
+          this app (Modal.jsx, BottomSheet.jsx) — no reason to keep its
+          GlobalSearch instance and effects alive in the background. */}
+      {user && menuOpen && <Sidebar mobileOpen onMobileClose={() => setMenuOpen(false)} />}
     </header>
   );
 }

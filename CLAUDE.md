@@ -3167,33 +3167,51 @@ sidebar, not the horizontal link strip `Navbar.jsx` used to show at that
 breakpoint — a deliberate, app-wide layout change (not a Dashboard-only
 one), landed via a round of mocked-up visual directions the business
 owner reviewed and picked a combination from before this was built for
-real. Below `xl:`, nothing changed: the tablet hamburger drawer and the
-phone `BottomNav` tab bar are exactly what they were before.
+real. Below `xl:`, the phone `BottomNav` tab bar is exactly what it was
+before; the tablet hamburger, however, now opens `Sidebar` itself as a
+slide-in drawer rather than the flat link-list dropdown it used to (see
+"Mobile/tablet drawer mode" below) — same component, same links, same
+icons as the persistent desktop sidebar either way.
 
-- `components/Sidebar.jsx` — `hidden ... xl:flex xl:sticky xl:top-0
-  xl:h-screen xl:w-60 xl:flex-col`, self-hiding below `xl:` the same way
-  `Navbar.jsx`'s own desktop content used to self-show only at `xl:` — the
-  two components are mutually exclusive by construction (each hides
-  itself at the other's breakpoint), so exactly one ever renders; neither
-  needs to know the other exists. Background is a fixed `bg-lagoon-950` —
-  intentionally *not* theme-aware (no `dark:` variants), the same way an
-  always-dark accent panel would work regardless of the app's own light/
-  dark setting, since it reads fine against either. Holds, top to bottom:
-  the wordmark (links to `/`, same as `Navbar.jsx`'s own), `GlobalSearch`
-  (full-width, no `max-w-*` cap — the sidebar itself is the width
-  constraint now), the nav list, and a bottom-pinned account row
-  (initials avatar + name, linking to `/account`, plus `ThemeToggle` and
-  a logout icon button) — search and account controls live in the
-  sidebar itself rather than a separate top bar repeated on every page
-  (the shape most dense B2B dashboards — Notion, Linear, Vercel — already
-  use for this), which is also what let this ship as a global layout
-  change with no changes needed to any individual page. `ThemeToggle`
-  needed `!`-prefixed override classes
+- `components/Sidebar.jsx` — takes an optional `mobileOpen`/`onMobileClose`
+  pair (both unused/`undefined` for the persistent desktop instance
+  `App.jsx` renders). With `mobileOpen` falsy, it's `hidden ... xl:flex
+  xl:sticky xl:top-0 xl:h-screen xl:w-60 xl:flex-col`, self-hiding below
+  `xl:` the same way `Navbar.jsx`'s own desktop content used to self-show
+  only at `xl:` — the two components are mutually exclusive by
+  construction below `xl:` (only one is ever open/relevant at a time), so
+  neither needs to know the other exists beyond the props Navbar passes
+  in. Background is a fixed `bg-lagoon-950` — intentionally *not*
+  theme-aware (no `dark:` variants), the same way an always-dark accent
+  panel would work regardless of the app's own light/dark setting, since
+  it reads fine against either. Holds, top to bottom: the wordmark (links
+  to `/`, same as `Navbar.jsx`'s own), `GlobalSearch` (full-width, no
+  `max-w-*` cap — the sidebar itself is the width constraint now), the nav
+  list, and a bottom-pinned account row (initials avatar + name, linking
+  to `/account`, plus `ThemeToggle` and a logout icon button) — search and
+  account controls live in the sidebar itself rather than a separate top
+  bar repeated on every page (the shape most dense B2B dashboards —
+  Notion, Linear, Vercel — already use for this), which is also what let
+  this ship as a global layout change with no changes needed to any
+  individual page. `ThemeToggle` needed `!`-prefixed override classes
   (`!text-lagoon-200 hover:!bg-white/10 hover:!text-white`) to read
   correctly against the dark sidebar — its own default classes
   (`text-slate-500` etc.) are appended-not-replaced by its `className`
   prop, so a plain override class isn't guaranteed to win the cascade;
-  `!important` is.
+  `!important` is. `GlobalSearch`'s own input needed the same treatment
+  for the opposite reason: its `dark:bg-slate-900 dark:text-white`
+  styling is tuned for the app's own themed *page* background, not this
+  permanently-dark panel — stacked with the app's own dark theme, the
+  input read as dark text on a near-black field, effectively invisible.
+  Since `GlobalSearch`'s `className` prop only reaches its outer wrapper,
+  not the nested `<input>`, the fix is a wrapping `<div>` with Tailwind's
+  arbitrary-descendant-selector syntax:
+  `[&_input]:!border-lagoon-200 [&_input]:!bg-white
+  [&_input]:!text-slate-900 [&_input::placeholder]:!text-slate-400` —
+  forces a light input regardless of the app's own theme, in both the
+  persistent desktop sidebar and the mobile drawer (both render the same
+  `GlobalSearch` call, so both needed it, and both got it from this one
+  change).
 - The nav list reuses `Navbar.jsx`'s own exported `BUSINESS_LINKS` array
   and the identical `can()`/`adminOnly` filtering logic — one source of
   truth for "which links exist and who can see them," shared by both
@@ -3221,7 +3239,10 @@ phone `BottomNav` tab bar are exactly what they were before.
   depth alone (only `transform`/`filter`/`perspective`/`contain: paint`
   ancestors would do that, and nothing in this new wrapper sets any of
   those), and `PortalApp` was already rendered inside the routed content,
-  never touching `Sidebar`/`Navbar` at all.
+  never touching `Sidebar`/`Navbar` at all. (`Sidebar`'s own mobile drawer
+  mode, added later, portals its content straight to `document.body`
+  rather than relying on this nesting at all — see "Mobile/tablet drawer
+  mode" below for why.)
 - `Navbar.jsx` lost its own `xl:flex` desktop branch entirely (search,
   the link row, "My account", `ThemeToggle`, "Log out") — that content
   now lives in `Sidebar.jsx` instead, so keeping a parallel, now-dead copy
@@ -3231,6 +3252,53 @@ phone `BottomNav` tab bar are exactly what they were before.
   toggle / tablet dropdown's own now-redundant `xl:hidden` qualifiers
   were dropped (the parent already hides at that breakpoint) rather than
   left as harmless-but-confusing dead specificity.
+- **Mobile/tablet drawer mode**: the hamburger button (`sm:` up, hidden
+  below `sm:` where `BottomNav` takes over — see `Navbar.jsx` above) used
+  to open a flat, separately-maintained link-list dropdown; it now opens
+  `Sidebar` itself (`{user && menuOpen && <Sidebar mobileOpen
+  onMobileClose={() => setMenuOpen(false)} />}`), only mounted while
+  actually open — same "don't keep a popup's effects alive in the
+  background" convention `Modal.jsx`/`BottomSheet.jsx` already follow.
+  This means the tablet nav is now guaranteed to show the exact same
+  links/icons/filtering as the persistent desktop sidebar (no second copy
+  to drift out of sync), and `Navbar.jsx` itself dropped the
+  `visibleLinks`/`isActive`/`handleLogout` helpers it used to need for the
+  old dropdown — `Sidebar.jsx` already owns all three internally. With
+  `mobileOpen` true, `Sidebar` renders a backdrop (`fixed inset-0 z-30
+  bg-slate-900/50 xl:hidden`, click-to-close) plus itself as a slide-in
+  panel (`fixed inset-y-0 left-0 z-40 flex w-72 flex-col`, the `xl:*`
+  classes from the persistent case left untouched so `xl:sticky`/`xl:flex`
+  /etc. still correctly override them at that breakpoint if the viewport
+  is ever resized while a drawer happens to be open) — plus a visible
+  close (`X`) button in its own header row, and the same Escape-to-close +
+  `document.body.style.overflow = 'hidden'` scroll-lock contract as
+  `Modal.jsx` (a `useEffect` gated on `mobileOpen`, cleaned up on
+  close/unmount). Every nav `<Link>`, the wordmark, and the `/account`
+  link all call an `onMobileClose?.()` handler on click (`handleLinkClick`)
+  so navigating via the drawer also closes it, not just navigates —
+  without this, the drawer would still be sitting open over the new page.
+  **The one real gotcha**: `Navbar.jsx`'s `<header>` has `backdrop-blur`
+  (`backdrop-filter: blur(...)`), and per the CSS Filter Effects spec,
+  `backdrop-filter` establishes a new containing block for
+  `position: fixed` descendants — same as `filter` does. A first attempt
+  at this feature nested the drawer's `<aside>`/backdrop directly inside
+  `<header>` (matching where the old dropdown used to render) and the
+  drawer silently collapsed to the header's own ~76px height instead of
+  the full viewport, since `inset-y-0` was resolving against the header's
+  box, not the viewport — confirmed via a Playwright `getBoundingClientRect()`
+  check (a `fullPage` screenshot alone was misleading here, since CDP's
+  full-page capture can render `position: fixed` elements oddly regardless
+  of this bug; the real fix had to be verified with bounding-box math
+  against the actual viewport, not a screenshot). The fix is `Sidebar.jsx`
+  rendering its drawer-mode content through `createPortal(content,
+  document.body)` — but only when `mobileOpen` is true; the persistent
+  desktop instance (`mobileOpen` falsy, rendered by `App.jsx` as a
+  `<header>`-independent sibling, so it never had this problem) still
+  renders inline as before, unaffected. Any future fixed-position overlay
+  that might end up nested inside `Navbar.jsx`'s `<header>` (or any other
+  `backdrop-blur`/`filter`/`perspective`/`will-change: transform` ancestor)
+  needs the same portal treatment — this isn't a one-off Sidebar quirk, it's
+  how CSS containing blocks work.
 
 ### Icon action buttons
 
