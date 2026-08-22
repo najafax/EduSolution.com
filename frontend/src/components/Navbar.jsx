@@ -63,64 +63,23 @@ export default function Navbar() {
 
   return (
     <header
-      className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10 dark:border-slate-800 dark:bg-slate-950/80"
+      className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10 xl:hidden dark:border-slate-800 dark:bg-slate-950/80"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <nav className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 xl:px-8 sm:py-4">
+      <nav className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4">
         <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
           EduSolution<span className="text-lagoon-600">.com</span>
         </Link>
 
         {user ? (
           <>
-            {/* Desktop links. min-w-0 lets this group shrink to fit whatever
-                room the nav row actually has instead of forcing the page
-                wider; the link list itself is the one segment that scrolls
-                internally (overflow-x-auto) if it still doesn't fit, so
-                search/account/theme/logout stay put and the page never
-                grows a horizontal scrollbar. */}
-            <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 xl:flex">
-              <GlobalSearch className="max-w-[200px] shrink-0 2xl:max-w-[280px]" />
-              <kbd
-                className="hidden shrink-0 rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-400 2xl:block dark:border-slate-600"
-                title="Press Cmd/Ctrl+K to open the command palette"
-              >
-                ⌘K
-              </kbd>
-              <div className="nav-links-scroll flex min-w-0 items-center gap-2.5 overflow-x-auto py-1">
-                {visibleLinks.map((link) => (
-                  <Link
-                    key={link.to}
-                    to={link.to}
-                    className={`shrink-0 text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive(link.to) ? 'text-lagoon-600' : 'text-slate-700 dark:text-slate-300'}`}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-              <Link
-                to="/account"
-                className={`shrink-0 text-sm font-medium hover:text-slate-900 dark:hover:text-white ${isActive('/account') ? 'text-lagoon-600' : 'text-slate-700 dark:text-slate-300'}`}
-              >
-                My account
-              </Link>
-              <ThemeToggle />
-              <button
-                onClick={handleLogout}
-                className="min-h-11 shrink-0 whitespace-nowrap rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-              >
-                Log out
-              </button>
-            </div>
-
             {/* Mobile menu toggle. Below `sm` (phones), BottomNav.jsx's tab
                 bar + "More" sheet replaces this hamburger entirely — so the
                 hamburger itself only renders from `sm` up (tablets), while
                 the phone-only search toggle takes its place below `sm`
-                (GlobalSearch otherwise only appears inside this drawer or
-                the tablet-and-up desktop bar, so phones need their own way
-                in). */}
-            <div className="flex items-center gap-1 xl:hidden">
+                (GlobalSearch otherwise only appears inside this drawer, since
+                Sidebar.jsx now owns the desktop/xl+ search box). */}
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => setPhoneSearchOpen((v) => !v)}
                 aria-label={phoneSearchOpen ? 'Close search' : 'Search'}
@@ -173,7 +132,7 @@ export default function Navbar() {
       )}
 
       {user && menuOpen && (
-        <div className="hidden border-t border-slate-200 px-4 py-2 sm:block xl:hidden dark:border-slate-800">
+        <div className="hidden border-t border-slate-200 px-4 py-2 sm:block dark:border-slate-800">
           <div className="py-2">
             <GlobalSearch onNavigate={() => setMenuOpen(false)} />
           </div>

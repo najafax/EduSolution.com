@@ -6,10 +6,9 @@ import { useDashboardShortcuts } from '../lib/useDashboardShortcuts';
 import RevenueTrendChart from '../components/RevenueTrendChart';
 import StatusBreakdownChart from '../components/StatusBreakdownChart';
 import Accordion from '../components/Accordion';
-import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import DashboardShortcutsEditor from '../components/DashboardShortcutsEditor';
-import { UsersIcon, InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, TrendUpIcon, TrendDownIcon, BankIcon } from '../components/icons';
+import { AlertTriangleIcon, LicenseIcon } from '../components/icons';
 import { money } from '../lib/money';
 
 function greeting() {
@@ -31,14 +30,25 @@ const SHORTCUTS = [
   { to: '/settings', label: 'Settings', module: 'settings' },
 ];
 
+// How many days out a license still counts as "expiring soon" — matches
+// routes/licenses.js's own EXPIRY_WARNING_DAYS; not imported (this is a
+// frontend display concern reading the backend's already-filtered
+// `?status=expiring_soon` result, not re-deriving the threshold itself).
+const NEEDS_ATTENTION_LIMIT = 4;
+
 export default function Dashboard() {
   const { user, token, can } = useAuth();
   const [summary, setSummary] = useState(null);
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState('');
   const [customizing, setCustomizing] = useState(false);
+  const [overdueInvoices, setOverdueInvoices] = useState([]);
+  const [expiringLicenses, setExpiringLicenses] = useState([]);
 
   const canViewFinancials = can('financials', 'view');
+  const canViewInvoices = can('invoices', 'view');
+  const canViewLicenses = can('licenses', 'view');
+  const canSeeAttentionPanel = canViewFinancials && (canViewInvoices || canViewLicenses);
 
   useEffect(() => {
     if (canViewFinancials) {
@@ -47,45 +57,78 @@ export default function Dashboard() {
     api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
   }, [token, canViewFinancials]);
 
+  // "Needs attention" — the invoices already overdue and the licenses about
+  // to lapse, the two things on this page that actually call for action
+  // rather than just reporting a number. Each is its own small, permission-
+  // gated fetch (separate from `financials:view`, which the rest of this
+  // page's data depends on) rather than something financials/summary
+  // returns, since a user could have one of these grants without the
+  // other. Both are best-effort: a failure here shouldn't block the rest
+  // of the dashboard, so errors are swallowed rather than surfaced.
+  useEffect(() => {
+    if (!canSeeAttentionPanel || !canViewInvoices) return;
+    api.invoices
+      .list(token, { status: 'sent' })
+      .then(({ invoices }) => {
+        const overdue = invoices.filter((inv) => inv.is_overdue).sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
+        setOverdueInvoices(overdue.slice(0, NEEDS_ATTENTION_LIMIT));
+      })
+      .catch(() => {});
+  }, [token, canSeeAttentionPanel, canViewInvoices]);
+
+  useEffect(() => {
+    if (!canSeeAttentionPanel || !canViewLicenses) return;
+    api.licenses
+      .list(token, { status: 'expiring_soon' })
+      .then(({ licenses }) => {
+        const sorted = [...licenses].sort((a, b) => (a.expiry_date < b.expiry_date ? -1 : 1));
+        setExpiringLicenses(sorted.slice(0, NEEDS_ATTENTION_LIMIT));
+      })
+      .catch(() => {});
+  }, [token, canSeeAttentionPanel, canViewLicenses]);
+
   const symbol = settings?.currency_symbol || '$';
   const permittedShortcuts = SHORTCUTS.filter((s) => can(s.module, 'view'));
   const { visible: visibleShortcuts, orderedAvailable, hiddenSet, toggleHidden, moveUp, moveDown, reset } =
     useDashboardShortcuts(permittedShortcuts);
 
-  const isProfitable = summary && summary.netProfit >= 0;
   const isPositiveBalance = summary && summary.bankBalance >= 0;
-  const kpis = summary
-    ? [
-        { key: 'clients', label: 'Clients', value: summary.clientCount, icon: <UsersIcon />, tone: 'neutral' },
-        { key: 'invoiced', label: 'Invoiced', value: money(symbol, summary.totalInvoiced), icon: <InvoiceIcon />, tone: 'neutral' },
-        { key: 'paid', label: 'Paid', value: money(symbol, summary.totalPaid), icon: <CheckCircleIcon />, tone: 'positive' },
-        { key: 'outstanding', label: 'Outstanding', value: money(symbol, summary.totalOutstanding), icon: <ClockIcon />, tone: 'neutral' },
-        {
-          key: 'overdue',
-          label: 'Overdue',
-          value: money(symbol, summary.overdueAmount),
-          sub: `${summary.overdueCount} invoice${summary.overdueCount === 1 ? '' : 's'}`,
-          icon: <AlertTriangleIcon />,
-          tone: summary.overdueCount > 0 ? 'negative' : 'neutral',
-        },
-        {
-          key: 'profit',
-          label: 'Net profit',
-          value: money(symbol, summary.netProfit),
-          icon: isProfitable ? <TrendUpIcon /> : <TrendDownIcon />,
-          tone: isProfitable ? 'positive' : 'negative',
-        },
-        {
-          key: 'bankBalance',
-          label: 'Bank balance',
-          value: money(symbol, summary.bankBalance),
-          icon: <BankIcon />,
-          tone: isPositiveBalance ? 'positive' : 'negative',
-        },
-      ]
-    : [];
-
   const firstName = user?.name?.split(' ')[0];
+  const attentionCount = overdueInvoices.length + expiringLicenses.length;
+
+  function shortcutsRow() {
+    return (
+      <div className="mt-6">
+        {permittedShortcuts.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setCustomizing(true)}
+            className="mb-2 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          >
+            Customize shortcuts
+          </button>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {visibleShortcuts.map((s) => (
+            <Link
+              key={s.to}
+              to={s.to}
+              className="flex min-h-11 items-center rounded-full border border-slate-300 px-5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              {s.label}
+            </Link>
+          ))}
+          {visibleShortcuts.length === 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {permittedShortcuts.length === 0
+                ? 'Nothing to show yet — ask an admin to grant you access to what you need.'
+                : 'All shortcuts are hidden.'}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
@@ -96,63 +139,131 @@ export default function Dashboard() {
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       {!canViewFinancials ? (
-        <div className="mt-8">
-          {permittedShortcuts.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setCustomizing(true)}
-              className="mb-2 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-            >
-              Customize shortcuts
-            </button>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {visibleShortcuts.map((s) => (
-              <Link
-                key={s.to}
-                to={s.to}
-                className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                {s.label}
-              </Link>
-            ))}
-            {visibleShortcuts.length === 0 && (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {permittedShortcuts.length === 0
-                  ? 'Nothing to show yet — ask an admin to grant you access to what you need.'
-                  : 'All shortcuts are hidden.'}
-              </p>
-            )}
-          </div>
-        </div>
+        <div className="mt-8">{shortcutsRow()}</div>
       ) : !summary ? (
         <p className="mt-8 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
       ) : (
         <>
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {kpis.map((kpi) => (
-              <KpiCard
-                key={kpi.key}
-                label={kpi.label}
-                value={kpi.value}
-                sub={kpi.sub}
-                icon={kpi.icon}
-                tone={kpi.tone}
-                className={kpi.key === 'bankBalance' ? 'col-span-2 sm:col-span-3 lg:col-span-6' : ''}
-              />
-            ))}
+          {/* Hero — the one number that matters most at a glance, plus a
+              plain-language summary built only from figures this app can
+              actually vouch for (see routes/financials.js's own bankBalance
+              note on why it's a running proxy, not a live bank connection) —
+              no invented month-over-month delta, since summary/GET doesn't
+              return a prior-period figure to compare against. */}
+          <div className="mt-8 flex flex-col gap-6 rounded-2xl border border-lagoon-100 bg-lagoon-50 p-6 sm:p-9 md:flex-row md:items-center md:justify-between dark:border-lagoon-900 dark:bg-lagoon-950/40">
+            <div>
+              <p className="text-sm font-semibold text-lagoon-700 dark:text-lagoon-400">Bank balance</p>
+              <p className={`font-display mt-1 text-4xl font-extrabold sm:text-5xl ${isPositiveBalance ? 'text-slate-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
+                {money(symbol, summary.bankBalance)}
+              </p>
+              <p className="mt-3 max-w-md text-sm text-slate-700 dark:text-slate-300">
+                {summary.clientCount} active client{summary.clientCount === 1 ? '' : 's'}, {money(symbol, summary.totalPaid)} collected,
+                and {money(symbol, summary.netProfit)} in net profit so far.
+              </p>
+            </div>
+            <div className="flex gap-9">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Net profit</p>
+                <p className={`font-display mt-1 text-2xl font-extrabold ${summary.netProfit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
+                  {money(symbol, summary.netProfit)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Outstanding</p>
+                <p className="font-display mt-1 text-2xl font-extrabold text-slate-900 dark:text-white">{money(symbol, summary.totalOutstanding)}</p>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <Accordion title="Revenue, last 6 months">
-                <RevenueTrendChart data={summary.monthlyTrend} currencySymbol={symbol} />
-              </Accordion>
+          {/* Secondary strip — de-emphasized on purpose: these back up the
+              hero number above rather than competing with it. */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl border border-slate-200 bg-white px-6 py-5 dark:border-slate-700 dark:bg-slate-900">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Clients</p>
+              <p className="font-display mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">{summary.clientCount}</p>
             </div>
+            <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-700" />
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Invoiced</p>
+              <p className="font-display mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">{money(symbol, summary.totalInvoiced)}</p>
+            </div>
+            <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-700" />
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Paid</p>
+              <p className="font-display mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">{money(symbol, summary.totalPaid)}</p>
+            </div>
+            <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-700" />
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Overdue</p>
+              <p className={`font-display mt-0.5 text-lg font-extrabold ${summary.overdueCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>
+                {money(symbol, summary.overdueAmount)}
+              </p>
+            </div>
+            {summary.totalCapitalContributions > 0 && (
+              <>
+                <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-700" />
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Capital in</p>
+                  <p className="font-display mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">{money(symbol, summary.totalCapitalContributions)}</p>
+                </div>
+              </>
+            )}
+          </div>
 
+          <div className="mt-6">
+            <Accordion title="Revenue, last 6 months">
+              <RevenueTrendChart data={summary.monthlyTrend} currencySymbol={symbol} />
+            </Accordion>
+          </div>
+
+          <div className={`mt-6 grid gap-6 ${canSeeAttentionPanel ? 'lg:grid-cols-2' : ''}`}>
             <Accordion title="Invoices by status">
               <StatusBreakdownChart counts={summary.invoiceCounts} />
             </Accordion>
+
+            {canSeeAttentionPanel && (
+              <Accordion title={`Needs attention${attentionCount > 0 ? ` (${attentionCount})` : ''}`}>
+                {overdueInvoices.length === 0 && expiringLicenses.length === 0 ? (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Nothing needs your attention right now.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {overdueInvoices.map((inv) => (
+                      <Link
+                        key={`inv-${inv.id}`}
+                        to={`/invoices/${inv.id}`}
+                        className="flex items-center justify-between gap-3 rounded-lg bg-red-50 px-3 py-2 text-sm hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/70"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <AlertTriangleIcon width={16} height={16} className="shrink-0 text-red-600 dark:text-red-400" />
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-slate-900 dark:text-white">{inv.client_name}</p>
+                            <p className="text-xs text-red-600 dark:text-red-400">{inv.number} · overdue since {inv.due_date}</p>
+                          </div>
+                        </div>
+                        <span className="shrink-0 font-semibold text-red-600 dark:text-red-400">{money(symbol, inv.balance_due)}</span>
+                      </Link>
+                    ))}
+                    {expiringLicenses.map((lic) => (
+                      <Link
+                        key={`lic-${lic.id}`}
+                        to="/licenses"
+                        className="flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-sm hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-950/70"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <LicenseIcon width={16} height={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-slate-900 dark:text-white">
+                              {lic.name} · {lic.client_name}
+                            </p>
+                            <p className="text-xs text-amber-600 dark:text-amber-400">Expires {lic.expiry_date}</p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </Accordion>
+            )}
           </div>
 
           <div className="mt-6">
@@ -180,28 +291,7 @@ export default function Dashboard() {
             </Accordion>
           </div>
 
-          <div className="mt-6">
-            {permittedShortcuts.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setCustomizing(true)}
-                className="mb-2 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Customize shortcuts
-              </button>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {visibleShortcuts.map((s) => (
-                <Link
-                  key={s.to}
-                  to={s.to}
-                  className="min-h-11 flex items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  {s.label}
-                </Link>
-              ))}
-            </div>
-          </div>
+          {shortcutsRow()}
         </>
       )}
 

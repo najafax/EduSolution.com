@@ -2895,12 +2895,45 @@ frontend stops holding/sending it.
   or staff) since it's never permission-gated.
 - `pages/Dashboard.jsx` — `SHORTCUTS` (the quick-link tiles) each carry a
   `module` and are filtered through `can(s.module, 'view')` the same way as
-  `Navbar.jsx`'s links. The whole KPI/chart view additionally requires
-  `can('financials', 'view')`; a staff user without it sees just the
-  filtered shortcut tiles instead (with a "nothing to show yet" message if
-  even those are empty), never a loading spinner that never resolves — the
-  financials API call itself is skipped entirely rather than made and
-  403ing.
+  `Navbar.jsx`'s/`Sidebar.jsx`'s own links. The whole hero/chart view
+  additionally requires `can('financials', 'view')`; a staff user without
+  it sees just the filtered shortcut tiles instead (with a "nothing to show
+  yet" message if even those are empty), never a loading spinner that never
+  resolves — the financials API call itself is skipped entirely rather than
+  made and 403ing. Below the existing greeting (see below), the page opens
+  with a hero band — `bankBalance` in `font-display` at 4xl/5xl (the one
+  number this app can most vouch for, see `routes/financials.js`'s own
+  note), a plain-language summary sentence built only from fields the
+  `/financials/summary` response actually returns
+  (`{clientCount} active clients, {money(totalPaid)} collected, and
+  {money(netProfit)} in net profit so far` — deliberately no invented
+  month-over-month delta, since that response has no prior-period figure to
+  diff against), plus `netProfit`/`totalOutstanding` as smaller secondary
+  figures beside it — followed by a de-emphasized secondary strip
+  (`clientCount`/`totalInvoiced`/`totalPaid`/`overdueAmount`, plus
+  `totalCapitalContributions` only when it's non-zero) as plain
+  divider-separated metrics, not individual bordered cards, so it reads as
+  supporting detail rather than competing with the hero. This replaced the
+  page's previous `KpiCard` grid outright — the hero/strip pairing carries
+  the same figures with a clearer at-a-glance hierarchy (one headline
+  number, everything else secondary) rather than seven same-sized cards.
+  Below that, `Accordion`-wrapped panels for the revenue chart / invoices-
+  by-status / "Needs attention" / recent payments are unchanged in
+  mechanism from before (same mobile-collapsible convention, see "Mobile
+  design system" below) — only "Needs attention" is new. That panel merges
+  overdue invoices (`api.invoices.list(token, { status: 'sent' })`,
+  filtered client-side to `is_overdue` rows since there's no server-side
+  overdue filter, sorted oldest-due-first) and expiring-soon licenses
+  (`api.licenses.list(token, { status: 'expiring_soon' })`, sorted
+  soonest-first) into one list, each capped to `NEEDS_ATTENTION_LIMIT` (4)
+  — deliberately two extra, independent fetches gated on their own
+  `invoices`/`licenses` view permissions (not `financials`, since a user
+  could hold one grant without the other), both best-effort (a failed
+  fetch is swallowed, not surfaced as a page error, since this is a
+  supplementary widget). The panel — and the two-column grid it shares
+  with "Invoices by status" — only renders at all when the user holds
+  *either* permission; with neither, "Invoices by status" alone spans the
+  full width rather than leaving an empty half-column next to nothing.
 - `pages/Dashboard.jsx` and `pages/business/Financials.jsx` charts
   (`components/RevenueTrendChart.jsx`, `components/StatusBreakdownChart.jsx`)
   are hand-rolled SVG/CSS, no charting library. Status colors there are
@@ -3107,17 +3140,18 @@ keeps its existing layout.
   restyled. `components/Accordion.jsx` picked up the same `rounded-2xl`
   for visual consistency with `KpiCard`/`MobileListAccordion`'s cards.
   `KpiCard` also takes an optional `className` (default `''`), appended to
-  the card's own classes — the one caller today is Dashboard's own "Bank
-  balance" card's full-width grid span (see `routes/financials.js` above;
-  `Financials.jsx` itself no longer singles any card out this way, see the
-  same note), but any future card that needs to break out of the shared
-  grid's per-cell sizing can use the same prop rather than a one-off
-  wrapper.
+  the card's own classes, for any card that needs to break out of the
+  shared grid's per-cell sizing — no current caller uses it (Dashboard's
+  own "Bank balance" figure moved into its own hero treatment rather than
+  a `KpiCard`, see below, and `Financials.jsx` renders all of its cards at
+  one uniform size), but the prop stays for the next one that does.
 - `pages/Dashboard.jsx` opens with a time-of-day greeting (`greeting()` —
   "Good morning"/afternoon/evening by `new Date().getHours()`) above the
   user's first name in `font-display`, with the business name (falling back
   to the user's email if `business_settings` hasn't loaded yet) underneath
-  — replacing the previous plain "Welcome, {name}" + email line.
+  — replacing the previous plain "Welcome, {name}" + email line. The hero
+  band described above (see "Sidebar navigation" below for the rest of
+  this page's redesign) sits directly beneath this greeting, unchanged.
 - `pages/business/InvoiceDetail.jsx` gained a mobile-only (`sm:hidden`)
   gradient hero card between the header actions and the existing Bill-to/
   Details grid: total due in `font-display`, a paid-vs-total progress bar,
@@ -3125,6 +3159,78 @@ keeps its existing layout.
   already surfaces balance due inline), this is purely a phone-first
   "surface the number before the fold" addition and doesn't change any
   desktop markup or the page's data flow.
+
+### Sidebar navigation (desktop)
+
+The app's persistent navigation at `xl:` and up (≥1280px) is a dark
+sidebar, not the horizontal link strip `Navbar.jsx` used to show at that
+breakpoint — a deliberate, app-wide layout change (not a Dashboard-only
+one), landed via a round of mocked-up visual directions the business
+owner reviewed and picked a combination from before this was built for
+real. Below `xl:`, nothing changed: the tablet hamburger drawer and the
+phone `BottomNav` tab bar are exactly what they were before.
+
+- `components/Sidebar.jsx` — `hidden ... xl:flex xl:sticky xl:top-0
+  xl:h-screen xl:w-60 xl:flex-col`, self-hiding below `xl:` the same way
+  `Navbar.jsx`'s own desktop content used to self-show only at `xl:` — the
+  two components are mutually exclusive by construction (each hides
+  itself at the other's breakpoint), so exactly one ever renders; neither
+  needs to know the other exists. Background is a fixed `bg-lagoon-950` —
+  intentionally *not* theme-aware (no `dark:` variants), the same way an
+  always-dark accent panel would work regardless of the app's own light/
+  dark setting, since it reads fine against either. Holds, top to bottom:
+  the wordmark (links to `/`, same as `Navbar.jsx`'s own), `GlobalSearch`
+  (full-width, no `max-w-*` cap — the sidebar itself is the width
+  constraint now), the nav list, and a bottom-pinned account row
+  (initials avatar + name, linking to `/account`, plus `ThemeToggle` and
+  a logout icon button) — search and account controls live in the
+  sidebar itself rather than a separate top bar repeated on every page
+  (the shape most dense B2B dashboards — Notion, Linear, Vercel — already
+  use for this), which is also what let this ship as a global layout
+  change with no changes needed to any individual page. `ThemeToggle`
+  needed `!`-prefixed override classes
+  (`!text-lagoon-200 hover:!bg-white/10 hover:!text-white`) to read
+  correctly against the dark sidebar — its own default classes
+  (`text-slate-500` etc.) are appended-not-replaced by its `className`
+  prop, so a plain override class isn't guaranteed to win the cascade;
+  `!important` is.
+- The nav list reuses `Navbar.jsx`'s own exported `BUSINESS_LINKS` array
+  and the identical `can()`/`adminOnly` filtering logic — one source of
+  truth for "which links exist and who can see them," shared by both
+  components rather than duplicated. `LINK_ICONS` maps each link's `to`
+  path to one of `components/icons.jsx`'s icons; a few modules
+  deliberately reuse an icon that already carries a close-enough meaning
+  elsewhere in the app rather than inventing a new glyph per link —
+  Capital and Users both reuse `UsersIcon` (Capital already reuses it on
+  its own `Financials.jsx` KPI card, see "Capital contributions" above;
+  Users manages staff *people*, so the same glyph reads fine there too).
+  Two links had no existing icon to reuse: `ProductIcon` (a small stacked
+  box — `ExpenseIcon`'s silhouette already means "money spent"
+  specifically, so reusing it for the product catalog would misread) and
+  `SettingsIcon` (a gear — Settings was a plain text link in the old top
+  nav and never needed one before). Both follow `icons.jsx`'s existing
+  20×20/1.5px-stroke/`currentColor` convention.
+- `App.jsx`'s root layout gained one more nesting level to make room for
+  this: the outermost div is now `flex ... xl:flex-row` with `Sidebar`
+  and a new `min-w-0 flex-1 flex-col` "main column" div as its two
+  children — `Navbar`/`IdleTimeoutMonitor`/`CommandPalette`/the routed
+  `Suspense` content/`Footer` all moved one level deeper, into that main
+  column, unchanged otherwise. `BottomNav` (phone-only, `fixed`) and the
+  portal's own routing (`isPortalRoute`) are unaffected either way — a
+  `position: fixed` element's containing block isn't changed by nesting
+  depth alone (only `transform`/`filter`/`perspective`/`contain: paint`
+  ancestors would do that, and nothing in this new wrapper sets any of
+  those), and `PortalApp` was already rendered inside the routed content,
+  never touching `Sidebar`/`Navbar` at all.
+- `Navbar.jsx` lost its own `xl:flex` desktop branch entirely (search,
+  the link row, "My account", `ThemeToggle`, "Log out") — that content
+  now lives in `Sidebar.jsx` instead, so keeping a parallel, now-dead copy
+  in `Navbar.jsx` would just be two places to update the same thing. The
+  `<header>` itself gained `xl:hidden` so the mobile/tablet top bar
+  disappears completely once `Sidebar` takes over, and the mobile menu
+  toggle / tablet dropdown's own now-redundant `xl:hidden` qualifiers
+  were dropped (the parent already hides at that breakpoint) rather than
+  left as harmless-but-confusing dead specificity.
 
 ### Icon action buttons
 

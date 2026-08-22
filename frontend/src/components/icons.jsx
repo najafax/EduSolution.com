@@ -334,6 +334,31 @@ export function MegaphoneIcon(props) {
   );
 }
 
+// A small stacked box — "product/catalog item" (Sidebar.jsx's Products nav
+// link). No existing icon fit this: ExpenseIcon's silhouette already means
+// "money spent" specifically, so reusing it here would misread as an
+// expense-related link rather than the product catalog.
+export function ProductIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 2.5 17 6v8l-7 3.5L3 14V6l7-3.5Z" strokeLinejoin="round" />
+      <path d="M3 6l7 3.5L17 6M10 9.5V17" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// A gear — "settings" (Sidebar.jsx's Settings nav link). The one genuinely
+// missing standard icon this app never needed before, since Settings only
+// ever appeared as a plain text link in the old top nav.
+export function SettingsIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 12.75a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5Z" />
+      <path d="M16.2 12.3a1.5 1.5 0 0 0 .3 1.65l.05.05a1.8 1.8 0 1 1-2.55 2.55l-.05-.05a1.5 1.5 0 0 0-1.65-.3 1.5 1.5 0 0 0-.9 1.37V17.7a1.8 1.8 0 1 1-3.6 0v-.08a1.5 1.5 0 0 0-.98-1.37 1.5 1.5 0 0 0-1.65.3l-.05.05a1.8 1.8 0 1 1-2.55-2.55l.05-.05a1.5 1.5 0 0 0 .3-1.65 1.5 1.5 0 0 0-1.37-.9H2.3a1.8 1.8 0 1 1 0-3.6h.08a1.5 1.5 0 0 0 1.37-.98 1.5 1.5 0 0 0-.3-1.65l-.05-.05A1.8 1.8 0 1 1 5.95 3.7l.05.05a1.5 1.5 0 0 0 1.65.3h.08a1.5 1.5 0 0 0 .9-1.37V2.3a1.8 1.8 0 1 1 3.6 0v.08a1.5 1.5 0 0 0 .9 1.37h.08a1.5 1.5 0 0 0 1.65-.3l.05-.05a1.8 1.8 0 1 1 2.55 2.55l-.05.05a1.5 1.5 0 0 0-.3 1.65v.08a1.5 1.5 0 0 0 1.37.9h.08a1.8 1.8 0 1 1 0 3.6h-.08a1.5 1.5 0 0 0-1.37.9Z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function LogoutIcon(props) {
   return (
     <svg {...base} {...props}>
