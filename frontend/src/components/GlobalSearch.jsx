@@ -103,7 +103,7 @@ export default function GlobalSearch({ onNavigate, className = 'max-w-xs', autoF
                       className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       <span className="font-medium text-slate-900 dark:text-white">{qt.number}</span>
-                      <span className="text-slate-500"> — {qt.client_name}</span>
+                      <span className="text-slate-500 dark:text-slate-400"> — {qt.client_name}</span>
                     </button>
                   ))}
                 </div>
@@ -118,7 +118,7 @@ export default function GlobalSearch({ onNavigate, className = 'max-w-xs', autoF
                       className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       <span className="font-medium text-slate-900 dark:text-white">{inv.number}</span>
-                      <span className="text-slate-500"> — {inv.client_name}</span>
+                      <span className="text-slate-500 dark:text-slate-400"> — {inv.client_name}</span>
                     </button>
                   ))}
                 </div>
@@ -133,7 +133,7 @@ export default function GlobalSearch({ onNavigate, className = 'max-w-xs', autoF
                       className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       <span className="font-medium text-slate-900 dark:text-white">{ex.description}</span>
-                      <span className="text-slate-500"> — {ex.category}</span>
+                      <span className="text-slate-500 dark:text-slate-400"> — {ex.category}</span>
                     </button>
                   ))}
                 </div>

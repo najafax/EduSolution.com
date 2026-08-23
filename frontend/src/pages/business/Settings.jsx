@@ -36,7 +36,7 @@ export default function Settings() {
   }
 
   if (!form) {
-    return <div className="mx-auto max-w-2xl px-4 py-10 text-sm text-slate-500 sm:px-6">{error || 'Loading…'}</div>;
+    return <div className="mx-auto max-w-2xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">{error || 'Loading…'}</div>;
   }
 
   return (

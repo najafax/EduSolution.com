@@ -102,7 +102,7 @@ export default function MyAccount() {
             />
           </label>
         </div>
-        {profileError && <p className="mt-3 text-sm text-red-600">{profileError}</p>}
+        {profileError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{profileError}</p>}
         {profileSuccess && <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{profileSuccess}</p>}
         <button
           type="submit"
@@ -140,7 +140,7 @@ export default function MyAccount() {
             />
           </label>
         </div>
-        {passwordError && <p className="mt-3 text-sm text-red-600">{passwordError}</p>}
+        {passwordError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{passwordError}</p>}
         {passwordSuccess && <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{passwordSuccess}</p>}
         <button
           type="submit"
@@ -171,7 +171,7 @@ export default function MyAccount() {
           />
           <span className="text-sm text-slate-700 dark:text-slate-300">Email me when a client accepts a quote</span>
         </label>
-        {prefsError && <p className="mt-3 text-sm text-red-600">{prefsError}</p>}
+        {prefsError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{prefsError}</p>}
         {prefsSuccess && <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{prefsSuccess}</p>}
         <button
           type="submit"

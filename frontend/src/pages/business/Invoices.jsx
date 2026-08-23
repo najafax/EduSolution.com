@@ -242,7 +242,7 @@ export default function Invoices() {
         <StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />
       </div>
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (

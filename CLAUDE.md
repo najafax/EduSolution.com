@@ -2175,6 +2175,39 @@ frontend stops holding/sending it.
   toggle itself is unaffected by this — anyone who explicitly picks Dark
   or System still gets exactly that, stored and honored on every future
   visit; only the unset, brand-new-visitor case changed.
+- **Every form input needs its own explicit `dark:` classes** — there is
+  no global rule making an `<input>`/`<textarea>`/`<select>` legible in
+  dark mode; each one is themed individually
+  (`dark:border-slate-600 dark:bg-slate-900 dark:text-white` is the
+  standard trio, `dark:bg-slate-800` on a couple of pages that nest one
+  level deeper). Tailwind's Preflight resets a form control's `color` to
+  `inherit`, and without a per-field `dark:text-white` that resolves to
+  whatever color the page happens to inherit — normally close enough to
+  readable, but combined with Safari/WebKit's own independent tendency to
+  paint native form-control chrome dark when the OS (not just this app's
+  own `.dark` toggle) prefers dark, an unstyled field can end up
+  dark-on-dark: a real dark background from the browser's own native
+  styling, with black-ish inherited text sitting on top of it — invisible
+  while typing, not just off-brand. `pages/business/Clients.jsx`'s and
+  `pages/business/Expenses.jsx`'s modal forms shipped exactly this way
+  (spotted from a phone screenshot in dark mode) — both are typical of
+  every other resource's form (`Products.jsx`, `Settings.jsx`,
+  `CapitalContributions.jsx`, etc.) in every other respect, just missing
+  the `dark:` classes entirely on every field, label, and the Cancel
+  button, apparently from whenever each form was last rewritten. Fixed by
+  bringing both in line with the same pattern every other page already
+  uses; a handful of other one-off misses turned up in the same sweep
+  (`Users.jsx`'s reset-password modal input, the Notes `<textarea>` on
+  `QuoteForm.jsx`/`InvoiceForm.jsx`/`RecurringInvoices.jsx`, and several
+  `text-red-600` error messages across the app missing their
+  `dark:text-red-400` pair) — same bug, same fix, different pages. There's
+  no shared `<Field>`/`<Input>` component this could be centralized into
+  today (each page defines its own local `Field` — see individual page
+  notes below), so this is a check-every-form-by-hand problem: any new
+  form field needs the same trio from the start, and an audit like this
+  one (`grep` every page/component for `text-slate-`/`border-slate-`/
+  `bg-slate-`/`bg-white` class usage with no `dark:` counterpart on the
+  same line) is the fastest way to catch a page that was missed.
 
 ### Frontend (`frontend/src/`)
 
