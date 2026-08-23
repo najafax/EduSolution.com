@@ -25,6 +25,17 @@ function distinctPayees() {
     .map((r) => r.payee);
 }
 
+// `amount` is always the local-currency figure actually spent; for a
+// 'currency exchange' row with a real (>0) `exchange_rate`, the USD the
+// business actually received is derived from those two — never stored
+// itself, so it can never drift from the two numbers it's computed from
+// (same don't-store-what-you-can-compute approach `invoices.js`'s
+// `withComputed()` takes for `is_overdue`). Every other row gets `null`.
+function withComputedUsd(row) {
+  const amountUsd = row.category === 'currency exchange' && row.exchange_rate > 0 ? row.amount / row.exchange_rate : null;
+  return { ...row, amount_usd: amountUsd };
+}
+
 router.get('/', view, (req, res) => {
   const { q, category, payee, page: pageParam } = req.query;
   const conditions = [];
@@ -48,7 +59,7 @@ router.get('/', view, (req, res) => {
   const { totalAmount } = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS totalAmount FROM expenses ${where}`).get(...params);
 
   if (!pageParam) {
-    const rows = db.prepare(`SELECT * FROM expenses ${where} ORDER BY expense_date DESC, id DESC`).all(...params);
+    const rows = db.prepare(`SELECT * FROM expenses ${where} ORDER BY expense_date DESC, id DESC`).all(...params).map(withComputedUsd);
     return res.json({ expenses: rows, categories: CATEGORIES, payees: distinctPayees(), totalAmount });
   }
 
@@ -57,7 +68,8 @@ router.get('/', view, (req, res) => {
   const { total } = db.prepare(`SELECT COUNT(*) AS total FROM expenses ${where}`).get(...params);
   const rows = db
     .prepare(`SELECT * FROM expenses ${where} ORDER BY expense_date DESC, id DESC LIMIT ? OFFSET ?`)
-    .all(...params, PAGE_SIZE, offset);
+    .all(...params, PAGE_SIZE, offset)
+    .map(withComputedUsd);
   res.json({
     expenses: rows,
     categories: CATEGORIES,
@@ -72,15 +84,21 @@ router.get('/', view, (req, res) => {
 
 // Shared by both export routes below so the CSV and XLSX downloads can
 // never drift apart — one row query, one column list, two serializers.
+// The four currency-exchange columns are blank for every other category's
+// row, same as `Payee`/`Notes` already are for rows that never set them.
 function loadExpenseExport() {
   return {
-    rows: db.prepare('SELECT * FROM expenses ORDER BY expense_date DESC, id DESC').all(),
+    rows: db.prepare('SELECT * FROM expenses ORDER BY expense_date DESC, id DESC').all().map(withComputedUsd),
     columns: [
       { label: 'Date', key: 'expense_date' },
       { label: 'Category', key: 'category' },
       { label: 'Description', key: 'description' },
       { label: 'Amount', key: 'amount' },
       { label: 'Payee', key: 'payee' },
+      { label: 'Exchange rate', value: (r) => r.exchange_rate ?? '' },
+      { label: 'Amount (USD)', value: (r) => r.amount_usd ?? '' },
+      { label: 'Payee account number', key: 'payee_account_number' },
+      { label: 'USD destination', key: 'usd_destination' },
       { label: 'Notes', key: 'notes' },
     ],
   };
@@ -104,7 +122,7 @@ router.get('/export.xlsx', view, async (req, res) => {
 });
 
 function validate(body) {
-  const { category = 'other', description, amount, expense_date } = body || {};
+  const { category = 'other', description, amount, expense_date, exchange_rate } = body || {};
   if (!description || !amount || !expense_date) {
     return 'description, amount and expense_date are required';
   }
@@ -115,7 +133,34 @@ function validate(body) {
   if (!CATEGORIES.includes(category)) {
     return `category must be one of: ${CATEGORIES.join(', ')}`;
   }
+  // The rate is only meaningful (and only ever shown on the form) for this
+  // one category — required there so `amount_usd` never silently computes
+  // against a missing rate, ignored everywhere else regardless of what a
+  // stray value in the body claims.
+  if (category === 'currency exchange') {
+    const rateNum = Number(exchange_rate);
+    if (!exchange_rate || !Number.isFinite(rateNum) || rateNum <= 0) {
+      return 'exchange rate must be a positive number for a currency exchange expense';
+    }
+  }
   return null;
+}
+
+// Extracted so POST/PUT can't disagree on what actually gets written —
+// `exchange_rate`/`payee_account_number`/`usd_destination` only ever
+// persist for a 'currency exchange' row; anything submitted for another
+// category (e.g. a leftover value from switching the dropdown back and
+// forth on the form) is discarded rather than stored.
+function currencyExchangeFields(body) {
+  const { category = 'other', exchange_rate, payee_account_number = '', usd_destination = '' } = body || {};
+  if (category !== 'currency exchange') {
+    return { exchangeRate: null, payeeAccountNumber: '', usdDestination: '' };
+  }
+  return {
+    exchangeRate: Number(exchange_rate),
+    payeeAccountNumber: payee_account_number.trim(),
+    usdDestination: usd_destination.trim(),
+  };
 }
 
 router.post('/', manage, (req, res) => {
@@ -123,11 +168,15 @@ router.post('/', manage, (req, res) => {
   if (error) return res.status(400).json({ error });
 
   const { category = 'other', description, amount, expense_date, payee = '', notes = '' } = req.body;
+  const { exchangeRate, payeeAccountNumber, usdDestination } = currencyExchangeFields(req.body);
   const result = db
-    .prepare('INSERT INTO expenses (category, description, amount, expense_date, payee, notes) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(category, description.trim(), Number(amount), expense_date, payee.trim(), notes);
+    .prepare(
+      `INSERT INTO expenses (category, description, amount, expense_date, payee, notes, exchange_rate, payee_account_number, usd_destination)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(category, description.trim(), Number(amount), expense_date, payee.trim(), notes, exchangeRate, payeeAccountNumber, usdDestination);
 
-  const expense = db.prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);
+  const expense = withComputedUsd(db.prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid));
   logActivity({ userName: req.user.name, action: 'created', entityType: 'expense', entityId: expense.id, entityLabel: expense.description });
   res.status(201).json({ expense });
 });
@@ -140,11 +189,24 @@ router.put('/:id', manage, (req, res) => {
   if (error) return res.status(400).json({ error });
 
   const { category = 'other', description, amount, expense_date, payee = '', notes = '' } = req.body;
+  const { exchangeRate, payeeAccountNumber, usdDestination } = currencyExchangeFields(req.body);
   db.prepare(
-    `UPDATE expenses SET category = ?, description = ?, amount = ?, expense_date = ?, payee = ?, notes = ?, updated_at = datetime('now') WHERE id = ?`,
-  ).run(category, description.trim(), Number(amount), expense_date, payee.trim(), notes, req.params.id);
+    `UPDATE expenses SET category = ?, description = ?, amount = ?, expense_date = ?, payee = ?, notes = ?,
+       exchange_rate = ?, payee_account_number = ?, usd_destination = ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(
+    category,
+    description.trim(),
+    Number(amount),
+    expense_date,
+    payee.trim(),
+    notes,
+    exchangeRate,
+    payeeAccountNumber,
+    usdDestination,
+    req.params.id,
+  );
 
-  const expense = db.prepare('SELECT * FROM expenses WHERE id = ?').get(req.params.id);
+  const expense = withComputedUsd(db.prepare('SELECT * FROM expenses WHERE id = ?').get(req.params.id));
   logActivity({ userName: req.user.name, action: 'updated', entityType: 'expense', entityId: expense.id, entityLabel: expense.description });
   res.json({ expense });
 });

@@ -121,6 +121,10 @@ backend port in frontend code.
   production data since the very first deploy. Same pattern again for
   `expenses.payee` (see "Expense filters" in `routes/expenses.js` below) —
   `expenses` has carried real rows since long before this column existed.
+  Same pattern once more for `expenses.exchange_rate`/
+  `payee_account_number`/`usd_destination` (see "Currency exchange
+  details" in `routes/expenses.js` below) — same reasoning, `expenses`
+  already had real rows.
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
   <jwt>` header, then **re-fetches the live user row from the DB** (by the
   id in the JWT payload) rather than trusting the token's claims, and
@@ -541,6 +545,54 @@ deliberately untouched by either, always returning every row.
   an em dash when blank) and, unlike `notes`, as its own mobile-accordion
   detail row — but only when non-blank, so most expenses (which have no
   payee) don't show an empty row.
+- **Currency exchange details**: three columns —
+  `exchange_rate`/`payee_account_number`/`usd_destination` — exist only to
+  serve the `currency exchange` category specifically (a business paying
+  local currency to buy USD, then spending or investing that USD
+  elsewhere); every other category leaves all three unset. `exchange_rate`
+  is the one nullable numeric column in this table (every other optional
+  number in the app defaults to 0 — see `products.tax_rate`) since 0 would
+  be a nonsensical rate and risks a divide-by-zero; `NULL` unambiguously
+  means "not a currency-exchange row." `amount` keeps meaning exactly what
+  it always has — the local-currency figure actually spent — so for a
+  currency-exchange row it's specifically what was paid to *buy* the USD,
+  not the USD amount itself. The USD actually received is never stored:
+  `withComputedUsd()` derives it fresh on every read as `amount /
+  exchange_rate` (only when `category === 'currency exchange'` and the
+  rate is a real positive number, else `null`) — same don't-store-what-
+  you-can-compute approach `invoices.js`'s `withComputed()` takes for
+  `is_overdue`, so it can never drift from the two numbers it's computed
+  from. `POST /`/`PUT /:id` both route the three fields through
+  `currencyExchangeFields()`, which discards them (writes `NULL`/`''`)
+  for any other category regardless of what a stray value in the request
+  body claims — switching the form's Category dropdown away from
+  "currency exchange" and saving always clears them server-side, not just
+  hides them client-side. `validate()` requires a positive `exchange_rate`
+  specifically when `category === 'currency exchange'`, so `amount_usd`
+  can never silently compute against a missing rate. `GET
+  /export.csv`/`GET /export.xlsx` gained four columns (`Exchange rate`,
+  `Amount (USD)`, `Payee account number`, `USD destination`) via
+  `value: (r) => …` accessors rather than plain `key`s (the first two are
+  computed, not real columns) — blank for every non-currency-exchange row,
+  same convention `Payee`/`Notes` already follow for rows that never set
+  them. `routes/import.js`'s `processExpenses()` mirrors the same rule for
+  historical bulk import — `exchange_rate` required and validated the same
+  way for a `currency exchange` row, the other two columns optional and
+  ignored for every other category — and `Import.jsx`'s CSV template/column
+  hint list grew the three columns to match.
+  `pages/business/Expenses.jsx`'s New/Edit form shows a distinct
+  `bg-slate-50` sub-panel with all three fields plus a live, read-only
+  "Amount received (USD)" preview (recomputed from the form's own draft
+  `amount`/`exchange_rate` on every keystroke, mirroring the backend's own
+  formula) — but only while `form.category === 'currency exchange'`, so
+  every other category's form looks exactly as it did before this feature.
+  The desktop table's Amount cell and the mobile `MobileListAccordion`
+  summary both grow a small secondary `$X.XX @ rate` line under the
+  local-currency amount for a currency-exchange row (nothing added for any
+  other row); the mobile accordion's expanded body adds Exchange
+  rate/Amount (USD)/Payee account number/USD destination detail rows,
+  each only rendered when non-blank, same "only show the exception case"
+  convention `payee`'s own detail row already follows.
 - `routes/capitalContributions.js` — CRUD for `capital_contributions`
   (`contributor_name`/`amount`/`contribution_date`/`notes`), mounted at
   `/api/capital-contributions`. This is the deliberate mirror of an

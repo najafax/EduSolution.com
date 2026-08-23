@@ -161,6 +161,9 @@ db.exec(`
     expense_date TEXT NOT NULL,
     payee TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
+    exchange_rate REAL,
+    payee_account_number TEXT NOT NULL DEFAULT '',
+    usd_destination TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -538,6 +541,24 @@ if (!licenseColumns.has('url')) {
 const expenseColumns = new Set(db.prepare('PRAGMA table_info(expenses)').all().map((c) => c.name));
 if (!expenseColumns.has('payee')) {
   db.exec(`ALTER TABLE expenses ADD COLUMN payee TEXT NOT NULL DEFAULT '';`);
+}
+
+// Same pattern once more: three columns specific to the 'currency exchange'
+// category (see "Currency exchange details" in routes/expenses.js below) —
+// `exchange_rate` is nullable (unlike every other numeric column in this
+// app, which defaults to 0) since 0 is a nonsensical rate and would divide-
+// by-zero when computing the USD amount received; NULL unambiguously means
+// "not a currency exchange row / rate not entered" instead. The other two
+// are plain optional text, same `TEXT NOT NULL DEFAULT ''` convention as
+// `payee`/`notes`.
+if (!expenseColumns.has('exchange_rate')) {
+  db.exec(`ALTER TABLE expenses ADD COLUMN exchange_rate REAL;`);
+}
+if (!expenseColumns.has('payee_account_number')) {
+  db.exec(`ALTER TABLE expenses ADD COLUMN payee_account_number TEXT NOT NULL DEFAULT '';`);
+}
+if (!expenseColumns.has('usd_destination')) {
+  db.exec(`ALTER TABLE expenses ADD COLUMN usd_destination TEXT NOT NULL DEFAULT '';`);
 }
 
 // Same pattern again: `notify_quote_responses` added to `users` — the
