@@ -13,6 +13,7 @@ const manage = requirePermission('expenses', 'manage');
 const CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'shareholder payments', 'marketing', 'software', 'travel', 'currency exchange', 'other'];
 
 const PAGE_SIZE = 20;
+const round2 = (n) => Math.round(n * 100) / 100;
 
 // `payees` mirrors the existing `categories` convention: served alongside
 // the list itself, independent of whatever `q`/`category`/`payee` filter is
@@ -31,8 +32,12 @@ function distinctPayees() {
 // itself, so it can never drift from the two numbers it's computed from
 // (same don't-store-what-you-can-compute approach `invoices.js`'s
 // `withComputed()` takes for `is_overdue`). Every other row gets `null`.
+// Rounded to 2dp — an unrounded division (e.g. 599.9987068993386) would
+// otherwise leak floating-point noise into the list, CSV/Excel export, and
+// the analytics transaction table below, all of which just display this
+// value as-is rather than reformatting it themselves.
 function withComputedUsd(row) {
-  const amountUsd = row.category === 'currency exchange' && row.exchange_rate > 0 ? row.amount / row.exchange_rate : null;
+  const amountUsd = row.category === 'currency exchange' && row.exchange_rate > 0 ? round2(row.amount / row.exchange_rate) : null;
   return { ...row, amount_usd: amountUsd };
 }
 
@@ -119,6 +124,99 @@ router.get('/export.xlsx', view, async (req, res) => {
     'Content-Disposition': 'attachment; filename="expenses.xlsx"',
   });
   res.send(buffer);
+});
+
+// Historical, year-over-year view — distinct from the plain totals `GET /`
+// already returns for the current filtered page. Same "fetch every row
+// once, loop in JS" approach `routes/licenses.js`'s own `GET /analytics`
+// takes, rather than a per-year SQL query — fine at this app's scale, and
+// simpler than a GROUP BY strftime('%Y', ...) for every metric below. Not
+// gated behind `?category=`/`?q=` — this is a whole-history report, not a
+// filtered list.
+//
+// The yearly chart pairs `total` (every category) against
+// `currencyExchangeSpent` (currency-exchange rows only) — both in local
+// currency, so they're directly comparable on one axis, unlike
+// `currencyExchangeUsd` which is a different currency entirely and would
+// misrepresent scale if plotted alongside either. USD figures are reported
+// separately instead, in `totals` and per year in `byYear`, for the
+// currency-exchange-specific panel to render on its own.
+router.get('/analytics', view, (req, res) => {
+  const rows = db.prepare('SELECT category, amount, expense_date, exchange_rate FROM expenses').all();
+  const currentYear = new Date().getFullYear();
+  const yearOf = (d) => d.slice(0, 4);
+
+  const years = new Set([currentYear]);
+  rows.forEach((r) => years.add(Number(yearOf(r.expense_date))));
+  const minYear = Math.min(...years);
+
+  const byYear = [];
+  for (let year = currentYear; year >= minYear; year--) {
+    const y = String(year);
+    const yearRows = rows.filter((r) => yearOf(r.expense_date) === y);
+    const exchangeRows = yearRows.filter((r) => r.category === 'currency exchange');
+    byYear.push({
+      year,
+      total: round2(yearRows.reduce((sum, r) => sum + r.amount, 0)),
+      count: yearRows.length,
+      currencyExchangeSpent: round2(exchangeRows.reduce((sum, r) => sum + r.amount, 0)),
+      currencyExchangeUsd: round2(exchangeRows.reduce((sum, r) => sum + (r.exchange_rate > 0 ? r.amount / r.exchange_rate : 0), 0)),
+    });
+  }
+
+  const byCategory = {};
+  for (const cat of CATEGORIES) byCategory[cat] = 0;
+  rows.forEach((r) => {
+    byCategory[r.category] = round2((byCategory[r.category] || 0) + r.amount);
+  });
+
+  const topPayees = db
+    .prepare(
+      `SELECT payee, COUNT(*) AS expense_count, COALESCE(SUM(amount), 0) AS total_amount
+       FROM expenses WHERE payee != ''
+       GROUP BY payee
+       ORDER BY total_amount DESC
+       LIMIT 5`,
+    )
+    .all();
+
+  // The individual currency-exchange records themselves, in full — the
+  // whole reason this analytics page exists alongside the yearly/category
+  // rollups above (see the frontend page). This category's row count is
+  // expected to stay small at this app's scale (an occasional MVR→USD
+  // conversion, not a high-volume transaction type), so no pagination —
+  // same "don't build it until needed" call `routes/licenses.js`'s own
+  // `GET /:id/renewals` already makes for a comparably small per-entity list.
+  const currencyExchangeTransactions = db
+    .prepare("SELECT * FROM expenses WHERE category = 'currency exchange' ORDER BY expense_date DESC, id DESC")
+    .all()
+    .map(withComputedUsd);
+
+  const exchangeRows = rows.filter((r) => r.category === 'currency exchange');
+  const totalCurrencyExchangeSpent = round2(exchangeRows.reduce((sum, r) => sum + r.amount, 0));
+  const totalCurrencyExchangeUsd = round2(
+    exchangeRows.reduce((sum, r) => sum + (r.exchange_rate > 0 ? r.amount / r.exchange_rate : 0), 0),
+  );
+
+  res.json({
+    byYear,
+    byCategory,
+    topPayees,
+    currencyExchangeTransactions,
+    totals: {
+      totalAmount: round2(rows.reduce((sum, r) => sum + r.amount, 0)),
+      totalCount: rows.length,
+      totalCurrencyExchangeSpent,
+      totalCurrencyExchangeUsd,
+      exchangeTransactionCount: exchangeRows.length,
+      // The true blended rate across every exchange, not an average of the
+      // individual rates (which would weight a tiny exchange the same as a
+      // huge one) — total local currency spent divided by total USD
+      // actually received, `null` when nothing's been exchanged yet rather
+      // than a division-by-zero.
+      averageExchangeRate: totalCurrencyExchangeUsd > 0 ? round2(totalCurrencyExchangeSpent / totalCurrencyExchangeUsd) : null,
+    },
+  });
 });
 
 function validate(body) {

@@ -161,6 +161,7 @@ export const api = {
     remove: (id, token) => request(`/expenses/${id}`, { method: 'DELETE', token }),
     exportCsv: (token) => downloadFile('/expenses/export.csv', token, 'expenses.csv'),
     exportXlsx: (token) => downloadFile('/expenses/export.xlsx', token, 'expenses.xlsx'),
+    analytics: (token) => request('/expenses/analytics', { token }),
   },
 
   capitalContributions: {

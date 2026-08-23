@@ -28,6 +28,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Clients = lazy(() => import('./pages/business/Clients'));
 const Products = lazy(() => import('./pages/business/Products'));
 const Expenses = lazy(() => import('./pages/business/Expenses'));
+const ExpenseAnalytics = lazy(() => import('./pages/business/ExpenseAnalytics'));
 const CapitalContributions = lazy(() => import('./pages/business/CapitalContributions'));
 const Settings = lazy(() => import('./pages/business/Settings'));
 const Quotes = lazy(() => import('./pages/business/Quotes'));
@@ -114,6 +115,7 @@ export default function App() {
                 <Route path="/campaigns" element={<Protected><Campaigns /></Protected>} />
                 <Route path="/products" element={<Protected><Products /></Protected>} />
                 <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
+                <Route path="/expenses/analytics" element={<Protected><ExpenseAnalytics /></Protected>} />
                 <Route path="/capital-contributions" element={<Protected><CapitalContributions /></Protected>} />
                 <Route path="/settings" element={<Protected><Settings /></Protected>} />
                 <Route path="/import" element={<Protected><Import /></Protected>} />
