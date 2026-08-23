@@ -18,7 +18,17 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import { ExpenseIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
 
-const EMPTY_FORM = { category: 'other', description: '', amount: '', expense_date: todayStr(), payee: '', notes: '' };
+const EMPTY_FORM = {
+  category: 'other',
+  description: '',
+  amount: '',
+  expense_date: todayStr(),
+  payee: '',
+  notes: '',
+  exchange_rate: '',
+  payee_account_number: '',
+  usd_destination: '',
+};
 
 export default function Expenses() {
   const { token, can } = useAuth();
@@ -85,10 +95,18 @@ export default function Expenses() {
       expense_date: expense.expense_date,
       payee: expense.payee,
       notes: expense.notes,
+      exchange_rate: expense.exchange_rate ?? '',
+      payee_account_number: expense.payee_account_number || '',
+      usd_destination: expense.usd_destination || '',
     });
     setEditingId(expense.id);
     setShowForm(true);
   }
+
+  const isCurrencyExchange = form.category === 'currency exchange';
+  const exchangeRateNum = Number(form.exchange_rate);
+  const amountUsdPreview =
+    isCurrencyExchange && form.amount && exchangeRateNum > 0 ? Number(form.amount) / exchangeRateNum : null;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -254,6 +272,55 @@ export default function Expenses() {
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
+
+          {isCurrencyExchange && (
+            <div className="sm:col-span-2 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 dark:border-slate-700 dark:bg-slate-800/50">
+              <p className="text-xs text-slate-500 dark:text-slate-400 sm:col-span-2">
+                Amount above is what was paid in local currency to buy USD. Enter the rate used to see how much USD the
+                company received.
+              </p>
+              <label className="block">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Exchange rate</span>
+                <input
+                  type="number"
+                  min="0.0001"
+                  step="0.0001"
+                  required={isCurrencyExchange}
+                  value={form.exchange_rate}
+                  onChange={(e) => setForm((f) => ({ ...f, exchange_rate: e.target.value }))}
+                  placeholder="e.g. 15.42"
+                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount received (USD)</span>
+                <div className="mt-1 flex min-h-11 w-full items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-base text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                  {amountUsdPreview !== null ? `$${amountUsdPreview.toFixed(2)}` : '—'}
+                </div>
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Payee account number</span>
+                <input
+                  type="text"
+                  value={form.payee_account_number}
+                  onChange={(e) => setForm((f) => ({ ...f, payee_account_number: e.target.value }))}
+                  placeholder="Account the USD was paid to"
+                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">USD destination</span>
+                <input
+                  type="text"
+                  value={form.usd_destination}
+                  onChange={(e) => setForm((f) => ({ ...f, usd_destination: e.target.value }))}
+                  placeholder="What the USD was used for — e.g. EduPage license renewal"
+                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+              </label>
+            </div>
+          )}
+
           <div className="sm:col-span-2">
             <label className="block">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
@@ -317,7 +384,14 @@ export default function Expenses() {
                       <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600 dark:text-slate-400">{expense.category}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{expense.payee || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{expense.description}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{expense.amount.toFixed(2)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
+                        {expense.amount.toFixed(2)}
+                        {expense.amount_usd !== null && (
+                          <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                            ${expense.amount_usd.toFixed(2)} @ {expense.exchange_rate}
+                          </p>
+                        )}
+                      </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex justify-end gap-1.5">
@@ -359,7 +433,12 @@ export default function Expenses() {
                           <p className="truncate font-medium text-slate-900 dark:text-white">{expense.description}</p>
                           <p className="capitalize text-slate-500 dark:text-slate-400">{expense.category}</p>
                         </div>
-                        <p className="shrink-0 text-slate-900 dark:text-white">{expense.amount.toFixed(2)}</p>
+                        <div className="shrink-0 text-right">
+                          <p className="text-slate-900 dark:text-white">{expense.amount.toFixed(2)}</p>
+                          {expense.amount_usd !== null && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400">${expense.amount_usd.toFixed(2)}</p>
+                          )}
+                        </div>
                       </div>
                     }
                   >
@@ -371,6 +450,30 @@ export default function Expenses() {
                       <div className="flex justify-between">
                         <dt className="text-slate-500 dark:text-slate-400">Payee</dt>
                         <dd className="text-slate-900 dark:text-white">{expense.payee}</dd>
+                      </div>
+                    )}
+                    {expense.amount_usd !== null && (
+                      <div className="flex justify-between">
+                        <dt className="text-slate-500 dark:text-slate-400">Exchange rate</dt>
+                        <dd className="text-slate-900 dark:text-white">{expense.exchange_rate}</dd>
+                      </div>
+                    )}
+                    {expense.amount_usd !== null && (
+                      <div className="flex justify-between">
+                        <dt className="text-slate-500 dark:text-slate-400">Amount (USD)</dt>
+                        <dd className="text-slate-900 dark:text-white">${expense.amount_usd.toFixed(2)}</dd>
+                      </div>
+                    )}
+                    {expense.payee_account_number && (
+                      <div className="flex justify-between">
+                        <dt className="text-slate-500 dark:text-slate-400">Payee account number</dt>
+                        <dd className="text-slate-900 dark:text-white">{expense.payee_account_number}</dd>
+                      </div>
+                    )}
+                    {expense.usd_destination && (
+                      <div className="flex justify-between">
+                        <dt className="text-slate-500 dark:text-slate-400">USD destination</dt>
+                        <dd className="text-slate-900 dark:text-white">{expense.usd_destination}</dd>
                       </div>
                     )}
                     {canManage && (

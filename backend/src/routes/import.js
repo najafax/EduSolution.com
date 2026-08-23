@@ -211,9 +211,33 @@ function validateExpenseRow(row, dateFormat) {
   if (!EXPENSE_CATEGORIES.includes(category)) {
     return { ok: false, message: `category must be one of: ${EXPENSE_CATEGORIES.join(', ')}` };
   }
+  // Same "only meaningful for this one category" rule as the manual form
+  // (routes/expenses.js) — a rate on any other category's row is ignored,
+  // never stored.
+  let exchangeRate = null;
+  let payeeAccountNumber = '';
+  let usdDestination = '';
+  if (category === 'currency exchange') {
+    exchangeRate = parseNumber(row.exchange_rate);
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      return { ok: false, message: 'exchange_rate must be a positive number for a currency exchange row' };
+    }
+    payeeAccountNumber = (row.payee_account_number || '').trim();
+    usdDestination = (row.usd_destination || '').trim();
+  }
   return {
     ok: true,
-    values: { category, description, amount, expense_date, payee: (row.payee || '').trim(), notes: (row.notes || '').trim() },
+    values: {
+      category,
+      description,
+      amount,
+      expense_date,
+      payee: (row.payee || '').trim(),
+      notes: (row.notes || '').trim(),
+      exchangeRate,
+      payeeAccountNumber,
+      usdDestination,
+    },
   };
 }
 
@@ -222,7 +246,8 @@ function processExpenses(rows, commit) {
   const results = [];
   let imported = 0;
   const insert = db.prepare(
-    'INSERT INTO expenses (category, description, amount, expense_date, payee, notes) VALUES (?, ?, ?, ?, ?, ?)',
+    `INSERT INTO expenses (category, description, amount, expense_date, payee, notes, exchange_rate, payee_account_number, usd_destination)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
 
   rows.forEach((row, index) => {
@@ -234,7 +259,17 @@ function processExpenses(rows, commit) {
     }
     const v = outcome.values;
     if (commit) {
-      const result = insert.run(v.category, v.description, v.amount, v.expense_date, v.payee, v.notes);
+      const result = insert.run(
+        v.category,
+        v.description,
+        v.amount,
+        v.expense_date,
+        v.payee,
+        v.notes,
+        v.exchangeRate,
+        v.payeeAccountNumber,
+        v.usdDestination,
+      );
       imported += 1;
       results.push({ row: rowNumber, status: 'ok', message: 'imported', preview: v.description, id: result.lastInsertRowid });
     } else {
