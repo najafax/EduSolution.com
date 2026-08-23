@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -16,7 +17,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
-import { ExpenseIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
+import { ExpenseIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, ReportIcon } from '../../components/icons';
 
 const EMPTY_FORM = {
   category: 'other',
@@ -157,6 +158,13 @@ export default function Expenses() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Expenses</h1>
         <div className="flex flex-wrap gap-2">
+          <Link
+            to="/expenses/analytics"
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <ReportIcon width={16} height={16} />
+            Analytics
+          </Link>
           <button
             onClick={handleExportCsv}
             className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"

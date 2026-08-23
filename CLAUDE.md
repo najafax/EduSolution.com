@@ -592,7 +592,72 @@ deliberately untouched by either, always returning every row.
   other row); the mobile accordion's expanded body adds Exchange
   rate/Amount (USD)/Payee account number/USD destination detail rows,
   each only rendered when non-blank, same "only show the exception case"
-  convention `payee`'s own detail row already follows.
+  convention `payee`'s own detail row already follows. `amount_usd` is
+  rounded to 2dp inside `withComputedUsd()` itself (`Math.round(x * 100) /
+  100`) rather than left as a raw division — without it, a rate like
+  `15.4667` produces floating-point noise (`599.9987068993386`) that would
+  otherwise leak into the list, CSV/Excel export, and the analytics
+  transaction table below exactly as returned, since none of those
+  reformat the figure themselves beyond `.toFixed(2)` on display.
+- **Expense analytics**: `GET /expenses/analytics` (`view`-gated, no
+  route-ordering concern the way `licenses.js`'s/`invoices.js`'s own
+  `GET /analytics` have — this router has no `GET /:id` at all, only
+  `PUT`/`DELETE /:id`, so there's no literal-path-vs-param collision to
+  register ahead of) is the year-over-year + currency-exchange-detail
+  report backing `pages/business/ExpenseAnalytics.jsx` (route
+  `/expenses/analytics`, linked from `Expenses.jsx`'s header next to
+  "Export CSV", same placement as every other list page's own "Analytics"
+  link). Same "fetch every row once, loop in JS" approach
+  `routes/licenses.js`'s own `GET /analytics` takes rather than a
+  `GROUP BY strftime(...)` per metric — fine at this app's scale. For
+  every year from the earliest `expense_date` through the current year
+  (gap years included at zero, same convention every other analytics
+  endpoint follows), `byYear` reports `total` (every category, local
+  currency) and `count`, plus `currencyExchangeSpent` (`currency
+  exchange` rows only, local currency) and `currencyExchangeUsd` (that
+  same subset's computed USD received). `byCategory` is an all-time
+  `{ category: amount }` map across the fixed `CATEGORIES` list (0 for a
+  category never used, so the frontend can filter those out itself rather
+  than the backend guessing which are worth returning). `topPayees` is a
+  top-5-by-total-amount `GROUP BY payee` query, the same shape
+  `routes/licenses.js`'s own `topClients` already uses. The one thing
+  this report does that no other analytics endpoint needs to:
+  `currencyExchangeTransactions` returns the **full, un-paginated** list
+  of every currency-exchange row (through `withComputedUsd()`, so each
+  carries its own `amount_usd`) — this is what actually answers "show
+  these details" for the feature, versus the rolled-up `byYear`/
+  `byCategory`/`totals` numbers around it; no pagination since this
+  category's row count is expected to stay small at this app's scale (an
+  occasional MVR→USD conversion, not a high-volume transaction type),
+  same "don't build it until needed" call `routes/licenses.js`'s own
+  `GET /:id/renewals` already makes for a comparably small per-entity
+  list. `totals.averageExchangeRate` is the *blended* rate — total local
+  currency spent divided by total USD actually received, not an average
+  of the individual per-transaction rates (which would weight a $10
+  exchange the same as a $10,000 one) — `null` when nothing's been
+  exchanged yet rather than a division-by-zero.
+  `pages/business/ExpenseAnalytics.jsx` follows the same shape every
+  other analytics page does (KPI strip via `KpiCard`, a year-by-year
+  table, `hidden overflow-x-auto sm:block` desktop tables +
+  `MobileListAccordion` `sm:hidden` mobile counterparts throughout) with
+  two deliberate departures: the yearly `YearlyBarChart` pairs `total`
+  against `currencyExchangeSpent` rather than two unrelated counts —
+  both are local-currency money figures so they're directly comparable on
+  one axis, unlike `currencyExchangeUsd`, which is a different currency
+  entirely and would misrepresent scale if plotted alongside either (USD
+  figures are reported separately instead, in the KPI strip and the
+  year-by-year table's own column). And the category breakdown is a
+  small local horizontal-bar block, not `components/BreakdownBars.jsx` —
+  that shared component's fixed `w-6` value column and unformatted
+  `{r.value}` rendering are tuned for the small integer counts every
+  other caller (Licenses' billing-cycle split) passes it, and would
+  either clip or misrender a money figure like `$24700.00`; since this is
+  the only current caller that would need a wider, currency-formatted
+  value column, it stays a page-local block rather than complicating the
+  shared component for one caller. `USD`-denominated figures throughout
+  this page are prefixed with a literal `$`, never `settings.currency_symbol`
+  — a currency exchange result is always US dollars regardless of what
+  the business's own configured currency is.
 - `routes/capitalContributions.js` — CRUD for `capital_contributions`
   (`contributor_name`/`amount`/`contribution_date`/`notes`), mounted at
   `/api/capital-contributions`. This is the deliberate mirror of an
