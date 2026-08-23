@@ -2893,9 +2893,25 @@ frontend stops holding/sending it.
   than a `can()` check, same UX-only caveat. "My account" is appended after
   the filtered links, unconditionally visible to any logged-in user (admin
   or staff) since it's never permission-gated.
-- `pages/Dashboard.jsx` — `SHORTCUTS` (the quick-link tiles) each carry a
-  `module` and are filtered through `can(s.module, 'view')` the same way as
-  `Navbar.jsx`'s/`Sidebar.jsx`'s own links. The whole hero/chart view
+- `pages/Dashboard.jsx` — the page's outer container is `mx-auto max-w-5xl
+  px-4 py-10 sm:px-6 lg:px-8`, matching the same centered-column pattern
+  `pages/portal/PortalDashboard.jsx` already uses for its own dashboard
+  (`mx-auto max-w-5xl px-4 py-10 sm:px-6`) — every other business page in
+  this app (`Clients.jsx`, `Financials.jsx`, `Invoices.jsx`, etc.) is a
+  bare `px-4 py-10 sm:px-6 lg:px-8` with no `max-w-*`, deliberately
+  stretching to fill whatever width is available next to the sidebar
+  (those are list/table pages that benefit from the extra room); Dashboard
+  is the one page here that reads as a "reading" surface — a hero figure,
+  KPI strip, and a handful of stacked cards — so past `lg:` it was capped
+  at `max-w-5xl` and centered rather than letting those cards stretch to
+  fill the full remaining width on a wide desktop screen, which read as
+  inconsistent panel widths (a hero card and KPI strip both stretched
+  near-edge-to-edge, sitting above/below a half-width "Invoices by
+  status"/"Needs attention" pair from the two-column grid that used to sit
+  between them — see below) rather than a single readable column. `SHORTCUTS`
+  (the quick-link tiles) each carry a `module` and are filtered through
+  `can(s.module, 'view')` the same way as `Navbar.jsx`'s/`Sidebar.jsx`'s own
+  links. The whole hero/chart view
   additionally requires `can('financials', 'view')`; a staff user without
   it sees just the filtered shortcut tiles instead (with a "nothing to show
   yet" message if even those are empty), never a loading spinner that never
@@ -2930,10 +2946,18 @@ frontend stops holding/sending it.
   `invoices`/`licenses` view permissions (not `financials`, since a user
   could hold one grant without the other), both best-effort (a failed
   fetch is swallowed, not surfaced as a page error, since this is a
-  supplementary widget). The panel — and the two-column grid it shares
-  with "Invoices by status" — only renders at all when the user holds
-  *either* permission; with neither, "Invoices by status" alone spans the
-  full width rather than leaving an empty half-column next to nothing.
+  supplementary widget). The panel only renders at all when the user holds
+  *either* permission. It originally sat side by side with "Invoices by
+  status" in a `lg:grid-cols-2` row — two half-width cards sandwiched
+  between the full-width hero/KPI-strip/revenue-chart cards above and the
+  full-width recent-payments card below — which is what actually prompted
+  adding the `max-w-5xl` cap above: capping the container's width doesn't
+  by itself fix "every panel should read as the same width" while one row
+  is still split into two half-width columns, so that row now stacks
+  ("Invoices by status" full width, "Needs attention" full width right
+  below it, `flex flex-col gap-6` instead of a two-column `grid`) — every
+  panel on the page is the same width now, not just the same *container*
+  width.
 - `pages/Dashboard.jsx` and `pages/business/Financials.jsx` charts
   (`components/RevenueTrendChart.jsx`, `components/StatusBreakdownChart.jsx`)
   are hand-rolled SVG/CSS, no charting library. Status colors there are

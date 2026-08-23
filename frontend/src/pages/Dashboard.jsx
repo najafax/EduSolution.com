@@ -131,7 +131,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
       <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{greeting()}</p>
       <h1 className="font-display text-3xl font-extrabold text-slate-900 dark:text-white">{firstName}</h1>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{settings?.business_name || user?.email}</p>
@@ -216,7 +216,12 @@ export default function Dashboard() {
             </Accordion>
           </div>
 
-          <div className={`mt-6 grid gap-6 ${canSeeAttentionPanel ? 'lg:grid-cols-2' : ''}`}>
+          {/* Stacked full-width, not a side-by-side grid — every panel on
+              this page reads as the same width so the layout stays
+              consistent top to bottom, rather than this one row narrowing
+              to two half-width cards while everything above/below it stays
+              full width. */}
+          <div className="mt-6 flex flex-col gap-6">
             <Accordion title="Invoices by status">
               <StatusBreakdownChart counts={summary.invoiceCounts} />
             </Accordion>
