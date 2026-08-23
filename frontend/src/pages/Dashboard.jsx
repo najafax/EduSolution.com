@@ -136,7 +136,7 @@ export default function Dashboard() {
       <h1 className="font-display text-3xl font-extrabold text-slate-900 dark:text-white">{firstName}</h1>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{settings?.business_name || user?.email}</p>
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       {!canViewFinancials ? (
         <div className="mt-8">{shortcutsRow()}</div>

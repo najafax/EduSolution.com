@@ -188,11 +188,11 @@ export default function Users() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search users…" />
       </div>
 
-      {error && !showForm && resetTargetId === null && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && !showForm && resetTargetId === null && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit user' : 'New user'} maxWidthClass="max-w-3xl">
         <form onSubmit={handleSubmit}>
-          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+          {error && <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
@@ -321,7 +321,7 @@ export default function Users() {
         title="Reset password"
       >
         <form onSubmit={handleResetPassword} className="flex flex-col gap-3">
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">New password</span>
             <input
@@ -330,7 +330,7 @@ export default function Users() {
               minLength={8}
               value={resetPassword}
               onChange={(e) => setResetPassword(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
           <div className="flex gap-3">

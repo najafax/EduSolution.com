@@ -189,17 +189,17 @@ export default function Expenses() {
         />
       </div>
 
-      {error && !showForm && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && !showForm && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit expense' : 'New expense'} maxWidthClass="max-w-2xl">
         <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
-          {error && <p className="text-sm text-red-600 sm:col-span-2">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400 sm:col-span-2">{error}</p>}
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Category</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Category</span>
             <select
               value={form.category}
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             >
               {categories.map((c) => (
                 <option key={c} value={c}>
@@ -209,7 +209,7 @@ export default function Expenses() {
             </select>
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Amount</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount</span>
             <input
               type="number"
               min="0.01"
@@ -217,51 +217,51 @@ export default function Expenses() {
               required
               value={form.amount}
               onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
           <div className="sm:col-span-2">
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Description</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Description</span>
               <input
                 type="text"
                 required
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
           </div>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Date</span>
-            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Date</span>
+            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
               <input
                 type="date"
                 required
                 value={form.expense_date}
                 onChange={(e) => setForm((f) => ({ ...f, expense_date: e.target.value }))}
-                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none"
+                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
               />
             </div>
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Payee</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Payee</span>
             <input
               type="text"
               value={form.payee}
               onChange={(e) => setForm((f) => ({ ...f, payee: e.target.value }))}
               placeholder="Who was paid — a shareholder, employee, vendor…"
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
           <div className="sm:col-span-2">
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Notes</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
               <input
                 type="text"
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </label>
           </div>
@@ -276,7 +276,7 @@ export default function Expenses() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Cancel
             </button>

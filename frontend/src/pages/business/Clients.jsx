@@ -209,12 +209,12 @@ export default function Clients() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search clients…" />
       </div>
 
-      {error && !showForm && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && !showForm && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit client' : 'New client'} maxWidthClass="max-w-2xl">
         <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
           {error && (
-            <p className="text-sm text-red-600 sm:col-span-2">{error}</p>
+            <p className="text-sm text-red-600 dark:text-red-400 sm:col-span-2">{error}</p>
           )}
           <Field label="Client name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} required />
           <Field label="Email" type="email" value={form.email} onChange={(v) => setForm((f) => ({ ...f, email: v }))} required />
@@ -236,7 +236,7 @@ export default function Clients() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -350,13 +350,13 @@ export default function Clients() {
 function Field({ label, value, onChange, type = 'text', required = false }) {
   return (
     <label className="block">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
       <input
         type={type}
         required={required}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none"
+        className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
       />
     </label>
   );

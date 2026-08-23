@@ -144,7 +144,7 @@ export default function CommandPalette() {
 
         <div className="max-h-96 overflow-y-auto py-2">
           {items.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-slate-500">No results for "{query}".</p>
+            <p className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">No results for "{query}".</p>
           ) : (
             items.map((item, i) => (
               <button
@@ -157,7 +157,7 @@ export default function CommandPalette() {
                 }`}
               >
                 <span className="font-medium text-slate-900 dark:text-white">{item.label}</span>
-                <span className="text-xs text-slate-400">{item.sublabel}</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500">{item.sublabel}</span>
               </button>
             ))
           )}
