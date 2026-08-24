@@ -3623,6 +3623,29 @@ keeps its existing layout.
   — replacing the previous plain "Welcome, {name}" + email line. The hero
   band described above (see "Sidebar navigation" below for the rest of
   this page's redesign) sits directly beneath this greeting, unchanged.
+  **Currency-symbol flash on load**: the hero/KPI figures briefly rendered
+  with the `'$'` fallback symbol before snapping to the business's real
+  `currency_symbol` (e.g. `MVR`) a moment later — `api.financials.summary()`
+  and `api.settings.get()` fire together in the same effect but resolve
+  independently, and the summary fetch usually wins the race, so the page
+  left its "Loading…" state (gated only on `summary`) and painted at least
+  one frame with `symbol = settings?.currency_symbol || '$'` before
+  `settings` itself arrived. Fixed with a `settingsLoaded` flag, set in a
+  `.finally()` alongside the existing `.then()`/`.catch()` on the settings
+  fetch — the loading gate now waits on `!summary || !settingsLoaded`, not
+  `!summary` alone, so the hero never paints until the real symbol (or, for
+  a staff user without `settings:view`, the confirmed-permanent `'$'`
+  fallback — `.finally()` still fires on that 403) is known. Deliberately
+  *not* the same fix as gating on `!settings` directly, which would hang a
+  permission-restricted user on "Loading…" forever, since their settings
+  fetch never succeeds — `settingsLoaded` tracks "the fetch is done" (either
+  outcome), not "the fetch succeeded." The same independent-parallel-fetch
+  race exists on every other page that reads `settings?.currency_symbol ||
+  '$'` (`Financials.jsx`, `InvoiceDetail.jsx`, `Products.jsx`, the analytics
+  pages, etc.) but wasn't reported there and wasn't touched by this fix —
+  it's a narrower, page-by-page bug fix rather than a shared-hook
+  refactor, since each of those pages' own loading-gate conditions differ
+  enough that a generic extraction wasn't the right scope for this pass.
 - `pages/business/InvoiceDetail.jsx` gained a mobile-only (`sm:hidden`)
   gradient hero card between the header actions and the existing Bill-to/
   Details grid: total due in `font-display`, a paid-vs-total progress bar,
