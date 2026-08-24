@@ -24,6 +24,7 @@ export default function ExpenseAnalytics() {
   const canView = can('expenses', 'view');
   const [data, setData] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -32,7 +33,15 @@ export default function ExpenseAnalytics() {
       .analytics(token)
       .then(setData)
       .catch((err) => setError(err.message));
-    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
+    // .finally flips settingsLoaded whether the fetch succeeds or fails —
+    // the loading gate below waits on this too, so money figures never
+    // flash '$' before the real currency symbol arrives (see Dashboard.jsx's
+    // own note on this race for the full story).
+    api.settings
+      .get(token)
+      .then(({ settings }) => setSettings(settings))
+      .catch(() => {})
+      .finally(() => setSettingsLoaded(true));
   }, [token, canView]);
 
   if (!canView) {
@@ -44,7 +53,7 @@ export default function ExpenseAnalytics() {
   const thisYear = data?.byYear.find((y) => y.year === currentYear);
 
   if (error && !data) return <div className="px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6 lg:px-8">{error}</div>;
-  if (!data) return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">Loading…</div>;
+  if (!data || !settingsLoaded) return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">Loading…</div>;
 
   const categoryRows = Object.entries(data.byCategory)
     .filter(([, amount]) => amount > 0)
