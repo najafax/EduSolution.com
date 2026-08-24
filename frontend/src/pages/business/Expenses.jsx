@@ -20,39 +20,54 @@ import IconActionButton from '../../components/IconActionButton';
 import ImportResultsTable from '../../components/ImportResultsTable';
 import { ExpenseIcon, DownloadIcon, UploadIcon, PlusIcon, PencilIcon, TrashIcon, ReportIcon } from '../../components/icons';
 
-// Same template content as pages/business/Import.jsx's own
-// `currency-exchange` entry in its TEMPLATES map — duplicated rather than
-// imported (a plain string, not worth coupling two page files over), same
-// acceptable-duplication call Products.jsx's own PRODUCTS_CSV_TEMPLATE
-// already makes. Keep both in sync if the columns ever change.
-const CURRENCY_EXCHANGE_CSV_TEMPLATE =
-  'description,amount,expense_date,exchange_rate,payee,payee_account_number,usd_destination,notes\n' +
-  'MVR to USD for EduPage renewal,15420,2026-03-20,15.42,,7730000123456,EduPage license renewal,\n' +
-  'MVR to USD for hosting bill,3200,2026-04-02,15.55,,7730000123456,Annual hosting invoice,\n';
+// Same template content as pages/business/Import.jsx's own `expenses`
+// entry in its TEMPLATES map — duplicated rather than imported (a plain
+// string, not worth coupling two page files over), same acceptable-
+// duplication call Products.jsx's own PRODUCTS_CSV_TEMPLATE already
+// makes. Keep both in sync if the columns ever change. Shows a mix of
+// categories on purpose (including one currency-exchange row) — the
+// whole point of this template is to demonstrate that one file can carry
+// every category at once, currency exchange included.
+const EXPENSES_CSV_TEMPLATE =
+  'category,description,amount,expense_date,payee,notes,exchange_rate,payee_account_number,usd_destination\n' +
+  'rent,Office rent for March,15000,2026-03-01,,,,,\n' +
+  'shareholder payments,Q1 dividend,5000,2026-03-15,Jane Doe,,,,\n' +
+  'currency exchange,MVR to USD for EduPage renewal,15420,2026-03-20,,,15.42,7730000123456,EduPage license renewal\n';
 
-function downloadCurrencyExchangeTemplate() {
-  const blob = new Blob([CURRENCY_EXCHANGE_CSV_TEMPLATE], { type: 'text/csv' });
+function downloadExpensesTemplate() {
+  const blob = new Blob([EXPENSES_CSV_TEMPLATE], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'currency-exchange-import-template.csv';
+  a.download = 'expenses-import-template.csv';
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-// The embedded counterpart to the standalone Import page's own
-// `currency-exchange` type (routes/import.js's POST
-// /api/import/currency-exchange backs both — see that route's own
-// processCurrencyExchange() for why this is layered on the generic
-// `expenses` importer rather than a parallel implementation) — asked for
-// directly on this page, same reasoning Products.jsx's own embedded
+// The embedded counterpart to the standalone Import page's own `expenses`
+// type (routes/import.js's POST /api/import/expenses backs both) — asked
+// for directly on this page, same reasoning Products.jsx's own embedded
 // import got: sending someone to the generic Import page just to bring in
-// a batch of currency-exchange records is unnecessary friction. There's no
-// category column in this CSV shape at all — every row is imported as
-// category 'currency exchange' regardless of what (if anything) a stray
-// category value in the file claims, matching the backend's own override.
+// a batch of expenses is unnecessary friction. This one file handles
+// every category, currency exchange included — a row's own `category`
+// column decides what it becomes, exactly like the manual form's own
+// Category dropdown; only a row whose category is `currency exchange`
+// needs `exchange_rate` filled in (see routes/expenses.js's own
+// validation), every other category leaves it blank. This deliberately
+// replaced an earlier version of this modal that only imported currency
+// exchange rows (forcing every row to that one category) — that meant a
+// business with a mixed batch of expenses had to split it into two
+// separate files and two separate imports to bring everything in; a
+// single `expenses` import handles the mix in one pass instead. The
+// standalone Import page's own `currency-exchange` type (still there,
+// still calling the same backend route as `expenses` — see
+// processCurrencyExchange() in routes/import.js) is unaffected: it's
+// still a real convenience for someone whose entire file is nothing but
+// currency exchange rows and would rather not repeat that column value
+// on every line, but it was never the right default for the page where
+// most expenses actually get created.
 function ImportModal({ open, onClose, token, onImported }) {
   const [fileName, setFileName] = useState('');
   const [csvText, setCsvText] = useState('');
@@ -92,7 +107,7 @@ function ImportModal({ open, onClose, token, onImported }) {
     setError('');
     setCommitted(null);
     try {
-      setPreview(await api.import.run('currency-exchange', csvText, false, token));
+      setPreview(await api.import.run('expenses', csvText, false, token));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -104,7 +119,7 @@ function ImportModal({ open, onClose, token, onImported }) {
     setBusy(true);
     setError('');
     try {
-      const result = await api.import.run('currency-exchange', csvText, true, token);
+      const result = await api.import.run('expenses', csvText, true, token);
       setCommitted(result);
       setPreview(null);
       if (result.imported > 0) onImported();
@@ -116,22 +131,22 @@ function ImportModal({ open, onClose, token, onImported }) {
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title="Import currency exchange transactions" maxWidthClass="max-w-2xl">
+    <Modal open={open} onClose={handleClose} title="Import expenses" maxWidthClass="max-w-2xl">
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Bring in a batch of currency exchange expenses from a CSV file. Preview first to catch errors — nothing is
-        saved until you confirm. Every row is imported as an expense with category "currency exchange", so there's no
-        category column to fill in.
+        Bring in a batch of expenses from a CSV file — any category, including currency exchange, all in one file.
+        Preview first to catch errors — nothing is saved until you confirm.
       </p>
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
         <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Expected columns</p>
         <p className="mt-1 break-words font-mono text-xs text-slate-600 dark:text-slate-400">
-          description*, amount*, expense_date*, exchange_rate*, payee, payee_account_number, usd_destination, notes
+          category*, description*, amount*, expense_date*, payee, notes, exchange_rate (required for currency
+          exchange), payee_account_number, usd_destination
         </p>
         <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">* required</p>
         <button
           type="button"
-          onClick={downloadCurrencyExchangeTemplate}
+          onClick={downloadExpensesTemplate}
           className="mt-3 min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
         >
           Download template
@@ -378,7 +393,7 @@ export default function Expenses() {
               className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               <UploadIcon width={16} height={16} />
-              Import currency exchange
+              Import CSV
             </button>
           )}
           {canManage && (
