@@ -85,7 +85,19 @@ function parseCsv(text) {
   const nonEmpty = rows.filter((r) => !(r.length === 1 && r[0] === ''));
   if (nonEmpty.length === 0) return [];
 
-  const headers = nonEmpty[0].map((h) => h.trim().toLowerCase());
+  // Every import validator in routes/import.js reads its row object by a
+  // literal snake_case key (row.expense_date, row.exchange_rate, …), but
+  // this app's own "Export CSV" buttons write human-readable Title Case
+  // headers ("Expense date", "Exchange rate") for readability in a
+  // spreadsheet — collapsing whitespace runs into underscores here means
+  // an exported file re-uploaded to the matching import (the natural
+  // "download to back up, delete, re-import" workflow the export/import
+  // pair on the same page invites) still resolves to the right keys,
+  // without making the export itself look like raw column names. This is
+  // a no-op for every hand-authored CSV using the already-underscored
+  // template headers (import.js's own TEMPLATES), since those never
+  // contain a space to begin with.
+  const headers = nonEmpty[0].map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'));
   return nonEmpty.slice(1).map((r) => {
     const obj = {};
     headers.forEach((h, idx) => {
