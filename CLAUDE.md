@@ -3914,16 +3914,62 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
   not page-scoped) stops a second `vite:preloadError` in the same page load
   from triggering a second reload, so a *genuinely* broken deploy (not just
   a stale local cache) fails once and stays failed rather than
-  reload-looping the tab forever. `registerType: 'autoUpdate'` in
-  `vite.config.js`'s `VitePWA()` config already handles the common case in
-  the background (periodically detecting a new service worker and
-  reloading), but there's a real window between "tab open, deploy ships"
-  and "background check notices and reloads" where a click straight into a
-  changed route loses that race — `vite:preloadError` is the direct,
-  immediate catch for exactly that gap, not a replacement for
-  `autoUpdate`. Still a real, worthwhile fix for the failure mode it
-  targets, but see below for why it didn't fix the bug it was originally
-  written for.
+  reload-looping the tab forever. This note originally claimed
+  `registerType: 'autoUpdate'` already handled the common case in the
+  background (periodically detecting a new service worker and reloading) —
+  that turned out to be wrong, not just incomplete; see "Service worker
+  update wiring" below for what `autoUpdate` actually does on its own
+  (nothing, without the fix documented there) and why. Still a real,
+  worthwhile fix for the failure mode it targets (a stale *chunk map*
+  specifically, on a click into a changed route) — it just isn't, and
+  never was, a general "the app is running an old version" fix the way
+  this note first framed it.
+- **Service worker update wiring**: a report of "I don't see the
+  notification center on mobile" (an admin, on the live deployed site —
+  ruling out both a code bug, since the feature worked correctly in every
+  local/production-build test, and a permission-gating explanation, since
+  admins always hold every permission) turned out to be the real version of
+  the gap the stale-chunk note above only partially closes: a tab (or
+  installed PWA) left open across a deploy, never navigated, never
+  reloaded. `registerType: 'autoUpdate'` in `vite.config.js`'s `VitePWA()`
+  only controls how the *generated service worker itself* behaves once a
+  new version is found and activated (`skipWaiting`/`clientsClaim`, so it
+  takes over instantly rather than waiting for every tab to close) — it
+  does nothing to make the browser actually go looking for that new
+  version, and does nothing to reload an already-open tab once it does.
+  That behavior only exists in vite-plugin-pwa's `virtual:pwa-register`
+  module — and this app was never importing it. `injectRegister` defaults
+  to `'auto'`, which resolves to the plugin's own bare, auto-injected
+  `registerSW.js` (`if ('serviceWorker' in navigator) { … .register('/sw.js') }`,
+  literally nothing else) *unless* the app's own source statically imports
+  `virtual:pwa-register` somewhere — which this app never did, so it had
+  silently been running the dumb version the entire time. The bare script
+  has no listener for a new service worker activating, so even once the
+  browser did eventually notice a new `sw.js` (only guaranteed on
+  navigation, or roughly once every 24 hours in the background otherwise —
+  an infrequent check for a dashboard tab someone just leaves open), the
+  already-rendered page never learned about it and kept running the old
+  JS in memory indefinitely. `main.jsx` now imports `registerSW` from
+  `virtual:pwa-register` (vite-plugin-pwa detects that import at build
+  time and swaps to it instead of injecting the bare script — confirmed by
+  checking `dist/index.html` no longer references `registerSW.js` after
+  this change) with an `onRegisteredSW` callback that polls
+  `registration.update()` every hour, so an idle open tab checks for a new
+  deploy on its own schedule rather than whatever infrequent interval the
+  browser would otherwise pick. With `registerType: 'autoUpdate'`, the
+  module's own internal `activated` listener calls `window.location.reload()`
+  automatically the moment a new service worker takes over — no prompt, no
+  `onNeedRefresh` needed, matching the "silent, automatic" contract
+  `autoUpdate` was always supposed to provide. Verified end-to-end (not
+  just "does it register") with two real builds: opened a page against a
+  v1 build (`window.__BUILD_MARKER__` unset), swapped the served `dist/`
+  files to a v2 build in place — the same thing a real redeploy does to an
+  already-open tab — called `registration.update()` (simulating the hourly
+  check firing), and confirmed the page reloaded on its own and came back
+  up on the same route (`/dashboard`) now running v2's code
+  (`window.__BUILD_MARKER__ === 'v2'`). Before this fix, that same test
+  never reloads — the marker stays unset forever, exactly matching what
+  the mobile report described.
 - **Error boundaries**: nothing in this app caught a render-time crash
   anywhere until `components/ErrorBoundary.jsx` was added — React's default
   behavior with no error boundary in the tree is to unmount *everything*
