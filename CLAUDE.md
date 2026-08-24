@@ -3700,6 +3700,37 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
   was missing before, so `npm run preview` (the one workflow command that
   actually serves the real production build, the only way to verify
   chunking like this end to end) had no backend connectivity at all.
+- **Stale-chunk recovery after a deploy**: every chunk's filename carries a
+  content hash, so a browser tab left open across a deploy is still
+  holding the *old* `index.html`'s chunk map. Navigating to a route whose
+  chunk was renamed or removed by the new deploy 404s that dynamic
+  `import()` — and since nothing in this app wraps the lazy routes in an
+  error boundary (there isn't one anywhere in the tree), that unhandled
+  rejection unmounts the whole app instead of just the one route, landing
+  on a blank page with no way back short of a manual hard refresh. This
+  is exactly what happened the first time `ExpenseAnalytics.jsx` shipped:
+  reported as "the page is just blank," reproduced nowhere locally (fresh
+  dev server, fresh production build via `npm run preview`, empty data,
+  real data — every combination rendered correctly with zero console
+  errors), which is itself the signature of this bug: it's not a bug *in*
+  the new page, it's a bug in *reaching* any newly-added page from a tab
+  that loaded before the deploy that added it. `main.jsx` now listens for
+  `vite:preloadError` — the event Vite's own dynamic-import wrapper fires
+  specifically when a chunk fails to load — and calls
+  `window.location.reload()` once, which fetches the current `index.html`
+  and chunk map and resolves the failed navigation transparently. A
+  plain module-scoped boolean (not `sessionStorage`, since the failure
+  mode this guards is JS-context-scoped, not page-scoped) stops a second
+  `vite:preloadError` in the same page load from triggering a second
+  reload, so a *genuinely* broken deploy (not just a stale local cache)
+  fails once and stays failed rather than reload-looping the tab forever.
+  `registerType: 'autoUpdate'` in `vite.config.js`'s `VitePWA()` config
+  already handles the common case in the background (periodically
+  detecting a new service worker and reloading), but there's a real
+  window between "tab open, deploy ships" and "background check notices
+  and reloads" where a click straight into a changed route loses that
+  race — `vite:preloadError` is the direct, immediate catch for exactly
+  that gap, not a replacement for `autoUpdate`.
 
 ### Auth flow end-to-end
 
