@@ -2799,22 +2799,39 @@ frontend stops holding/sending it.
   page's own `load()` (passed in as `onImported`) so the product list
   behind it refreshes without the user having to close the modal and
   reload manually.
-  **Currency exchange import, embedded on the Expenses page**: the same
-  pattern again, this time for `routes/import.js`'s `currency-exchange`
-  type — `pages/business/Expenses.jsx` gets an "Import currency exchange"
-  header button (between "Export Excel" and "New expense", same
-  `UploadIcon`) opening its own local `ImportModal`, a near-identical copy
-  of `Products.jsx`'s (fixed column hint instead of a type selector, no
-  `category` field since this type's whole point is that every row is
-  already `currency exchange`, same preview-then-confirm/`ImportResultsTable`
-  contract calling `api.import.run('currency-exchange', ...)`).
-  `CURRENCY_EXCHANGE_CSV_TEMPLATE` duplicates `Import.jsx`'s own
-  `currency-exchange` template entry, same reasoning
+  **Expense import, embedded on the Expenses page**: the same pattern
+  again, this time for `routes/import.js`'s general `expenses` type —
+  `pages/business/Expenses.jsx` gets an "Import CSV" header button
+  (between "Export Excel" and "New expense", same `UploadIcon`) opening
+  its own local `ImportModal`, a near-identical copy of `Products.jsx`'s
+  (fixed column hint instead of a type selector, same preview-then-confirm/
+  `ImportResultsTable` contract calling `api.import.run('expenses', ...)`).
+  This one file handles every category at once, currency exchange
+  included — a row's own `category` column decides what it becomes, and
+  only a `currency exchange` row needs `exchange_rate` filled in, exactly
+  matching the manual form's own validation. This modal originally called
+  the dedicated `currency-exchange` type instead (forcing every row to
+  that one category, with no `category` column in the CSV at all) — asked
+  for first, and genuinely simpler for a file that really was 100%
+  currency exchange rows, but it meant a business with a mixed batch of
+  real expenses had to split it into two separate files and two separate
+  imports just to bring everything in. Switched to the general `expenses`
+  type once that gap was pointed out, so this one button now covers
+  everything a business would actually want to bulk-import here in a
+  single pass. `EXPENSES_CSV_TEMPLATE` duplicates `Import.jsx`'s own
+  `expenses` template entry (deliberately showing a mix of categories,
+  including one currency-exchange row, since demonstrating that mix is
+  the whole point of this template now), same reasoning
   `PRODUCTS_CSV_TEMPLATE` above already documents. `onImported` is wired to
   the page's own `load()` the same way, so a successful import refreshes
-  the expense list (and, since these rows are visible there too, the page's
-  own currency-exchange summary once it's re-fetched) without a manual
-  reload.
+  the expense list (and, since currency-exchange rows are visible there
+  too, the page's own currency-exchange summary once it's re-fetched)
+  without a manual reload. The standalone Import page's own dedicated
+  `currency-exchange` type (see `routes/import.js` above) is untouched and
+  still available there — it's still a real convenience for a file that's
+  genuinely 100% currency exchange rows and would rather skip repeating
+  that column value on every line, it just was never the right default
+  for the page where most expenses actually get created.
 - `components/GlobalSearch.jsx` — a debounced (250ms) search box that calls
   `api.search.query()` and renders a grouped dropdown (clients/quotes/
   invoices/expenses); clicking a result navigates there. Mounted three times
