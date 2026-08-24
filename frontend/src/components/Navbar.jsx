@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
 import Sidebar from './Sidebar';
 import ThemeToggle from './ThemeToggle';
+import NotificationCenter from './NotificationCenter';
 import { SearchIcon, XIcon } from './icons';
 
 // `module: null` means always visible to any logged-in user regardless of
@@ -78,6 +79,7 @@ export default function Navbar() {
               >
                 {phoneSearchOpen ? <XIcon width={22} height={22} /> : <SearchIcon width={22} height={22} />}
               </button>
+              <NotificationCenter />
               <ThemeToggle />
               <button
                 onClick={() => setMenuOpen((v) => !v)}

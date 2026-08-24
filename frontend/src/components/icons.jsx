@@ -359,6 +359,18 @@ export function SettingsIcon(props) {
   );
 }
 
+// The upload counterpart to DownloadIcon just above — same tray, arrow
+// reversed to point up out of it. Used for "Import CSV" actions (see
+// Products.jsx's bulk import button).
+export function UploadIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 12.5V3M6.5 6.5 10 3l3.5 3.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 14.5V16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function LogoutIcon(props) {
   return (
     <svg {...base} {...props}>

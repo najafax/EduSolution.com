@@ -846,6 +846,114 @@ function processLicenses(rows, commit) {
   return { results, imported };
 }
 
+// ---- Products -------------------------------------------------------------------
+
+function validateProductRow(row) {
+  const name = (row.name || '').trim();
+  if (!name) return { ok: false, message: 'name is required' };
+
+  const unitPrice = parseNumber(row.unit_price);
+  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+    return { ok: false, message: 'unit_price must be a non-negative number' };
+  }
+
+  const taxRateRaw = (row.tax_rate || '').trim();
+  const taxRate = taxRateRaw ? parseNumber(row.tax_rate) : 0;
+  if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100) {
+    return { ok: false, message: 'tax_rate must be a number between 0 and 100' };
+  }
+
+  // Same "opt-in, defaults to hidden" convention as the manual form's own
+  // checkbox (see routes/products.js) — any value other than a recognizable
+  // truthy string leaves a product out of the client portal.
+  const visibleInPortal = ['true', 'yes', '1', 'y'].includes((row.visible_in_portal || '').trim().toLowerCase());
+
+  return {
+    ok: true,
+    values: { name, description: (row.description || '').trim(), unitPrice, taxRate, visibleInPortal },
+  };
+}
+
+// Products have no client to disambiguate by, so a row is matched to an
+// existing product purely by name (trimmed, case-insensitive) — same
+// export → edit → re-import safety routes/licenses.js's own
+// existingLicenseMap() already established for that entity; see its own
+// comment for the reasoning. A matching row updates the product in place
+// instead of inserting a duplicate.
+function existingProductMap() {
+  const rows = db.prepare('SELECT id, name FROM products').all();
+  const map = new Map();
+  for (const row of rows) map.set(row.name.trim().toLowerCase(), row.id);
+  return map;
+}
+
+function processProducts(rows, commit) {
+  const existingProducts = existingProductMap();
+  const seenNames = new Map(); // name.toLowerCase() -> the first row number that used it
+  const results = [];
+  let imported = 0;
+
+  const insert = db.prepare(
+    'INSERT INTO products (name, description, unit_price, tax_rate, visible_in_portal) VALUES (?, ?, ?, ?, ?)',
+  );
+  // Deliberately never touches name — an update is a correction to an
+  // already-existing product matched by that exact name, not a rename;
+  // renaming (if ever wanted) stays a manual edit on the Products page.
+  const update = db.prepare(
+    `UPDATE products SET description = ?, unit_price = ?, tax_rate = ?, visible_in_portal = ?, updated_at = datetime('now') WHERE id = ?`,
+  );
+
+  rows.forEach((row, index) => {
+    const rowNumber = index + 2;
+    const outcome = validateProductRow(row);
+    if (!outcome.ok) {
+      results.push({ row: rowNumber, status: 'error', message: outcome.message, preview: row.name || '' });
+      return;
+    }
+    const v = outcome.values;
+    const key = v.name.toLowerCase();
+    if (seenNames.has(key)) {
+      results.push({
+        row: rowNumber,
+        status: 'error',
+        message: `duplicate: "${v.name}" also appears on row ${seenNames.get(key)} in this file`,
+        preview: v.name,
+      });
+      return;
+    }
+    seenNames.set(key, rowNumber);
+
+    const existingId = existingProducts.get(key);
+    if (commit) {
+      let productId;
+      if (existingId) {
+        update.run(v.description, v.unitPrice, v.taxRate, v.visibleInPortal ? 1 : 0, existingId);
+        productId = existingId;
+      } else {
+        const result = insert.run(v.name, v.description, v.unitPrice, v.taxRate, v.visibleInPortal ? 1 : 0);
+        productId = result.lastInsertRowid;
+      }
+      imported += 1;
+      results.push({
+        row: rowNumber,
+        status: 'ok',
+        message: existingId ? 'updated existing product' : 'imported',
+        preview: v.name,
+        id: productId,
+      });
+    } else {
+      results.push({
+        row: rowNumber,
+        status: 'ok',
+        message: existingId ? 'ready to update existing product' : 'ready to import',
+        preview: v.name,
+      });
+    }
+  });
+
+  return { results, imported };
+}
+
 // ---- Route --------------------------------------------------------------------
 
 const HANDLERS = {
@@ -854,13 +962,16 @@ const HANDLERS = {
   invoices: processInvoices,
   quotes: processQuotes,
   licenses: processLicenses,
+  products: processProducts,
 };
 
 router.post('/:type', (req, res) => {
   const { type } = req.params;
   const handler = HANDLERS[type];
   if (!handler) {
-    return res.status(400).json({ error: `Unknown import type "${type}". Must be one of: clients, expenses, invoices, quotes, licenses.` });
+    return res
+      .status(400)
+      .json({ error: `Unknown import type "${type}". Must be one of: clients, expenses, invoices, quotes, licenses, products.` });
   }
 
   const { csv, commit = false } = req.body || {};
