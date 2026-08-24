@@ -280,6 +280,29 @@ function processExpenses(rows, commit) {
   return { results, imported };
 }
 
+// A dedicated import type for currency-exchange rows specifically, layered
+// entirely on top of processExpenses()/validateExpenseRow() above rather
+// than a parallel implementation — every currency-exchange expense is
+// still, underneath, a plain `expenses` row with `category = 'currency
+// exchange'` (see routes/expenses.js's own "Currency exchange details"
+// note), so this just forces that category onto every row before handing
+// off to the exact same validator/inserter the generic `expenses` type
+// already uses. This exists because the generic `expenses` importer
+// technically already supports currency-exchange rows (a `category` column
+// set to `currency exchange` on each row, per its own CSV template), but
+// making someone repeat that exact string on every row of a CSV that's
+// *entirely* currency exchanges is unnecessary friction — this type drops
+// the `category` column from the CSV shape altogether (any value present
+// there is silently overridden, not read) and every row goes straight to
+// the `exchange_rate`-required validation branch, since that branch is
+// keyed on `category === 'currency exchange'` and that's now guaranteed.
+function processCurrencyExchange(rows, commit) {
+  return processExpenses(
+    rows.map((row) => ({ ...row, category: 'currency exchange' })),
+    commit,
+  );
+}
+
 // Shared by invoice and quote rows: matched by email first (the primary,
 // unambiguous key), falling back to an exact client_name match — some
 // historical data identifies a client by a name/reference code rather than
@@ -963,15 +986,16 @@ const HANDLERS = {
   quotes: processQuotes,
   licenses: processLicenses,
   products: processProducts,
+  'currency-exchange': processCurrencyExchange,
 };
 
 router.post('/:type', (req, res) => {
   const { type } = req.params;
   const handler = HANDLERS[type];
   if (!handler) {
-    return res
-      .status(400)
-      .json({ error: `Unknown import type "${type}". Must be one of: clients, expenses, invoices, quotes, licenses, products.` });
+    return res.status(400).json({
+      error: `Unknown import type "${type}". Must be one of: clients, expenses, invoices, quotes, licenses, products, currency-exchange.`,
+    });
   }
 
   const { csv, commit = false } = req.body || {};
@@ -1005,11 +1029,18 @@ router.post('/:type', (req, res) => {
     const label =
       type === 'invoices' && outcome.paymentsImported > 0
         ? `${outcome.imported} invoices (${outcome.paymentsImported} with payment history)`
-        : `${outcome.imported} ${type}`;
+        : type === 'currency-exchange'
+          ? `${outcome.imported} currency exchange expenses`
+          : `${outcome.imported} ${type}`;
+    // currency-exchange rows are, under the hood, plain `expenses` rows
+    // (see processCurrencyExchange() above) — logged with the same
+    // entityType every other expense mutation already uses rather than a
+    // synthetic 'currency-exchange' type nothing else in activity_log
+    // would ever produce.
     logActivity({
       userName: req.user.name,
       action: 'bulk imported',
-      entityType: type,
+      entityType: type === 'currency-exchange' ? 'expense' : type,
       entityId: null,
       entityLabel: `${label} from CSV`,
     });

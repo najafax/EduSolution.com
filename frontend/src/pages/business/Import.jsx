@@ -37,6 +37,12 @@ const TYPES = [
     columns: 'name*, description, unit_price*, tax_rate, visible_in_portal',
     note: 'A row matching an existing product by name (case-insensitive) updates it in place instead of creating a duplicate — safe to re-import an edited export.',
   },
+  {
+    value: 'currency-exchange',
+    label: 'Currency exchange',
+    columns: 'description*, amount*, expense_date*, exchange_rate*, payee, payee_account_number, usd_destination, notes',
+    note: "Every row is imported as an expense with category \"currency exchange\" — there's no category column, since this type is only for that one category. Same as importing under the general Expenses type with every row's category already set.",
+  },
 ];
 
 const TEMPLATES = {
@@ -63,6 +69,10 @@ const TEMPLATES = {
     'name,description,unit_price,tax_rate,visible_in_portal\n' +
     'LMS Pro Annual License,Learning management system — annual plan,1200,0,true\n' +
     'Consulting Hour,General consulting, billed hourly,75,0,false\n',
+  'currency-exchange':
+    'description,amount,expense_date,exchange_rate,payee,payee_account_number,usd_destination,notes\n' +
+    'MVR to USD for EduPage renewal,15420,2026-03-20,15.42,,7730000123456,EduPage license renewal,\n' +
+    'MVR to USD for hosting bill,3200,2026-04-02,15.55,,7730000123456,Annual hosting invoice,\n',
 };
 
 function downloadTemplate(type) {

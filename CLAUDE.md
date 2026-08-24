@@ -1129,8 +1129,9 @@ deliberately untouched by either, always returning every row.
   a formula regardless of its leading character. `writeBuffer()` is async
   (unlike `toCsv`), so every `GET /export.xlsx` handler is an `async` route.
 - `routes/import.js` — `POST /api/import/:type` (`type` is `clients`,
-  `expenses`, `invoices`, `quotes`, `licenses`, or `products`) bulk-imports
-  historical data from CSV text in the request body. Always validates every row first; `commit: false`
+  `expenses`, `invoices`, `quotes`, `licenses`, `products`, or
+  `currency-exchange`) bulk-imports historical data from CSV text in the
+  request body. Always validates every row first; `commit: false`
   (the default) is a dry-run that reports what *would* happen with no DB
   writes, `commit: true` actually inserts the valid rows and skips the
   invalid ones — the frontend always previews before offering to commit.
@@ -1297,6 +1298,30 @@ deliberately untouched by either, always returning every row.
   `duplicate: "..." also appears on row N` error rather than silently
   updating the same product twice from one batch. `imported` counts every
   row that resolved to a write (insert or update).
+  **`currency-exchange`** (`processCurrencyExchange()`) isn't a distinct
+  entity — every currency-exchange transaction is, underneath, a plain
+  `expenses` row with `category = 'currency exchange'` (the general
+  `expenses` type above already supports importing these via a `category`
+  column set on each row), so this type is a thin wrapper rather than a
+  parallel implementation: it maps every row to `{ ...row, category:
+  'currency exchange' }` and hands the whole batch straight to
+  `processExpenses()`/`validateExpenseRow()` above, unchanged. The only
+  real difference is the CSV shape this type expects — no `category`
+  column at all (any value present there is silently discarded, not read;
+  every row becomes `currency exchange` regardless), so `description`,
+  `amount`, `expense_date`, and `exchange_rate` are all required on every
+  row (the last one only because `validateExpenseRow()`'s own
+  `category === 'currency exchange'` branch is now unconditionally true).
+  Exists purely so a batch of currency-exchange records — the one category
+  with its own dedicated detail view (`routes/expenses.js`'s "Currency
+  exchange details", `ExpenseAnalytics.jsx`'s own transactions table) —
+  doesn't require repeating the same literal string on every row of an
+  otherwise-uniform CSV. The success-path activity log entry (below) reads
+  `entityType: 'expense'`, not the literal `'currency-exchange'` route
+  param, and its label says "N currency exchange expenses" rather than the
+  generic `${imported} ${type}` every other type gets, since these rows
+  are genuinely just expenses and should read that way in the feed, not as
+  a fabricated entity type nothing else in `activity_log` ever produces.
 - `lib/backup.js` — `runBackup()`: skips entirely if `BACKUP_S3_BUCKET`
   isn't set. Otherwise runs `VACUUM INTO` to write a consistent snapshot of
   the live database (safe against catching a WAL-mode write mid-flight,
@@ -2751,8 +2776,8 @@ frontend stops holding/sending it.
   identical table — see `pages/business/Products.jsx`'s own embedded
   import flow below — rather than staying a private component only
   `Import.jsx` could reach.
-  **Products import, embedded on the Products page itself**: unlike every
-  other importable entity, which only has the generic `Import.jsx` flow,
+  **Products import, embedded on the Products page itself**: unlike most
+  importable entities, which only have the generic `Import.jsx` flow,
   `pages/business/Products.jsx` also gets its own "Import CSV" header
   button (next to "New product", `UploadIcon` — the reversed-arrow
   counterpart to `DownloadIcon`, see `components/icons.jsx`) opening a
@@ -2774,6 +2799,22 @@ frontend stops holding/sending it.
   page's own `load()` (passed in as `onImported`) so the product list
   behind it refreshes without the user having to close the modal and
   reload manually.
+  **Currency exchange import, embedded on the Expenses page**: the same
+  pattern again, this time for `routes/import.js`'s `currency-exchange`
+  type — `pages/business/Expenses.jsx` gets an "Import currency exchange"
+  header button (between "Export Excel" and "New expense", same
+  `UploadIcon`) opening its own local `ImportModal`, a near-identical copy
+  of `Products.jsx`'s (fixed column hint instead of a type selector, no
+  `category` field since this type's whole point is that every row is
+  already `currency exchange`, same preview-then-confirm/`ImportResultsTable`
+  contract calling `api.import.run('currency-exchange', ...)`).
+  `CURRENCY_EXCHANGE_CSV_TEMPLATE` duplicates `Import.jsx`'s own
+  `currency-exchange` template entry, same reasoning
+  `PRODUCTS_CSV_TEMPLATE` above already documents. `onImported` is wired to
+  the page's own `load()` the same way, so a successful import refreshes
+  the expense list (and, since these rows are visible there too, the page's
+  own currency-exchange summary once it's re-fetched) without a manual
+  reload.
 - `components/GlobalSearch.jsx` — a debounced (250ms) search box that calls
   `api.search.query()` and renders a grouped dropdown (clients/quotes/
   invoices/expenses); clicking a result navigates there. Mounted three times
