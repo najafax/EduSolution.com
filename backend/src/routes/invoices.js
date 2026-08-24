@@ -152,61 +152,74 @@ router.get('/export.xlsx', view, async (req, res) => {
 const round2 = (n) => Math.round(n * 100) / 100;
 
 router.get('/analytics', view, (req, res) => {
-  const invoices = db.prepare('SELECT id, client_id, status, issue_date, total, amount_paid FROM invoices').all();
-  const payments = db.prepare('SELECT invoice_id, amount, paid_at FROM payments').all();
-  const voidEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'invoice' AND action = 'voided'").all();
+  try {
+    const invoices = db.prepare('SELECT id, client_id, status, issue_date, total, amount_paid FROM invoices').all();
+    const payments = db.prepare('SELECT invoice_id, amount, paid_at FROM payments').all();
+    const voidEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'invoice' AND action = 'voided'").all();
 
-  const yearOf = (dateStr) => dateStr.slice(0, 4);
-  const currentYear = new Date().getFullYear();
-  const years = new Set([currentYear]);
-  [...invoices.map((i) => i.issue_date), ...payments.map((p) => p.paid_at), ...voidEvents.map((v) => v.created_at)].forEach((d) =>
-    years.add(Number(yearOf(d))),
-  );
-  const minYear = Math.min(...years);
+    const currentYear = new Date().getFullYear();
+    // See routes/expenses.js's own GET /analytics for why this can't be a
+    // bare `dateStr.slice(0, 4)` — a blank/malformed date (a pre-validation
+    // row, a direct DB edit) would otherwise either throw or, worse, silently
+    // compute as year 0 and blow the loop below out to ~2000 iterations.
+    // yearOf() returns null for anything that isn't a plausible year, and
+    // such a row is simply left out of the yearly breakdown.
+    const yearOf = (dateStr) => {
+      if (typeof dateStr !== 'string' || dateStr.length < 4) return null;
+      const y = Number(dateStr.slice(0, 4));
+      return Number.isInteger(y) && y >= 1990 && y <= currentYear + 1 ? y : null;
+    };
+    const validYears = [...invoices.map((i) => i.issue_date), ...payments.map((p) => p.paid_at), ...voidEvents.map((v) => v.created_at)]
+      .map(yearOf)
+      .filter((y) => y !== null);
+    const minYear = validYears.length ? Math.min(currentYear, ...validYears) : currentYear;
 
-  const byYear = [];
-  for (let year = currentYear; year >= minYear; year--) {
-    const y = String(year);
-    const issuedThisYear = invoices.filter((i) => yearOf(i.issue_date) === y);
-    const paymentsThisYear = payments.filter((p) => yearOf(p.paid_at) === y);
-    byYear.push({
-      year,
-      issued: issuedThisYear.length,
-      amountInvoiced: round2(issuedThisYear.filter((i) => i.status !== 'void').reduce((sum, i) => sum + i.total, 0)),
-      paymentsReceived: paymentsThisYear.length,
-      amountCollected: round2(paymentsThisYear.reduce((sum, p) => sum + p.amount, 0)),
-      voided: voidEvents.filter((v) => yearOf(v.created_at) === y).length,
+    const byYear = [];
+    for (let year = currentYear; year >= minYear; year--) {
+      const issuedThisYear = invoices.filter((i) => yearOf(i.issue_date) === year);
+      const paymentsThisYear = payments.filter((p) => yearOf(p.paid_at) === year);
+      byYear.push({
+        year,
+        issued: issuedThisYear.length,
+        amountInvoiced: round2(issuedThisYear.filter((i) => i.status !== 'void').reduce((sum, i) => sum + i.total, 0)),
+        paymentsReceived: paymentsThisYear.length,
+        amountCollected: round2(paymentsThisYear.reduce((sum, p) => sum + p.amount, 0)),
+        voided: voidEvents.filter((v) => yearOf(v.created_at) === year).length,
+      });
+    }
+
+    const byStatus = db
+      .prepare('SELECT status, COUNT(*) AS c FROM invoices GROUP BY status')
+      .all()
+      .reduce((acc, row) => ({ ...acc, [row.status]: row.c }), { draft: 0, sent: 0, paid: 0, void: 0 });
+
+    const topClients = db
+      .prepare(
+        `SELECT clients.id, clients.name, COUNT(*) AS invoice_count, COALESCE(SUM(invoices.total), 0) AS total_amount
+         FROM invoices JOIN clients ON clients.id = invoices.client_id
+         WHERE invoices.status != 'void'
+         GROUP BY clients.id
+         ORDER BY total_amount DESC, invoice_count DESC
+         LIMIT 5`,
+      )
+      .all();
+
+    res.json({
+      byYear,
+      byStatus,
+      topClients,
+      totals: {
+        totalInvoices: invoices.length,
+        totalInvoiced: round2(invoices.filter((i) => i.status !== 'void').reduce((sum, i) => sum + i.total, 0)),
+        totalCollected: round2(payments.reduce((sum, p) => sum + p.amount, 0)),
+        totalOutstanding: round2(invoices.filter((i) => i.status === 'sent').reduce((sum, i) => sum + (i.total - i.amount_paid), 0)),
+        totalVoided: byStatus.void,
+      },
     });
+  } catch (err) {
+    console.error('GET /api/invoices/analytics failed:', err);
+    res.status(500).json({ error: 'Failed to load invoice analytics' });
   }
-
-  const byStatus = db
-    .prepare('SELECT status, COUNT(*) AS c FROM invoices GROUP BY status')
-    .all()
-    .reduce((acc, row) => ({ ...acc, [row.status]: row.c }), { draft: 0, sent: 0, paid: 0, void: 0 });
-
-  const topClients = db
-    .prepare(
-      `SELECT clients.id, clients.name, COUNT(*) AS invoice_count, COALESCE(SUM(invoices.total), 0) AS total_amount
-       FROM invoices JOIN clients ON clients.id = invoices.client_id
-       WHERE invoices.status != 'void'
-       GROUP BY clients.id
-       ORDER BY total_amount DESC, invoice_count DESC
-       LIMIT 5`,
-    )
-    .all();
-
-  res.json({
-    byYear,
-    byStatus,
-    topClients,
-    totals: {
-      totalInvoices: invoices.length,
-      totalInvoiced: round2(invoices.filter((i) => i.status !== 'void').reduce((sum, i) => sum + i.total, 0)),
-      totalCollected: round2(payments.reduce((sum, p) => sum + p.amount, 0)),
-      totalOutstanding: round2(invoices.filter((i) => i.status === 'sent').reduce((sum, i) => sum + (i.total - i.amount_paid), 0)),
-      totalVoided: byStatus.void,
-    },
-  });
 });
 
 router.post('/', manage, (req, res) => {

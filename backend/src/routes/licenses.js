@@ -183,71 +183,91 @@ router.get('/export.xlsx', view, async (req, res) => {
 // already is for a different figure — not a claim about what was actually
 // billed that year.
 router.get('/analytics', view, (req, res) => {
-  const licenses = db.prepare('SELECT id, client_id, billing_cycle, amount, start_date FROM licenses').all();
-  const renewals = db.prepare('SELECT license_id, renewed_at FROM license_renewals').all();
-  const billingChanges = db
-    .prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'changed billing cycle'")
-    .all();
-  const cancellations = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'cancelled'").all();
-  const reactivations = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'reactivated'").all();
+  try {
+    const licenses = db.prepare('SELECT id, client_id, billing_cycle, amount, start_date FROM licenses').all();
+    const renewals = db.prepare('SELECT license_id, renewed_at FROM license_renewals').all();
+    const billingChanges = db
+      .prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'changed billing cycle'")
+      .all();
+    const cancellations = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'cancelled'").all();
+    const reactivations = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'reactivated'").all();
 
-  const amountByLicenseId = new Map(licenses.map((l) => [l.id, l.amount]));
-  const yearOf = (dateStr) => dateStr.slice(0, 4);
-  const currentYear = new Date().getFullYear();
+    const amountByLicenseId = new Map(licenses.map((l) => [l.id, l.amount]));
+    const currentYear = new Date().getFullYear();
+    // See routes/expenses.js's own GET /analytics for why this can't be a
+    // bare `dateStr.slice(0, 4)` — a blank/malformed date would otherwise
+    // either throw or silently compute as year 0 and blow the loop below out
+    // to ~2000 iterations. yearOf() returns null for anything that isn't a
+    // plausible year, and such a row is simply left out of the yearly
+    // breakdown.
+    const yearOf = (dateStr) => {
+      if (typeof dateStr !== 'string' || dateStr.length < 4) return null;
+      const y = Number(dateStr.slice(0, 4));
+      return Number.isInteger(y) && y >= 1990 && y <= currentYear + 1 ? y : null;
+    };
 
-  const years = new Set([currentYear]);
-  [...licenses.map((l) => l.start_date), ...renewals.map((r) => r.renewed_at), ...billingChanges.map((r) => r.created_at), ...cancellations.map((r) => r.created_at), ...reactivations.map((r) => r.created_at)]
-    .forEach((dateStr) => years.add(Number(yearOf(dateStr))));
-  const minYear = Math.min(...years);
+    const validYears = [
+      ...licenses.map((l) => l.start_date),
+      ...renewals.map((r) => r.renewed_at),
+      ...billingChanges.map((r) => r.created_at),
+      ...cancellations.map((r) => r.created_at),
+      ...reactivations.map((r) => r.created_at),
+    ]
+      .map(yearOf)
+      .filter((y) => y !== null);
+    const minYear = validYears.length ? Math.min(currentYear, ...validYears) : currentYear;
 
-  const byYear = [];
-  for (let year = currentYear; year >= minYear; year--) {
-    const y = String(year);
-    const newLicensesThisYear = licenses.filter((l) => yearOf(l.start_date) === y);
-    const renewalsThisYear = renewals.filter((r) => yearOf(r.renewed_at) === y);
-    const revenueEstimate =
-      Math.round(
-        (newLicensesThisYear.reduce((sum, l) => sum + l.amount, 0) +
-          renewalsThisYear.reduce((sum, r) => sum + (amountByLicenseId.get(r.license_id) || 0), 0)) *
-          100,
-      ) / 100;
+    const byYear = [];
+    for (let year = currentYear; year >= minYear; year--) {
+      const newLicensesThisYear = licenses.filter((l) => yearOf(l.start_date) === year);
+      const renewalsThisYear = renewals.filter((r) => yearOf(r.renewed_at) === year);
+      const revenueEstimate =
+        Math.round(
+          (newLicensesThisYear.reduce((sum, l) => sum + l.amount, 0) +
+            renewalsThisYear.reduce((sum, r) => sum + (amountByLicenseId.get(r.license_id) || 0), 0)) *
+            100,
+        ) / 100;
 
-    byYear.push({
-      year,
-      newLicenses: newLicensesThisYear.length,
-      renewals: renewalsThisYear.length,
-      cancelled: cancellations.filter((r) => yearOf(r.created_at) === y).length,
-      reactivated: reactivations.filter((r) => yearOf(r.created_at) === y).length,
-      billingCycleChanges: billingChanges.filter((r) => yearOf(r.created_at) === y).length,
-      revenueEstimate,
+      byYear.push({
+        year,
+        newLicenses: newLicensesThisYear.length,
+        renewals: renewalsThisYear.length,
+        cancelled: cancellations.filter((r) => yearOf(r.created_at) === year).length,
+        reactivated: reactivations.filter((r) => yearOf(r.created_at) === year).length,
+        billingCycleChanges: billingChanges.filter((r) => yearOf(r.created_at) === year).length,
+        revenueEstimate,
+      });
+    }
+
+    const byBillingCycle = { monthly: 0, yearly: 0 };
+    for (const l of licenses) byBillingCycle[l.billing_cycle] = (byBillingCycle[l.billing_cycle] || 0) + 1;
+
+    const topClients = db
+      .prepare(
+        `SELECT clients.id, clients.name, COUNT(*) AS license_count, COALESCE(SUM(licenses.amount), 0) AS total_amount
+         FROM licenses JOIN clients ON clients.id = licenses.client_id
+         GROUP BY clients.id
+         ORDER BY license_count DESC, total_amount DESC
+         LIMIT 5`,
+      )
+      .all();
+
+    res.json({
+      byYear,
+      byBillingCycle,
+      topClients,
+      totals: {
+        totalLicenses: licenses.length,
+        totalRenewals: renewals.length,
+        totalBillingCycleChanges: billingChanges.length,
+        totalCancelled: cancellations.length,
+        totalReactivated: reactivations.length,
+      },
     });
+  } catch (err) {
+    console.error('GET /api/licenses/analytics failed:', err);
+    res.status(500).json({ error: 'Failed to load license analytics' });
   }
-
-  const byBillingCycle = { monthly: 0, yearly: 0 };
-  for (const l of licenses) byBillingCycle[l.billing_cycle] = (byBillingCycle[l.billing_cycle] || 0) + 1;
-
-  const topClients = db
-    .prepare(
-      `SELECT clients.id, clients.name, COUNT(*) AS license_count, COALESCE(SUM(licenses.amount), 0) AS total_amount
-       FROM licenses JOIN clients ON clients.id = licenses.client_id
-       GROUP BY clients.id
-       ORDER BY license_count DESC, total_amount DESC
-       LIMIT 5`,
-    )
-    .all();
-
-  res.json({
-    byYear,
-    byBillingCycle,
-    topClients,
-    totals: {
-      totalLicenses: licenses.length,
-      totalRenewals: renewals.length,
-      totalBillingCycleChanges: billingChanges.length,
-      totalCancelled: cancellations.length,
-      totalReactivated: reactivations.length,
-    },
-  });
 });
 
 function validate(body) {

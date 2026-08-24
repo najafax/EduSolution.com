@@ -281,8 +281,10 @@ export default function ExpenseAnalytics() {
                         {symbol}
                         {t.amount.toFixed(2)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right dark:text-white">{t.exchange_rate}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-medium dark:text-white">${t.amount_usd.toFixed(2)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right dark:text-white">{t.exchange_rate ?? '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-medium dark:text-white">
+                        {t.amount_usd !== null ? `$${t.amount_usd.toFixed(2)}` : '—'}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{t.payee_account_number || '—'}</td>
                       <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{t.usd_destination || '—'}</td>
                     </tr>
@@ -307,14 +309,14 @@ export default function ExpenseAnalytics() {
                           {symbol}
                           {t.amount.toFixed(2)}
                         </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">${t.amount_usd.toFixed(2)}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{t.amount_usd !== null ? `$${t.amount_usd.toFixed(2)}` : '—'}</p>
                       </div>
                     </div>
                   }
                 >
                   <div className="flex justify-between">
                     <dt className="text-slate-500 dark:text-slate-400">Exchange rate</dt>
-                    <dd className="text-slate-900 dark:text-white">{t.exchange_rate}</dd>
+                    <dd className="text-slate-900 dark:text-white">{t.exchange_rate ?? '—'}</dd>
                   </div>
                   {t.payee_account_number && (
                     <div className="flex justify-between">

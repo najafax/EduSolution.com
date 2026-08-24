@@ -131,66 +131,79 @@ router.get('/export.xlsx', view, async (req, res) => {
 const round2 = (n) => Math.round(n * 100) / 100;
 
 router.get('/analytics', view, (req, res) => {
-  const quotes = db
-    .prepare('SELECT id, client_id, status, issue_date, total, client_responded_at, updated_at FROM quotes')
-    .all();
-  const convertedEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'quote' AND action = 'converted to invoice'").all();
+  try {
+    const quotes = db
+      .prepare('SELECT id, client_id, status, issue_date, total, client_responded_at, updated_at FROM quotes')
+      .all();
+    const convertedEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'quote' AND action = 'converted to invoice'").all();
 
-  const yearOf = (dateStr) => dateStr.slice(0, 4);
-  const decidedAt = (q) => q.client_responded_at || q.updated_at;
-  const currentYear = new Date().getFullYear();
-  const years = new Set([currentYear]);
-  [...quotes.map((q) => q.issue_date), ...quotes.map(decidedAt), ...convertedEvents.map((e) => e.created_at)].forEach((d) =>
-    years.add(Number(yearOf(d))),
-  );
-  const minYear = Math.min(...years);
+    const decidedAt = (q) => q.client_responded_at || q.updated_at;
+    const currentYear = new Date().getFullYear();
+    // See routes/expenses.js's own GET /analytics for why this can't be a
+    // bare `dateStr.slice(0, 4)` — a blank/malformed date would otherwise
+    // either throw or silently compute as year 0 and blow the loop below out
+    // to ~2000 iterations. yearOf() returns null for anything that isn't a
+    // plausible year, and such a row is simply left out of the yearly
+    // breakdown.
+    const yearOf = (dateStr) => {
+      if (typeof dateStr !== 'string' || dateStr.length < 4) return null;
+      const y = Number(dateStr.slice(0, 4));
+      return Number.isInteger(y) && y >= 1990 && y <= currentYear + 1 ? y : null;
+    };
+    const validYears = [...quotes.map((q) => q.issue_date), ...quotes.map(decidedAt), ...convertedEvents.map((e) => e.created_at)]
+      .map(yearOf)
+      .filter((y) => y !== null);
+    const minYear = validYears.length ? Math.min(currentYear, ...validYears) : currentYear;
 
-  const byYear = [];
-  for (let year = currentYear; year >= minYear; year--) {
-    const y = String(year);
-    const createdThisYear = quotes.filter((q) => yearOf(q.issue_date) === y);
-    byYear.push({
-      year,
-      created: createdThisYear.length,
-      amountQuoted: round2(createdThisYear.reduce((sum, q) => sum + q.total, 0)),
-      accepted: quotes.filter((q) => q.status === 'accepted' && yearOf(decidedAt(q)) === y).length,
-      declined: quotes.filter((q) => q.status === 'declined' && yearOf(decidedAt(q)) === y).length,
-      converted: convertedEvents.filter((e) => yearOf(e.created_at) === y).length,
+    const byYear = [];
+    for (let year = currentYear; year >= minYear; year--) {
+      const createdThisYear = quotes.filter((q) => yearOf(q.issue_date) === year);
+      byYear.push({
+        year,
+        created: createdThisYear.length,
+        amountQuoted: round2(createdThisYear.reduce((sum, q) => sum + q.total, 0)),
+        accepted: quotes.filter((q) => q.status === 'accepted' && yearOf(decidedAt(q)) === year).length,
+        declined: quotes.filter((q) => q.status === 'declined' && yearOf(decidedAt(q)) === year).length,
+        converted: convertedEvents.filter((e) => yearOf(e.created_at) === year).length,
+      });
+    }
+
+    const byStatus = db
+      .prepare('SELECT status, COUNT(*) AS c FROM quotes GROUP BY status')
+      .all()
+      .reduce((acc, row) => ({ ...acc, [row.status]: row.c }), { draft: 0, sent: 0, accepted: 0, declined: 0, expired: 0 });
+
+    const topClients = db
+      .prepare(
+        `SELECT clients.id, clients.name, COUNT(*) AS quote_count, COALESCE(SUM(quotes.total), 0) AS total_amount
+         FROM quotes JOIN clients ON clients.id = quotes.client_id
+         GROUP BY clients.id
+         ORDER BY total_amount DESC, quote_count DESC
+         LIMIT 5`,
+      )
+      .all();
+
+    const totalAccepted = byStatus.accepted;
+    const totalDeclined = byStatus.declined;
+    const decidedCount = totalAccepted + totalDeclined;
+
+    res.json({
+      byYear,
+      byStatus,
+      topClients,
+      totals: {
+        totalQuotes: quotes.length,
+        totalQuoted: round2(quotes.reduce((sum, q) => sum + q.total, 0)),
+        totalAccepted,
+        totalDeclined,
+        totalConverted: convertedEvents.length,
+        winRate: decidedCount > 0 ? round2((totalAccepted / decidedCount) * 100) : null,
+      },
     });
+  } catch (err) {
+    console.error('GET /api/quotes/analytics failed:', err);
+    res.status(500).json({ error: 'Failed to load quote analytics' });
   }
-
-  const byStatus = db
-    .prepare('SELECT status, COUNT(*) AS c FROM quotes GROUP BY status')
-    .all()
-    .reduce((acc, row) => ({ ...acc, [row.status]: row.c }), { draft: 0, sent: 0, accepted: 0, declined: 0, expired: 0 });
-
-  const topClients = db
-    .prepare(
-      `SELECT clients.id, clients.name, COUNT(*) AS quote_count, COALESCE(SUM(quotes.total), 0) AS total_amount
-       FROM quotes JOIN clients ON clients.id = quotes.client_id
-       GROUP BY clients.id
-       ORDER BY total_amount DESC, quote_count DESC
-       LIMIT 5`,
-    )
-    .all();
-
-  const totalAccepted = byStatus.accepted;
-  const totalDeclined = byStatus.declined;
-  const decidedCount = totalAccepted + totalDeclined;
-
-  res.json({
-    byYear,
-    byStatus,
-    topClients,
-    totals: {
-      totalQuotes: quotes.length,
-      totalQuoted: round2(quotes.reduce((sum, q) => sum + q.total, 0)),
-      totalAccepted,
-      totalDeclined,
-      totalConverted: convertedEvents.length,
-      winRate: decidedCount > 0 ? round2((totalAccepted / decidedCount) * 100) : null,
-    },
-  });
 });
 
 router.post('/', manage, (req, res) => {

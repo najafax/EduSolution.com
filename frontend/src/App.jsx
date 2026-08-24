@@ -7,6 +7,7 @@ import BottomNav from './components/BottomNav';
 import ProtectedRoute from './components/ProtectedRoute';
 import IdleTimeoutMonitor from './components/IdleTimeoutMonitor';
 import CommandPalette from './components/CommandPalette';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useAuth } from './context/AuthContext';
 
 // Every routed page is loaded on demand rather than bundled into one
@@ -72,7 +73,8 @@ export default function App() {
   // shell below, which reads AuthContext/`can()` and would be both wrong
   // (a client isn't a staff user) and broken (those components assume a
   // staff `user`/`permissions` shape a portal account doesn't have).
-  const isPortalRoute = useLocation().pathname.startsWith('/portal');
+  const location = useLocation();
+  const isPortalRoute = location.pathname.startsWith('/portal');
 
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 xl:flex-row">
@@ -96,6 +98,10 @@ export default function App() {
             content — see BottomNav.jsx. */}
         <div className={`flex flex-1 flex-col ${user && !isPortalRoute ? 'pb-16 sm:pb-0' : ''}`}>
           <div className="flex-1">
+            {/* Keyed by pathname so a crash on one page doesn't linger once
+                the user navigates elsewhere — remounting clears the
+                boundary's caught-error state along with everything else. */}
+            <ErrorBoundary key={location.pathname}>
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 {/* Login is also the app's landing page — see pages/Login.jsx's
@@ -144,7 +150,8 @@ export default function App() {
                 <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
                 <Route path="/account" element={<Protected><MyAccount /></Protected>} />
               </Routes>
-            </Suspense>
+              </Suspense>
+            </ErrorBoundary>
           </div>
           {/* Hidden on phones while logged in: BottomNav + each page's own
               FloatingActionButton (fixed, sm:hidden) already own that screen
