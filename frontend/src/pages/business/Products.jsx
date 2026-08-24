@@ -7,11 +7,199 @@ import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
-import { PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
+import ImportResultsTable from '../../components/ImportResultsTable';
+import { PlusIcon, PencilIcon, TrashIcon, UploadIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 
 const EMPTY_FORM = { name: '', description: '', unit_price: '', tax_rate: '', visible_in_portal: false };
+
+// Same template content as pages/business/Import.jsx's own `products` entry
+// in its TEMPLATES map — duplicated rather than imported (this page has no
+// other reason to depend on that one, and it's a plain string), same
+// acceptable-duplication call routes/expenses.js's EXPENSE_CATEGORIES makes
+// against routes/import.js's own copy. Keep both in sync if the columns
+// ever change.
+const PRODUCTS_CSV_TEMPLATE =
+  'name,description,unit_price,tax_rate,visible_in_portal\n' +
+  'LMS Pro Annual License,Learning management system — annual plan,1200,0,true\n' +
+  'Consulting Hour,General consulting, billed hourly,75,0,false\n';
+
+function downloadProductsTemplate() {
+  const blob = new Blob([PRODUCTS_CSV_TEMPLATE], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'products-import-template.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+// The embedded counterpart to the standalone Import page's `products` type
+// (routes/import.js's POST /api/import/products backs both) — asked for
+// directly on this page rather than sending someone to the generic Import
+// page just to bring in a product catalog. Same preview-then-confirm
+// contract: nothing is written until "Confirm import" is clicked, and a row
+// matching an existing product by name updates it in place instead of
+// creating a duplicate (see routes/import.js's own existingProductMap()).
+function ImportModal({ open, onClose, token, onImported }) {
+  const [fileName, setFileName] = useState('');
+  const [csvText, setCsvText] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [committed, setCommitted] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function reset() {
+    setFileName('');
+    setCsvText('');
+    setPreview(null);
+    setCommitted(null);
+    setError('');
+  }
+
+  function handleClose() {
+    reset();
+    onClose();
+  }
+
+  function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setPreview(null);
+    setCommitted(null);
+    setError('');
+    const reader = new FileReader();
+    reader.onload = () => setCsvText(String(reader.result || ''));
+    reader.readAsText(file);
+  }
+
+  async function handlePreview() {
+    if (!csvText) return;
+    setBusy(true);
+    setError('');
+    setCommitted(null);
+    try {
+      setPreview(await api.import.run('products', csvText, false, token));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleConfirm() {
+    setBusy(true);
+    setError('');
+    try {
+      const result = await api.import.run('products', csvText, true, token);
+      setCommitted(result);
+      setPreview(null);
+      if (result.imported > 0) onImported();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={handleClose} title="Import products" maxWidthClass="max-w-2xl">
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Bring in a product catalog from a CSV file. Preview first to catch errors — nothing is saved until you confirm.
+        A row matching an existing product by name updates it in place instead of creating a duplicate.
+      </p>
+
+      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Expected columns</p>
+        <p className="mt-1 break-words font-mono text-xs text-slate-600 dark:text-slate-400">
+          name*, description, unit_price*, tax_rate, visible_in_portal
+        </p>
+        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">* required</p>
+        <button
+          type="button"
+          onClick={downloadProductsTemplate}
+          className="mt-3 min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
+        >
+          Download template
+        </button>
+      </div>
+
+      <div className="mt-4">
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">CSV file</span>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={handleFile}
+            className="mt-1 block w-full text-sm text-slate-600 file:mr-4 file:min-h-11 file:rounded-md file:border-0 file:bg-lagoon-50 file:px-4 file:text-sm file:font-medium file:text-lagoon-700 hover:file:bg-lagoon-100 dark:text-slate-400 dark:file:bg-lagoon-950 dark:file:text-lagoon-400 dark:hover:file:bg-lagoon-900"
+          />
+        </label>
+        {fileName && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Selected: {fileName}</p>}
+      </div>
+
+      {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+      <div className="mt-4 flex gap-3">
+        <button
+          type="button"
+          onClick={handlePreview}
+          disabled={!csvText || busy}
+          className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+        >
+          {busy ? 'Working…' : 'Preview'}
+        </button>
+        <button
+          type="button"
+          onClick={handleClose}
+          className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          Close
+        </button>
+      </div>
+
+      {preview && (
+        <div className="mt-4 rounded-lg border border-amber-300 bg-white dark:border-amber-700 dark:bg-slate-900">
+          <p className="rounded-t-lg border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            Preview only — nothing has been saved yet.
+          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+              {preview.validCount} of {preview.total} row(s) ready to import
+              {preview.errorCount > 0 && <span className="text-red-600 dark:text-red-400"> ({preview.errorCount} with errors)</span>}
+            </h2>
+            {preview.validCount > 0 && (
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={busy}
+                className="min-h-11 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-60"
+              >
+                {busy ? 'Importing…' : `Confirm import (${preview.validCount})`}
+              </button>
+            )}
+          </div>
+          <div className="px-4 pb-4">
+            <ImportResultsTable results={preview.results} />
+          </div>
+        </div>
+      )}
+
+      {committed && (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950">
+          <h2 className="text-sm font-semibold text-emerald-900 dark:text-emerald-300">
+            Imported {committed.imported} of {committed.total} row(s)
+            {committed.errorCount > 0 && ` — ${committed.errorCount} skipped`}
+          </h2>
+          <ImportResultsTable results={committed.results} />
+        </div>
+      )}
+    </Modal>
+  );
+}
 
 // visible_in_portal is opt-in (see db/index.js's own migration note) — most
 // products stay invisible here, so the badge is only shown for the
@@ -38,6 +226,7 @@ export default function Products() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -124,13 +313,22 @@ export default function Products() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Products</h1>
         {canManage && (
-          <button
-            onClick={startCreate}
-            className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
-          >
-            <PlusIcon width={16} height={16} />
-            New product
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <UploadIcon width={16} height={16} />
+              Import CSV
+            </button>
+            <button
+              onClick={startCreate}
+              className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+            >
+              <PlusIcon width={16} height={16} />
+              New product
+            </button>
+          </div>
         )}
       </div>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
@@ -332,6 +530,8 @@ export default function Products() {
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New product" />}
+
+      {canManage && <ImportModal open={showImport} onClose={() => setShowImport(false)} token={token} onImported={load} />}
 
       {confirmDialog}
     </div>

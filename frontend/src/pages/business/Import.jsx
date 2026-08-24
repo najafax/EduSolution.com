@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { useConfirm } from '../../lib/useConfirm';
+import ImportResultsTable from '../../components/ImportResultsTable';
 
 const TYPES = [
   { value: 'clients', label: 'Clients', columns: 'name*, email*, phone, address, notes' },
@@ -30,6 +31,18 @@ const TYPES = [
       'client_email or client_name (at least one)*, name*, billing_cycle, amount, start_date*, expiry_date, status, url, notes',
     note: "Multiple rows with the same client and license name are treated as one license's renewal history, not separate licenses — the row with the latest start_date becomes the current record, and every earlier row becomes a past renewal.",
   },
+  {
+    value: 'products',
+    label: 'Products',
+    columns: 'name*, description, unit_price*, tax_rate, visible_in_portal',
+    note: 'A row matching an existing product by name (case-insensitive) updates it in place instead of creating a duplicate — safe to re-import an edited export.',
+  },
+  {
+    value: 'currency-exchange',
+    label: 'Currency exchange',
+    columns: 'description*, amount*, expense_date*, exchange_rate*, payee, payee_account_number, usd_destination, notes',
+    note: "Every row is imported as an expense with category \"currency exchange\" — there's no category column, since this type is only for that one category. Same as importing under the general Expenses type with every row's category already set.",
+  },
 ];
 
 const TEMPLATES = {
@@ -52,6 +65,14 @@ const TEMPLATES = {
     'jane@example.com,,LMS Pro Annual License,yearly,1100,2024-08-16,2025-08-16,active,,First year — earlier row, becomes renewal history\n' +
     'jane@example.com,,LMS Pro Annual License,yearly,1200,2025-08-16,2026-08-16,active,https://lms.example.com/activate,Second year — latest start_date, becomes the current record\n' +
     ',Acme School,API Access License,monthly,50,2026-06-01,,active,,Matched by client_name; expiry_date left blank (defaults to start_date + 1 billing cycle)\n',
+  products:
+    'name,description,unit_price,tax_rate,visible_in_portal\n' +
+    'LMS Pro Annual License,Learning management system — annual plan,1200,0,true\n' +
+    'Consulting Hour,General consulting, billed hourly,75,0,false\n',
+  'currency-exchange':
+    'description,amount,expense_date,exchange_rate,payee,payee_account_number,usd_destination,notes\n' +
+    'MVR to USD for EduPage renewal,15420,2026-03-20,15.42,,7730000123456,EduPage license renewal,\n' +
+    'MVR to USD for hosting bill,3200,2026-04-02,15.55,,7730000123456,Annual hosting invoice,\n',
 };
 
 function downloadTemplate(type) {
@@ -217,43 +238,6 @@ function DangerZone({ token }) {
   );
 }
 
-function ResultsTable({ results }) {
-  return (
-    <div className="mt-4 max-h-96 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
-      <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-        <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800">
-          <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-            <th className="px-4 py-2">Row</th>
-            <th className="px-4 py-2">Status</th>
-            <th className="px-4 py-2">Item</th>
-            <th className="px-4 py-2">Message</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-          {results.map((r) => (
-            <tr key={r.row}>
-              <td className="whitespace-nowrap px-4 py-2 text-slate-500 dark:text-slate-400">{r.row}</td>
-              <td className="whitespace-nowrap px-4 py-2">
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    r.status === 'ok'
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                      : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
-                  }`}
-                >
-                  {r.status === 'ok' ? 'OK' : 'Error'}
-                </span>
-              </td>
-              <td className="whitespace-nowrap px-4 py-2 text-slate-700 dark:text-slate-300">{r.preview}</td>
-              <td className="px-4 py-2 text-slate-600 dark:text-slate-400">{r.message}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export default function Import() {
   const { token, can, user } = useAuth();
   const canManage = can('import', 'manage');
@@ -327,8 +311,8 @@ export default function Import() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Import historical data</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        Bring in existing clients, expenses, invoices (with payment history), quotes, or licenses from a CSV file.
-        Preview first to catch errors — nothing is saved until you confirm.
+        Bring in existing clients, expenses, invoices (with payment history), quotes, licenses, or products from a
+        CSV file. Preview first to catch errors — nothing is saved until you confirm.
       </p>
       {(type === 'invoices' || type === 'quotes' || type === 'licenses') && (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
@@ -412,7 +396,7 @@ export default function Import() {
             )}
           </div>
           <div className="px-6 pb-6">
-            <ResultsTable results={preview.results} />
+            <ImportResultsTable results={preview.results} />
           </div>
         </div>
       )}
@@ -423,7 +407,7 @@ export default function Import() {
             Imported {committed.imported} of {committed.total} row(s)
             {committed.errorCount > 0 && ` — ${committed.errorCount} skipped`}
           </h2>
-          <ResultsTable results={committed.results} />
+          <ImportResultsTable results={committed.results} />
         </div>
       )}
 

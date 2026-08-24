@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
 import ThemeToggle from './ThemeToggle';
+import NotificationCenter from './NotificationCenter';
 import { BUSINESS_LINKS } from './Navbar';
 import {
   HomeIcon,
@@ -136,19 +137,26 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
           <Link to="/" onClick={handleLinkClick} className="text-base font-semibold text-white">
             EduSolution<span className="text-lagoon-300">.com</span>
           </Link>
-          {/* Close button, drawer mode only — the backdrop click and Escape
-              (see the effect above) also close it, but a visible control
-              matters here since there's no other affordance in-panel. */}
-          <button
-            type="button"
-            onClick={onMobileClose}
-            aria-label="Close menu"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-lagoon-200 hover:bg-white/10 hover:text-white xl:hidden"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-            </svg>
-          </button>
+          <div className="flex shrink-0 items-center gap-0.5">
+            {/* Same forced-light-icon override reasoning as ThemeToggle's own
+                Sidebar usage below — its default slate styling is tuned for
+                the app's themed page background, not this permanently-dark
+                panel. */}
+            <NotificationCenter align="left" className="!text-lagoon-200 hover:!bg-white/10 hover:!text-white" />
+            {/* Close button, drawer mode only — the backdrop click and Escape
+                (see the effect above) also close it, but a visible control
+                matters here since there's no other affordance in-panel. */}
+            <button
+              type="button"
+              onClick={onMobileClose}
+              aria-label="Close menu"
+              className="flex h-9 w-9 items-center justify-center rounded-md text-lagoon-200 hover:bg-white/10 hover:text-white xl:hidden"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* GlobalSearch's own dark: styling is tuned for the app's themed

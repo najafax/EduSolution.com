@@ -1129,8 +1129,9 @@ deliberately untouched by either, always returning every row.
   a formula regardless of its leading character. `writeBuffer()` is async
   (unlike `toCsv`), so every `GET /export.xlsx` handler is an `async` route.
 - `routes/import.js` — `POST /api/import/:type` (`type` is `clients`,
-  `expenses`, `invoices`, `quotes`, or `licenses`) bulk-imports historical
-  data from CSV text in the request body. Always validates every row first; `commit: false`
+  `expenses`, `invoices`, `quotes`, `licenses`, `products`, or
+  `currency-exchange`) bulk-imports historical data from CSV text in the
+  request body. Always validates every row first; `commit: false`
   (the default) is a dry-run that reports what *would* happen with no DB
   writes, `commit: true` actually inserts the valid rows and skips the
   invalid ones — the frontend always previews before offering to commit.
@@ -1278,6 +1279,49 @@ deliberately untouched by either, always returning every row.
   step makes the distinction obvious before anything commits. If more than
   one existing license somehow already shares a client+name (e.g. from
   duplicates created before this matching existed), the highest id wins.
+  **Products** (`processProducts()`) is the simplest importer in this file
+  — no client to resolve, no dates, no multi-table writes, just `name`
+  (required), `description`, `unit_price` (required, non-negative),
+  `tax_rate` (optional, 0–100, same validation `routes/products.js`'s own
+  `POST`/`PUT` apply), and `visible_in_portal` (optional; `true`/`yes`/`1`/
+  `y`, case-insensitive, is truthy — anything else, including a blank
+  cell, defaults to `false`/hidden, matching the manual form's own
+  opt-in-only default). Products have no client to disambiguate by, so
+  `existingProductMap()` matches a row to an existing product purely by
+  `name` (trimmed, case-insensitive) — same export → edit → re-import
+  safety `existingLicenseMap()` above already established for licenses,
+  applied to the one other entity here that benefits from it: a business
+  correcting a price or opting a product into the portal via an edited
+  re-import doesn't end up with a duplicate catalog entry. A matching row
+  updates every field except `name` itself (an update is a correction, not
+  a rename); a name repeated *within the same file* is rejected with a
+  `duplicate: "..." also appears on row N` error rather than silently
+  updating the same product twice from one batch. `imported` counts every
+  row that resolved to a write (insert or update).
+  **`currency-exchange`** (`processCurrencyExchange()`) isn't a distinct
+  entity — every currency-exchange transaction is, underneath, a plain
+  `expenses` row with `category = 'currency exchange'` (the general
+  `expenses` type above already supports importing these via a `category`
+  column set on each row), so this type is a thin wrapper rather than a
+  parallel implementation: it maps every row to `{ ...row, category:
+  'currency exchange' }` and hands the whole batch straight to
+  `processExpenses()`/`validateExpenseRow()` above, unchanged. The only
+  real difference is the CSV shape this type expects — no `category`
+  column at all (any value present there is silently discarded, not read;
+  every row becomes `currency exchange` regardless), so `description`,
+  `amount`, `expense_date`, and `exchange_rate` are all required on every
+  row (the last one only because `validateExpenseRow()`'s own
+  `category === 'currency exchange'` branch is now unconditionally true).
+  Exists purely so a batch of currency-exchange records — the one category
+  with its own dedicated detail view (`routes/expenses.js`'s "Currency
+  exchange details", `ExpenseAnalytics.jsx`'s own transactions table) —
+  doesn't require repeating the same literal string on every row of an
+  otherwise-uniform CSV. The success-path activity log entry (below) reads
+  `entityType: 'expense'`, not the literal `'currency-exchange'` route
+  param, and its label says "N currency exchange expenses" rather than the
+  generic `${imported} ${type}` every other type gets, since these rows
+  are genuinely just expenses and should read that way in the feed, not as
+  a fabricated entity type nothing else in `activity_log` ever produces.
 - `lib/backup.js` — `runBackup()`: skips entirely if `BACKUP_S3_BUCKET`
   isn't set. Otherwise runs `VACUUM INTO` to write a consistent snapshot of
   the live database (safe against catching a WAL-mode write mid-flight,
@@ -2726,7 +2770,51 @@ frontend stops holding/sending it.
   above) at the bottom, but only when `user.role === 'admin'` — checked
   directly against the role, not `can('import', 'manage')` like the rest
   of this page, since a staff member could be granted that permission
-  without being trusted with a bulk, unrecoverable delete.
+  without being trusted with a bulk, unrecoverable delete. Its per-type
+  `ResultsTable` (row/status/item/message) was pulled out into
+  `components/ImportResultsTable.jsx` once a second caller needed the
+  identical table — see `pages/business/Products.jsx`'s own embedded
+  import flow below — rather than staying a private component only
+  `Import.jsx` could reach.
+  **Products import, embedded on the Products page itself**: unlike most
+  importable entities, which only have the generic `Import.jsx` flow,
+  `pages/business/Products.jsx` also gets its own "Import CSV" header
+  button (next to "New product", `UploadIcon` — the reversed-arrow
+  counterpart to `DownloadIcon`, see `components/icons.jsx`) opening a
+  local `ImportModal` sub-component — asked for directly on this page
+  rather than sending someone to the standalone Import page just to bring
+  in a product catalog. It's a genuinely separate, page-scoped React
+  component (not a shared one), but talks to the exact same
+  `POST /api/import/products` endpoint via `api.import.run('products', ...)`
+  and reuses the shared `ImportResultsTable` above, so the preview-then-
+  confirm contract, validation, and result rendering can never drift from
+  the standalone Import page's own `products` type — only the surrounding
+  chrome (no type selector, a fixed products-only column hint, a `Modal`
+  instead of a full page) differs. `PRODUCTS_CSV_TEMPLATE` is a duplicated
+  copy of `Import.jsx`'s own `products` entry in its `TEMPLATES` map
+  (same acceptable-duplication precedent `EXPENSE_CATEGORIES` sets between
+  `routes/expenses.js` and `routes/import.js` — keep both in sync if the
+  columns ever change) rather than importing across two page files for one
+  string. On a successful commit with `imported > 0`, the modal calls the
+  page's own `load()` (passed in as `onImported`) so the product list
+  behind it refreshes without the user having to close the modal and
+  reload manually.
+  **Currency exchange import, embedded on the Expenses page**: the same
+  pattern again, this time for `routes/import.js`'s `currency-exchange`
+  type — `pages/business/Expenses.jsx` gets an "Import currency exchange"
+  header button (between "Export Excel" and "New expense", same
+  `UploadIcon`) opening its own local `ImportModal`, a near-identical copy
+  of `Products.jsx`'s (fixed column hint instead of a type selector, no
+  `category` field since this type's whole point is that every row is
+  already `currency exchange`, same preview-then-confirm/`ImportResultsTable`
+  contract calling `api.import.run('currency-exchange', ...)`).
+  `CURRENCY_EXCHANGE_CSV_TEMPLATE` duplicates `Import.jsx`'s own
+  `currency-exchange` template entry, same reasoning
+  `PRODUCTS_CSV_TEMPLATE` above already documents. `onImported` is wired to
+  the page's own `load()` the same way, so a successful import refreshes
+  the expense list (and, since these rows are visible there too, the page's
+  own currency-exchange summary once it's re-fetched) without a manual
+  reload.
 - `components/GlobalSearch.jsx` — a debounced (250ms) search box that calls
   `api.search.query()` and renders a grouped dropdown (clients/quotes/
   invoices/expenses); clicking a result navigates there. Mounted three times
@@ -3043,22 +3131,25 @@ frontend stops holding/sending it.
   than a `can()` check, same UX-only caveat. "My account" is appended after
   the filtered links, unconditionally visible to any logged-in user (admin
   or staff) since it's never permission-gated.
-- `pages/Dashboard.jsx` — the page's outer container is `mx-auto max-w-5xl
-  px-4 py-10 sm:px-6 lg:px-8`, matching the same centered-column pattern
-  `pages/portal/PortalDashboard.jsx` already uses for its own dashboard
-  (`mx-auto max-w-5xl px-4 py-10 sm:px-6`) — every other business page in
-  this app (`Clients.jsx`, `Financials.jsx`, `Invoices.jsx`, etc.) is a
-  bare `px-4 py-10 sm:px-6 lg:px-8` with no `max-w-*`, deliberately
-  stretching to fill whatever width is available next to the sidebar
-  (those are list/table pages that benefit from the extra room); Dashboard
-  is the one page here that reads as a "reading" surface — a hero figure,
-  KPI strip, and a handful of stacked cards — so past `lg:` it was capped
-  at `max-w-5xl` and centered rather than letting those cards stretch to
-  fill the full remaining width on a wide desktop screen, which read as
-  inconsistent panel widths (a hero card and KPI strip both stretched
-  near-edge-to-edge, sitting above/below a half-width "Invoices by
-  status"/"Needs attention" pair from the two-column grid that used to sit
-  between them — see below) rather than a single readable column. `SHORTCUTS`
+- `pages/Dashboard.jsx` — the page's outer container is a bare `px-4 py-10
+  sm:px-6 lg:px-8`, same as every other business page in this app
+  (`Clients.jsx`, `Financials.jsx`, `Invoices.jsx`, etc.), stretching to
+  fill whatever width is available next to the sidebar rather than capping
+  and centering. This page briefly carried a `mx-auto max-w-5xl` cap
+  (matching `pages/portal/PortalDashboard.jsx`'s own centered-column
+  layout) when the "Invoices by status"/"Needs attention" panels below
+  still sat side by side in a `lg:grid-cols-2` row — two half-width cards
+  sandwiched between full-width hero/strip/chart cards read as
+  inconsistent panel widths, and capping+centering the whole page was one
+  way to make that less visually jarring. The cap was removed again
+  shortly after (full browser width was explicitly asked for back) — the
+  fix that actually mattered for panel-width consistency was stacking
+  "Invoices by status"/"Needs attention" full-width instead of side by
+  side (still true, see below), not the container cap; removing the cap
+  just lets every one of those now-uniform-width panels stretch to fill
+  the full available width on a wide screen instead of stopping at
+  1024px, the same as every other list/table business page already does.
+  `SHORTCUTS`
   (the quick-link tiles) each carry a `module` and are filtered through
   `can(s.module, 'view')` the same way as `Navbar.jsx`'s/`Sidebar.jsx`'s own
   links. The whole hero/chart view
@@ -3100,14 +3191,12 @@ frontend stops holding/sending it.
   *either* permission. It originally sat side by side with "Invoices by
   status" in a `lg:grid-cols-2` row — two half-width cards sandwiched
   between the full-width hero/KPI-strip/revenue-chart cards above and the
-  full-width recent-payments card below — which is what actually prompted
-  adding the `max-w-5xl` cap above: capping the container's width doesn't
-  by itself fix "every panel should read as the same width" while one row
-  is still split into two half-width columns, so that row now stacks
-  ("Invoices by status" full width, "Needs attention" full width right
-  below it, `flex flex-col gap-6` instead of a two-column `grid`) — every
-  panel on the page is the same width now, not just the same *container*
-  width.
+  full-width recent-payments card below, which read as inconsistent panel
+  widths regardless of whether the outer container was capped or full-width
+  — so that row now stacks instead ("Invoices by status" full width,
+  "Needs attention" full width right below it, `flex flex-col gap-6`
+  instead of a two-column `grid`) — every panel on the page reads as the
+  same width now, whatever width the container itself happens to be.
 - `pages/Dashboard.jsx` and `pages/business/Financials.jsx` charts
   (`components/RevenueTrendChart.jsx`, `components/StatusBreakdownChart.jsx`)
   are hand-rolled SVG/CSS, no charting library. Status colors there are
@@ -3473,6 +3562,115 @@ icons as the persistent desktop sidebar either way.
   `backdrop-blur`/`filter`/`perspective`/`will-change: transform` ancestor)
   needs the same portal treatment — this isn't a one-off Sidebar quirk, it's
   how CSS containing blocks work.
+
+### Notification center
+
+A bell icon in the top nav, global to every logged-in page, surfacing what
+already needs attention — asked for directly as "a notification center on
+the top navbar," which in this app's post-sidebar layout means two
+different literal locations (see "Sidebar navigation (desktop)" above):
+`Sidebar.jsx` *is* the top nav at `xl:` and up, and `Navbar.jsx`'s
+`<header>` is the real top nav below that. `components/NotificationCenter.jsx`
+is one shared component mounted in both, rather than two separate
+implementations, the same "one source of truth, filtered by breakpoint"
+approach `BUSINESS_LINKS` already established for the nav links themselves.
+
+- **Deliberately no backend route, no notifications table, no read/unread
+  state.** This is a live, computed view built entirely from three existing,
+  already-permission-gated list endpoints — the same "don't build it until
+  needed" call this app already makes elsewhere (`routes/reports.js`'s
+  un-paginated currency-exchange list, `routes/licenses.js`'s own renewal
+  history) — not a persisted per-user inbox. Two of the three categories are
+  a straight reuse of `pages/Dashboard.jsx`'s own "Needs attention" panel
+  logic, fetched independently here rather than imported from that page
+  (a different component, same acceptable-duplication precedent
+  `EXPIRY_WARNING_DAYS` already sets between `routes/licenses.js` and
+  `lib/scheduler.js`): **overdue invoices** (`api.invoices.list(token,
+  { status: 'sent' })`, filtered client-side to `is_overdue`, sorted
+  oldest-due-first — there's no server-side overdue filter, same as
+  Dashboard's own fetch) and **licenses expiring soon**
+  (`api.licenses.list(token, { status: 'expiring_soon' })`, sorted
+  soonest-first). The third category Dashboard's panel doesn't cover:
+  **pending quote requests** (`api.quoteRequests.list(token, { status:
+  'pending' })`) — a request sitting unanswered is exactly the kind of
+  thing this component exists to surface, and Dashboard's own panel was
+  never revisited to add it (this component isn't a Dashboard replacement,
+  it's a global companion to it). Each of the three fetches is independently
+  gated on its own view permission (`invoices`/`licenses`/`quotes`) via
+  `can()`, so a partial-access staff user sees only what they're actually
+  allowed to see — the same per-category gating `routes/search.js` already
+  does for global search, just client-side here since these are three
+  ordinary already-gated list endpoints, not a dedicated aggregation route.
+  The whole bell renders nothing (`return null`) if a user holds none of the
+  three permissions, rather than an empty, pointless bell.
+- **Fetch timing**: `load()` runs once on mount (per permission grant) and
+  again every time the dropdown is opened (`useEffect` on `open`) — so a
+  tab left open for a while doesn't keep showing a stale count for as long
+  as it stays closed, without needing a polling interval running in the
+  background the whole time. Every fetch is best-effort (`.catch(() => {})`),
+  matching Dashboard's own panel — a failed fetch just leaves that
+  category empty rather than surfacing an error from what's meant to be a
+  lightweight, ambient widget.
+- **UI**: a `BellIcon` button (reused as-is from the existing Remind/Send-
+  reminder icon — a bell already means "notification" universally, no new
+  glyph needed) with a red count badge (capped display at `9+`) when the
+  combined total across all three categories is non-zero, opening an
+  absolutely-positioned dropdown on click — same outside-click-to-close
+  `mousedown` listener + `boxRef` pattern `components/GlobalSearch.jsx`
+  already uses for its own results dropdown, not a `Modal`/`BottomSheet`
+  (this is a small anchored popover, not a full takeover). Each category
+  renders as its own labeled section (icon + color matching the semantic
+  meaning already established elsewhere — red `AlertTriangleIcon` for
+  overdue, amber `LicenseIcon` for expiring, `InboxIcon` for quote
+  requests), capped at `LIMIT_PER_TYPE` (5) with a "+N more" link to the
+  full list page when a category has more than that — clicking any item or
+  the "+more" link closes the dropdown and navigates (`useNavigate`, not a
+  plain `<Link>`, since closing the dropdown has to happen alongside the
+  navigation). Overdue-invoice items link straight to that invoice's own
+  detail page (`/invoices/:id`); expiring-license and pending-quote-request
+  items link to their respective list pages (`/licenses`, `/quote-requests`)
+  rather than a specific row, mirroring Dashboard's own "Needs attention"
+  panel exactly (neither Licenses nor QuoteRequests has a per-record routed
+  detail page to link to — both are list+modal pages, see their own notes
+  above). An empty state ("You're all caught up.") renders when the total
+  is zero, rather than an empty dropdown with just a header.
+- **The one real layout bug this surfaced**: the dropdown's default
+  anchor (`right-0`, absolutely positioned against its own `relative`
+  wrapper) assumes there's room to its left to grow into — true for
+  `Navbar.jsx`'s header, which spans the full viewport width, but false
+  for `Sidebar.jsx`, where the bell sits near the top-right of a narrow
+  240px column: a `right-0`-anchored `w-80` (320px) dropdown there
+  necessarily extends further left than the sidebar's own left edge,
+  overlapping/clipping against the browser window's own left edge rather
+  than opening cleanly into the roomy main content area beside it (caught
+  visually via a Playwright screenshot, not by reasoning about the CSS
+  alone). Fixed with an `align` prop (`'right'` default, `'left'` for the
+  `Sidebar.jsx` instance only) that swaps which edge the dropdown anchors
+  to — `align="left"` there means the dropdown's *left* edge lines up with
+  the bell instead, growing rightward into the main content area, which
+  always has room regardless of how narrow the sidebar itself is.
+  `Navbar.jsx`'s instance stays on the default right anchor, which was
+  never actually a problem there (verified at phone, tablet, and desktop
+  widths) — the header's own width, not the button's position within it,
+  is what determines whether that anchor has room, and the header is
+  always at least as wide as the dropdown.
+- **Placement and theming**: `Sidebar.jsx` renders it in the top wordmark
+  row (next to the drawer-mode-only close button, both now wrapped in a
+  shared `flex items-center gap-0.5` container), with the same forced-light
+  `!text-lagoon-200 hover:!bg-white/10 hover:!text-white` override
+  `ThemeToggle`'s own Sidebar usage already needs — the component's default
+  slate-toned button styling is tuned for the app's themed page background,
+  not this permanently-dark `bg-lagoon-950` panel, and a plain override
+  class isn't guaranteed to win the cascade there (see `ThemeToggle`'s own
+  note on why `!important` is needed). The dropdown panel itself is
+  unaffected by that override — it's a light-surfaced (`bg-white
+  dark:bg-slate-900`) popover regardless of the sidebar's own fixed dark
+  background, same as `GlobalSearch`'s own results dropdown. `Navbar.jsx`
+  renders it between the phone-only search-toggle button and `ThemeToggle`,
+  visible at every width that header itself renders at (phone through
+  tablet) — unlike the hamburger, which is `sm:flex hidden` (phone uses
+  `BottomNav` instead), the bell has no phone-specific replacement, so it
+  stays visible there.
 
 ### Icon action buttons
 

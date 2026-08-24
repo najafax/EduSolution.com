@@ -280,6 +280,29 @@ function processExpenses(rows, commit) {
   return { results, imported };
 }
 
+// A dedicated import type for currency-exchange rows specifically, layered
+// entirely on top of processExpenses()/validateExpenseRow() above rather
+// than a parallel implementation — every currency-exchange expense is
+// still, underneath, a plain `expenses` row with `category = 'currency
+// exchange'` (see routes/expenses.js's own "Currency exchange details"
+// note), so this just forces that category onto every row before handing
+// off to the exact same validator/inserter the generic `expenses` type
+// already uses. This exists because the generic `expenses` importer
+// technically already supports currency-exchange rows (a `category` column
+// set to `currency exchange` on each row, per its own CSV template), but
+// making someone repeat that exact string on every row of a CSV that's
+// *entirely* currency exchanges is unnecessary friction — this type drops
+// the `category` column from the CSV shape altogether (any value present
+// there is silently overridden, not read) and every row goes straight to
+// the `exchange_rate`-required validation branch, since that branch is
+// keyed on `category === 'currency exchange'` and that's now guaranteed.
+function processCurrencyExchange(rows, commit) {
+  return processExpenses(
+    rows.map((row) => ({ ...row, category: 'currency exchange' })),
+    commit,
+  );
+}
+
 // Shared by invoice and quote rows: matched by email first (the primary,
 // unambiguous key), falling back to an exact client_name match — some
 // historical data identifies a client by a name/reference code rather than
@@ -846,6 +869,114 @@ function processLicenses(rows, commit) {
   return { results, imported };
 }
 
+// ---- Products -------------------------------------------------------------------
+
+function validateProductRow(row) {
+  const name = (row.name || '').trim();
+  if (!name) return { ok: false, message: 'name is required' };
+
+  const unitPrice = parseNumber(row.unit_price);
+  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+    return { ok: false, message: 'unit_price must be a non-negative number' };
+  }
+
+  const taxRateRaw = (row.tax_rate || '').trim();
+  const taxRate = taxRateRaw ? parseNumber(row.tax_rate) : 0;
+  if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100) {
+    return { ok: false, message: 'tax_rate must be a number between 0 and 100' };
+  }
+
+  // Same "opt-in, defaults to hidden" convention as the manual form's own
+  // checkbox (see routes/products.js) — any value other than a recognizable
+  // truthy string leaves a product out of the client portal.
+  const visibleInPortal = ['true', 'yes', '1', 'y'].includes((row.visible_in_portal || '').trim().toLowerCase());
+
+  return {
+    ok: true,
+    values: { name, description: (row.description || '').trim(), unitPrice, taxRate, visibleInPortal },
+  };
+}
+
+// Products have no client to disambiguate by, so a row is matched to an
+// existing product purely by name (trimmed, case-insensitive) — same
+// export → edit → re-import safety routes/licenses.js's own
+// existingLicenseMap() already established for that entity; see its own
+// comment for the reasoning. A matching row updates the product in place
+// instead of inserting a duplicate.
+function existingProductMap() {
+  const rows = db.prepare('SELECT id, name FROM products').all();
+  const map = new Map();
+  for (const row of rows) map.set(row.name.trim().toLowerCase(), row.id);
+  return map;
+}
+
+function processProducts(rows, commit) {
+  const existingProducts = existingProductMap();
+  const seenNames = new Map(); // name.toLowerCase() -> the first row number that used it
+  const results = [];
+  let imported = 0;
+
+  const insert = db.prepare(
+    'INSERT INTO products (name, description, unit_price, tax_rate, visible_in_portal) VALUES (?, ?, ?, ?, ?)',
+  );
+  // Deliberately never touches name — an update is a correction to an
+  // already-existing product matched by that exact name, not a rename;
+  // renaming (if ever wanted) stays a manual edit on the Products page.
+  const update = db.prepare(
+    `UPDATE products SET description = ?, unit_price = ?, tax_rate = ?, visible_in_portal = ?, updated_at = datetime('now') WHERE id = ?`,
+  );
+
+  rows.forEach((row, index) => {
+    const rowNumber = index + 2;
+    const outcome = validateProductRow(row);
+    if (!outcome.ok) {
+      results.push({ row: rowNumber, status: 'error', message: outcome.message, preview: row.name || '' });
+      return;
+    }
+    const v = outcome.values;
+    const key = v.name.toLowerCase();
+    if (seenNames.has(key)) {
+      results.push({
+        row: rowNumber,
+        status: 'error',
+        message: `duplicate: "${v.name}" also appears on row ${seenNames.get(key)} in this file`,
+        preview: v.name,
+      });
+      return;
+    }
+    seenNames.set(key, rowNumber);
+
+    const existingId = existingProducts.get(key);
+    if (commit) {
+      let productId;
+      if (existingId) {
+        update.run(v.description, v.unitPrice, v.taxRate, v.visibleInPortal ? 1 : 0, existingId);
+        productId = existingId;
+      } else {
+        const result = insert.run(v.name, v.description, v.unitPrice, v.taxRate, v.visibleInPortal ? 1 : 0);
+        productId = result.lastInsertRowid;
+      }
+      imported += 1;
+      results.push({
+        row: rowNumber,
+        status: 'ok',
+        message: existingId ? 'updated existing product' : 'imported',
+        preview: v.name,
+        id: productId,
+      });
+    } else {
+      results.push({
+        row: rowNumber,
+        status: 'ok',
+        message: existingId ? 'ready to update existing product' : 'ready to import',
+        preview: v.name,
+      });
+    }
+  });
+
+  return { results, imported };
+}
+
 // ---- Route --------------------------------------------------------------------
 
 const HANDLERS = {
@@ -854,13 +985,17 @@ const HANDLERS = {
   invoices: processInvoices,
   quotes: processQuotes,
   licenses: processLicenses,
+  products: processProducts,
+  'currency-exchange': processCurrencyExchange,
 };
 
 router.post('/:type', (req, res) => {
   const { type } = req.params;
   const handler = HANDLERS[type];
   if (!handler) {
-    return res.status(400).json({ error: `Unknown import type "${type}". Must be one of: clients, expenses, invoices, quotes, licenses.` });
+    return res.status(400).json({
+      error: `Unknown import type "${type}". Must be one of: clients, expenses, invoices, quotes, licenses, products, currency-exchange.`,
+    });
   }
 
   const { csv, commit = false } = req.body || {};
@@ -894,11 +1029,18 @@ router.post('/:type', (req, res) => {
     const label =
       type === 'invoices' && outcome.paymentsImported > 0
         ? `${outcome.imported} invoices (${outcome.paymentsImported} with payment history)`
-        : `${outcome.imported} ${type}`;
+        : type === 'currency-exchange'
+          ? `${outcome.imported} currency exchange expenses`
+          : `${outcome.imported} ${type}`;
+    // currency-exchange rows are, under the hood, plain `expenses` rows
+    // (see processCurrencyExchange() above) — logged with the same
+    // entityType every other expense mutation already uses rather than a
+    // synthetic 'currency-exchange' type nothing else in activity_log
+    // would ever produce.
     logActivity({
       userName: req.user.name,
       action: 'bulk imported',
-      entityType: type,
+      entityType: type === 'currency-exchange' ? 'expense' : type,
       entityId: null,
       entityLabel: `${label} from CSV`,
     });
