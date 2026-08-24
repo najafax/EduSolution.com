@@ -765,7 +765,25 @@ deliberately untouched by either, always returning every row.
   pagination/search — a `{ active, expiring_soon, expired, cancelled, total }`
   count across every license, backing the KPI strip at the top of
   `Licenses.jsx` — and `GET /export.csv`/`GET /export.xlsx`, both following
-  the usual conventions. **The core action**: `POST /:id/renew` is "the client paid,
+  the usual conventions. **Export/reimport round-tripping**:
+  `loadLicenseExport()`'s columns are named so a downloaded export
+  reimports correctly through `routes/import.js`'s license importer (see
+  `lib/csv.js`'s own note on `parseCsv()` for why this needed fixing at
+  all) — `Client email`/`Client name` (both now included; previously a
+  single `Client` column matched neither `client_email` nor
+  `client_name`), `Name` (previously `License`, which never matched
+  `row.name`), and a `Notes` column that didn't exist in this export at
+  all before. The `Status` column is the one place a straight rename
+  wasn't enough: it exports `display_status` (`active` | `expiring_soon`
+  | `expired` | `cancelled` — the more informative value a human actually
+  wants to see in a downloaded report, matching what `Licenses.jsx`'s own
+  table shows) rather than the two raw stored values (`active` |
+  `cancelled`), so `validateLicenseRow()` normalizes `expiring_soon` and
+  `expired` back to `active` on the way in — both are just `withComputed()`
+  deriving a richer view of `status: 'active'` plus `expiry_date` at read
+  time, never a separately stored state, so reimporting either value as
+  `active` reflects reality exactly, not a lossy approximation. **The core
+  action**: `POST /:id/renew` is "the client paid,
   extend it" — advances `expiry_date` by exactly one `billing_cycle`
   (`monthly` or `yearly`, month-end-clamped the same way `lib/scheduler.js`'s
   own `advanceDate()` handles Jan 31 → Feb) from the *current* `expiry_date`,
@@ -1151,13 +1169,11 @@ deliberately untouched by either, always returning every row.
   written in raw snake_case (which would make the downloaded file read
   like a technical dump rather than a report). This alone doesn't make
   every entity's export a safe reimport source — it fixes `expenses`
-  fully (see `routes/expenses.js`'s own note), but e.g.
-  `routes/licenses.js`'s export still labels its client column `"Client"`
-  (the license importer reads `row.client_email`/`row.client_name`,
-  neither matching) and its license-name column `"License"` (the importer
-  reads `row.name`) — a single-word label with no space to normalize, so
-  this fix alone can't close that gap. Not fixed here since it wasn't
-  what was reported; worth the same treatment if it comes up.
+  fully (see `routes/expenses.js`'s own note) and, combined with a
+  handful of label renames, `licenses` too (see `routes/licenses.js`'s
+  own note on that one — a single-word label with no space for this
+  normalization to work with needed a real rename, not just whitespace
+  collapsing). Not audited for every other entity yet.
 - `lib/xlsx.js` — `toXlsxBuffer(rows, columns, sheetName)`, the `.xlsx`
   counterpart to `toCsv()` above, built on `exceljs` (the one real npm
   dependency either serializer needs — CSV is simple enough to hand-roll,

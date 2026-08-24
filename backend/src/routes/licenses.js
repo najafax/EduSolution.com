@@ -120,25 +120,38 @@ router.get('/summary', view, (req, res) => {
 
 // Shared by both export routes below so the CSV and XLSX downloads can
 // never drift apart — one row query, one column list, two serializers.
+// Every label here (once lib/csv.js's parseCsv() lowercases and
+// underscores it on reimport) is also this row's import column name —
+// 'Client email'/'Client name'/'Name' specifically so a downloaded
+// export reimports correctly instead of the "Client"/"License" labels
+// this used to carry, which matched neither `client_email`/`client_name`
+// nor `name` on the way back in. `client_email` is included (not just
+// `client_name`) so a re-import prefers the same unambiguous match by
+// email `resolveClient()` already prefers everywhere else; both are
+// still useful in the downloaded file for a human reading it, not just
+// for reimport. `Notes` was previously missing from this export
+// entirely — a license's notes never round-tripped even by accident.
 function loadLicenseExport() {
   return {
     rows: db
       .prepare(
-        `SELECT licenses.*, clients.name AS client_name
+        `SELECT licenses.*, clients.name AS client_name, clients.email AS client_email
          FROM licenses JOIN clients ON clients.id = licenses.client_id
          ORDER BY licenses.expiry_date ASC, licenses.id DESC`,
       )
       .all()
       .map(withComputed),
     columns: [
-      { label: 'Client', key: 'client_name' },
-      { label: 'License', key: 'name' },
+      { label: 'Client email', key: 'client_email' },
+      { label: 'Client name', key: 'client_name' },
+      { label: 'Name', key: 'name' },
       { label: 'Status', key: 'display_status' },
       { label: 'Billing cycle', key: 'billing_cycle' },
       { label: 'Amount', key: 'amount' },
       { label: 'Start date', key: 'start_date' },
       { label: 'Expiry date', key: 'expiry_date' },
       { label: 'URL', key: 'url' },
+      { label: 'Notes', key: 'notes' },
       { label: 'Last renewed', key: 'last_renewed_at' },
     ],
   };
