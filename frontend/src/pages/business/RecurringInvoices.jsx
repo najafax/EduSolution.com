@@ -38,6 +38,7 @@ export default function RecurringInvoices() {
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -72,7 +73,17 @@ export default function RecurringInvoices() {
   useEffect(() => {
     api.clients.list(token).then(({ clients }) => setClients(clients));
     api.products.list(token).then(({ products }) => setProducts(products)).catch(() => {});
-    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
+    // .finally flips settingsLoaded whether the fetch succeeds or fails —
+    // the loading gate below waits on this too (on the initial load only,
+    // same as the list itself — see load()'s own note), so a template's
+    // amount figures never flash '$' before the real currency symbol
+    // arrives (see Dashboard.jsx's own note on this race for the full
+    // story).
+    api.settings
+      .get(token)
+      .then(({ settings }) => setSettings(settings))
+      .catch(() => {})
+      .finally(() => setSettingsLoaded(true));
   }, [token]);
 
   function startCreate() {
@@ -329,7 +340,7 @@ export default function RecurringInvoices() {
       </Modal>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        {loading ? (
+        {loading || !settingsLoaded ? (
           <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
         ) : recurring.length === 0 ? (
           <p className="p-6 text-sm text-slate-500 dark:text-slate-400">

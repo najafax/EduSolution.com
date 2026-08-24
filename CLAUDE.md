@@ -3651,14 +3651,56 @@ keeps its existing layout.
   verified the same way (a Playwright test throttling `/api/settings` to
   confirm no `$` frame ever paints, plus a permission-restricted-staff
   check confirming the page still renders promptly with the `$` fallback
-  rather than hanging). Single-record detail pages (`InvoiceDetail.jsx`,
-  `QuoteDetail.jsx`), plain list pages with a total row but no KPI-strip
-  hero (`Products.jsx`, `RecurringInvoices.jsx`, `Licenses.jsx`), and the
-  client-facing public/portal pages were deliberately left as-is — this was
-  scoped to the app's "financial KPI" pages (a hero/hard number a person
-  glances at, same shape as Dashboard) specifically, not every page that
-  happens to read `currency_symbol`; the same fix can be applied to any of
-  those the same way if a flash is ever reported there too.
+  rather than hanging). **The sweep was then extended to every remaining
+  staff page reading `settings?.currency_symbol`** —
+  `InvoiceDetail.jsx`/`QuoteDetail.jsx` (single-record detail pages, same
+  `!data`-gate shape as the analytics pages) and `Products.jsx`/
+  `RecurringInvoices.jsx`/`Licenses.jsx` (list pages with their own
+  `loading` boolean rather than a `!data` check — these got the same
+  `settingsLoaded` state and `.finally()`, but the fix widens the page's
+  existing `loading` render-gate to `loading || !settingsLoaded` instead
+  of introducing a second gate, so the "only show the skeleton on the very
+  first load" behavior those three pages already have — see
+  `lib/useDebouncedValue.js`'s own note on why refetches don't re-show the
+  skeleton — is preserved unchanged for search/filter/page-change
+  refetches, and only the *initial* paint additionally waits on settings).
+  All five were verified the same throttled-Playwright way, with real
+  test records in place so each page's money-bearing cells were actually
+  exercised, not just an empty state.
+  **The client portal and the public document-link pages were
+  investigated and found to already be safe, needing no fix**:
+  `PublicQuote.jsx`/`PublicInvoice.jsx` read `settings` from the *same*
+  `api.public.getQuote()`/`getInvoice()` response as the document itself
+  (see `routes/public.js` above) rather than a separate fetch, so there's
+  no second promise to race against. The four portal pages that read
+  `settings` (`PortalDashboard.jsx`, `PortalInvoices.jsx`,
+  `PortalLicenses.jsx`, `PortalQuotes.jsx`) all read it from
+  `PortalAuthContext` rather than fetching it themselves — and that
+  context's bootstrap effect already fetches `me()`/`getSettings()`
+  together via `Promise.all` before ever setting `loading` to `false`,
+  the same pattern this fix introduces everywhere else. The one place
+  that looked suspect on inspection — `PortalAuthContext.jsx`'s `login()`
+  sets `token`/`account` synchronously and fetches `settings` in the
+  background, which briefly looked like the same race — turned out to be
+  a non-issue in practice: `App.jsx`'s `<ErrorBoundary key={location.pathname}>`
+  (see "Error boundaries" above) remounts everything beneath it, including
+  `PortalAuthProvider`, on every pathname change — so the moment `login()`
+  navigates to `/portal/dashboard`, a *fresh* `PortalAuthProvider` instance
+  mounts, reads the now-persisted token from `localStorage`, and runs the
+  same `Promise.all`-gated bootstrap effect from scratch before revealing
+  anything. Confirmed by instrumenting the context directly (temporary
+  `console.log`s tracing renders/mounts/effects) rather than trusting a
+  Playwright text-content check alone, since an earlier pass at this same
+  verification wrongly concluded pages were safe when they weren't — the
+  browser was silently serving cached `/api/settings` responses across
+  sequential `page.goto()` calls within one browser context, masking the
+  real race entirely; the reliable test methodology is a **fresh browser
+  context per page** so no page's check can ride on another's cached
+  response.
+  `PortalInvoiceDetail.jsx`/`PortalQuoteDetail.jsx` are the portal's own
+  per-record detail pages and, like the public pages, get `settings` from
+  their own document-fetch response rather than context or a separate
+  call — also no race.
 - `pages/business/InvoiceDetail.jsx` gained a mobile-only (`sm:hidden`)
   gradient hero card between the header actions and the existing Bill-to/
   Details grid: total due in `font-display`, a paid-vs-total progress bar,
