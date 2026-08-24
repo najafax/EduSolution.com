@@ -95,11 +95,22 @@ router.get('/', view, (req, res) => {
 
 // Shared by both export routes below so the CSV and XLSX downloads can
 // never drift apart — one row query, one column list, two serializers.
+// Note: this export is a financial summary, not a full reimport source —
+// unlike clients/expenses/licenses/products, an invoice reimported via
+// routes/import.js's processInvoices() always collapses to one synthetic
+// line item with a hardcoded zero discount (see that route's own INSERT),
+// so even with every column perfectly named, reimporting an invoice that
+// had multiple real line items or any real discount would silently
+// produce a different (wrong) total than the original — there's no
+// column here that safely reverses to the raw `amount`/`tax_rate`/
+// `description` the importer actually needs. Only the client columns
+// below are fixed for reimport purposes (so at least client matching
+// works if someone tries), not the rest of this shape.
 function loadInvoiceExport() {
   return {
     rows: db
       .prepare(
-        `SELECT invoices.*, clients.name AS client_name
+        `SELECT invoices.*, clients.name AS client_name, clients.email AS client_email
          FROM invoices JOIN clients ON clients.id = invoices.client_id
          ORDER BY invoices.issue_date DESC, invoices.id DESC`,
       )
@@ -107,7 +118,8 @@ function loadInvoiceExport() {
       .map(withComputed),
     columns: [
       { label: 'Number', key: 'number' },
-      { label: 'Client', key: 'client_name' },
+      { label: 'Client email', key: 'client_email' },
+      { label: 'Client name', key: 'client_name' },
       { label: 'Status', key: 'status' },
       { label: 'Issue date', key: 'issue_date' },
       { label: 'Due date', key: 'due_date' },
