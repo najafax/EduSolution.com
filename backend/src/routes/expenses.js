@@ -142,81 +142,104 @@ router.get('/export.xlsx', view, async (req, res) => {
 // separately instead, in `totals` and per year in `byYear`, for the
 // currency-exchange-specific panel to render on its own.
 router.get('/analytics', view, (req, res) => {
-  const rows = db.prepare('SELECT category, amount, expense_date, exchange_rate FROM expenses').all();
-  const currentYear = new Date().getFullYear();
-  const yearOf = (d) => d.slice(0, 4);
+  try {
+    const rows = db.prepare('SELECT category, amount, expense_date, exchange_rate FROM expenses').all();
+    const currentYear = new Date().getFullYear();
+    // expense_date is required and validated non-blank on every write path
+    // (create/update, CSV import), but a row written before that validation
+    // existed, or edited directly against the database, can still carry a
+    // blank or malformed value. `''.slice(0, 4)` used to compute as year 0
+    // (`Number('') === 0`), which pushed minYear down to 0 and made the loop
+    // below iterate ~2000 times instead of the handful of real years — a
+    // response with that many empty byYear entries, not an error, which is
+    // what actually made this page unusable rather than throwing an obvious
+    // exception. yearOf() now returns null for anything that isn't a
+    // plausible year; a row with no derivable year is simply left out of the
+    // yearly breakdown (byCategory/topPayees/totals below don't need a date,
+    // so it's still fully counted everywhere else).
+    const yearOf = (d) => {
+      if (typeof d !== 'string' || d.length < 4) return null;
+      const y = Number(d.slice(0, 4));
+      return Number.isInteger(y) && y >= 1990 && y <= currentYear + 1 ? y : null;
+    };
 
-  const years = new Set([currentYear]);
-  rows.forEach((r) => years.add(Number(yearOf(r.expense_date))));
-  const minYear = Math.min(...years);
+    const validYears = rows.map((r) => yearOf(r.expense_date)).filter((y) => y !== null);
+    const minYear = validYears.length ? Math.min(currentYear, ...validYears) : currentYear;
 
-  const byYear = [];
-  for (let year = currentYear; year >= minYear; year--) {
-    const y = String(year);
-    const yearRows = rows.filter((r) => yearOf(r.expense_date) === y);
-    const exchangeRows = yearRows.filter((r) => r.category === 'currency exchange');
-    byYear.push({
-      year,
-      total: round2(yearRows.reduce((sum, r) => sum + r.amount, 0)),
-      count: yearRows.length,
-      currencyExchangeSpent: round2(exchangeRows.reduce((sum, r) => sum + r.amount, 0)),
-      currencyExchangeUsd: round2(exchangeRows.reduce((sum, r) => sum + (r.exchange_rate > 0 ? r.amount / r.exchange_rate : 0), 0)),
+    const byYear = [];
+    for (let year = currentYear; year >= minYear; year--) {
+      const yearRows = rows.filter((r) => yearOf(r.expense_date) === year);
+      const exchangeRows = yearRows.filter((r) => r.category === 'currency exchange');
+      byYear.push({
+        year,
+        total: round2(yearRows.reduce((sum, r) => sum + r.amount, 0)),
+        count: yearRows.length,
+        currencyExchangeSpent: round2(exchangeRows.reduce((sum, r) => sum + r.amount, 0)),
+        currencyExchangeUsd: round2(exchangeRows.reduce((sum, r) => sum + (r.exchange_rate > 0 ? r.amount / r.exchange_rate : 0), 0)),
+      });
+    }
+
+    const byCategory = {};
+    for (const cat of CATEGORIES) byCategory[cat] = 0;
+    rows.forEach((r) => {
+      byCategory[r.category] = round2((byCategory[r.category] || 0) + r.amount);
     });
+
+    const topPayees = db
+      .prepare(
+        `SELECT payee, COUNT(*) AS expense_count, COALESCE(SUM(amount), 0) AS total_amount
+         FROM expenses WHERE payee != ''
+         GROUP BY payee
+         ORDER BY total_amount DESC
+         LIMIT 5`,
+      )
+      .all();
+
+    // The individual currency-exchange records themselves, in full — the
+    // whole reason this analytics page exists alongside the yearly/category
+    // rollups above (see the frontend page). This category's row count is
+    // expected to stay small at this app's scale (an occasional MVR→USD
+    // conversion, not a high-volume transaction type), so no pagination —
+    // same "don't build it until needed" call `routes/licenses.js`'s own
+    // `GET /:id/renewals` already makes for a comparably small per-entity list.
+    const currencyExchangeTransactions = db
+      .prepare("SELECT * FROM expenses WHERE category = 'currency exchange' ORDER BY expense_date DESC, id DESC")
+      .all()
+      .map(withComputedUsd);
+
+    const exchangeRows = rows.filter((r) => r.category === 'currency exchange');
+    const totalCurrencyExchangeSpent = round2(exchangeRows.reduce((sum, r) => sum + r.amount, 0));
+    const totalCurrencyExchangeUsd = round2(
+      exchangeRows.reduce((sum, r) => sum + (r.exchange_rate > 0 ? r.amount / r.exchange_rate : 0), 0),
+    );
+
+    res.json({
+      byYear,
+      byCategory,
+      topPayees,
+      currencyExchangeTransactions,
+      totals: {
+        totalAmount: round2(rows.reduce((sum, r) => sum + r.amount, 0)),
+        totalCount: rows.length,
+        totalCurrencyExchangeSpent,
+        totalCurrencyExchangeUsd,
+        exchangeTransactionCount: exchangeRows.length,
+        // The true blended rate across every exchange, not an average of the
+        // individual rates (which would weight a tiny exchange the same as a
+        // huge one) — total local currency spent divided by total USD
+        // actually received, `null` when nothing's been exchanged yet rather
+        // than a division-by-zero.
+        averageExchangeRate: totalCurrencyExchangeUsd > 0 ? round2(totalCurrencyExchangeSpent / totalCurrencyExchangeUsd) : null,
+      },
+    });
+  } catch (err) {
+    // Belt-and-suspenders on top of the yearOf() hardening above — guarantees
+    // a proper JSON error response (which the frontend can show as an inline
+    // message) instead of an unhandled exception, for any failure mode this
+    // route didn't anticipate.
+    console.error('GET /api/expenses/analytics failed:', err);
+    res.status(500).json({ error: 'Failed to load expense analytics' });
   }
-
-  const byCategory = {};
-  for (const cat of CATEGORIES) byCategory[cat] = 0;
-  rows.forEach((r) => {
-    byCategory[r.category] = round2((byCategory[r.category] || 0) + r.amount);
-  });
-
-  const topPayees = db
-    .prepare(
-      `SELECT payee, COUNT(*) AS expense_count, COALESCE(SUM(amount), 0) AS total_amount
-       FROM expenses WHERE payee != ''
-       GROUP BY payee
-       ORDER BY total_amount DESC
-       LIMIT 5`,
-    )
-    .all();
-
-  // The individual currency-exchange records themselves, in full — the
-  // whole reason this analytics page exists alongside the yearly/category
-  // rollups above (see the frontend page). This category's row count is
-  // expected to stay small at this app's scale (an occasional MVR→USD
-  // conversion, not a high-volume transaction type), so no pagination —
-  // same "don't build it until needed" call `routes/licenses.js`'s own
-  // `GET /:id/renewals` already makes for a comparably small per-entity list.
-  const currencyExchangeTransactions = db
-    .prepare("SELECT * FROM expenses WHERE category = 'currency exchange' ORDER BY expense_date DESC, id DESC")
-    .all()
-    .map(withComputedUsd);
-
-  const exchangeRows = rows.filter((r) => r.category === 'currency exchange');
-  const totalCurrencyExchangeSpent = round2(exchangeRows.reduce((sum, r) => sum + r.amount, 0));
-  const totalCurrencyExchangeUsd = round2(
-    exchangeRows.reduce((sum, r) => sum + (r.exchange_rate > 0 ? r.amount / r.exchange_rate : 0), 0),
-  );
-
-  res.json({
-    byYear,
-    byCategory,
-    topPayees,
-    currencyExchangeTransactions,
-    totals: {
-      totalAmount: round2(rows.reduce((sum, r) => sum + r.amount, 0)),
-      totalCount: rows.length,
-      totalCurrencyExchangeSpent,
-      totalCurrencyExchangeUsd,
-      exchangeTransactionCount: exchangeRows.length,
-      // The true blended rate across every exchange, not an average of the
-      // individual rates (which would weight a tiny exchange the same as a
-      // huge one) — total local currency spent divided by total USD
-      // actually received, `null` when nothing's been exchanged yet rather
-      // than a division-by-zero.
-      averageExchangeRate: totalCurrencyExchangeUsd > 0 ? round2(totalCurrencyExchangeSpent / totalCurrencyExchangeUsd) : null,
-    },
-  });
 });
 
 function validate(body) {

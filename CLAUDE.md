@@ -3704,33 +3704,97 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
   content hash, so a browser tab left open across a deploy is still
   holding the *old* `index.html`'s chunk map. Navigating to a route whose
   chunk was renamed or removed by the new deploy 404s that dynamic
-  `import()` — and since nothing in this app wraps the lazy routes in an
-  error boundary (there isn't one anywhere in the tree), that unhandled
-  rejection unmounts the whole app instead of just the one route, landing
-  on a blank page with no way back short of a manual hard refresh. This
-  is exactly what happened the first time `ExpenseAnalytics.jsx` shipped:
-  reported as "the page is just blank," reproduced nowhere locally (fresh
-  dev server, fresh production build via `npm run preview`, empty data,
-  real data — every combination rendered correctly with zero console
-  errors), which is itself the signature of this bug: it's not a bug *in*
-  the new page, it's a bug in *reaching* any newly-added page from a tab
-  that loaded before the deploy that added it. `main.jsx` now listens for
-  `vite:preloadError` — the event Vite's own dynamic-import wrapper fires
-  specifically when a chunk fails to load — and calls
-  `window.location.reload()` once, which fetches the current `index.html`
-  and chunk map and resolves the failed navigation transparently. A
-  plain module-scoped boolean (not `sessionStorage`, since the failure
-  mode this guards is JS-context-scoped, not page-scoped) stops a second
-  `vite:preloadError` in the same page load from triggering a second
-  reload, so a *genuinely* broken deploy (not just a stale local cache)
-  fails once and stays failed rather than reload-looping the tab forever.
-  `registerType: 'autoUpdate'` in `vite.config.js`'s `VitePWA()` config
-  already handles the common case in the background (periodically
-  detecting a new service worker and reloading), but there's a real
-  window between "tab open, deploy ships" and "background check notices
-  and reloads" where a click straight into a changed route loses that
-  race — `vite:preloadError` is the direct, immediate catch for exactly
-  that gap, not a replacement for `autoUpdate`.
+  `import()`, which used to unmount the whole app rather than just the one
+  route (see "Error boundaries" below for why, and for the rest of the
+  story — this fix alone turned out not to be the full explanation the
+  first time it was tried). `main.jsx` listens for `vite:preloadError` —
+  the event Vite's own dynamic-import wrapper fires specifically when a
+  chunk fails to load — and calls `window.location.reload()` once, which
+  fetches the current `index.html` and chunk map and resolves the failed
+  navigation transparently. A plain module-scoped boolean (not
+  `sessionStorage`, since the failure mode this guards is JS-context-scoped,
+  not page-scoped) stops a second `vite:preloadError` in the same page load
+  from triggering a second reload, so a *genuinely* broken deploy (not just
+  a stale local cache) fails once and stays failed rather than
+  reload-looping the tab forever. `registerType: 'autoUpdate'` in
+  `vite.config.js`'s `VitePWA()` config already handles the common case in
+  the background (periodically detecting a new service worker and
+  reloading), but there's a real window between "tab open, deploy ships"
+  and "background check notices and reloads" where a click straight into a
+  changed route loses that race — `vite:preloadError` is the direct,
+  immediate catch for exactly that gap, not a replacement for
+  `autoUpdate`. Still a real, worthwhile fix for the failure mode it
+  targets, but see below for why it didn't fix the bug it was originally
+  written for.
+- **Error boundaries**: nothing in this app caught a render-time crash
+  anywhere until `components/ErrorBoundary.jsx` was added — React's default
+  behavior with no error boundary in the tree is to unmount *everything*
+  on an uncaught error during render, not just the failing subtree, which
+  is what turns one bad page into a blank app with the sidebar and nav gone
+  too. This is the second half of a fix that started out misdiagnosed: a
+  report of "`ExpenseAnalytics.jsx` opens a blank page" was first read as
+  the stale-chunk problem above (it reproduced nowhere locally — fresh dev
+  server, fresh production build, empty data, realistic synthetic data,
+  every combination rendered fine), shipped as that fix alone, and the
+  report came back unchanged — "rest of the analytics works perfectly, I
+  only [have] expenses analytics open a blank page," which the stale-chunk
+  theory never actually explained (that failure mode is transient and
+  route-agnostic, not consistently pinned to one specific page). The real
+  cause turned out to be data-shaped, not deploy-shaped:
+  `expenses.exchange_rate` is a nullable column added via `ALTER TABLE` to
+  a table that already had real `category = 'currency exchange'` rows (see
+  `db/index.js`'s migration note on this exact column) — every row created
+  before that migration ran, or before the `validate()`/CSV-import checks
+  that now require a positive rate for that category existed, carries
+  `exchange_rate = NULL` in the live database. `withComputedUsd()` (see
+  `routes/expenses.js` above) correctly returns `amount_usd: null` for
+  exactly those rows, and `Expenses.jsx`'s own list page already guarded
+  every read of it with `!== null` — but `ExpenseAnalytics.jsx`, added in a
+  later change, called `t.amount_usd.toFixed(2)` unconditionally in two
+  places (the currency-exchange-transactions table's desktop and mobile
+  rows), which throws the instant a single legacy no-rate row renders.
+  With no error boundary anywhere, that throw unmounted the whole tree —
+  a page that looked identical to a stale-chunk failure from the outside
+  (same blank result, same total absence of console errors visible to a
+  user who isn't watching devtools), but that no synthetic test database
+  could ever reproduce, since every test row this app's own test suite of
+  Playwright scripts had ever created went through the validated write
+  path and therefore always had a real rate. Fixed on both sides: the two
+  unconditional `.toFixed()` calls in `ExpenseAnalytics.jsx` now check
+  `amount_usd !== null` first (falling back to `'—'`, matching
+  `Expenses.jsx`'s own convention exactly), and `ErrorBoundary.jsx` (a
+  class component — error boundaries have no hook equivalent, so this is
+  the one class component in an otherwise all-function-component codebase)
+  is now rendered once in `App.jsx` around the `Suspense`/`Routes` block,
+  keyed by `location.pathname` so navigating to any other route remounts
+  it and clears whatever it caught. This is deliberately defense-in-depth,
+  not just a fix for the one bug found: the boundary means *any* future
+  render-time crash on *any* page — this one's cause, or one nobody's
+  thought of yet — shows a recoverable "This page hit an error and
+  couldn't load" message with a reload button, sidebar and nav still fully
+  intact, rather than silently taking down the entire app. The four
+  analytics routes' own year-loop math (`routes/expenses.js`'s,
+  `routes/invoices.js`'s, `routes/quotes.js`'s, and `routes/licenses.js`'s
+  `GET /analytics`, all following the identical `dateStr.slice(0, 4)`
+  shape) got a matching backend-side hardening pass at the same time, for
+  the same reason as the frontend fix: defense against a class of bug, not
+  just the one instance found. A blank/malformed date value used to throw
+  outright, or worse — `Number('')` is `0`, not `NaN`, so an empty-string
+  date silently computed as year 0 and made the `for (year = currentYear;
+  year >= minYear; year--)` loop iterate ~2000 times instead of the
+  handful of real years, returning a huge, slow, mostly-empty response
+  rather than an obvious error. Each route's `yearOf()` now returns `null`
+  for anything that isn't a plausible year (not a string, too short, or
+  outside a 1990–current-year+1 band), and a row with no derivable year is
+  simply left out of the yearly breakdown rather than corrupting the
+  range — everything else that doesn't need a date (category/status
+  breakdowns, top-client/payee lists, all-time totals) still counts it.
+  Each route's handler body is also now wrapped in try/catch, logging and
+  returning a proper `{ error }` JSON response instead of an unhandled
+  exception, so any failure mode none of this anticipated still surfaces
+  as a real error the frontend's existing `.catch()` can show inline,
+  rather than a raw 500 with no body or (pre-`ErrorBoundary`) a blank
+  page.
 
 ### Auth flow end-to-end
 
