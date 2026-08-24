@@ -40,6 +40,7 @@ export default function Dashboard() {
   const { user, token, can } = useAuth();
   const [summary, setSummary] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [error, setError] = useState('');
   const [customizing, setCustomizing] = useState(false);
   const [overdueInvoices, setOverdueInvoices] = useState([]);
@@ -54,7 +55,17 @@ export default function Dashboard() {
     if (canViewFinancials) {
       api.financials.summary(token).then(setSummary).catch((err) => setError(err.message));
     }
-    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
+    // `.finally` flips settingsLoaded whether the fetch succeeds or fails
+    // (e.g. a staff user without settings:view) — the render below waits on
+    // this alongside `summary` so the hero/KPI figures never paint with the
+    // '$' fallback for one frame before snapping to the real currency
+    // symbol once this resolves a moment later (both fetches fire together
+    // but resolve independently, and summary usually wins the race).
+    api.settings
+      .get(token)
+      .then(({ settings }) => setSettings(settings))
+      .catch(() => {})
+      .finally(() => setSettingsLoaded(true));
   }, [token, canViewFinancials]);
 
   // "Needs attention" — the invoices already overdue and the licenses about
@@ -140,7 +151,7 @@ export default function Dashboard() {
 
       {!canViewFinancials ? (
         <div className="mt-8">{shortcutsRow()}</div>
-      ) : !summary ? (
+      ) : !summary || !settingsLoaded ? (
         <p className="mt-8 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
       ) : (
         <>
