@@ -118,20 +118,32 @@ router.get('/bank-balance/pdf', async (req, res) => {
   const contributionsBefore = db
     .prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM capital_contributions WHERE contribution_date < ?')
     .get(range.from).total;
-  const openingBalance = Math.round((startingBalance + paidBefore + contributionsBefore - expensesBefore) * 100) / 100;
+  const drawsBefore = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'draw' AND draw_date < ?").get(range.from).total;
+  const returnsBefore = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return' AND draw_date < ?").get(range.from).total;
+  const openingBalance =
+    Math.round((startingBalance + paidBefore + contributionsBefore - expensesBefore - drawsBefore + returnsBefore) * 100) / 100;
 
   const totalPayments = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at BETWEEN ? AND ?').get(range.from, range.to).total;
   const totalExpenses = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date BETWEEN ? AND ?').get(range.from, range.to).total;
   const totalContributions = db
     .prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM capital_contributions WHERE contribution_date BETWEEN ? AND ?')
     .get(range.from, range.to).total;
-  const closingBalance = Math.round((openingBalance + totalPayments + totalContributions - totalExpenses) * 100) / 100;
+  const totalDraws = db
+    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'draw' AND draw_date BETWEEN ? AND ?")
+    .get(range.from, range.to).total;
+  const totalReturns = db
+    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return' AND draw_date BETWEEN ? AND ?")
+    .get(range.from, range.to).total;
+  const closingBalance =
+    Math.round((openingBalance + totalPayments + totalContributions - totalExpenses - totalDraws + totalReturns) * 100) / 100;
 
   const buffer = await renderBankBalancePdf({
     openingBalance,
     totalPayments,
     totalContributions,
     totalExpenses,
+    totalDraws,
+    totalReturns,
     closingBalance,
     from: range.from,
     to: range.to,

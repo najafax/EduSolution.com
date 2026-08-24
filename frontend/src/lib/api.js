@@ -173,6 +173,16 @@ export const api = {
     exportXlsx: (token) => downloadFile('/capital-contributions/export.xlsx', token, 'capital-contributions.xlsx'),
   },
 
+  ownerDraws: {
+    list: (token, { q, type, takenBy, page } = {}) => request(`/owner-draws${qs({ q, type, takenBy, page })}`, { token }),
+    summary: (token) => request('/owner-draws/summary', { token }),
+    create: (payload, token) => request('/owner-draws', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/owner-draws/${id}`, { method: 'PUT', body: payload, token }),
+    remove: (id, token) => request(`/owner-draws/${id}`, { method: 'DELETE', token }),
+    exportCsv: (token) => downloadFile('/owner-draws/export.csv', token, 'owner-draws.csv'),
+    exportXlsx: (token) => downloadFile('/owner-draws/export.xlsx', token, 'owner-draws.xlsx'),
+  },
+
   recurringInvoices: {
     list: (token, { q, page } = {}) => request(`/recurring-invoices${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/recurring-invoices/${id}`, { token }),

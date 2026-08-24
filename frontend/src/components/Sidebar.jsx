@@ -42,6 +42,7 @@ const LINK_ICONS = {
   '/licenses': LicenseIcon,
   '/expenses': ExpenseIcon,
   '/capital-contributions': UsersIcon,
+  '/owner-draws': BankIcon,
   '/financials': BankIcon,
   '/reports': ReportIcon,
   '/activity': HistoryIcon,

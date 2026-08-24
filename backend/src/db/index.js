@@ -187,6 +187,29 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- Money an owner/partner takes OUT of the business for personal use —
+  -- the mirror image of capital_contributions above (money going IN). A
+  -- separate table for the same reason capital_contributions itself is
+  -- separate from a negative expense: expenses.amount is validated > 0
+  -- everywhere, so a draw needs its own always-positive amount rather
+  -- than corrupting that invariant. type ('draw' or 'return') keeps both
+  -- halves of this relationship — money taken, and money paid back — in
+  -- one place with one running balance, rather than splitting "return"
+  -- off into capital_contributions (which already covers a fresh
+  -- injection unrelated to any prior draw, a different real-world event
+  -- even though the cash movement looks the same).
+  CREATE TABLE IF NOT EXISTS owner_draws (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL DEFAULT 'draw',
+    taken_by_name TEXT NOT NULL,
+    amount REAL NOT NULL,
+    draw_date TEXT NOT NULL,
+    notes TEXT NOT NULL DEFAULT '',
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS recurring_invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL REFERENCES clients(id),

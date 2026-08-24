@@ -358,16 +358,18 @@ function renderProfitLossPdf({ revenueTotal, expensesByCategory, totalExpenses, 
 // `to`. A single drawSummaryBox (not two drawStatementSection blocks like
 // P&L) since this is a short four-line reconciliation, not a
 // category-by-category breakdown.
-function renderBankBalancePdf({ openingBalance, totalPayments, totalContributions, totalExpenses, closingBalance, from, to, settings }) {
+function renderBankBalancePdf({ openingBalance, totalPayments, totalContributions, totalExpenses, totalDraws, totalReturns, closingBalance, from, to, settings }) {
   const doc = newDoc();
   const symbol = settings.currency_symbol || '$';
   let y = drawReportHeader(doc, { title: 'BANK BALANCE STATEMENT', subtitle: `${from} to ${to}`, settings });
 
   const rows = [{ label: 'Opening balance', value: signedMoney(openingBalance, symbol) }, { label: 'Payments received', value: money(totalPayments, symbol) }];
   // Only shown when relevant — most businesses never have one, and a
-  // zero-value "Capital contributions" row on every statement would just be
-  // noise for the common case.
+  // zero-value "Capital contributions"/"Owner draws"/"Owner returns" row on
+  // every statement would just be noise for the common case.
   if (totalContributions) rows.push({ label: 'Capital contributions', value: money(totalContributions, symbol) });
+  if (totalDraws) rows.push({ label: 'Owner draws', value: signedMoney(-totalDraws, symbol) });
+  if (totalReturns) rows.push({ label: 'Owner returns', value: money(totalReturns, symbol) });
   rows.push(
     { label: 'Expenses', value: signedMoney(-totalExpenses, symbol) },
     { label: 'Closing balance', value: signedMoney(closingBalance, symbol), bold: true },
@@ -380,7 +382,7 @@ function renderBankBalancePdf({ openingBalance, totalPayments, totalContribution
     .fontSize(8)
     .fillColor(COLORS.muted)
     .text(
-      "Opening balance is the starting balance set in Settings plus every payment received and capital contribution recorded before this period, minus expenses. Not a live bank feed — money moving outside this app (loans, tax remittances) isn't reflected.",
+      "Opening balance is the starting balance set in Settings plus every payment received and capital contribution recorded before this period, minus expenses and net owner draws. Not a live bank feed — money moving outside this app (loans, tax remittances) isn't reflected.",
       MARGIN,
       y,
       { width: CONTENT_WIDTH },

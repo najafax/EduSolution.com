@@ -744,6 +744,102 @@ deliberately untouched by either, always returning every row.
   "Capital contributions" row when the period's total is non-zero, so a
   business that's never used this feature doesn't see a pointless `$0.00`
   line on every statement.
+- `routes/ownerDraws.js` — CRUD for `owner_draws` (`type`/`taken_by_name`/
+  `amount`/`draw_date`/`notes`), mounted at `/api/owner-draws`. This is the
+  mirror image of `capital_contributions` above — money an owner/partner
+  takes *out* of the business, rather than putting in — but it's a
+  deliberately separate table, not a `capital_contributions` row with a
+  negative amount or an opposite sign: `type` is a real column (`draw` |
+  `return`, both stored, `TYPES` array validated the same way
+  `discount_type`/license `billing_cycle` are elsewhere) so a single table
+  can hold both halves of the relationship — money taken, and any of it
+  later paid back — under one running balance. `type: 'return'` is *not*
+  the same real-world event as a fresh `capital_contributions` row, even
+  though the cash movement looks identical (money flowing into the
+  business from an owner): a contribution is new personal money being
+  injected with no prior draw behind it, a return is specifically money
+  that was taken out being paid back — keeping them in separate tables
+  would lose that distinction and make "how much is still outstanding"
+  impossible to compute without cross-referencing two unrelated tables by
+  date/amount/name, which is exactly the kind of fragile matching this app
+  avoids elsewhere (see `POST /invoices/:id/payments`'s license
+  auto-renewal matching by *content*, not id, for the closest comparison
+  of "matching without a real link" and why it's still preferred to
+  nothing — here there's no need for content-matching at all, since `type`
+  already answers the question directly). Also not a plain `expenses` row
+  tagged `shareholder payments` — a plain expense has no notion of a
+  running balance or a later repayment recorded against it, and treating a
+  draw as a normal expense would also wrongly pull it into `netProfit`
+  (see "Financial impact" below for why that would be wrong).
+  Gated on the existing `expenses` permission rather than a new `MODULES`
+  entry — same "reuse when the sensitivity level already matches" call
+  `capitalContributions.js`/`reports.js` already make: this is the same
+  kind of non-invoice cash-movement data `expenses` already covers, and
+  its own outbound-money category (`shareholder payments`) already lives
+  there. Follows `capitalContributions.js`'s exact conventions: `GET /`
+  supports `?q=` (matching `taken_by_name`/`notes`), `?type=` (exact match
+  against `TYPES`), and `?takenBy=` (the `taken_by_name` analog of
+  `contributor`, via the same `distinctNames()`-backed dropdown pattern
+  `distinctContributors()`/`distinctPayees()` already establish) — all
+  compose freely with `?page=` (see "Pagination convention" above; `GET /`
+  with no `page` still returns the full unfiltered array, same convention
+  every other list route follows). `GET /summary` (independent of
+  pagination/search/filters, same convention `licenses.js`'s own
+  `GET /summary` and `capitalContributions.js`'s own `totalAmount`
+  establish) returns `{ totalDraws, totalReturns, outstandingBalance }` —
+  the running balance across every draw and return on file, backing the
+  KPI strip at the top of `OwnerDraws.jsx`. Has the matching
+  `GET /export.csv`/`GET /export.xlsx` pair. Every mutation
+  (create/update/delete) calls `logActivity()`, with `action` text that
+  distinguishes a draw from a return (`'recorded a draw for'` vs.
+  `'recorded a return from'`, and the update/delete equivalents) rather
+  than one generic verb, so the activity feed reads naturally either way.
+  `pages/business/OwnerDraws.jsx` (route `/owner-draws`, nav link "Owner
+  draws" right after "Capital" in `Navbar.jsx`'s `BUSINESS_LINKS`, also
+  gated on `expenses`) is the same list+modal-form+FAB shape as
+  `CapitalContributions.jsx`, with two additions on top: a KPI strip
+  (`KpiCard`s for Total drawn/Total returned/Outstanding balance, from
+  `GET /summary` — refreshed on load and, since the actual DELETE behind
+  `useUndoableDelete.js`'s undo toast doesn't fire until its 5-second undo
+  window closes, on a matching delayed refresh after a delete rather than
+  immediately) and a `type` selector in the create/edit form (a two-button
+  Draw/Return toggle, not a `<select>`, since there are only ever two
+  values and a toggle makes the choice more visually obvious than a
+  dropdown) plus a matching `StatusFilterChips` row above the list
+  (All/Draws/Returns, wired to `?type=`) — otherwise the same
+  confirm-then-undo-toast delete pattern, `SearchInput` + `SearchableSelect`
+  name filter, and standard desktop-table + `MobileListAccordion` mobile
+  split (each row's `type` also renders as a small colored pill — amber
+  for draw, emerald for return — matching the same semantic-color
+  convention `StatusBadge` uses elsewhere, and the mobile accordion gets a
+  matching `accent` stripe). Also included in `routes/dataReset.js`'s
+  Danger Zone as its own standalone category (`owner_draws` — no
+  cascading needed, no other table references it) — there's no CSV
+  *import* type for it yet, same reasoning `capital_contributions` doesn't
+  have one: the ask was recording new draws/returns going forward, not
+  backfilling history. **Financial impact**: `routes/financials.js`'s
+  `GET /summary` sums this table as `totalOwnerDraws`/`totalOwnerReturns`
+  and factors the *net* of the two into `bankBalance` (subtracting draws,
+  adding returns back) — deliberately *not* into `netProfit`, mirroring
+  `capital_contributions`'s own exclusion in the opposite direction: an
+  owner draw is personal money leaving the business, not a business
+  expense, so folding it into net profit would understate how profitable
+  the business actually was (the mirror image of why a contribution isn't
+  added to net profit either). It still belongs in `bankBalance`, since
+  the cash really did leave the account; see `routes/financials.js`'s own
+  comment for the reasoning. `Financials.jsx` renders it as its own
+  `KpiCard` ("Owner draws (net)", icon: `TrendDownIcon`, tone `warning`
+  when outstanding, positioned right before the "Bank balance" card,
+  matching where the Capital contributions card sits relative to it) —
+  `bankBalance`'s own `sub` text was updated to "Starting balance + net
+  profit + contributions − owner draws" to match. `routes/reports.js`'s
+  `GET /bank-balance/pdf` (and `lib/reportPdf.js`'s `renderBankBalancePdf`)
+  got the same treatment as `capital_contributions` did: opening/closing
+  balance both subtract draws and add back returns recorded in/before the
+  range, and the PDF's summary box only renders an "Owner draws"/"Owner
+  returns" row when that period's respective total is non-zero — same
+  "don't show a pointless `$0.00` line" convention the existing "Capital
+  contributions" row already follows.
 - `routes/recurring.js` — CRUD for `recurring_invoices` (+ their
   `recurring_invoice_items` template line items) mounted at
   `/api/recurring-invoices`. Frequency is `weekly|monthly|yearly`. `GET /`
@@ -956,18 +1052,23 @@ deliberately untouched by either, always returning every row.
   `business_settings.starting_balance` (admin-editable on the Settings page,
   see `routes/settings.js` above) plus `netProfit` plus
   `totalCapitalContributions` (`SUM(capital_contributions.amount)`, see
-  `routes/capitalContributions.js` above) — the one number this app can
-  vouch for without a real bank feed: whatever balance you had the day you
-  set `starting_balance`, plus every payment and capital contribution
-  collected and minus every expense recorded since. `totalCapitalContributions`
-  is deliberately excluded from `netProfit` itself (an owner/partner
-  injecting personal money isn't the business earning it) but still counted
-  in `bankBalance` (that cash really did land in the account) — see
-  `routes/capitalContributions.js`'s own "Financial impact" note for why.
-  It's a running proxy, not a live balance — anything moving money outside
-  the `payments`/`expenses`/`capital_contributions` tables (a loan, a tax
-  remittance) isn't reflected, so it can drift from the real account over
-  time if those go unrecorded. `Dashboard.jsx`/`Financials.jsx` both render
+  `routes/capitalContributions.js` above) minus the *net* of
+  `totalOwnerDraws`/`totalOwnerReturns` (`SUM(owner_draws.amount)` per
+  `type`, see `routes/ownerDraws.js` above — draws subtract, returns add
+  back) — the one number this app can vouch for without a real bank feed:
+  whatever balance you had the day you set `starting_balance`, plus every
+  payment, capital contribution, and owner return collected, minus every
+  expense and owner draw recorded since. `totalCapitalContributions`/net
+  owner draws are both deliberately excluded from `netProfit` itself (an
+  owner/partner injecting personal money isn't the business earning it,
+  and a draw isn't a business expense) but still counted in `bankBalance`
+  (that cash really did move through the account either way) — see
+  `routes/capitalContributions.js`'s/`routes/ownerDraws.js`'s own
+  "Financial impact" notes for why. It's a running proxy, not a live
+  balance — anything moving money outside the `payments`/`expenses`/
+  `capital_contributions`/`owner_draws` tables (a loan, a tax remittance)
+  isn't reflected, so it can drift from the real account over time if
+  those go unrecorded. `Dashboard.jsx`/`Financials.jsx` both render
   `bankBalance` as a `KpiCard`
   (icon: `BankIcon`) alongside the other summary figures, tone flipping to
   `negative` the same way `netProfit`'s own card does when the number goes
@@ -975,12 +1076,13 @@ deliberately untouched by either, always returning every row.
   it's still rendered full-width (`col-span-2 sm:col-span-3 lg:col-span-6`,
   via `KpiCard`'s optional `className` prop) as a standalone headline below
   the other shortcut-tile-adjacent KPIs. `Financials.jsx` instead renders
-  all 8 of its KPI cards — including `bankBalance` — in one uniform
-  `grid-cols-2` grid, same size, no card singled out for extra width; this
-  page is the deeper financial-detail view (vs. Dashboard's quick-glance
-  summary), so once `capitalContributions` brought the count to 8, an even
-  grid reads more like a real balance-sheet-style overview than one card
-  visually shouting over the rest.
+  all 9 of its KPI cards — including `bankBalance` and `ownerDraws`'s own
+  net-draws card — in one uniform `grid-cols-2` grid, same size, no card
+  singled out for extra width; this page is the deeper financial-detail
+  view (vs. Dashboard's quick-glance summary), so once `capitalContributions`
+  (and later `ownerDraws`) brought the count up, an even grid reads more
+  like a real balance-sheet-style overview than one card visually shouting
+  over the rest.
 - `routes/reports.js` (mounted at `/api/reports`) — five downloadable PDF
   reports, each `GET /<type>/pdf?from=&to=` (`YYYY-MM-DD`, both required;
   400s if either is missing/malformed or `from` is after `to`). Gated on
@@ -1008,9 +1110,10 @@ deliberately untouched by either, always returning every row.
   `routes/financials.js`'s `bankBalance` (see below), just split at the
   period boundary instead of computed "as of right now": opening balance
   is `business_settings.starting_balance` plus every
-  `payments`/`capital_contributions`/`expenses` row dated strictly *before*
-  `from`, closing balance adds every row *through* `to` (same inclusive
-  `BETWEEN` convention the other reports use) on top of that. None of these routes call `logActivity()` (same
+  `payments`/`capital_contributions`/`expenses`/`owner_draws` row dated
+  strictly *before* `from` (draws subtract, returns add back), closing
+  balance adds every row *through* `to` (same inclusive `BETWEEN`
+  convention the other reports use) on top of that. None of these routes call `logActivity()` (same
   as the existing `:id/pdf` routes — a read-only download isn't a
   mutation) or accept `page`/`q` (each report is inherently a from/to
   filtered dump, not a paginated list).
@@ -1585,8 +1688,8 @@ Status/derived-field conventions worth knowing before touching this code:
   `requirePermission`/module system entirely) — `POST /` bulk-deletes
   whichever tables the caller picks via a `categories` array (one or more
   of `clients`, `quotes`, `invoices`, `recurring`, `licenses`, `expenses`,
-  `capital_contributions`, `products`, `activity`), rather than an
-  all-or-nothing clear. A
+  `capital_contributions`, `owner_draws`, `products`, `activity`), rather
+  than an all-or-nothing clear. A
   `CATEGORIES` map translates each picked key into the actual table(s) it
   touches (e.g. `invoices` → `invoice_items`, `payments`, `invoices`);
   `clients` is the one category that always pulls in more than its own
@@ -2490,13 +2593,14 @@ frontend stops holding/sending it.
   changes when Excel exports were added, only new `exportXlsx()` entries
   alongside each resource's existing `exportCsv()`. Every list page that
   has an "Export CSV" button (`Clients.jsx`, `Quotes.jsx`, `Invoices.jsx`,
-  `Expenses.jsx`, `CapitalContributions.jsx`, `Licenses.jsx` — see each
-  resource's own `GET /export.csv`/`GET /export.xlsx` pair above) has a
+  `Expenses.jsx`, `CapitalContributions.jsx`, `Licenses.jsx`,
+  `OwnerDraws.jsx` — see each resource's own `GET /export.csv`/
+  `GET /export.xlsx` pair above) has a
   matching "Export Excel" button right next to it, wired to a
   `handleExportXlsx()` sibling of that page's existing `handleExportCsv()`
   (renamed from the original unqualified `handleExport()` once there were
   two formats to disambiguate between). The "Export Excel" button on each
-  of those 6 pages is `hidden sm:flex` — visible from `sm` up, hidden below
+  of those pages is `hidden sm:flex` — visible from `sm` up, hidden below
   it — while its "Export CSV"/"Analytics"/"New X" siblings in the same
   header row stay visible at every width; CSV is the one export format a
   phone can actually do anything with (a `.csv` opens in whatever the OS
@@ -3806,8 +3910,9 @@ proved out, rather than staying a one-off.
 - Row actions built on `IconActionButton`: `Licenses.jsx` (Renew/Cancel/
   Reactivate/Remind/History/Edit/Delete — the original, most elaborate
   case, see above), `Clients.jsx`/`Products.jsx`/`Expenses.jsx`/
-  `CapitalContributions.jsx`/`RecurringInvoices.jsx` (Edit/Delete, tone
-  `slate`/`red`), `Users.jsx` (Edit/Reset password/Delete — the new
+  `CapitalContributions.jsx`/`OwnerDraws.jsx`/`RecurringInvoices.jsx`
+  (Edit/Delete, tone `slate`/`red`), `Users.jsx` (Edit/Reset password/
+  Delete — the new
   `KeyIcon` is this page's one addition, since nothing else in the app
   needed a "reset password" glyph), `InvoiceDetail.jsx`'s Payments
   table (Download/Email per receipt row, both tone `lagoon`), and
@@ -3871,9 +3976,10 @@ proved out, rather than staying a one-off.
   inline in the same `<button>`/`<Link>` (`flex items-center gap-1.5`),
   rather than switching to `IconActionButton`'s icon-only shape. Applied
   to every list page's header row (`Clients.jsx`, `Products.jsx`,
-  `Expenses.jsx`, `CapitalContributions.jsx`, `RecurringInvoices.jsx`,
-  `Users.jsx`, `Quotes.jsx`, `Invoices.jsx`, `Licenses.jsx`) and both
-  document detail pages (`QuoteDetail.jsx`, `InvoiceDetail.jsx`).
+  `Expenses.jsx`, `CapitalContributions.jsx`, `OwnerDraws.jsx`,
+  `RecurringInvoices.jsx`, `Users.jsx`, `Quotes.jsx`, `Invoices.jsx`,
+  `Licenses.jsx`) and both document detail pages (`QuoteDetail.jsx`,
+  `InvoiceDetail.jsx`).
   **Every header button row wraps** (`className="flex flex-wrap gap-2"` on
   the `<div>` holding the row) rather than staying on one unbreakable line
   — the header buttons on `Quotes.jsx`/`Invoices.jsx`/`Licenses.jsx` in
@@ -3893,8 +3999,9 @@ proved out, rather than staying a one-off.
   reason: one button away from the same bug otherwise.
 - **Deliberately left untouched**: every modal-form's Save/Cancel footer
   (`Clients.jsx`, `Products.jsx`, `Expenses.jsx`,
-  `CapitalContributions.jsx`, `RecurringInvoices.jsx`, `Users.jsx` — both
-  its create/edit and reset-password forms, `Licenses.jsx`) and any other
+  `CapitalContributions.jsx`, `OwnerDraws.jsx`, `RecurringInvoices.jsx`,
+  `Users.jsx` — both its create/edit and reset-password forms,
+  `Licenses.jsx`) and any other
   plain form-submit button (e.g. `QuoteDetail.jsx`'s inline "Create
   invoice" convert form). These are all the exact same shared
   Save/Cancel-footer shape reused verbatim across every resource in the
