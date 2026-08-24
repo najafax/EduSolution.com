@@ -319,6 +319,26 @@ deliberately untouched by either, always returning every row.
   convention" above); `status`/`q` compose (both narrow the same query), and
   `?status=` predates this feature — it's not currently driven by any
   frontend UI on the list pages, but stays available for other callers.
+  **Export/reimport**: unlike `clients`/`expenses`/`licenses`/`products`,
+  this export is deliberately *not* a full reimport source, and can't be
+  made one by renaming columns the way those four were — `loadInvoiceExport()`/
+  `loadQuoteExport()` gained `Client email` (alongside the existing
+  `Client` column, renamed `Client name`) purely so client-matching
+  works correctly if someone tries reimporting this file, mirroring
+  `routes/licenses.js`'s own fix for the same "Client" mismatch. But
+  `routes/import.js`'s `processInvoices()`/`processQuotes()` always
+  collapse a document to one synthetic line item with a hardcoded zero
+  discount (see those functions' own `INSERT` statements) — there's no
+  column here (`Subtotal`/`Discount`/`Tax`/`Total`/`Amount paid`/`Balance
+  due`, all aggregated/computed figures) that reverses safely to the raw
+  `amount`/`tax_rate`/`description` the importer needs, and a document
+  that ever had a real discount or more than one line item would
+  reimport to a *different*, wrong total even with perfect column names
+  — worse than the reimport just failing outright. So this stays a
+  financial summary/report export, not a backup format; reimporting it
+  now correctly fails on the missing `amount` column (with client
+  matching no longer masking that behind an unrelated "no client found"
+  error) rather than silently producing incorrect figures.
   Invoices only:
   `POST /:id/remind` and `POST /:id/payments`. `quotes.js` also has
   `POST /:id/convert-to-invoice`, which copies the quote's line items into
@@ -1173,7 +1193,9 @@ deliberately untouched by either, always returning every row.
   handful of label renames, `licenses` too (see `routes/licenses.js`'s
   own note on that one — a single-word label with no space for this
   normalization to work with needed a real rename, not just whitespace
-  collapsing). Not audited for every other entity yet.
+  collapsing). `invoices`/`quotes` are the one pair this can't close the
+  gap for, structurally rather than by a naming oversight — see
+  `routes/invoices.js`'s own note on why.
 - `lib/xlsx.js` — `toXlsxBuffer(rows, columns, sheetName)`, the `.xlsx`
   counterpart to `toCsv()` above, built on `exceljs` (the one real npm
   dependency either serializer needs — CSV is simple enough to hand-roll,
