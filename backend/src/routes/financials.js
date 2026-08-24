@@ -53,16 +53,26 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
   // bankBalance below, since that cash really did land in the account.
   const netProfit = Math.round((totalPaid - totalExpenses) * 100) / 100;
   const totalCapitalContributions = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM capital_contributions').get().total;
+  // Same exclude-from-netProfit, include-in-bankBalance treatment as capital
+  // contributions above, mirrored in the opposite direction: an owner draw
+  // is personal money leaving the business, not a business expense, so it
+  // doesn't belong in netProfit either — but the cash really did leave the
+  // account, so bankBalance still needs to reflect it. A later 'return'
+  // entry pays part or all of it back, so only the net (draws - returns)
+  // actually moves the balance.
+  const totalOwnerDraws = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'draw'").get().total;
+  const totalOwnerReturns = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return'").get().total;
 
   // Not a real-time bank feed — just the one number this app can actually
   // vouch for: whatever balance you had the day you set starting_balance
   // (business_settings, see routes/settings.js), plus every payment
   // collected and capital contribution recorded since, minus every expense
-  // recorded since. Anything moving money outside those tables (a loan, a
-  // tax remittance) won't be reflected, so this is a running proxy, not a
-  // bank statement.
+  // and net owner draw recorded since. Anything moving money outside those
+  // tables (a loan, a tax remittance) won't be reflected, so this is a
+  // running proxy, not a bank statement.
   const startingBalance = db.prepare('SELECT starting_balance FROM business_settings WHERE id = 1').get()?.starting_balance || 0;
-  const bankBalance = Math.round((startingBalance + netProfit + totalCapitalContributions) * 100) / 100;
+  const bankBalance =
+    Math.round((startingBalance + netProfit + totalCapitalContributions - totalOwnerDraws + totalOwnerReturns) * 100) / 100;
 
   const months = recentMonths(6);
   const invoicedByMonth = Object.fromEntries(months.map((m) => [m, 0]));
@@ -104,6 +114,8 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
     totalExpenses: Math.round(totalExpenses * 100) / 100,
     netProfit,
     totalCapitalContributions: Math.round(totalCapitalContributions * 100) / 100,
+    totalOwnerDraws: Math.round(totalOwnerDraws * 100) / 100,
+    totalOwnerReturns: Math.round(totalOwnerReturns * 100) / 100,
     bankBalance,
     quoteCounts,
     invoiceCounts,

@@ -30,6 +30,7 @@ const CATEGORIES = {
   licenses: ['license_renewals', 'licenses'],
   expenses: ['expenses'],
   capital_contributions: ['capital_contributions'],
+  owner_draws: ['owner_draws'],
   products: ['products'],
   activity: ['activity_log'],
 };
@@ -49,6 +50,7 @@ const TABLE_ORDER = [
   'licenses',
   'expenses',
   'capital_contributions',
+  'owner_draws',
   'clients',
   'products',
   'activity_log',

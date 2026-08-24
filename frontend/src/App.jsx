@@ -31,6 +31,7 @@ const Products = lazy(() => import('./pages/business/Products'));
 const Expenses = lazy(() => import('./pages/business/Expenses'));
 const ExpenseAnalytics = lazy(() => import('./pages/business/ExpenseAnalytics'));
 const CapitalContributions = lazy(() => import('./pages/business/CapitalContributions'));
+const OwnerDraws = lazy(() => import('./pages/business/OwnerDraws'));
 const Settings = lazy(() => import('./pages/business/Settings'));
 const Quotes = lazy(() => import('./pages/business/Quotes'));
 const QuoteRequests = lazy(() => import('./pages/business/QuoteRequests'));
@@ -123,6 +124,7 @@ export default function App() {
                 <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
                 <Route path="/expenses/analytics" element={<Protected><ExpenseAnalytics /></Protected>} />
                 <Route path="/capital-contributions" element={<Protected><CapitalContributions /></Protected>} />
+                <Route path="/owner-draws" element={<Protected><OwnerDraws /></Protected>} />
                 <Route path="/settings" element={<Protected><Settings /></Protected>} />
                 <Route path="/import" element={<Protected><Import /></Protected>} />
 
