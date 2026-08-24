@@ -672,7 +672,17 @@ function validateLicenseRow(row, clientsByEmail, clientsByName, dateFormat) {
   const amount = amountRaw ? parseNumber(row.amount) : 0;
   if (!Number.isFinite(amount) || amount < 0) return { ok: false, message: 'amount must be a non-negative number' };
 
+  // 'expiring_soon'/'expired' aren't real stored values — they're
+  // routes/licenses.js's withComputed() deriving a more informative
+  // display_status from status='active' plus expiry_date at read time
+  // (see that function's own comment). The Licenses page's own "Export
+  // CSV"/"Export Excel" buttons write that derived value to the Status
+  // column specifically because it's what a human wants to see there —
+  // normalizing both back to 'active' here is what lets that same
+  // export be reimported directly instead of rejecting a value the
+  // export itself produces.
   let status = (row.status || '').trim().toLowerCase();
+  if (status === 'expiring_soon' || status === 'expired') status = 'active';
   if (status && !LICENSE_STATUSES.includes(status)) {
     return { ok: false, message: `status must be one of: ${LICENSE_STATUSES.join(', ')} (got "${(row.status || '').trim()}")` };
   }

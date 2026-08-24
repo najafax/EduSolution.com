@@ -580,6 +580,18 @@ deliberately untouched by either, always returning every row.
   way for a `currency exchange` row, the other two columns optional and
   ignored for every other category — and `Import.jsx`'s CSV template/column
   hint list grew the three columns to match.
+  **Export/reimport round-tripping**: `loadExpenseExport()`'s own `Date`
+  column is labeled `Expense date` specifically so it survives a reimport
+  of the file it produced — see `lib/csv.js`'s own note on `parseCsv()`
+  for the full story (a business exporting its expenses, clearing them,
+  and reimporting the same file used to come back with zero expenses
+  instead of the same ones, silently inflating `netProfit` since
+  `totalExpenses` had dropped to zero while nothing else changed). Every
+  other column here already round-trips correctly once `parseCsv()`
+  normalizes whitespace — `Exchange rate`/`Payee account
+  number`/`USD destination` needed no rename, only `Date` did (a
+  single-word label that would otherwise normalize to `date`, not
+  `expense_date`).
   `pages/business/Expenses.jsx`'s New/Edit form shows a distinct
   `bg-slate-50` sub-panel with all three fields plus a live, read-only
   "Amount received (USD)" preview (recomputed from the form's own draft
@@ -753,7 +765,25 @@ deliberately untouched by either, always returning every row.
   pagination/search — a `{ active, expiring_soon, expired, cancelled, total }`
   count across every license, backing the KPI strip at the top of
   `Licenses.jsx` — and `GET /export.csv`/`GET /export.xlsx`, both following
-  the usual conventions. **The core action**: `POST /:id/renew` is "the client paid,
+  the usual conventions. **Export/reimport round-tripping**:
+  `loadLicenseExport()`'s columns are named so a downloaded export
+  reimports correctly through `routes/import.js`'s license importer (see
+  `lib/csv.js`'s own note on `parseCsv()` for why this needed fixing at
+  all) — `Client email`/`Client name` (both now included; previously a
+  single `Client` column matched neither `client_email` nor
+  `client_name`), `Name` (previously `License`, which never matched
+  `row.name`), and a `Notes` column that didn't exist in this export at
+  all before. The `Status` column is the one place a straight rename
+  wasn't enough: it exports `display_status` (`active` | `expiring_soon`
+  | `expired` | `cancelled` — the more informative value a human actually
+  wants to see in a downloaded report, matching what `Licenses.jsx`'s own
+  table shows) rather than the two raw stored values (`active` |
+  `cancelled`), so `validateLicenseRow()` normalizes `expiring_soon` and
+  `expired` back to `active` on the way in — both are just `withComputed()`
+  deriving a richer view of `status: 'active'` plus `expiry_date` at read
+  time, never a separately stored state, so reimporting either value as
+  `active` reflects reality exactly, not a lossy approximation. **The core
+  action**: `POST /:id/renew` is "the client paid,
   extend it" — advances `expiry_date` by exactly one `billing_cycle`
   (`monthly` or `yearly`, month-end-clamped the same way `lib/scheduler.js`'s
   own `advanceDate()` handles Jan 31 → Feb) from the *current* `expiry_date`,
@@ -1108,7 +1138,42 @@ deliberately untouched by either, always returning every row.
   enough quoting/escaping for this app's exports. `parseCsv(text)` is the
   counterpart — a small state-machine parser (handles quoted fields with
   embedded commas/newlines/escaped quotes, \r\n or \n line endings) that
-  backs `routes/import.js`.
+  backs `routes/import.js`. Its header row is lowercased *and* has
+  whitespace runs collapsed to underscores (`h.trim().toLowerCase().replace(/\s+/g,
+  '_')`) before becoming each row object's keys — added after "delete
+  some expenses, re-export/re-import the same ones, net profit changes"
+  turned out to mean exactly what it sounds like: `routes/expenses.js`'s
+  own `GET /export.csv` wrote a human-readable `"Expense date"` header
+  (well, `"Date"` at the time — see that route's own note), but
+  `routes/import.js`'s `validateExpenseRow()` reads `row.expense_date`, a
+  plain lowercase-and-underscored key never checking for the export's own
+  Title-Case-with-spaces label. Every field whose export label was more
+  than one word — `expense_date`, `exchange_rate`,
+  `payee_account_number`, `usd_destination` — was silently unreadable on
+  reimport, so `expense_date` came back `undefined` for every row,
+  `normalizeDate(undefined, …)` returned `null`, and every single row
+  failed validation with "expense_date must be a valid date." A business
+  that exported its expenses, cleared them (the Danger Zone, or a manual
+  bulk delete), and reimported the very file it had just downloaded ended
+  up with *zero* expenses re-created instead of the same ones back — read
+  from the financials summary as "net profit went up," since
+  `totalExpenses` had silently dropped to (or toward) zero while nothing
+  else about the business had changed. This normalization is what closes
+  that gap: it's a no-op for every hand-authored CSV using this app's own
+  underscored template headers (`routes/import.js`'s own `TEMPLATES`, e.g.
+  `expense_date` — never contains a space to begin with, so
+  `.replace(/\s+/g, '_')` never touches it), and it's what makes an
+  exported file's own Title Case headers resolve to the right keys instead
+  — `"Expense date"` → `expense_date`, `"Exchange rate"` →
+  `exchange_rate`, and so on — without needing every export label to be
+  written in raw snake_case (which would make the downloaded file read
+  like a technical dump rather than a report). This alone doesn't make
+  every entity's export a safe reimport source — it fixes `expenses`
+  fully (see `routes/expenses.js`'s own note) and, combined with a
+  handful of label renames, `licenses` too (see `routes/licenses.js`'s
+  own note on that one — a single-word label with no space for this
+  normalization to work with needed a real rename, not just whitespace
+  collapsing). Not audited for every other entity yet.
 - `lib/xlsx.js` — `toXlsxBuffer(rows, columns, sheetName)`, the `.xlsx`
   counterpart to `toCsv()` above, built on `exceljs` (the one real npm
   dependency either serializer needs — CSV is simple enough to hand-roll,

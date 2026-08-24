@@ -94,8 +94,17 @@ router.get('/', view, (req, res) => {
 function loadExpenseExport() {
   return {
     rows: db.prepare('SELECT * FROM expenses ORDER BY expense_date DESC, id DESC').all().map(withComputedUsd),
+    // Every label here doubles as this row's import column name once
+    // lib/csv.js's parseCsv() lowercases and underscores it — "Expense
+    // date" (not the shorter, more report-like "Date") specifically so a
+    // downloaded export re-uploaded to this same page's "Import CSV"
+    // resolves to `expense_date`, matching routes/import.js's
+    // validateExpenseRow(). Every other label here already round-trips
+    // correctly this way ("Exchange rate" → `exchange_rate`, "Payee
+    // account number" → `payee_account_number`, "USD destination" →
+    // `usd_destination`) without needing a rename.
     columns: [
-      { label: 'Date', key: 'expense_date' },
+      { label: 'Expense date', key: 'expense_date' },
       { label: 'Category', key: 'category' },
       { label: 'Description', key: 'description' },
       { label: 'Amount', key: 'amount' },
