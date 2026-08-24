@@ -15,11 +15,22 @@ export default function Financials() {
   const { token } = useAuth();
   const [summary, setSummary] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     api.financials.summary(token).then(setSummary).catch((err) => setError(err.message));
-    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
+    // .finally flips settingsLoaded whether the fetch succeeds or fails
+    // (e.g. a staff user without settings:view) — the loading gate below
+    // waits on this too, so every money figure on this page paints with
+    // the real currency symbol on first render instead of flashing '$'
+    // for a frame while settings is still in flight (see Dashboard.jsx's
+    // own note on this same race for the full story).
+    api.settings
+      .get(token)
+      .then(({ settings }) => setSettings(settings))
+      .catch(() => {})
+      .finally(() => setSettingsLoaded(true));
   }, [token]);
 
   async function handleDownloadReceipt(invoiceId, paymentId) {
@@ -32,7 +43,7 @@ export default function Financials() {
   }
 
   if (error && !summary) return <div className="px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6 lg:px-8">{error}</div>;
-  if (!summary) return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">Loading…</div>;
+  if (!summary || !settingsLoaded) return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">Loading…</div>;
 
   const symbol = settings?.currency_symbol || '$';
   const collectedPct = summary.totalInvoiced > 0 ? (summary.totalPaid / summary.totalInvoiced) * 100 : 0;

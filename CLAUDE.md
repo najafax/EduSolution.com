@@ -3640,12 +3640,25 @@ keeps its existing layout.
   permission-restricted user on "Loading…" forever, since their settings
   fetch never succeeds — `settingsLoaded` tracks "the fetch is done" (either
   outcome), not "the fetch succeeded." The same independent-parallel-fetch
-  race exists on every other page that reads `settings?.currency_symbol ||
-  '$'` (`Financials.jsx`, `InvoiceDetail.jsx`, `Products.jsx`, the analytics
-  pages, etc.) but wasn't reported there and wasn't touched by this fix —
-  it's a narrower, page-by-page bug fix rather than a shared-hook
-  refactor, since each of those pages' own loading-gate conditions differ
-  enough that a generic extraction wasn't the right scope for this pass.
+  race exists on every page that reads `settings?.currency_symbol || '$'`
+  from a separate `api.settings.get()` call sitting next to its own primary
+  data fetch — this same `settingsLoaded`-gated fix was rolled out to the
+  other pages built around a KPI-strip/summary shape once the Dashboard fix
+  was confirmed: `pages/business/Financials.jsx` and the four analytics
+  pages (`ExpenseAnalytics.jsx`, `InvoiceAnalytics.jsx`,
+  `LicenseAnalytics.jsx`, `QuoteAnalytics.jsx`) — each got the identical
+  `settingsLoaded` state + `.finally()` + widened loading-gate treatment,
+  verified the same way (a Playwright test throttling `/api/settings` to
+  confirm no `$` frame ever paints, plus a permission-restricted-staff
+  check confirming the page still renders promptly with the `$` fallback
+  rather than hanging). Single-record detail pages (`InvoiceDetail.jsx`,
+  `QuoteDetail.jsx`), plain list pages with a total row but no KPI-strip
+  hero (`Products.jsx`, `RecurringInvoices.jsx`, `Licenses.jsx`), and the
+  client-facing public/portal pages were deliberately left as-is — this was
+  scoped to the app's "financial KPI" pages (a hero/hard number a person
+  glances at, same shape as Dashboard) specifically, not every page that
+  happens to read `currency_symbol`; the same fix can be applied to any of
+  those the same way if a flash is ever reported there too.
 - `pages/business/InvoiceDetail.jsx` gained a mobile-only (`sm:hidden`)
   gradient hero card between the header actions and the existing Bill-to/
   Details grid: total due in `font-display`, a paid-vs-total progress bar,
