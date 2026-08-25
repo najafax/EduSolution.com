@@ -12,7 +12,6 @@ const {
 } = require('../middleware/rateLimit');
 const { sendMail } = require('../lib/mailer');
 const { renderQuotePdf, renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
-const { renderClientStatementPdf } = require('../lib/reportPdf');
 const { logActivity } = require('../lib/activity');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
 const { notifyStaffOfPaymentProof } = require('../lib/paymentProofNotify');
@@ -447,7 +446,7 @@ function getClientInvoice(clientId, id) {
   const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order').all(invoice.id);
   const payments = db.prepare('SELECT * FROM payments WHERE invoice_id = ? ORDER BY paid_at').all(invoice.id);
   const paymentProofs = db
-    .prepare('SELECT id, file_name, file_type, note, status, uploaded_at FROM payment_proofs WHERE invoice_id = ? ORDER BY uploaded_at DESC')
+    .prepare('SELECT id, file_name, file_type, note, status, uploaded_at, review_note FROM payment_proofs WHERE invoice_id = ? ORDER BY uploaded_at DESC')
     .all(invoice.id);
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
   return { invoice: withComputedInvoice(invoice), items, payments, paymentProofs, client };
@@ -524,7 +523,7 @@ router.post('/invoices/:id/payment-proof', requireClientAuth, (req, res) => {
   );
 
   const proof = db
-    .prepare('SELECT id, file_name, file_type, note, status, uploaded_at FROM payment_proofs WHERE id = ?')
+    .prepare('SELECT id, file_name, file_type, note, status, uploaded_at, review_note FROM payment_proofs WHERE id = ?')
     .get(result.lastInsertRowid);
   res.status(201).json({ proof });
 });
@@ -555,43 +554,6 @@ router.get('/invoices/:id/payments/:paymentId/pdf', requireClientAuth, async (re
   res.set({
     'Content-Type': 'application/pdf',
     'Content-Disposition': `inline; filename="${payment.receipt_number}.pdf"`,
-  });
-  res.send(buffer);
-});
-
-const STATEMENT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-// A downloadable consolidated statement of account — every invoice issued
-// to this client in the range plus a summary (invoiced/paid/outstanding),
-// the portal's own counterpart to routes/reports.js's staff-side
-// GET /sales/pdf, just scoped to one client and framed as a statement
-// rather than a business-wide sales report. Reuses lib/reportPdf.js's
-// renderClientStatementPdf() (see that file for why it's a thin variant of
-// renderSalesReportPdf() rather than a full duplicate) so the table/summary
-// layout can never drift from the shared report styling. Same accrual
-// convention (issue_date, excluding void) as every other report in this
-// app — see routes/reports.js's own invoicesInRange() comment.
-router.get('/statement/pdf', requireClientAuth, async (req, res) => {
-  const { from, to } = req.query;
-  if (!STATEMENT_DATE_RE.test(from || '') || !STATEMENT_DATE_RE.test(to || '')) {
-    return res.status(400).json({ error: 'from and to are required as YYYY-MM-DD' });
-  }
-  if (from > to) {
-    return res.status(400).json({ error: 'from must not be after to' });
-  }
-
-  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.clientAccount.client_id);
-  const invoices = db
-    .prepare(
-      `SELECT * FROM invoices WHERE client_id = ? AND status != 'void' AND issue_date BETWEEN ? AND ? ORDER BY issue_date ASC, id ASC`,
-    )
-    .all(req.clientAccount.client_id, from, to);
-  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
-
-  const buffer = await renderClientStatementPdf({ client, invoices, from, to, settings });
-  res.set({
-    'Content-Type': 'application/pdf',
-    'Content-Disposition': `inline; filename="statement-${from}-to-${to}.pdf"`,
   });
   res.send(buffer);
 });

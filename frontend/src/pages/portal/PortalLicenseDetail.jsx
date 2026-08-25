@@ -25,16 +25,16 @@ export default function PortalLicenseDetail() {
   }, [id, token]);
 
   if (error && !data) {
-    return <div className="mx-auto max-w-2xl px-4 py-16 text-center text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
+    return <div className="px-4 py-16 text-center text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
   }
   if (!data) {
-    return <div className="mx-auto max-w-2xl px-4 py-16 text-center text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
+    return <div className="px-4 py-16 text-center text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
   }
 
   const { license, renewals } = data;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+    <div className="px-4 py-10 sm:px-6">
       <Link to="/portal/licenses" className="inline-flex items-center text-sm font-medium text-lagoon-600 hover:text-lagoon-500">
         <ChevronRightIcon width={16} height={16} className="rotate-180" />
         Back to licenses

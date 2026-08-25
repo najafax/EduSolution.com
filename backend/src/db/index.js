@@ -673,6 +673,17 @@ if (!userColumns.has('notify_payment_proofs')) {
   db.exec(`ALTER TABLE users ADD COLUMN notify_payment_proofs INTEGER NOT NULL DEFAULT 0;`);
 }
 
+// Same pattern once more for `payment_proofs.review_note` — the staff
+// note attached when rejecting a proof (see "Payment proof upload" below,
+// the reject action). Unlike `payment_proofs` itself, this can't go
+// straight into the CREATE TABLE statement: the table shipped in the
+// previous deploy and may already carry real uploaded proofs, so this
+// follows the same ALTER TABLE lesson `licenses.url` learned the hard way.
+const paymentProofColumns = new Set(db.prepare('PRAGMA table_info(payment_proofs)').all().map((c) => c.name));
+if (!paymentProofColumns.has('review_note')) {
+  db.exec(`ALTER TABLE payment_proofs ADD COLUMN review_note TEXT NOT NULL DEFAULT '';`);
+}
+
 // `client_viewed_at` on both `quotes` and `invoices` — stamped the first
 // time a client actually opens the document, whether via its public
 // `public_token` link (routes/public.js) or the client portal

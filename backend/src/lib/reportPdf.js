@@ -391,58 +391,10 @@ function renderBankBalancePdf({ openingBalance, totalPayments, totalContribution
   return docToBuffer(doc, (d) => addPageFooter(d, settings));
 }
 
-// The client portal's own downloadable statement of account
-// (routes/clientPortal.js's GET /statement/pdf) — a thin variant of
-// renderSalesReportPdf() above rather than a full duplicate: same columns,
-// same summary-box shape, same accrual convention, just for one client's
-// own invoices instead of every client's, and titled/subtitled to read as
-// "your statement" rather than a business-wide sales report. Drops the
-// CLIENT column renderSalesReportPdf() needs (every row is already the
-// same client here) in favor of a wider DESCRIPTION-less date/status/total/
-// paid/balance layout, and the subtitle line names the client directly so
-// the PDF is self-explanatory even printed on its own with no cover page.
-function renderClientStatementPdf({ client, invoices, from, to, settings }) {
-  const doc = newDoc();
-  const symbol = settings.currency_symbol || '$';
-  let y = drawReportHeader(doc, { title: 'STATEMENT OF ACCOUNT', subtitle: `${client.name}  ·  ${from} to ${to}`, settings });
-
-  if (invoices.length === 0) {
-    drawEmptyNotice(doc, 'No invoices in this date range.', y);
-    return docToBuffer(doc, (d) => addPageFooter(d, settings));
-  }
-
-  const columns = [
-    { key: 'number', label: 'INVOICE #', x: 0, width: 110 },
-    { key: 'issue_date', label: 'DATE', x: 113, width: 80 },
-    { key: 'status', label: 'STATUS', x: 196, width: 70, format: (r) => r.status.toUpperCase() },
-    { key: 'total', label: 'TOTAL', x: 309, width: 65, align: 'right', format: (r) => money(r.total, symbol) },
-    { key: 'amount_paid', label: 'PAID', x: 376, width: 60, align: 'right', format: (r) => money(r.amount_paid, symbol) },
-    { key: 'balance', label: 'BALANCE', x: 438, width: 57, align: 'right', format: (r) => money(r.total - r.amount_paid, symbol) },
-  ];
-  y = drawReportTable(doc, { columns, rows: invoices }, y);
-
-  const totalInvoiced = invoices.reduce((s, i) => s + i.total, 0);
-  const totalPaid = invoices.reduce((s, i) => s + i.amount_paid, 0);
-  y = drawSummaryBox(
-    doc,
-    [
-      { label: 'Invoices', value: String(invoices.length) },
-      { label: 'Total invoiced', value: money(totalInvoiced, symbol) },
-      { label: 'Total paid', value: money(totalPaid, symbol) },
-      { label: 'Balance outstanding', value: money(totalInvoiced - totalPaid, symbol) },
-    ],
-    y,
-    { dividerBeforeLast: true },
-  );
-
-  return docToBuffer(doc, (d) => addPageFooter(d, settings));
-}
-
 module.exports = {
   renderSalesReportPdf,
   renderTaxReportPdf,
   renderExpenseReportPdf,
   renderProfitLossPdf,
   renderBankBalancePdf,
-  renderClientStatementPdf,
 };

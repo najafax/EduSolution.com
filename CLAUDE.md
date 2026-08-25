@@ -2392,27 +2392,14 @@ rather than eight overlapping diffs.
   once loaded-and-empty, same "only show the exception case" convention
   this app already follows (a brand-new client with no history yet doesn't
   need an empty panel telling them so).
-- **Statement of account PDF**: `routes/clientPortal.js` gains `GET
-  /statement/pdf?from=&to=` (`requireClientAuth`, same `YYYY-MM-DD`
-  validation and `from` > `to` rejection as `routes/reports.js`'s own
-  `parseDateRange()`) — the portal's counterpart to that same file's
-  staff-side `GET /sales/pdf`, just scoped to one client's own invoices
-  and framed as a statement rather than a business-wide sales report. Same
-  accrual convention as every other report in this app (`issue_date`,
-  excluding `void`). `lib/reportPdf.js` gained `renderClientStatementPdf()`
-  — a thin variant of that same file's `renderSalesReportPdf()` (reusing
-  its `drawReportHeader`/`drawReportTable`/`drawSummaryBox` helpers) rather
-  than a full duplicate: same columns minus the `CLIENT` one
-  (every row is already the same client here), same summary-box shape, the
-  subtitle line names the client directly (`` `${client.name}  ·  ${from}
-  to ${to}` ``) so the PDF reads correctly even printed on its own with no
-  cover page. `pages/portal/PortalInvoices.jsx` gained a "Download
-  statement" header button opening an inline from/to date-range form
-  (defaulting to `startOfMonthStr()`/`todayStr()`, same defaults
-  `Reports.jsx`'s own date pickers use) — distinct from a single receipt
-  (already downloadable per-payment from `PortalInvoiceDetail.jsx`), this
-  is one PDF covering every invoice issued in the chosen range, for a
-  client doing their own bookkeeping.
+- **Statement of account PDF — built, then removed.** This originally
+  shipped as `GET /statement/pdf?from=&to=` on `routes/clientPortal.js`
+  plus `lib/reportPdf.js`'s `renderClientStatementPdf()` and a "Download
+  statement" button on `pages/portal/PortalInvoices.jsx`, but was taken
+  back out shortly after on explicit request — the portal is meant to stay
+  a simple read/upload surface for a client, not a bookkeeping-report tool.
+  All three pieces were deleted outright rather than left dead/unreachable
+  in the codebase.
 - **Inline bank details on an unpaid invoice**: `PortalInvoiceDetail.jsx`
   renders a small "How to pay" block (`settings.bank_details` — the same
   field every quote/invoice PDF already prints, not a new one) directly on
@@ -2446,8 +2433,34 @@ rather than eight overlapping diffs.
   person — "my account," deliberately distinct from `UsersIcon`'s plural
   meaning elsewhere in the app) and `HelpCircleIcon` (a question mark in a
   circle — "need help").
-- `lib/api.js`'s `portal` object gained `changePassword`, `activity`,
-  `openStatementPdf`, and `licenses.get` alongside the existing calls.
+- `lib/api.js`'s `portal` object gained `changePassword`, `activity`, and
+  `licenses.get` alongside the existing calls (`openStatementPdf` was
+  removed along with the statement PDF feature itself, see above).
+- **Header rebrand**: `PortalLayout.jsx`'s wordmark link changed from
+  "EduSolution`.com`" (with a lagoon-colored `.com`) plus an adjacent
+  "Client portal" pill badge to a single plain "EDU SOLUTIONS" — the pill
+  was dropped outright rather than just hidden, on the reasoning that a
+  client logged into their own dedicated portal domain-space doesn't need
+  reminding they're "in the client portal" every time they look at the
+  header. `components/Footer.jsx` (shared with the staff app, rendered
+  by `PortalLayout.jsx` too) keeps its own "EduSolution.com" wordmark
+  unchanged — this rebrand was scoped to the header specifically, not a
+  full rename of every mention of the product name across the app.
+- **Full width**: every portal content page (`PortalDashboard.jsx`,
+  `PortalQuotes.jsx`, `PortalInvoices.jsx`, `PortalLicenses.jsx`,
+  `PortalMyAccount.jsx`, and the three detail pages' loading/error/loaded
+  states) dropped its `mx-auto max-w-*` cap — same bare `px-4 py-10
+  sm:px-6` shape every staff business list page already uses (see
+  Dashboard.jsx's own note on this same pattern). `PortalLayout.jsx`'s
+  header row lost its own `mx-auto max-w-5xl` wrapper too, so the header
+  and the content below it read as one consistent full-width surface
+  rather than a full-width body under a narrower header bar. Deliberately
+  **not** applied to the four unauthenticated auth pages
+  (`PortalLogin`/`PortalAcceptInvite`/`PortalForgotPassword`/
+  `PortalResetPassword`, all sharing `PortalAuthCard.jsx`'s centered-card
+  shell) — a login form stretched edge-to-edge across a wide monitor
+  would be a readability regression, not an improvement, and this was a
+  request about the portal's actual content pages, not its auth screens.
 
 ### Payment proof upload (`backend/src/`, `frontend/src/`)
 
@@ -2545,12 +2558,13 @@ touches is its own row.
   (`{pendingProofCount} pending`) so "something needs a look" is visible
   even while the section is collapsed on mobile — the standard desktop-
   table + `MobileListAccordion` split (see "Mobile design system" above)
-  applies here too. Each row gets three `IconActionButton`s: "View file"
-  (`DownloadIcon`, tone `lagoon`, ungated — a view-only user can still
-  look, same convention `Download PDF`'s own ungated button already
-  follows), "Mark reviewed" (`CheckCircleIcon`, tone `emerald`, `canManage`-
-  gated, hidden once already `reviewed` — there's nothing left to mark),
-  and "Delete" (`TrashIcon`, tone `red`, `canManage`-gated, behind the same
+  applies here too. Each row gets up to four `IconActionButton`s: "View
+  file" (`DownloadIcon`, tone `lagoon`, ungated — a view-only user can
+  still look, same convention `Download PDF`'s own ungated button already
+  follows), "Mark reviewed" (`CheckCircleIcon`, tone `emerald`,
+  `canManage`-gated, shown only while `status === 'pending'`), "Reject"
+  (`XIcon`, tone `red`, same `pending`-only gate), and "Delete"
+  (`TrashIcon`, tone `red`, `canManage`-gated, behind the same
   `useConfirm()` dialog every other destructive action in this app uses).
   `POST /:id/payment-proofs/:proofId/review` (`manage`) only ever flips
   `status`/`reviewed_by_name`/`reviewed_at` — it never touches the
@@ -2560,6 +2574,31 @@ touches is its own row.
   `DELETE /:id/payment-proofs/:proofId` (`manage`) logs an activity entry
   (`action: 'deleted a payment proof for'`) the same way every other
   delete in this app does.
+- **Reject with a note**: the other terminal outcome for a proof, alongside
+  "reviewed" — `POST /:id/payment-proofs/:proofId/reject` (`manage`) 400s
+  on a blank `note` (unlike review, a rejection has to explain itself),
+  otherwise sets `status = 'rejected'`, stores the note in
+  `payment_proofs.review_note` (`db/index.js`, guarded `ALTER TABLE` — this
+  table had already shipped a real deploy by the time this was added, same
+  `licenses.url` lesson every other post-launch column addition in this
+  file follows), and stamps `reviewed_by_name`/`reviewed_at` same as
+  review does. Like review, it only ever touches the proof's own row — an
+  invoice's `amount_paid`/`status` are never affected either way. Clicking
+  "Reject" (`InvoiceDetail.jsx`, `pending`-only, same row as "Mark
+  reviewed") opens a small `Modal` with a required textarea rather than a
+  bare `confirm()` — a rejection reason is real text input, not a yes/no,
+  same reasoning `QuoteRequests.jsx`'s own decline flow already uses a
+  `Modal` instead of `window.confirm()` for its note. `StatusBadge.jsx`
+  gained a `rejected` entry (red, same as `declined`/`void`) alongside the
+  existing `pending` (amber)/`reviewed` (falls back to the default slate).
+  The whole point of a reject-with-a-note action over just deleting the
+  upload is that the client sees *why* — `routes/clientPortal.js`'s
+  `getClientInvoice()` now selects `review_note` alongside `status`, and
+  `PortalInvoiceDetail.jsx` renders "Rejected: {review_note}" under the
+  client's own copy of that proof, in red, right next to their own upload
+  note. The upload form stays visible regardless (still gated only on
+  `balance_due > 0 && status !== 'void'`), so a rejected proof doesn't
+  block the client from uploading a corrected one.
 
 ### Quote requests (`backend/src/`, `frontend/src/`)
 

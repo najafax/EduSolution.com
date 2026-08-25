@@ -94,13 +94,10 @@ export default function PortalLayout({ children }) {
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950">
       <header className="border-b border-slate-200 dark:border-slate-800">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-6">
             <Link to="/portal/dashboard" className="font-bold text-slate-900 dark:text-white">
-              EduSolution<span className="text-lagoon-600">.com</span>
-              <span className="ml-2 rounded-full bg-lagoon-50 px-2 py-0.5 text-xs font-medium text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
-                Client portal
-              </span>
+              EDU SOLUTIONS
             </Link>
             <nav className="hidden items-center gap-1 sm:flex">
               {NAV_LINKS.map(({ to, label, icon: Icon }) => (
