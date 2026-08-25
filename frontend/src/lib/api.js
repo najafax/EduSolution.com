@@ -152,6 +152,13 @@ export const api = {
     openReceiptPdf: (id, paymentId, token) => openPdf(`/invoices/${id}/payments/${paymentId}/pdf`, token),
     exportCsv: (token) => downloadFile('/invoices/export.csv', token, 'invoices.csv'),
     exportXlsx: (token) => downloadFile('/invoices/export.xlsx', token, 'invoices.xlsx'),
+    // openPdf() is generic despite its name — it just fetches, blobs, and
+    // opens in a new tab using the response's own Content-Type, which
+    // works exactly as well for a JPEG/PNG payment slip as it does for a
+    // PDF one.
+    openPaymentProofFile: (id, proofId, token) => openPdf(`/invoices/${id}/payment-proofs/${proofId}/file`, token),
+    reviewPaymentProof: (id, proofId, token) => request(`/invoices/${id}/payment-proofs/${proofId}/review`, { method: 'POST', token }),
+    deletePaymentProof: (id, proofId, token) => request(`/invoices/${id}/payment-proofs/${proofId}`, { method: 'DELETE', token }),
   },
 
   expenses: {
@@ -298,6 +305,8 @@ export const api = {
       get: (id, token) => request(`/portal/invoices/${id}`, { token }),
       openPdf: (id, token) => openPdf(`/portal/invoices/${id}/pdf`, token),
       openReceiptPdf: (id, paymentId, token) => openPdf(`/portal/invoices/${id}/payments/${paymentId}/pdf`, token),
+      uploadPaymentProof: (id, payload, token) =>
+        request(`/portal/invoices/${id}/payment-proof`, { method: 'POST', body: payload, token }),
     },
 
     licenses: {

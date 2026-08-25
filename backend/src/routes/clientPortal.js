@@ -15,6 +15,7 @@ const { renderQuotePdf, renderInvoicePdf, renderReceiptPdf } = require('../lib/p
 const { renderClientStatementPdf } = require('../lib/reportPdf');
 const { logActivity } = require('../lib/activity');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
+const { notifyStaffOfPaymentProof } = require('../lib/paymentProofNotify');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour, same window as staff resets
 const MIN_PASSWORD_LENGTH = 8;
@@ -445,8 +446,11 @@ function getClientInvoice(clientId, id) {
   if (!invoice) return null;
   const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order').all(invoice.id);
   const payments = db.prepare('SELECT * FROM payments WHERE invoice_id = ? ORDER BY paid_at').all(invoice.id);
+  const paymentProofs = db
+    .prepare('SELECT id, file_name, file_type, note, status, uploaded_at FROM payment_proofs WHERE invoice_id = ? ORDER BY uploaded_at DESC')
+    .all(invoice.id);
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
-  return { invoice: withComputedInvoice(invoice), items, payments, client };
+  return { invoice: withComputedInvoice(invoice), items, payments, paymentProofs, client };
 }
 
 router.get('/invoices/:id', requireClientAuth, (req, res) => {
@@ -455,6 +459,74 @@ router.get('/invoices/:id', requireClientAuth, (req, res) => {
   markViewed('invoices', data.invoice.id);
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   res.json({ ...data, settings: publicSettings(settings) });
+});
+
+const PAYMENT_PROOF_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+// Applied to the decoded byte size, not the base64 string length (base64
+// inflates by ~4/3) — 6MB of real file comfortably covers a phone photo of
+// a bank slip or a short scanned PDF, and leaves headroom under
+// index.js's 8mb JSON body limit once the rest of the request envelope
+// (file_name/file_type/note/JSON overhead) is accounted for.
+const PAYMENT_PROOF_MAX_BYTES = 6 * 1024 * 1024;
+
+// A client's own upload of evidence that they paid — see db/index.js's own
+// note on payment_proofs for why this is deliberately *not* a payment
+// record: this app has no payment-gateway integration, so a proof is just
+// that, evidence a staff member reviews against the real bank statement
+// before recording the actual payment through the existing
+// POST /invoices/:id/payments flow. `file_data` must be a base64 data URI
+// whose declared MIME type matches `file_type` and is one of
+// PAYMENT_PROOF_TYPES — checked against the actual decoded byte length,
+// not trusted from the client, so a spoofed file_type/oversized payload
+// can't sneak past validation. Blocked once the invoice has nothing left
+// to pay (balance_due <= 0) or is void — there's nothing to prove payment
+// of at that point.
+router.post('/invoices/:id/payment-proof', requireClientAuth, (req, res) => {
+  const invoice = db.prepare('SELECT * FROM invoices WHERE id = ? AND client_id = ?').get(req.params.id, req.clientAccount.client_id);
+  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+  if (invoice.status === 'void') return res.status(409).json({ error: 'This invoice has been voided' });
+  const balanceDue = Math.round((invoice.total - invoice.amount_paid) * 100) / 100;
+  if (balanceDue <= 0) return res.status(409).json({ error: 'This invoice has already been paid in full' });
+
+  const { file_name: fileName, file_type: fileType, file_data: fileData, note } = req.body || {};
+  if (!fileName || !fileType || !fileData) {
+    return res.status(400).json({ error: 'A file is required' });
+  }
+  if (!PAYMENT_PROOF_TYPES.includes(fileType)) {
+    return res.status(400).json({ error: 'Only JPEG, PNG, WEBP, or PDF files are accepted' });
+  }
+  const match = new RegExp(`^data:${fileType.replace('/', '\\/')};base64,([A-Za-z0-9+/]+=*)$`).exec(fileData);
+  if (!match) {
+    return res.status(400).json({ error: 'The uploaded file could not be read' });
+  }
+  const byteLength = Buffer.byteLength(match[1], 'base64');
+  if (byteLength > PAYMENT_PROOF_MAX_BYTES) {
+    return res.status(400).json({ error: 'File is too large — please keep it under 6MB' });
+  }
+
+  const result = db
+    .prepare('INSERT INTO payment_proofs (invoice_id, file_data, file_name, file_type, note) VALUES (?, ?, ?, ?, ?)')
+    .run(invoice.id, fileData, String(fileName).slice(0, 255), fileType, (note || '').trim().slice(0, 1000));
+
+  logActivity({
+    userName: req.clientAccount.client_name,
+    action: 'uploaded a payment proof for (client)',
+    entityType: 'invoice',
+    entityId: invoice.id,
+    entityLabel: invoice.number,
+  });
+
+  // Never awaited — a slow or failed staff notification should never delay
+  // or break the client's own upload response, same reasoning
+  // notifyStaffOfQuoteAccepted() documents.
+  notifyStaffOfPaymentProof({ invoice, client: req.clientAccount, fileName }).catch((err) =>
+    console.error('Failed to notify staff of payment proof upload:', err.message),
+  );
+
+  const proof = db
+    .prepare('SELECT id, file_name, file_type, note, status, uploaded_at FROM payment_proofs WHERE id = ?')
+    .get(result.lastInsertRowid);
+  res.status(201).json({ proof });
 });
 
 router.get('/invoices/:id/pdf', requireClientAuth, async (req, res) => {
