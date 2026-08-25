@@ -1646,17 +1646,60 @@ deliberately untouched by either, always returning every row.
     `amount_paid < total`, `due_date < today`, and
     `last_reminder_sent_at` is either null or over 7 days old (so a human
     sending a manual reminder, or a previous automated one, suppresses
-    re-nagging for a week). Emails the invoice PDF and updates
+    re-nagging for a week). **Dunning ladder**: the email this job sends
+    escalates in tone as an invoice ages, rather than repeating the same
+    gentle wording indefinitely. `daysOverdue(dueDate)` computes how many
+    whole days past `due_date` today is, and `dunningContent({ invoice,
+    client, settings, balanceDue, overdueDays })` picks one of three fixed
+    stages from it: `soft` (the default, under `DUNNING_FIRM_DAYS` = 14
+    days overdue — a plain "this is due, here it is again" reminder),
+    `firm` (14–29 days — "remains unpaid... please arrange payment as soon
+    as possible"), and `final` (`DUNNING_FINAL_DAYS` = 30+ days — a
+    `FINAL NOTICE:` subject line and "please settle this balance
+    immediately to avoid further action"); each stage has its own
+    subject/HTML body, still with the invoice PDF attached exactly as
+    before. This needed **no new DB state or scheduling change at all** —
+    the job already runs daily and already suppresses re-sends for 7 days
+    via `last_reminder_sent_at`, so the *same* invoice naturally gets
+    re-selected roughly every week as it ages, and each time
+    `daysOverdue()` is simply recomputed fresh against today — an invoice
+    that was `soft` on its first reminder reads as `firm` a couple of
+    re-sends later and eventually `final`, with no separate "which rung of
+    the ladder is this invoice on" column to keep in sync. Deliberately
+    **not** wired into `lib/emailTemplates.js`'s admin-editable template
+    system the way `quote_send`/`invoice_send`/`invoice_remind`/
+    `receipt_send`/`license_remind`/`portal_invite` all are — this follows
+    that file's own existing precedent for this exact job (see its
+    top-of-file note): nobody reviews an automated reminder before it goes
+    out the way a human reviews a manual "Send" click via
+    `EmailPreviewModal`, so like the rest of this digest's wording, the
+    three stages' copy is a fixed, hardcoded escalation rather than
+    something an admin can rewrite per stage. `logEmail()`'s
+    `entityLabel` for this job is now `` `${invoice.number} (${stage})` ``
+    (e.g. `INV-2026-0001 (firm)`) rather than just the bare number, so the
+    Email Center's sent log shows which rung of the ladder each historical
+    send actually was. Emails the invoice PDF and updates
     `last_reminder_sent_at`. After the loop, if any reminders actually went
     out, calls `notifyStaffOfReminders(reminded, settings)` — queries
     `users` for `active = 1 AND notify_overdue = 1` and emails each an HTML
     digest listing every invoice that was just reminded (number/client/
-    balance/due date). This is opt-in per-user (see `PUT
-    /api/auth/preferences` above) and best-effort: each recipient send is
-    its own try/catch so one bad address never blocks the others, and since
-    it only runs after the SMTP-configured check above, it's naturally
-    dormant (never even reached) when SMTP isn't set — no separate gate
-    needed.
+    balance/due date), now with a fourth column reading the plain-English
+    stage label (`STAGE_LABELS`: "reminder" / "firm reminder" / "FINAL
+    NOTICE") so a staff member scanning the digest can tell at a glance
+    which overdue invoices are still early and which are about to (or
+    already did) get the final-notice treatment. This is opt-in per-user
+    (see `PUT /api/auth/preferences` above) and best-effort: each
+    recipient send is its own try/catch so one bad address never blocks
+    the others, and since it only runs after the SMTP-configured check
+    above, it's naturally dormant (never even reached) when SMTP isn't set
+    — no separate gate needed. Verified by creating three test invoices
+    engineered to sit at 3/20/45 days overdue and confirming
+    `dunningContent()` resolved each to `soft`/`firm`/`final` respectively
+    (via a temporary debug log, removed before commit) — real SMTP
+    delivery itself isn't testable in this environment, so the send
+    attempt was exercised against an unreachable `SMTP_HOST` to confirm
+    the full query/render/recipient pipeline runs correctly up to the
+    point of the (expected, harmless) `ECONNREFUSED`.
   - `15 8 * * *` — `runLicenseExpiryAlerts()`: staggered 15 minutes after
     the overdue-reminder job purely so the two jobs' console output doesn't
     interleave, not for any functional reason. Same shape as
