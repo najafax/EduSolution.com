@@ -282,6 +282,9 @@ export const api = {
     resetPassword: (token, password) => request('/portal/reset-password', { method: 'POST', body: { token, password } }),
     me: (token) => request('/portal/me', { token }),
     getSettings: (token) => request('/portal/settings', { token }),
+    changePassword: (payload, token) => request('/portal/change-password', { method: 'POST', body: payload, token }),
+    activity: (token) => request('/portal/activity', { token }),
+    openStatementPdf: (from, to, token) => openPdf(`/portal/statement/pdf?from=${from}&to=${to}`, token),
 
     quotes: {
       list: (token) => request('/portal/quotes', { token }),
@@ -299,6 +302,7 @@ export const api = {
 
     licenses: {
       list: (token) => request('/portal/licenses', { token }),
+      get: (id, token) => request(`/portal/licenses/${id}`, { token }),
     },
 
     products: {

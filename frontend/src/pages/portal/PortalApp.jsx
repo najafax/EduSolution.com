@@ -12,6 +12,8 @@ import PortalQuoteDetail from './PortalQuoteDetail';
 import PortalInvoices from './PortalInvoices';
 import PortalInvoiceDetail from './PortalInvoiceDetail';
 import PortalLicenses from './PortalLicenses';
+import PortalLicenseDetail from './PortalLicenseDetail';
+import PortalMyAccount from './PortalMyAccount';
 
 function Protected({ children }) {
   return (
@@ -41,6 +43,8 @@ export default function PortalApp() {
         <Route path="invoices" element={<Protected><PortalInvoices /></Protected>} />
         <Route path="invoices/:id" element={<Protected><PortalInvoiceDetail /></Protected>} />
         <Route path="licenses" element={<Protected><PortalLicenses /></Protected>} />
+        <Route path="licenses/:id" element={<Protected><PortalLicenseDetail /></Protected>} />
+        <Route path="account" element={<Protected><PortalMyAccount /></Protected>} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Routes>
     </PortalAuthProvider>

@@ -78,8 +78,20 @@ export function PortalAuthProvider({ children }) {
     setSettings(null);
   }
 
+  // Mirrors AuthContext.jsx's own updateToken — used by PortalMyAccount.jsx
+  // after a successful password change, whose response carries a fresh
+  // token (the old one is invalidated the instant password_changed_at
+  // changes, see middleware/clientAuth.js), so the caller's own session
+  // doesn't immediately log itself out.
+  function updateToken(nextToken) {
+    localStorage.setItem(TOKEN_KEY, nextToken);
+    setToken(nextToken);
+  }
+
   return (
-    <PortalAuthContext.Provider value={{ token, account, settings, loading, login, logout }}>{children}</PortalAuthContext.Provider>
+    <PortalAuthContext.Provider value={{ token, account, settings, loading, login, logout, updateToken }}>
+      {children}
+    </PortalAuthContext.Provider>
   );
 }
 

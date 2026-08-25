@@ -12,6 +12,7 @@ const {
 } = require('../middleware/rateLimit');
 const { sendMail } = require('../lib/mailer');
 const { renderQuotePdf, renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
+const { renderClientStatementPdf } = require('../lib/reportPdf');
 const { logActivity } = require('../lib/activity');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
 
@@ -175,6 +176,33 @@ router.get('/me', requireClientAuth, (req, res) => {
   res.json({ account: publicAccount(account) });
 });
 
+// The portal's own self-service password change — mirrors routes/auth.js's
+// POST /change-password exactly (verify currentPassword via bcrypt.compare
+// first, require MIN_PASSWORD_LENGTH, stamp password_changed_at, issue a
+// fresh token). Bumping password_changed_at invalidates every token issued
+// before now (see middleware/clientAuth.js's own iat check), including the
+// one this request just authenticated with, so a fresh token has to be
+// returned or the caller's own session would immediately log itself out.
+router.post('/change-password', requireClientAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+  }
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+  }
+
+  const valid = await bcrypt.compare(currentPassword, req.clientAccount.password_hash);
+  if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  db.prepare(`UPDATE client_portal_accounts SET password_hash = ?, password_changed_at = datetime('now') WHERE id = ?`).run(
+    passwordHash,
+    req.clientAccount.id,
+  );
+  res.json({ message: 'Password updated.', token: signClientToken(req.clientAccount) });
+});
+
 // --- Phase 3/4: read-only views of the client's own quotes/invoices/
 // licenses, plus a quote accept/decline action. Every query below is
 // scoped to `req.clientAccount.client_id` — there is no id-only lookup
@@ -243,6 +271,70 @@ function markViewed(table, id) {
 router.get('/settings', requireClientAuth, (req, res) => {
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   res.json({ settings: publicSettings(settings) });
+});
+
+// A synthesized recent-activity feed for the portal dashboard — not a read
+// of `activity_log` (that's a staff-wide audit trail with no `client_id`
+// column, and exposing it directly would risk leaking other clients' rows
+// alongside this one), but a small set of purpose-built queries against the
+// same `quotes`/`invoices`/`payments`/`licenses` tables every other route in
+// this router already scopes to `client_id`, merged into one chronological
+// list of `{ type, label, date, link, amount }` entries (`amount` only set
+// for a payment, so the frontend can format it with the currency symbol it
+// already has rather than this route needing to know it). Capped at
+// ACTIVITY_LIMIT (10, most recent first) — a running list this small
+// doesn't need pagination, same "don't build it until needed" call this
+// app already makes elsewhere (routes/licenses.js's own renewal history).
+const ACTIVITY_LIMIT = 10;
+
+router.get('/activity', requireClientAuth, (req, res) => {
+  const clientId = req.clientAccount.client_id;
+  const entries = [];
+
+  db.prepare(`SELECT id, number, issue_date FROM quotes WHERE client_id = ? AND ${CLIENT_VISIBLE_QUOTE}`)
+    .all(clientId)
+    .forEach((q) => entries.push({ type: 'quote_sent', label: `Quote ${q.number} sent to you`, date: q.issue_date, link: `/portal/quotes/${q.id}`, amount: null }));
+
+  db.prepare('SELECT id, number, client_response, client_responded_at FROM quotes WHERE client_id = ? AND client_responded_at IS NOT NULL')
+    .all(clientId)
+    .forEach((q) =>
+      entries.push({
+        type: 'quote_response',
+        label: `You ${q.client_response} quote ${q.number}`,
+        date: q.client_responded_at,
+        link: `/portal/quotes/${q.id}`,
+        amount: null,
+      }),
+    );
+
+  db.prepare('SELECT id, number, issue_date FROM invoices WHERE client_id = ?')
+    .all(clientId)
+    .forEach((i) => entries.push({ type: 'invoice_issued', label: `Invoice ${i.number} issued`, date: i.issue_date, link: `/portal/invoices/${i.id}`, amount: null }));
+
+  db.prepare(
+    `SELECT payments.amount, payments.paid_at, invoices.id AS invoice_id, invoices.number
+     FROM payments JOIN invoices ON invoices.id = payments.invoice_id
+     WHERE invoices.client_id = ?`,
+  )
+    .all(clientId)
+    .forEach((p) =>
+      entries.push({
+        type: 'payment',
+        label: `Payment received for invoice ${p.number}`,
+        date: p.paid_at,
+        link: `/portal/invoices/${p.invoice_id}`,
+        amount: p.amount,
+      }),
+    );
+
+  db.prepare("SELECT id, name, last_renewed_at FROM licenses WHERE client_id = ? AND last_renewed_at IS NOT NULL")
+    .all(clientId)
+    .forEach((l) =>
+      entries.push({ type: 'license_renewed', label: `License "${l.name}" renewed`, date: l.last_renewed_at, link: `/portal/licenses/${l.id}`, amount: null }),
+    );
+
+  entries.sort((a, b) => (a.date < b.date ? 1 : -1));
+  res.json({ activity: entries.slice(0, ACTIVITY_LIMIT) });
 });
 
 // A `draft` quote is normally invisible here — draft is "staff is still
@@ -395,16 +487,68 @@ router.get('/invoices/:id/payments/:paymentId/pdf', requireClientAuth, async (re
   res.send(buffer);
 });
 
-// List-only for now — no per-license detail/renewal-history view yet (the
-// staff-side GET /:id/renewals equivalent), just enough for a client to see
-// what's active/expiring/expired at a glance. Same ordering as
-// routes/licenses.js's own GET / (most recently renewed first).
+const STATEMENT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// A downloadable consolidated statement of account — every invoice issued
+// to this client in the range plus a summary (invoiced/paid/outstanding),
+// the portal's own counterpart to routes/reports.js's staff-side
+// GET /sales/pdf, just scoped to one client and framed as a statement
+// rather than a business-wide sales report. Reuses lib/reportPdf.js's
+// renderClientStatementPdf() (see that file for why it's a thin variant of
+// renderSalesReportPdf() rather than a full duplicate) so the table/summary
+// layout can never drift from the shared report styling. Same accrual
+// convention (issue_date, excluding void) as every other report in this
+// app — see routes/reports.js's own invoicesInRange() comment.
+router.get('/statement/pdf', requireClientAuth, async (req, res) => {
+  const { from, to } = req.query;
+  if (!STATEMENT_DATE_RE.test(from || '') || !STATEMENT_DATE_RE.test(to || '')) {
+    return res.status(400).json({ error: 'from and to are required as YYYY-MM-DD' });
+  }
+  if (from > to) {
+    return res.status(400).json({ error: 'from must not be after to' });
+  }
+
+  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.clientAccount.client_id);
+  const invoices = db
+    .prepare(
+      `SELECT * FROM invoices WHERE client_id = ? AND status != 'void' AND issue_date BETWEEN ? AND ? ORDER BY issue_date ASC, id ASC`,
+    )
+    .all(req.clientAccount.client_id, from, to);
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+
+  const buffer = await renderClientStatementPdf({ client, invoices, from, to, settings });
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `inline; filename="statement-${from}-to-${to}.pdf"`,
+  });
+  res.send(buffer);
+});
+
+// Same ordering as routes/licenses.js's own GET / (most recently renewed
+// first) — enough for a client to see what's active/expiring/expired at a
+// glance from the list; GET /licenses/:id below is the per-license detail
+// view with renewal history.
 router.get('/licenses', requireClientAuth, (req, res) => {
   const licenses = db
     .prepare('SELECT * FROM licenses WHERE client_id = ? ORDER BY last_renewed_at DESC, id DESC')
     .all(req.clientAccount.client_id)
     .map(withComputedLicense);
   res.json({ licenses });
+});
+
+// The portal's counterpart to routes/licenses.js's GET /:id/renewals —
+// scoped to client_id so a client can't read another client's license by
+// guessing an id (same as every other per-record portal route). Returns
+// the license itself (computed) plus its full renewal history in one call
+// rather than two, since this is a whole page here, not a modal opened on
+// demand from a list the way Licenses.jsx's own "History" action is.
+router.get('/licenses/:id', requireClientAuth, (req, res) => {
+  const license = db.prepare('SELECT * FROM licenses WHERE id = ? AND client_id = ?').get(req.params.id, req.clientAccount.client_id);
+  if (!license) return res.status(404).json({ error: 'License not found' });
+  const renewals = db
+    .prepare('SELECT * FROM license_renewals WHERE license_id = ? ORDER BY renewed_at DESC, id DESC')
+    .all(license.id);
+  res.json({ license: withComputedLicense(license), renewals });
 });
 
 // Unlike GET /api/products (staff), this is *not* the full catalog —

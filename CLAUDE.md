@@ -2290,6 +2290,160 @@ accept/decline).
   `api.login`/`api.forgotPassword`), everything else takes the portal
   token from `PortalAuthContext`, never `AuthContext`'s own `token`.
 
+### Client portal self-service improvements (`backend/src/`, `frontend/src/`)
+
+A batch of eight portal improvements built together in one pass — a
+self-service account page, a per-license detail view, a notification bell,
+a recent-activity timeline, a downloadable statement of account, inline
+bank details on an unpaid invoice, search on the portal's own list pages,
+and a "Need help?" contact popover. Grouped into one change rather than
+eight separate ones deliberately: several of them (the notification bell,
+the account/help icons, the license detail link) all land in
+`PortalLayout.jsx`/`PortalLicenses.jsx`, so building them together avoided
+the same file being repeatedly reopened and let the whole batch be
+reasoned about, tested, and documented as one coherent portal upgrade
+rather than eight overlapping diffs.
+
+- **Self-service account page**: `routes/clientPortal.js` gains `POST
+  /change-password` (`requireClientAuth`) — a straight mirror of
+  `routes/auth.js`'s own `POST /change-password` (verify `currentPassword`
+  via `bcrypt.compare` against `req.clientAccount.password_hash`, require
+  `MIN_PASSWORD_LENGTH`, stamp `password_changed_at`, and — since bumping
+  that column invalidates every token issued before now, including the one
+  the request just authenticated with (see `middleware/clientAuth.js`'s own
+  `iat` check) — return a fresh token so the caller's own session doesn't
+  immediately log itself out). `pages/portal/PortalMyAccount.jsx` (route
+  `/portal/account`) is the frontend: a read-only "Account" card (company
+  name, login email) plus a change-password form, styled after
+  `MyAccount.jsx`'s own change-password card. Deliberately **not** a full
+  mirror of `MyAccount.jsx` — there's no profile-edit form (a portal
+  account's `email` is its login identity; letting a client freely change
+  it would need its own verification/conflict-check flow, out of scope for
+  what this page actually needed to solve) and no notification-preference
+  toggles (the portal has nothing equivalent to `notify_overdue`/
+  `notify_quote_responses` — those are staff-side digest opt-ins with no
+  portal-side counterpart). `PortalAuthContext.jsx` gained its own
+  `updateToken()` (mirroring `AuthContext.jsx`'s), so a successful password
+  change can adopt the fresh token without a full re-login.
+- **Per-license detail view**: `routes/clientPortal.js` gains `GET
+  /licenses/:id` (`requireClientAuth`, scoped to `client_id` same as every
+  other per-record portal route — a mismatch 404s, never leaking whether
+  the id belongs to *some* other client) — the portal's counterpart to
+  `routes/licenses.js`'s own `GET /:id/renewals`, just returning the
+  license itself (computed via the router's existing `withComputedLicense`)
+  and its full `license_renewals` history in one call rather than two,
+  since this is a whole page here, not a modal opened on demand from a
+  list the way `Licenses.jsx`'s own "History" action works.
+  `pages/portal/PortalLicenseDetail.jsx` (route `/portal/licenses/:id`,
+  styled after `PortalInvoiceDetail.jsx`'s own card layout) shows the
+  license's billing cycle/amount/dates/notes plus a renewal-history list
+  (date + previous→new expiry per entry, "No renewals recorded yet." empty
+  state — same convention `Licenses.jsx`'s own History modal already uses).
+  `PortalLicenses.jsx`'s cards are now `Link`s to this page instead of
+  plain `div`s.
+- **Notification bell**: `components/portal/PortalNotificationCenter.jsx`
+  is the portal's own counterpart to `components/NotificationCenter.jsx` —
+  same shape (a live, computed view refetched on open, no persistence or
+  read/unread state, outside-click-to-close), kept as its own component
+  rather than generalizing the shared one (different auth context,
+  different data source, different nav targets — the same "acceptable
+  duplication" precedent `withComputedInvoice`/`publicSettings`/
+  `markViewed` already set between `routes/public.js` and
+  `routes/clientPortal.js`). No new backend route — it reuses the same
+  three already-scoped list endpoints (`GET /quotes`, `GET /invoices`, `GET
+  /licenses`) the dashboard's own KPI strip already calls, filtered
+  client-side into four categories: **overdue invoices** (`is_overdue`),
+  **due soon** (not yet overdue, `balance_due > 0`, `due_date` within
+  `DUE_SOON_DAYS` = 7 — a shorter window than licenses' own 14-day
+  `EXPIRY_WARNING_DAYS`, since a bill due in two weeks isn't urgent the way
+  one due in a few days is), **expiring licenses**
+  (`display_status === 'expiring_soon'`), and **awaiting your response**
+  (quotes with `status === 'sent'`). Mounted in `PortalLayout.jsx`'s header
+  control cluster, right-anchored (the header always has room, same
+  reasoning `NotificationCenter.jsx`'s own default `align="right"` already
+  documents for `Navbar.jsx`'s header).
+- **Recent activity timeline**: `routes/clientPortal.js` gains `GET
+  /activity` (`requireClientAuth`) — deliberately **not** a read of
+  `activity_log` (that's a staff-wide audit trail with no `client_id`
+  column at all; exposing it directly would risk leaking another client's
+  rows alongside this one), but a small set of purpose-built queries
+  against the same `quotes`/`invoices`/`payments`/`licenses` tables every
+  other route in this router already scopes to `client_id`, merged into
+  one chronological list of `{ type, label, date, link, amount }` entries
+  (`amount` only set for a `payment` entry, so the frontend can format it
+  with the currency symbol it already has rather than this route needing
+  to know it) and capped at `ACTIVITY_LIMIT` (10, most recent first) — a
+  list this small doesn't need pagination, same "don't build it until
+  needed" call this app already makes elsewhere. Four entry types: quote
+  sent (`issue_date`, gated through the same `CLIENT_VISIBLE_QUOTE` filter
+  every other quote read in this router uses), quote responded
+  (`client_responded_at`), invoice issued (`issue_date`), payment received
+  (`payments.paid_at`, joined to its invoice), and license renewed
+  (`last_renewed_at`). `pages/portal/PortalDashboard.jsx` renders this as a
+  "Recent activity" panel below the existing shortcut tiles — an
+  independent, best-effort fetch (failure just leaves the panel absent,
+  same reasoning `Dashboard.jsx`'s own "Needs attention" panel fetches are
+  kept separate from its main summary call) that renders nothing at all
+  once loaded-and-empty, same "only show the exception case" convention
+  this app already follows (a brand-new client with no history yet doesn't
+  need an empty panel telling them so).
+- **Statement of account PDF**: `routes/clientPortal.js` gains `GET
+  /statement/pdf?from=&to=` (`requireClientAuth`, same `YYYY-MM-DD`
+  validation and `from` > `to` rejection as `routes/reports.js`'s own
+  `parseDateRange()`) — the portal's counterpart to that same file's
+  staff-side `GET /sales/pdf`, just scoped to one client's own invoices
+  and framed as a statement rather than a business-wide sales report. Same
+  accrual convention as every other report in this app (`issue_date`,
+  excluding `void`). `lib/reportPdf.js` gained `renderClientStatementPdf()`
+  — a thin variant of that same file's `renderSalesReportPdf()` (reusing
+  its `drawReportHeader`/`drawReportTable`/`drawSummaryBox` helpers) rather
+  than a full duplicate: same columns minus the `CLIENT` one
+  (every row is already the same client here), same summary-box shape, the
+  subtitle line names the client directly (`` `${client.name}  ·  ${from}
+  to ${to}` ``) so the PDF reads correctly even printed on its own with no
+  cover page. `pages/portal/PortalInvoices.jsx` gained a "Download
+  statement" header button opening an inline from/to date-range form
+  (defaulting to `startOfMonthStr()`/`todayStr()`, same defaults
+  `Reports.jsx`'s own date pickers use) — distinct from a single receipt
+  (already downloadable per-payment from `PortalInvoiceDetail.jsx`), this
+  is one PDF covering every invoice issued in the chosen range, for a
+  client doing their own bookkeeping.
+- **Inline bank details on an unpaid invoice**: `PortalInvoiceDetail.jsx`
+  renders a small "How to pay" block (`settings.bank_details` — the same
+  field every quote/invoice PDF already prints, not a new one) directly on
+  the page whenever `invoice.balance_due > 0` and the business has actually
+  filled that field in, so a client doesn't have to download the PDF just
+  to find out how to pay. Hidden once the balance reaches 0 (nothing left
+  to pay) and when `bank_details` is blank, same "only show the exception
+  case" convention every other optional block on this app's detail pages
+  already follows.
+- **Search on portal document lists**: `PortalQuotes.jsx`/
+  `PortalInvoices.jsx`/`PortalLicenses.jsx` each gained a `components/
+  SearchInput.jsx` box filtering the already-fetched, already-unpaginated
+  list in memory (number/name, case-insensitive `includes()`) — no new
+  backend `?q=` param, since these lists are already fetched whole (a
+  single client's own document set is inherently small, see this router's
+  own top-of-file note on why none of these lists paginate) and a
+  client-side filter is all a growing history actually needs. Each page
+  shows a `No X match "..."` message when the filter matches nothing,
+  distinct from the list's own empty state (no documents at all).
+- **"Need help?" contact popover**: a small component local to
+  `PortalLayout.jsx` (not split into its own file — it's a single, simple
+  popover with no reuse case elsewhere), same outside-click-to-close
+  pattern as `PortalNotificationCenter.jsx`, showing the business's own
+  `phone`/`email` (from `business_settings`, already fetched once by
+  `PortalAuthContext` for every portal page — no new backend call needed).
+  Renders nothing at all — not even the trigger button — when the business
+  has filled in neither field, so an unconfigured business doesn't show a
+  pointless empty popover.
+- Two new icons in `components/icons.jsx`, following its existing
+  20×20/1.5px-stroke/`currentColor` convention: `UserIcon` (a single
+  person — "my account," deliberately distinct from `UsersIcon`'s plural
+  meaning elsewhere in the app) and `HelpCircleIcon` (a question mark in a
+  circle — "need help").
+- `lib/api.js`'s `portal` object gained `changePassword`, `activity`,
+  `openStatementPdf`, and `licenses.get` alongside the existing calls.
+
 ### Quote requests (`backend/src/`, `frontend/src/`)
 
 A client's ask for a quote, submitted from the portal, reviewed by staff,
