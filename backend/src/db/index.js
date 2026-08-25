@@ -401,6 +401,34 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_email_log_created ON email_log(created_at);
   CREATE INDEX IF NOT EXISTS idx_licenses_client ON licenses(client_id);
   CREATE INDEX IF NOT EXISTS idx_licenses_expiry ON licenses(expiry_date);
+
+  -- Added once the query patterns above (list routes' ORDER BY, the
+  -- scheduler's WHERE clauses, routes/reports.js's date-range SUMs) were
+  -- audited against what was actually indexed. SQLite doesn't index a
+  -- plain column automatically -- only PRIMARY KEY and UNIQUE columns get
+  -- one for free -- so every WHERE/ORDER BY column below was previously a
+  -- full table scan. Harmless at today's row counts, but each of these
+  -- mirrors a query this app already runs on every request to the
+  -- relevant page (a list's default sort, the daily scheduler jobs, a
+  -- report's date-range filter), so the cost of staying unindexed only
+  -- grows with real usage. status/date composites are ordered
+  -- (equality-column first, range-column second) to match SQLite's own
+  -- left-to-right index usage rules.
+  CREATE INDEX IF NOT EXISTS idx_invoices_status_due ON invoices(status, due_date);
+  CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON invoices(issue_date);
+  CREATE INDEX IF NOT EXISTS idx_quotes_status ON quotes(status);
+  CREATE INDEX IF NOT EXISTS idx_quotes_issue_date ON quotes(issue_date);
+  CREATE INDEX IF NOT EXISTS idx_quotes_expiry_date ON quotes(expiry_date);
+  CREATE INDEX IF NOT EXISTS idx_expenses_expense_date ON expenses(expense_date);
+  CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
+  CREATE INDEX IF NOT EXISTS idx_recurring_invoices_client ON recurring_invoices(client_id);
+  CREATE INDEX IF NOT EXISTS idx_recurring_invoices_next_run ON recurring_invoices(next_run_date);
+  CREATE INDEX IF NOT EXISTS idx_payments_paid_at ON payments(paid_at);
+  CREATE INDEX IF NOT EXISTS idx_capital_contributions_date ON capital_contributions(contribution_date);
+  CREATE INDEX IF NOT EXISTS idx_owner_draws_date ON owner_draws(draw_date);
+  CREATE INDEX IF NOT EXISTS idx_license_renewals_license ON license_renewals(license_id);
+  CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status);
+  CREATE INDEX IF NOT EXISTS idx_activity_entity ON activity_log(entity_type, action);
 `);
 
 // Lightweight migration for columns added to `users` after this table

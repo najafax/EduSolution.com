@@ -125,6 +125,55 @@ backend port in frontend code.
   `payee_account_number`/`usd_destination` (see "Currency exchange
   details" in `routes/expenses.js` below) — same reasoning, `expenses`
   already had real rows.
+- **Indexes**: same file's tail also carries a block of
+  `CREATE INDEX IF NOT EXISTS` statements — safe to append to on every
+  boot the same way the `CREATE TABLE IF NOT EXISTS` statements above it
+  are, since an index needs no data migration the way a new column does
+  (see the `ALTER TABLE` discussion above); a fresh index on an
+  already-populated table just gets built once, next startup. The
+  original set only covered foreign keys (`quotes.client_id`,
+  `invoices.client_id`, `licenses.client_id`, etc.) and a few
+  `created_at` columns; an audit of this file's own most frequent
+  queries — every list route's default `ORDER BY`, `lib/scheduler.js`'s
+  daily cron jobs (`WHERE status = 'sent' AND due_date < ?`, `WHERE
+  active = 1 AND next_run_date <= ?`, etc.), and `routes/reports.js`'s
+  date-range `SUM`s — found a second wave of columns driving a full table
+  scan on every one of those, unindexed since SQLite only auto-indexes
+  `PRIMARY KEY`/`UNIQUE` columns, not a plain column named in a `WHERE`/
+  `ORDER BY`. Added: `invoices(status, due_date)` (composite, matching
+  the scheduler's overdue-reminder query exactly — equality column
+  first, range column second, per SQLite's own left-to-right index
+  usage), `invoices(issue_date)`, `quotes(status)`, `quotes(issue_date)`,
+  `quotes(expiry_date)` (the `expireOverdueQuotes` job's own filter),
+  `expenses(expense_date)`, `expenses(category)`,
+  `recurring_invoices(client_id)` (the one table among
+  quotes/invoices/licenses/recurring_invoices that was missing this —
+  presumably an oversight when `recurring_invoice_items`'s own FK index
+  was added instead), `recurring_invoices(next_run_date)`,
+  `payments(paid_at)`, `capital_contributions(contribution_date)`,
+  `owner_draws(draw_date)`, `license_renewals(license_id)`,
+  `quote_requests(status)`, and `activity_log(entity_type, action)` (the
+  exact composite every analytics route's `activity_log` lookup already
+  filters on — `WHERE entity_type = 'invoice' AND action = 'voided'` and
+  its siblings in `routes/quotes.js`/`routes/licenses.js`). Verified with
+  `EXPLAIN QUERY PLAN` against each of the actual queries above — every
+  one now reports `SEARCH ... USING INDEX` (or `SCAN ... USING INDEX` for
+  the plain `ORDER BY` cases) instead of a bare table scan. Harmless at
+  this app's current row counts — nothing here changes behavior, only
+  how SQLite gets there — but each mirrors a query this app already runs
+  on every relevant page load or every day via the scheduler, so the
+  gap only would have grown as a business accumulates real history.
+  Deliberately *not* added: a composite `(license_id, renewed_at)` on
+  `license_renewals` to avoid its own query's small `TEMP B-TREE FOR
+  ORDER BY` step — a single license's renewal history is inherently tiny
+  (see `routes/licenses.js`'s own note on `GET /:id/renewals`), so
+  sorting that in memory after the index narrows to one license's rows
+  isn't worth a second index; and a plain index on `owner_draws(type)` or
+  similar two-value enum columns elsewhere, since a column with only two
+  distinct values gives SQLite's query planner little to narrow down —
+  the *date* half of each of those composite-shaped queries is what
+  actually cuts the row count, which is exactly the column that got
+  indexed instead.
 - `middleware/auth.js` — `requireAuth` verifies the `Authorization: Bearer
   <jwt>` header, then **re-fetches the live user row from the DB** (by the
   id in the JWT payload) rather than trusting the token's claims, and
