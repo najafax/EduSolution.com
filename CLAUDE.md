@@ -2357,7 +2357,11 @@ rather than eight overlapping diffs.
   `routes/clientPortal.js`). No new backend route — it reuses the same
   three already-scoped list endpoints (`GET /quotes`, `GET /invoices`, `GET
   /licenses`) the dashboard's own KPI strip already calls, filtered
-  client-side into four categories: **overdue invoices** (`is_overdue`),
+  client-side into four categories (a 5th, **payment proof rejected**, was
+  added later once payment proof upload/rejection shipped — see "Rejection
+  notification" under "Payment proof upload" below, since that one hits
+  its own dedicated endpoint rather than one of these three): **overdue
+  invoices** (`is_overdue`),
   **due soon** (not yet overdue, `balance_due > 0`, `due_date` within
   `DUE_SOON_DAYS` = 7 — a shorter window than licenses' own 14-day
   `EXPIRY_WARNING_DAYS`, since a bill due in two weeks isn't urgent the way
@@ -2599,6 +2603,47 @@ touches is its own row.
   note. The upload form stays visible regardless (still gated only on
   `balance_due > 0 && status !== 'void'`), so a rejected proof doesn't
   block the client from uploading a corrected one.
+- **Rejection notification**: "Rejected: {review_note}" on
+  `PortalInvoiceDetail.jsx` only surfaces once a client thinks to open that
+  specific invoice — nothing told them a rejection had happened at all, so
+  this closes that gap the same way every other "something needs your
+  attention" signal in this app already gets surfaced proactively rather
+  than left to be discovered. `routes/clientPortal.js` gains `GET
+  /payment-proofs/rejected` (`requireClientAuth`, scoped to
+  `req.clientAccount.client_id` same as every other per-client portal
+  route) — every one of the client's own rejected proofs across their
+  whole invoice set, newest review first, joined to `invoices` for the
+  invoice number: `{ id, file_name, review_note, reviewed_at, invoice_id,
+  invoice_number }`. Deliberately its own dedicated route rather than
+  folded into `GET /invoices/:id` (which already returns `paymentProofs`
+  for one invoice) — `PortalNotificationCenter.jsx`'s bell needs this
+  across the client's *whole* invoice set in one call, same reasoning the
+  bell's other categories each already hit their own already-scoped list
+  endpoint rather than a per-invoice one. `GET /activity` (see "Recent
+  activity timeline" above) gains a matching `payment_proof_rejected`
+  entry type — one more purpose-built query against `payment_proofs`
+  joined to `invoices` (still scoped to `client_id`, same as every other
+  query in that route), `label: `Payment proof rejected for invoice
+  ${number}``, `date: reviewed_at`, `link` straight to
+  `/portal/invoices/:id`. `PortalDashboard.jsx`'s `ACTIVITY_ICONS` map
+  gained a `payment_proof_rejected: AlertTriangleIcon` entry so this reads
+  correctly in the "Recent activity" panel rather than falling back to the
+  map's generic `QuoteIcon` default.
+  `PortalNotificationCenter.jsx` gained a 5th category, "Payment proof
+  rejected" — same live-computed-on-open pattern as the other four
+  (`rejectedProofs` state, fetched via the new endpoint above alongside
+  the existing three list calls in `load()`, folded into the bell's
+  `total` count), rendered with the same red `AlertTriangleIcon` treatment
+  `overdueInvoices` already uses (a rejection is exactly that kind of
+  "needs your attention now" item, not an amber "coming up" one like Due
+  soon/Expiring licenses) — bold invoice number, `review_note` as the red
+  subtext line (falling back to a generic "Rejected — please re-upload
+  proof of payment." in the unlikely case a row has no note, though the
+  backend's own `reject` route already requires one on every write going
+  forward). Clicking an entry navigates straight to that invoice's own
+  `/portal/invoices/:id` page — the same page `review_note`'s own inline
+  rendering already lives on — so the notification and the detail it's
+  pointing at are never two different views of the same fact.
 
 ### Quote requests (`backend/src/`, `frontend/src/`)
 

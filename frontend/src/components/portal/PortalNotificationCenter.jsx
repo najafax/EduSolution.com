@@ -14,14 +14,16 @@ const LIMIT_PER_TYPE = 5;
 
 // The portal's own counterpart to components/NotificationCenter.jsx —
 // same shape (a live, computed view refetched on open, no persistence or
-// read/unread state), but scoped to the logged-in client's own three
+// read/unread state), but scoped to the logged-in client's own
 // already-fetched, already-scoped list endpoints instead of the staff
 // app's permission-gated global ones. Kept as its own component rather
 // than a generalized shared one, same "different auth context, different
 // data source, different nav targets" reasoning every other portal/staff
 // pair in this app is duplicated for (withComputedInvoice,
 // publicSettings, markViewed between routes/public.js and
-// routes/clientPortal.js).
+// routes/clientPortal.js). A 5th category, rejected payment proofs, hits
+// its own dedicated GET /portal/payment-proofs/rejected rather than one
+// of the three list endpoints above — see routes/clientPortal.js for why.
 export default function PortalNotificationCenter() {
   const { token } = usePortalAuth();
   const navigate = useNavigate();
@@ -30,6 +32,7 @@ export default function PortalNotificationCenter() {
   const [overdueInvoices, setOverdueInvoices] = useState([]);
   const [dueSoonInvoices, setDueSoonInvoices] = useState([]);
   const [expiringLicenses, setExpiringLicenses] = useState([]);
+  const [rejectedProofs, setRejectedProofs] = useState([]);
   const boxRef = useRef(null);
 
   function load() {
@@ -55,6 +58,10 @@ export default function PortalNotificationCenter() {
         setExpiringLicenses(licenses.filter((l) => l.display_status === 'expiring_soon').sort((a, b) => (a.expiry_date < b.expiry_date ? -1 : 1))),
       )
       .catch(() => {});
+    api.portal
+      .rejectedPaymentProofs(token)
+      .then(({ proofs }) => setRejectedProofs(proofs))
+      .catch(() => {});
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,7 +79,7 @@ export default function PortalNotificationCenter() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const total = pendingQuotes.length + overdueInvoices.length + dueSoonInvoices.length + expiringLicenses.length;
+  const total = pendingQuotes.length + overdueInvoices.length + dueSoonInvoices.length + expiringLicenses.length + rejectedProofs.length;
 
   function go(path) {
     setOpen(false);
@@ -120,6 +127,27 @@ export default function PortalNotificationCenter() {
                       <span className="min-w-0">
                         <span className="block truncate font-medium text-slate-900 dark:text-white">{inv.number}</span>
                         <span className="block text-xs text-red-600 dark:text-red-400">Overdue since {inv.due_date}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {rejectedProofs.length > 0 && (
+                <div>
+                  <p className="px-4 pt-2 text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">Payment proof rejected</p>
+                  {rejectedProofs.slice(0, LIMIT_PER_TYPE).map((proof) => (
+                    <button
+                      key={`proof-${proof.id}`}
+                      type="button"
+                      onClick={() => go(`/portal/invoices/${proof.invoice_id}`)}
+                      className="flex w-full items-start gap-2 px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <AlertTriangleIcon width={16} height={16} className="mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium text-slate-900 dark:text-white">{proof.invoice_number}</span>
+                        <span className="block truncate text-xs text-red-600 dark:text-red-400">
+                          {proof.review_note || 'Rejected — please re-upload proof of payment.'}
+                        </span>
                       </span>
                     </button>
                   ))}

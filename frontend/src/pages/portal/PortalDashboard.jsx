@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePortalAuth } from '../../context/PortalAuthContext';
 import KpiCard from '../../components/KpiCard';
-import { QuoteIcon, InvoiceIcon, LicenseIcon, TrendUpIcon } from '../../components/icons';
+import { QuoteIcon, InvoiceIcon, LicenseIcon, TrendUpIcon, AlertTriangleIcon } from '../../components/icons';
 
 const SHORTCUTS = [
   { to: '/portal/quotes', label: 'Quotes', message: 'View and respond to quotes.', icon: QuoteIcon },
@@ -22,6 +22,7 @@ const ACTIVITY_ICONS = {
   invoice_issued: InvoiceIcon,
   payment: TrendUpIcon,
   license_renewed: LicenseIcon,
+  payment_proof_rejected: AlertTriangleIcon,
 };
 
 export default function PortalDashboard() {

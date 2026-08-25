@@ -310,6 +310,8 @@ export const api = {
         request(`/portal/invoices/${id}/payment-proof`, { method: 'POST', body: payload, token }),
     },
 
+    rejectedPaymentProofs: (token) => request('/portal/payment-proofs/rejected', { token }),
+
     licenses: {
       list: (token) => request('/portal/licenses', { token }),
       get: (id, token) => request(`/portal/licenses/${id}`, { token }),
