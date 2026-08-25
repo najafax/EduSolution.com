@@ -152,7 +152,7 @@ export default function Invoices() {
             label="Email invoice to client"
           />
         )}
-        {canManage && (
+        {canManage && invoice.status !== 'paid' && (
           <IconActionButton
             icon={DuplicateIcon}
             tone="slate"
@@ -163,7 +163,7 @@ export default function Invoices() {
             label="Duplicate invoice"
           />
         )}
-        {canManage && (
+        {canManage && invoice.status !== 'paid' && (
           <IconActionButton
             icon={TrashIcon}
             tone="red"

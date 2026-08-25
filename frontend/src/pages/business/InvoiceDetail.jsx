@@ -205,7 +205,7 @@ export default function InvoiceDetail() {
               Send reminder
             </button>
           )}
-          {canManage && (
+          {canManage && invoice.status !== 'paid' && (
             <button onClick={handleDuplicate} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
               <DuplicateIcon width={16} height={16} />
               Duplicate
@@ -217,7 +217,7 @@ export default function InvoiceDetail() {
               Void
             </button>
           )}
-          {canManage && (
+          {canManage && invoice.status !== 'paid' && (
             <button onClick={handleDelete} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
               <TrashIcon width={16} height={16} />
               Delete

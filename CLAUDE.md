@@ -4086,6 +4086,22 @@ proved out, rather than staying a one-off.
   guard) and Email to client is hidden once `status === 'void'` (mirrors
   `InvoiceDetail.jsx`'s own `invoice.status !== 'void'` gate); `Quotes.jsx`
   has neither restriction, matching `QuoteDetail.jsx`, which locks nothing.
+  `Invoices.jsx`'s Duplicate and Delete are additionally hidden once
+  `status === 'paid'` (both here and on `InvoiceDetail.jsx`'s own button
+  row) — a paid invoice is a settled, real-money record: `DELETE /:id`
+  already 409s once an invoice has any recorded payment (see
+  `routes/invoices.js` above, and every `paid` invoice has at least one by
+  definition), so hiding Delete here is the same "never show a button that
+  would just error" convention this app already applies everywhere else,
+  not a new restriction. Duplicate has no equivalent backend guard — the
+  API still allows duplicating a paid invoice into a fresh draft — but
+  cluttering a finished invoice's actions with one more thing to second-
+  guess wasn't worth it once Delete was already being hidden for the same
+  status, so it's a UI-only scope decision paired with it rather than a
+  safety fix of its own. Void is unaffected by this — it's already
+  `canVoid`-gated to `draft`/`sent` invoices with `amount_paid === 0`,
+  which a `paid` invoice never satisfies, so it was already implicitly
+  hidden here.
   A shared `busy: { id, action }` state (same shape as `Licenses.jsx`'s
   own) tracks which row and which specific action is in flight, so
   Duplicate/Delete on the same row each show their own correct
