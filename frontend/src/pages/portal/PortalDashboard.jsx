@@ -58,7 +58,7 @@ export default function PortalDashboard() {
   const activeLicenses = licenses?.filter((l) => l.display_status === 'active' || l.display_status === 'expiring_soon').length ?? 0;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <div className="px-4 py-10 sm:px-6">
       <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Welcome, {account?.clientName}</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         {settings?.business_name ? `Here's a quick look at your account with ${settings.business_name}.` : "Here's a quick look at your account."}

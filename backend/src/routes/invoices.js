@@ -42,7 +42,7 @@ function getInvoiceWithItems(id) {
   // proofs/:proofId below is the dedicated view/download route that
   // returns the full row.
   const paymentProofs = db
-    .prepare('SELECT id, file_name, file_type, note, status, uploaded_at, reviewed_by_name, reviewed_at FROM payment_proofs WHERE invoice_id = ? ORDER BY uploaded_at DESC')
+    .prepare('SELECT id, file_name, file_type, note, status, uploaded_at, review_note, reviewed_by_name, reviewed_at FROM payment_proofs WHERE invoice_id = ? ORDER BY uploaded_at DESC')
     .all(id);
   return { invoice: withComputed(invoice), items, client, payments, paymentProofs };
 }
@@ -749,6 +749,37 @@ router.post('/:id/payment-proofs/:proofId/review', manage, (req, res) => {
     proof.id,
   );
   res.json({ message: 'Marked reviewed.' });
+});
+
+// The other terminal outcome for a proof, alongside "review" above —
+// staff looked at it and it doesn't check out (amount doesn't match,
+// unreadable, wrong invoice referenced, etc.), and wants the client to
+// know why rather than silently deleting the upload. Requires a non-blank
+// `note` (unlike review, which needs no explanation) — the whole point of
+// a reject action over just deleting the row is that the client gets to
+// see the reason on their own copy (see routes/clientPortal.js's own
+// getClientInvoice(), which now selects review_note alongside status).
+// Like review, this only ever touches the proof's own row — never
+// amount_paid/status on the invoice.
+router.post('/:id/payment-proofs/:proofId/reject', manage, (req, res) => {
+  const invoice = db.prepare('SELECT number FROM invoices WHERE id = ?').get(req.params.id);
+  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+  const proof = db.prepare('SELECT * FROM payment_proofs WHERE id = ? AND invoice_id = ?').get(req.params.proofId, req.params.id);
+  if (!proof) return res.status(404).json({ error: 'Payment proof not found' });
+  const note = (req.body?.note || '').trim();
+  if (!note) return res.status(400).json({ error: 'Please explain why this proof is being rejected' });
+
+  db.prepare(
+    `UPDATE payment_proofs SET status = 'rejected', review_note = ?, reviewed_by_name = ?, reviewed_at = datetime('now') WHERE id = ?`,
+  ).run(note, req.user.name, proof.id);
+  logActivity({
+    userName: req.user.name,
+    action: 'rejected a payment proof for',
+    entityType: 'invoice',
+    entityId: Number(req.params.id),
+    entityLabel: invoice.number,
+  });
+  res.json({ message: 'Payment proof rejected.' });
 });
 
 router.delete('/:id/payment-proofs/:proofId', manage, (req, res) => {

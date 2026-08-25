@@ -32,7 +32,7 @@ export default function PortalLicenses() {
   const filtered = licenses?.filter((l) => l.name.toLowerCase().includes(search.trim().toLowerCase())) ?? [];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="px-4 py-10 sm:px-6">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Licenses</h1>
 
       {licenses && licenses.length > 0 && (

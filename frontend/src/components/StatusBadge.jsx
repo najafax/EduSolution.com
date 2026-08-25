@@ -19,6 +19,11 @@ const COLORS = {
   // color, distinct from 'expiring_soon's lapsing-soon warning.
   pending: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
   approved: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
+  // Payment proofs only (InvoiceDetail.jsx/PortalInvoiceDetail.jsx) —
+  // 'pending'/'reviewed' (the latter falls back to the default slate)
+  // already existed; 'rejected' reuses the same red as 'declined'/'void'
+  // above, same "a staff member said no" meaning.
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
 };
 
 export default function StatusBadge({ status }) {

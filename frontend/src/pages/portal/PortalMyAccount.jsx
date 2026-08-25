@@ -40,7 +40,7 @@ export default function PortalMyAccount() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+    <div className="px-4 py-10 sm:px-6">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My account</h1>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">

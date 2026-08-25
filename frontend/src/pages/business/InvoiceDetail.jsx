@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { todayStr, timeAgo } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
+import Modal from '../../components/Modal';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
@@ -31,6 +32,13 @@ export default function InvoiceDetail() {
   // one EmailPreviewModal instance shared by all three send-email triggers
   // on this page, since only one can be open at a time.
   const [emailModal, setEmailModal] = useState(null);
+  // The id of the proof currently being rejected, or null — opens a small
+  // Modal to collect the required note (a plain confirm() can't capture
+  // text input, same reasoning QuoteRequests.jsx's own decline flow uses
+  // a Modal instead of a bare confirm() for its note).
+  const [rejectingProofId, setRejectingProofId] = useState(null);
+  const [rejectNote, setRejectNote] = useState('');
+  const [rejecting, setRejecting] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
 
   function load() {
@@ -170,6 +178,27 @@ export default function InvoiceDetail() {
       load();
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  function openRejectProof(proofId) {
+    setRejectingProofId(proofId);
+    setRejectNote('');
+    setError('');
+  }
+
+  async function handleRejectPaymentProof(e) {
+    e.preventDefault();
+    setError('');
+    setRejecting(true);
+    try {
+      await api.invoices.rejectPaymentProof(id, rejectingProofId, { note: rejectNote }, token);
+      setRejectingProofId(null);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRejecting(false);
     }
   }
 
@@ -619,6 +648,9 @@ export default function InvoiceDetail() {
                       <td className="px-6 py-3 dark:text-white">
                         {p.file_name}
                         {p.note && <p className="text-xs text-slate-500 dark:text-slate-400">{p.note}</p>}
+                        {p.status === 'rejected' && p.review_note && (
+                          <p className="text-xs text-red-600 dark:text-red-400">Rejected: {p.review_note}</p>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.uploaded_at.slice(0, 10)}</td>
                       <td className="whitespace-nowrap px-4 py-3">
@@ -634,6 +666,9 @@ export default function InvoiceDetail() {
                               onClick={() => handleReviewPaymentProof(p.id)}
                               title="Mark reviewed"
                             />
+                          )}
+                          {canManage && p.status === 'pending' && (
+                            <IconActionButton icon={XIcon} tone="red" onClick={() => openRejectProof(p.id)} title="Reject" />
                           )}
                           {canManage && (
                             <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDeletePaymentProof(p.id)} title="Delete" />
@@ -667,10 +702,19 @@ export default function InvoiceDetail() {
                       <dd className="text-right text-slate-900 dark:text-white">{p.note}</dd>
                     </div>
                   )}
+                  {p.status === 'rejected' && p.review_note && (
+                    <div className="flex justify-between">
+                      <dt className="text-slate-500 dark:text-slate-400">Rejected</dt>
+                      <dd className="text-right text-red-600 dark:text-red-400">{p.review_note}</dd>
+                    </div>
+                  )}
                   <div className="flex gap-1.5 pt-1">
                     <IconActionButton icon={DownloadIcon} tone="lagoon" onClick={() => handleViewPaymentProof(p.id)} title="View file" />
                     {canManage && p.status === 'pending' && (
                       <IconActionButton icon={CheckCircleIcon} tone="emerald" onClick={() => handleReviewPaymentProof(p.id)} title="Mark reviewed" />
+                    )}
+                    {canManage && p.status === 'pending' && (
+                      <IconActionButton icon={XIcon} tone="red" onClick={() => openRejectProof(p.id)} title="Reject" />
                     )}
                     {canManage && <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDeletePaymentProof(p.id)} title="Delete" />}
                   </div>
@@ -718,6 +762,40 @@ export default function InvoiceDetail() {
           load();
         }}
       />
+
+      <Modal open={rejectingProofId !== null} onClose={() => setRejectingProofId(null)} title="Reject this payment proof" maxWidthClass="max-w-md">
+        <form onSubmit={handleRejectPaymentProof} className="flex flex-col gap-3">
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Why is it being rejected?</span>
+            <textarea
+              required
+              value={rejectNote}
+              onChange={(e) => setRejectNote(e.target.value)}
+              rows={3}
+              placeholder="e.g. amount doesn't match, wrong invoice, unreadable image"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
+            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">The client will see this note on their own copy.</span>
+          </label>
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setRejectingProofId(null)}
+              className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={rejecting}
+              className="min-h-11 rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-60"
+            >
+              {rejecting ? 'Rejecting…' : 'Reject'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {confirmDialog}
     </div>
