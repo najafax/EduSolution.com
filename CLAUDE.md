@@ -124,7 +124,12 @@ backend port in frontend code.
   Same pattern once more for `expenses.exchange_rate`/
   `payee_account_number`/`usd_destination` (see "Currency exchange
   details" in `routes/expenses.js` below) — same reasoning, `expenses`
-  already had real rows.
+  already had real rows. Same pattern again for `client_viewed_at` on both
+  `quotes` and `invoices` (see "Client view tracking" in `routes/public.js`
+  below) — both tables have carried real documents since the app's first
+  deploy, so this went straight into the `ALTER TABLE` list rather than the
+  `CREATE TABLE` statement, same lesson `licenses.url` learned the hard
+  way.
 - **Indexes**: same file's tail also carries a block of
   `CREATE INDEX IF NOT EXISTS` statements — safe to append to on every
   boot the same way the `CREATE TABLE IF NOT EXISTS` statements above it
@@ -1080,6 +1085,54 @@ deliberately untouched by either, always returning every row.
   stores `quotes.client_response`/`client_responded_at` and updates
   `status`). The emails sent from `quotes.js`/`invoices.js` `/send` routes
   link here (`${CLIENT_ORIGIN}/q/:token`, `${CLIENT_ORIGIN}/i/:token`).
+  **Client view tracking**: `GET /quotes/:token` and `GET /invoices/:token`
+  both call a small `markViewed(table, id)` helper that stamps
+  `client_viewed_at` (`quotes`/`invoices`, `ALTER TABLE`-added — see
+  `db/index.js` below) the *first* time the document is opened —
+  `UPDATE ... SET client_viewed_at = datetime('now') WHERE id = ? AND
+  client_viewed_at IS NULL`, so it's a no-op (and safe to call
+  unconditionally on every request) once already set. Deliberately the
+  first view only, not the most recent one: the question this answers is
+  "has the client ever actually seen this," and overwriting on every
+  repeat view would erase that earliest, more useful timestamp for no
+  benefit — a client re-opening a link they've already read isn't a
+  new signal worth capturing. `routes/clientPortal.js`'s own `GET
+  /quotes/:id`/`GET /invoices/:id` call an identically-shaped `markViewed()`
+  (its own copy, not imported — same duplication precedent as that file's
+  `withComputedInvoice()`/`publicSettings()`) so a client viewing through
+  the portal counts exactly the same as viewing via the public link; both
+  write to the same column, so staff get one unified "did they see it"
+  signal regardless of which route the client actually used. `table` is
+  always a literal (`'quotes'` or `'invoices'`) supplied by the call site,
+  never request input, so the string-interpolated table name carries no
+  injection risk (same reasoning `routes/dataReset.js`'s own
+  table-name-from-a-fixed-map already relies on). No route change was
+  needed on the staff-side `GET /api/quotes/:id`/`GET /api/invoices/:id` —
+  both already `SELECT *` the row, so `client_viewed_at` flows through
+  automatically the moment the column exists.
+  `QuoteDetail.jsx`/`InvoiceDetail.jsx` render a small "Viewed by client
+  {relative time}" line (via `lib/date.js`'s new `timeAgo()` helper) only
+  once that column is actually set — the common case (not yet viewed)
+  shows nothing, same "only show the exception case" convention
+  `PortalBadge`/the expense `payee` detail row already follow — positioned
+  right under the header's action-button row (for `InvoiceDetail.jsx`,
+  directly below the existing `last_reminder_sent_at` line, so both
+  "did we nag them" and "did they actually look" read together in one
+  place). **Copy public link**: both detail pages also gained a "Copy
+  public link" header button (`LinkIcon`, next to "Download PDF") that
+  writes `${window.location.origin}/q/:token` (or `/i/:token`) to the
+  clipboard via `navigator.clipboard.writeText()` and shows the same
+  inline `notice`/`error` line every other action on these pages already
+  uses — deliberately built from the *browser's own* origin rather than
+  trusting the backend's `CLIENT_ORIGIN` env var to match what's actually
+  being served, so the copied link is always correct for whichever
+  environment (local dev, staging, production) the person copying it is
+  really looking at. This exists so a document's link is reachable without
+  depending on the "Email to client" send actually working (SMTP being
+  configured, the email not landing in spam) — a business that primarily
+  reaches clients over WhatsApp or another channel can grab the link and
+  share it however they actually communicate, and staff get an easy way to
+  eyeball the URL itself before relying on it.
 - `routes/activity.js` — `GET /` returns a paginated (30/page) read of the
   `activity_log` table, newest first. There's no write endpoint — every
   other route's mutations write to this table themselves via

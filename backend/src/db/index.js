@@ -629,6 +629,24 @@ if (!userColumns.has('notify_monthly_report')) {
   db.exec(`ALTER TABLE users ADD COLUMN notify_monthly_report INTEGER NOT NULL DEFAULT 0;`);
 }
 
+// `client_viewed_at` on both `quotes` and `invoices` — stamped the first
+// time a client actually opens the document, whether via its public
+// `public_token` link (routes/public.js) or the client portal
+// (routes/clientPortal.js), so staff have a real "did they even see this"
+// signal instead of guessing from a lack of response. Deliberately the
+// *first* view only, not the most recent one — the question this answers
+// is "has the client seen it at all," and overwriting on every subsequent
+// view would erase that useful earliest timestamp for no benefit. Reuses
+// the already-declared `quoteColumns`/`invoiceColumns` sets from the
+// `created_by_name` migration above rather than re-querying `PRAGMA
+// table_info` a second time for the same two tables.
+if (!quoteColumns.has('client_viewed_at')) {
+  db.exec(`ALTER TABLE quotes ADD COLUMN client_viewed_at TEXT;`);
+}
+if (!invoiceColumns.has('client_viewed_at')) {
+  db.exec(`ALTER TABLE invoices ADD COLUMN client_viewed_at TEXT;`);
+}
+
 db.pragma('foreign_keys = ON');
 
 // Bound params rather than string-interpolated into the exec() block above,

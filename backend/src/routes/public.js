@@ -30,6 +30,18 @@ function publicSettings(settings) {
   return rest;
 }
 
+// Stamps client_viewed_at the first time a client actually opens the
+// document via this token — a no-op on every view after the first (the
+// WHERE clause only ever matches while the column is still NULL), so this
+// is safe to call unconditionally on every GET without an extra read first.
+// `table` is always a literal ('quotes' or 'invoices') from a call site
+// below, never request input, so the interpolation here carries no
+// injection risk — same as routes/dataReset.js's own table-name-from-a-
+// fixed-map pattern.
+function markViewed(table, id) {
+  db.prepare(`UPDATE ${table} SET client_viewed_at = datetime('now') WHERE id = ? AND client_viewed_at IS NULL`).run(id);
+}
+
 function getQuoteByToken(token) {
   const quote = db.prepare('SELECT * FROM quotes WHERE public_token = ?').get(token);
   if (!quote) return null;
@@ -49,6 +61,7 @@ function getInvoiceByToken(token) {
 router.get('/quotes/:token', (req, res) => {
   const data = getQuoteByToken(req.params.token);
   if (!data) return res.status(404).json({ error: 'Quote not found' });
+  markViewed('quotes', data.quote.id);
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   res.json({ ...data, settings: publicSettings(settings) });
 });
@@ -104,6 +117,7 @@ router.get('/quotes/:token/pdf', async (req, res) => {
 router.get('/invoices/:token', (req, res) => {
   const data = getInvoiceByToken(req.params.token);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  markViewed('invoices', data.invoice.id);
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   res.json({ ...data, settings: publicSettings(settings) });
 });

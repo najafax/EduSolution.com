@@ -380,3 +380,18 @@ export function LogoutIcon(props) {
     </svg>
   );
 }
+
+// A chain link — "copy the public link" (QuoteDetail.jsx/InvoiceDetail.jsx's
+// "Copy public link" button). Deliberately distinct from SendIcon's paper
+// plane, which already means "email this document to the client" — copying
+// the link is a different action (grab the URL to share however, not send
+// an email) and reads as a duplicate of Email to client if it reused that
+// glyph.
+export function LinkIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M8.5 11.5a3 3 0 0 0 4.24 0l2-2a3 3 0 1 0-4.24-4.24l-1 1" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M11.5 8.5a3 3 0 0 0-4.24 0l-2 2a3 3 0 1 0 4.24 4.24l1-1" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

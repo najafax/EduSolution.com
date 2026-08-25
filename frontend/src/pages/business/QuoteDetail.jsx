@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { todayPlus } from '../../lib/date';
+import { todayPlus, timeAgo } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
-import { PencilIcon, DownloadIcon, SendIcon, InvoiceIcon, DuplicateIcon, TrashIcon } from '../../components/icons';
+import { PencilIcon, DownloadIcon, SendIcon, InvoiceIcon, DuplicateIcon, TrashIcon, LinkIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 export default function QuoteDetail() {
@@ -53,6 +53,21 @@ export default function QuoteDetail() {
       await api.quotes.openPdf(id, token);
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  // Same domain the browser is actually running this page on — see
+  // InvoiceDetail.jsx's own handleCopyLink for why this beats trusting the
+  // backend's own CLIENT_ORIGIN to match what's really being served.
+  async function handleCopyLink() {
+    setError('');
+    setNotice('');
+    const url = `${window.location.origin}/q/${quote.public_token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice('Public link copied to clipboard.');
+    } catch {
+      setError('Could not copy the link — your browser may be blocking clipboard access.');
     }
   }
 
@@ -126,6 +141,10 @@ export default function QuoteDetail() {
             <DownloadIcon width={16} height={16} />
             Download PDF
           </button>
+          <button onClick={handleCopyLink} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <LinkIcon width={16} height={16} />
+            Copy public link
+          </button>
           {canManage && (
             <button onClick={() => setShowSendPreview(true)} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
               <SendIcon width={16} height={16} />
@@ -152,6 +171,10 @@ export default function QuoteDetail() {
           )}
         </div>
       </div>
+
+      {quote.client_viewed_at && (
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Viewed by client {timeAgo(quote.client_viewed_at)}</p>
+      )}
 
       {quote.converted_invoice_id && (
         <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
