@@ -39,6 +39,7 @@ function publicUser(user) {
     role: user.role,
     notifyOverdue: Boolean(user.notify_overdue),
     notifyQuoteResponses: Boolean(user.notify_quote_responses),
+    notifyMonthlyReport: Boolean(user.notify_monthly_report),
     createdAt: user.created_at,
   };
 }
@@ -191,19 +192,23 @@ router.post('/change-password', requireAuth, async (req, res) => {
   res.json({ message: 'Password updated.', token: signToken(user) });
 });
 
-// Two personal preferences: opt in to a daily digest email when the
-// overdue-reminder job actually sends reminders (see lib/scheduler.js), and
+// Three personal preferences: opt in to a daily digest email when the
+// overdue-reminder job actually sends reminders (see lib/scheduler.js),
 // opt in to a notification whenever a client accepts a quote (see
-// lib/quoteAcceptedNotify.js). Both fields are optional in the body so a
-// caller updating one doesn't have to also resend the other's current
-// value — `?? existing` keeps whichever wasn't sent unchanged, rather than
-// silently resetting it to false.
+// lib/quoteAcceptedNotify.js), and opt in to the automated monthly P&L
+// summary email (see lib/scheduler.js's `runMonthlyReport()`). All three
+// fields are optional in the body so a caller updating one doesn't have to
+// also resend the others' current values — `?? existing` keeps whichever
+// wasn't sent unchanged, rather than silently resetting it to false.
 router.put('/preferences', requireAuth, (req, res) => {
-  const existing = db.prepare('SELECT notify_overdue, notify_quote_responses FROM users WHERE id = ?').get(req.user.id);
-  const { notifyOverdue, notifyQuoteResponses } = req.body || {};
-  db.prepare('UPDATE users SET notify_overdue = ?, notify_quote_responses = ? WHERE id = ?').run(
+  const existing = db
+    .prepare('SELECT notify_overdue, notify_quote_responses, notify_monthly_report FROM users WHERE id = ?')
+    .get(req.user.id);
+  const { notifyOverdue, notifyQuoteResponses, notifyMonthlyReport } = req.body || {};
+  db.prepare('UPDATE users SET notify_overdue = ?, notify_quote_responses = ?, notify_monthly_report = ? WHERE id = ?').run(
     (notifyOverdue ?? existing.notify_overdue) ? 1 : 0,
     (notifyQuoteResponses ?? existing.notify_quote_responses) ? 1 : 0,
+    (notifyMonthlyReport ?? existing.notify_monthly_report) ? 1 : 0,
     req.user.id,
   );
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);

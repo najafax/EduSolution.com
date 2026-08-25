@@ -1625,10 +1625,48 @@ deliberately untouched by either, always returning every row.
     Logged to `email_log` as type `license_expiry_alert`. No staff-digest
     equivalent to `notifyStaffOfReminders()` for this job — that's scoped
     to overdue invoices specifically, not extended here.
-  All five jobs are also exported directly (`runBackup`,
+  - `0 9 1 * *` — `runMonthlyReport()`: the one job on a monthly rather
+    than daily schedule (`node-cron`'s 5-field expressions support a
+    day-of-month field directly) — fires at 09:00 on the 1st, comfortably
+    after the 03:00 backup and the four daily jobs above so a slow backup
+    can never delay it. Same `SMTP_HOST` skip as every other email job
+    here, plus one more early exit specific to this one: since its entire
+    purpose *is* the staff notification (there's no client-facing send to
+    fall back to the way `runOverdueReminders()` always runs regardless of
+    who's subscribed to the digest), it also skips — before generating
+    anything — if `SELECT ... FROM users WHERE active = 1 AND
+    notify_monthly_report = 1` comes back empty. Reports on the *previous*
+    calendar month (this job runs on the 1st, so the current month has no
+    data of its own yet) — `from`/`to` computed via `new Date(y, m, 0)`,
+    the same day-0-rollback trick `advanceDate()` above already relies on
+    for month-end clamping. Reuses the *exact* revenue/expense queries
+    `routes/reports.js`'s own `GET /profit-loss/pdf` uses (duplicated as
+    literals rather than imported — same acceptable-duplication call as
+    `EXPIRY_WARNING_DAYS` two jobs up) and `lib/reportPdf.js`'s
+    `renderProfitLossPdf()` to attach the identical PDF a human clicking
+    that same button would get for the same range, so the automated
+    email's attachment can never drift from the manual download. The
+    email body itself is a short plain-English summary (invoiced/
+    collected/expenses/net profit-or-loss) with the PDF attached, sent to
+    every opted-in recipient independently (one bad address doesn't block
+    the others, same `try/catch`-per-recipient shape as
+    `notifyStaffOfReminders()`). Deliberately **not** logged via
+    `lib/emailLog.js`'s `logEmail()` — same reasoning
+    `notifyStaffOfReminders()` documents: this is an internal staff
+    notification, not a client-facing send, so it has no place in the
+    Email Center's sent log. `notify_monthly_report` (`users`, `ALTER
+    TABLE`-added — same guarded pattern as `notify_overdue`/
+    `notify_quote_responses`, `users` already had real accounts) is the
+    third preference on `MyAccount.jsx`'s "Notifications" card, wired
+    through the exact same `PUT /api/auth/preferences` route as the other
+    two (see `routes/auth.js` above — that route's own `?? existing`
+    per-field fallback already handled a third optional field with no
+    changes needed beyond adding it to the destructure/`UPDATE`).
+  All six jobs are also exported directly (`runBackup`,
   `generateDueRecurringInvoices`, `expireOverdueQuotes`,
-  `runOverdueReminders`, `runLicenseExpiryAlerts`) so they can be invoked
-  outside the cron schedule (tests, or a manual "run now" action).
+  `runOverdueReminders`, `runLicenseExpiryAlerts`, `runMonthlyReport`) so
+  they can be invoked outside the cron schedule (tests, or a manual "run
+  now" action).
 
 Status/derived-field conventions worth knowing before touching this code:
 - Quote `status`: `draft | sent | accepted | declined | expired`, set
