@@ -143,6 +143,39 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- A client's uploaded evidence that they paid — a bank transfer slip, a
+  -- payment advice, a receipt photo — attached to one invoice from the
+  -- client portal (routes/clientPortal.js's POST /invoices/:id/payment-
+  -- proof). Deliberately not an automatic payment record: this app has no
+  -- payment-gateway integration, so a proof is just that — evidence for a
+  -- human to review against the real bank statement and then record
+  -- through the existing POST /invoices/:id/payments flow (routes/
+  -- invoices.js) same as always. file_data is a base64 data URI, same
+  -- storage approach business_settings already uses for logo/signature/
+  -- stamp images — no separate file storage service exists in this app,
+  -- and a payment slip is small enough (a photo or a short PDF) that
+  -- storing it inline is the same acceptable tradeoff. file_type is the
+  -- MIME type (image/jpeg, image/png, image/webp, or application/pdf —
+  -- see routes/clientPortal.js's own validation), kept as its own column
+  -- rather than parsed back out of the data URI on every read. status
+  -- (pending or reviewed) lets staff mark one as handled once they've
+  -- checked it against their bank statement and recorded the real payment
+  -- (or decided it doesn't match anything), so InvoiceDetail.jsx's own
+  -- list can visually distinguish "still needs a look" from "already
+  -- dealt with" without a separate read/dismissed table.
+  CREATE TABLE IF NOT EXISTS payment_proofs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    file_data TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    uploaded_at TEXT NOT NULL DEFAULT (datetime('now')),
+    reviewed_by_name TEXT NOT NULL DEFAULT '',
+    reviewed_at TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -401,6 +434,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_email_log_created ON email_log(created_at);
   CREATE INDEX IF NOT EXISTS idx_licenses_client ON licenses(client_id);
   CREATE INDEX IF NOT EXISTS idx_licenses_expiry ON licenses(expiry_date);
+  CREATE INDEX IF NOT EXISTS idx_payment_proofs_invoice ON payment_proofs(invoice_id);
 
   -- Added once the query patterns above (list routes' ORDER BY, the
   -- scheduler's WHERE clauses, routes/reports.js's date-range SUMs) were
@@ -627,6 +661,16 @@ if (!userColumns.has('notify_quote_responses')) {
 // had real accounts.
 if (!userColumns.has('notify_monthly_report')) {
   db.exec(`ALTER TABLE users ADD COLUMN notify_monthly_report INTEGER NOT NULL DEFAULT 0;`);
+}
+
+// Same pattern again: `notify_payment_proofs` added to `users` — the
+// opt-in preference (MyAccount.jsx, mirroring `notify_quote_responses`)
+// for a staff digest when a client uploads a payment slip/advice against
+// an invoice via the portal (see lib/paymentProofNotify.js and
+// routes/clientPortal.js's own POST /invoices/:id/payment-proof) — after
+// `users` already had real accounts.
+if (!userColumns.has('notify_payment_proofs')) {
+  db.exec(`ALTER TABLE users ADD COLUMN notify_payment_proofs INTEGER NOT NULL DEFAULT 0;`);
 }
 
 // `client_viewed_at` on both `quotes` and `invoices` — stamped the first

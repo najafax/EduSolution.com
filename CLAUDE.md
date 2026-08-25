@@ -129,7 +129,12 @@ backend port in frontend code.
   below) — both tables have carried real documents since the app's first
   deploy, so this went straight into the `ALTER TABLE` list rather than the
   `CREATE TABLE` statement, same lesson `licenses.url` learned the hard
-  way.
+  way. Same pattern once more for `users.notify_payment_proofs` (see
+  "Payment proof upload" below) — `users` already had real accounts by
+  then too. `payment_proofs` itself, by contrast, is a brand-new table
+  with no prior deploy to carry forward, so it's a plain `CREATE TABLE IF
+  NOT EXISTS` edit, same as `client_portal_accounts` was when the portal
+  itself first shipped.
 - **Indexes**: same file's tail also carries a block of
   `CREATE INDEX IF NOT EXISTS` statements — safe to append to on every
   boot the same way the `CREATE TABLE IF NOT EXISTS` statements above it
@@ -2443,6 +2448,118 @@ rather than eight overlapping diffs.
   circle — "need help").
 - `lib/api.js`'s `portal` object gained `changePassword`, `activity`,
   `openStatementPdf`, and `licenses.get` alongside the existing calls.
+
+### Payment proof upload (`backend/src/`, `frontend/src/`)
+
+A client can attach evidence that they paid — a bank transfer slip, a
+payment advice, a receipt photo — to one of their own unpaid invoices from
+the portal. This is deliberately **not** an online-payment feature: this
+app has no payment-gateway integration (no merchant account, no sandbox
+credentials, nothing to build against), so a "Pay now" button was never on
+the table here. A proof is just that — evidence a staff member reviews
+against the real bank statement before recording the actual payment
+through the existing `POST /invoices/:id/payments` flow, same as always.
+Nothing here auto-records a payment, auto-matches an amount, or changes
+`invoices.status`/`amount_paid` — the only state a proof mutation ever
+touches is its own row.
+
+- `payment_proofs` (`db/index.js`, brand new table — see that file's own
+  note on why this is a plain `CREATE TABLE IF NOT EXISTS` rather than an
+  `ALTER TABLE`) holds one row per upload: `invoice_id`, `file_data` (a
+  base64 data URI — same storage approach `business_settings`'s logo/
+  signature/stamp images already use, since this app has no separate file
+  storage service and a payment slip is small enough to store inline the
+  same way), `file_name`, `file_type` (the MIME type, kept as its own
+  column rather than re-parsed from the data URI on every read), `note`
+  (optional, client-supplied), `status` (`pending` | `reviewed`), and
+  `reviewed_by_name`/`reviewed_at` (set once a staff member marks it
+  handled). `ON DELETE CASCADE` on `invoice_id` — deleting an invoice
+  takes its proofs with it, same as it already does for `invoice_items`/
+  `payments`.
+- **Body size limit**: `index.js`'s `express.json()` limit was raised from
+  `2mb` to `8mb` — the old ceiling was sized for `PUT /api/settings`'s
+  base64-encoded logo/signature images (a few hundred KB each), but a
+  phone photo of a bank slip routinely runs 2-5MB before base64 inflates
+  it by another third, well past the old limit.
+- **Upload** (`routes/clientPortal.js`'s `POST /invoices/:id/payment-
+  proof`, `requireClientAuth`, scoped to `client_id` same as every other
+  per-record portal route): 400s if the file is missing, if `file_type`
+  isn't one of `PAYMENT_PROOF_TYPES` (`image/jpeg`, `image/png`,
+  `image/webp`, `application/pdf`), or if the decoded byte length exceeds
+  `PAYMENT_PROOF_MAX_BYTES` (6MB, leaving headroom under the 8mb JSON body
+  limit once the rest of the request envelope is counted) — all checked
+  against the actual decoded bytes, not trusted from the client, so a
+  spoofed `file_type` or an oversized payload can't sneak past validation.
+  409s if the invoice is `void` or already has nothing left to pay
+  (`balance_due <= 0`) — there's nothing to prove payment of at that
+  point. Logs an activity entry (`action: 'uploaded a payment proof for
+  (client)'`, same `"(client)"` suffix convention every other client-
+  initiated action in this app uses) and fires (never awaited)
+  `lib/paymentProofNotify.js`'s `notifyStaffOfPaymentProof()` — an opt-in
+  staff digest (`users.notify_payment_proofs`, the fourth checkbox on
+  `MyAccount.jsx`'s Notifications card, wired through the same `PUT
+  /api/auth/preferences` route as `notify_overdue`/
+  `notify_quote_responses`/`notify_monthly_report`), same internal-
+  notification shape as `lib/quoteAcceptedNotify.js`'s own
+  `notifyStaffOfQuoteAccepted()` — not a client-facing send, so it
+  deliberately doesn't go through `lib/emailTemplates.js`'s editable-
+  template system and isn't recorded to `email_log`.
+- **Client view**: `routes/clientPortal.js`'s `getClientInvoice()` now
+  also returns `paymentProofs` — metadata only (`id`, `file_name`,
+  `file_type`, `note`, `status`, `uploaded_at`), no `file_data`, since the
+  client already has their own copy of whatever they uploaded and doesn't
+  need to re-download it through the app. `PortalInvoiceDetail.jsx` renders
+  these as a "Payment proofs you've sent" list (file name, upload date,
+  note, a `StatusBadge` for `pending`/`reviewed` — `pending` already had an
+  amber color in `StatusBadge.jsx`'s map from the quote-requests feature,
+  `reviewed` falls back to that component's default slate, which reads
+  correctly as "settled/neutral" with no new color needed) above an
+  "Uploaded a bank slip? Send it here" upload form — a file input
+  (`accept="image/jpeg,image/png,image/webp,application/pdf"`) plus an
+  optional note textarea, converting the chosen file to a base64 data URI
+  client-side via `FileReader.readAsDataURL()` (wrapped in a `fileToDataUri()`
+  Promise helper, local to this file) before posting. The form itself is
+  gated the same way the backend is (`invoice.balance_due > 0 &&
+  invoice.status !== 'void'`), so it never shows for a case the backend
+  would just 409 on, same "don't show a button that would just error"
+  convention this app already follows everywhere else. A client-side size
+  check (`file.size > PROOF_MAX_BYTES`) gives an immediate, friendly error
+  before ever attempting the upload, rather than relying solely on the
+  backend's own rejection.
+- **Staff view**: `routes/invoices.js`'s `getInvoiceWithItems()` gains the
+  same `paymentProofs` metadata-only array (same reasoning — `file_data`
+  can be a few MB and this response is fetched on every invoice page
+  load). The actual file is served by a dedicated `GET
+  /:id/payment-proofs/:proofId/file` route (`view`-gated) that decodes the
+  stored data URI and streams the real bytes with the right
+  `Content-Type`/`Content-Disposition`, the same way `GET /:id/pdf`
+  already streams a PDF — this is deliberately *not* JSON-wrapped, so the
+  browser can render an image inline or open a PDF exactly like every
+  other document download in this app. `lib/api.js`'s
+  `openPaymentProofFile()` reuses the existing `openPdf()` helper for
+  this (fetch → blob → `window.open()`) despite the name — that helper was
+  always generic, it just fetches whatever `Content-Type` the response
+  actually carries. `InvoiceDetail.jsx` renders a "Payment proofs"
+  `Accordion` (only shown when at least one exists) right after
+  "Payments", with a pending-count badge on the accordion's own title
+  (`{pendingProofCount} pending`) so "something needs a look" is visible
+  even while the section is collapsed on mobile — the standard desktop-
+  table + `MobileListAccordion` split (see "Mobile design system" above)
+  applies here too. Each row gets three `IconActionButton`s: "View file"
+  (`DownloadIcon`, tone `lagoon`, ungated — a view-only user can still
+  look, same convention `Download PDF`'s own ungated button already
+  follows), "Mark reviewed" (`CheckCircleIcon`, tone `emerald`, `canManage`-
+  gated, hidden once already `reviewed` — there's nothing left to mark),
+  and "Delete" (`TrashIcon`, tone `red`, `canManage`-gated, behind the same
+  `useConfirm()` dialog every other destructive action in this app uses).
+  `POST /:id/payment-proofs/:proofId/review` (`manage`) only ever flips
+  `status`/`reviewed_by_name`/`reviewed_at` — it never touches the
+  invoice's own `amount_paid`/`status`, reinforcing that "reviewed" means
+  "a human looked at this," not "this payment was recorded" (recording the
+  real payment is still the separate, existing "Record payment" action).
+  `DELETE /:id/payment-proofs/:proofId` (`manage`) logs an activity entry
+  (`action: 'deleted a payment proof for'`) the same way every other
+  delete in this app does.
 
 ### Quote requests (`backend/src/`, `frontend/src/`)
 

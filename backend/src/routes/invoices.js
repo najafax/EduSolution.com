@@ -36,7 +36,15 @@ function getInvoiceWithItems(id) {
   const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order').all(id);
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(invoice.client_id);
   const payments = db.prepare('SELECT * FROM payments WHERE invoice_id = ? ORDER BY paid_at').all(id);
-  return { invoice: withComputed(invoice), items, client, payments };
+  // file_data deliberately excluded here — kept lean the same way the
+  // portal's own getClientInvoice() is, since a proof can be a few MB and
+  // this response is fetched on every page load. GET /:id/payment-
+  // proofs/:proofId below is the dedicated view/download route that
+  // returns the full row.
+  const paymentProofs = db
+    .prepare('SELECT id, file_name, file_type, note, status, uploaded_at, reviewed_by_name, reviewed_at FROM payment_proofs WHERE invoice_id = ? ORDER BY uploaded_at DESC')
+    .all(id);
+  return { invoice: withComputed(invoice), items, client, payments, paymentProofs };
 }
 
 function saveItems(invoiceId, items) {
@@ -706,6 +714,56 @@ router.post('/:id/payments/:paymentId/send-receipt', manage, async (req, res) =>
   }
 
   logEmail({ type: 'receipt_send', to: data.client.email, subject, sentByName: req.user.name, entityType: 'invoice', entityId: data.invoice.id, entityLabel: payment.receipt_number });
+  res.status(204).end();
+});
+
+// Streams the actual file — decoded from the stored base64 data URI, same
+// as lib/pdf.js's own decodeImageDataUri approach for settings images —
+// rather than returning it as JSON, so the browser can render an image
+// inline or open a PDF the same way GET /:id/pdf already does. This is the
+// one payment-proof route that isn't embedded in getInvoiceWithItems()'s
+// own response (see that function's own note on why file_data stays out
+// of the regular invoice fetch).
+router.get('/:id/payment-proofs/:proofId/file', view, (req, res) => {
+  const proof = db.prepare('SELECT * FROM payment_proofs WHERE id = ? AND invoice_id = ?').get(req.params.proofId, req.params.id);
+  if (!proof) return res.status(404).json({ error: 'Payment proof not found' });
+  const match = /^data:[^;]+;base64,([A-Za-z0-9+/]+=*)$/.exec(proof.file_data);
+  if (!match) return res.status(500).json({ error: 'Stored file could not be read' });
+  res.set({
+    'Content-Type': proof.file_type,
+    'Content-Disposition': `inline; filename="${proof.file_name}"`,
+  });
+  res.send(Buffer.from(match[1], 'base64'));
+});
+
+// "Reviewed" means a staff member has looked at the proof and either
+// recorded the real payment (POST /:id/payments, unchanged by this
+// feature) or decided it doesn't apply — this route only flips the status
+// flag, it never touches amount_paid/status on the invoice itself, since a
+// proof is evidence, not an instruction to auto-record anything.
+router.post('/:id/payment-proofs/:proofId/review', manage, (req, res) => {
+  const proof = db.prepare('SELECT * FROM payment_proofs WHERE id = ? AND invoice_id = ?').get(req.params.proofId, req.params.id);
+  if (!proof) return res.status(404).json({ error: 'Payment proof not found' });
+  db.prepare(`UPDATE payment_proofs SET status = 'reviewed', reviewed_by_name = ?, reviewed_at = datetime('now') WHERE id = ?`).run(
+    req.user.name,
+    proof.id,
+  );
+  res.json({ message: 'Marked reviewed.' });
+});
+
+router.delete('/:id/payment-proofs/:proofId', manage, (req, res) => {
+  const invoice = db.prepare('SELECT number FROM invoices WHERE id = ?').get(req.params.id);
+  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+  const proof = db.prepare('SELECT * FROM payment_proofs WHERE id = ? AND invoice_id = ?').get(req.params.proofId, req.params.id);
+  if (!proof) return res.status(404).json({ error: 'Payment proof not found' });
+  db.prepare('DELETE FROM payment_proofs WHERE id = ?').run(proof.id);
+  logActivity({
+    userName: req.user.name,
+    action: 'deleted a payment proof for',
+    entityType: 'invoice',
+    entityId: Number(req.params.id),
+    entityLabel: invoice.number,
+  });
   res.status(204).end();
 });
 

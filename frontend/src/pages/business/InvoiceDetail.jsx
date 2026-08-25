@@ -8,7 +8,7 @@ import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
-import { PencilIcon, DownloadIcon, SendIcon, BellIcon, DuplicateIcon, XIcon, TrashIcon, PlusIcon, LinkIcon } from '../../components/icons';
+import { PencilIcon, DownloadIcon, SendIcon, BellIcon, DuplicateIcon, XIcon, TrashIcon, PlusIcon, LinkIcon, CheckCircleIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 const METHODS = ['bank_transfer', 'cash', 'card', 'cheque', 'other'];
@@ -154,6 +154,36 @@ export default function InvoiceDetail() {
     }
   }
 
+  async function handleViewPaymentProof(proofId) {
+    setError('');
+    try {
+      await api.invoices.openPaymentProofFile(id, proofId, token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleReviewPaymentProof(proofId) {
+    setError('');
+    try {
+      await api.invoices.reviewPaymentProof(id, proofId, token);
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleDeletePaymentProof(proofId) {
+    if (!(await confirm({ title: 'Delete this payment proof?', confirmLabel: 'Delete' }))) return;
+    setError('');
+    try {
+      await api.invoices.deletePaymentProof(id, proofId, token);
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleVoid() {
     if (
       !(await confirm({
@@ -179,7 +209,8 @@ export default function InvoiceDetail() {
   if (error && !data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
   if (!data || !settingsLoaded) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
 
-  const { invoice, items, client, payments } = data;
+  const { invoice, items, client, payments, paymentProofs } = data;
+  const pendingProofCount = paymentProofs.filter((p) => p.status === 'pending').length;
   const symbol = settings?.currency_symbol || '$';
   const isLocked = invoice.status === 'sent' || invoice.status === 'paid';
   // Mirrors the backend's POST /:id/void guard (routes/invoices.js) so the
@@ -552,6 +583,103 @@ export default function InvoiceDetail() {
           )}
         </Accordion>
       </div>
+
+      {paymentProofs.length > 0 && (
+        <div className="mt-6">
+          {/* Evidence a client uploaded from the portal (a bank slip,
+              payment advice, receipt photo) — never an automatic payment
+              record, see db/index.js's own note on payment_proofs. A
+              pending badge on the accordion title itself (not just per-row)
+              so "something needs a look" is visible even collapsed. */}
+          <Accordion
+            title={
+              <span className="flex items-center gap-2">
+                Payment proofs
+                {pendingProofCount > 0 && (
+                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-400">
+                    {pendingProofCount} pending
+                  </span>
+                )}
+              </span>
+            }
+          >
+            <div className="-mx-6 hidden overflow-x-auto sm:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                    <th className="px-6 py-3">File</th>
+                    <th className="px-4 py-3">Uploaded</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-6 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {paymentProofs.map((p) => (
+                    <tr key={p.id}>
+                      <td className="px-6 py-3 dark:text-white">
+                        {p.file_name}
+                        {p.note && <p className="text-xs text-slate-500 dark:text-slate-400">{p.note}</p>}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{p.uploaded_at.slice(0, 10)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <StatusBadge status={p.status} />
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-3">
+                        <div className="flex justify-end gap-1.5">
+                          <IconActionButton icon={DownloadIcon} tone="lagoon" onClick={() => handleViewPaymentProof(p.id)} title="View file" />
+                          {canManage && p.status === 'pending' && (
+                            <IconActionButton
+                              icon={CheckCircleIcon}
+                              tone="emerald"
+                              onClick={() => handleReviewPaymentProof(p.id)}
+                              title="Mark reviewed"
+                            />
+                          )}
+                          {canManage && (
+                            <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDeletePaymentProof(p.id)} title="Delete" />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex flex-col gap-2.5 sm:hidden">
+              {paymentProofs.map((p) => (
+                <MobileListAccordion
+                  key={p.id}
+                  name="invoice-payment-proofs"
+                  summary={
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-900 dark:text-white">{p.file_name}</p>
+                        <p className="text-slate-500 dark:text-slate-400">{p.uploaded_at.slice(0, 10)}</p>
+                      </div>
+                      <StatusBadge status={p.status} />
+                    </div>
+                  }
+                >
+                  {p.note && (
+                    <div className="flex justify-between">
+                      <dt className="text-slate-500 dark:text-slate-400">Note</dt>
+                      <dd className="text-right text-slate-900 dark:text-white">{p.note}</dd>
+                    </div>
+                  )}
+                  <div className="flex gap-1.5 pt-1">
+                    <IconActionButton icon={DownloadIcon} tone="lagoon" onClick={() => handleViewPaymentProof(p.id)} title="View file" />
+                    {canManage && p.status === 'pending' && (
+                      <IconActionButton icon={CheckCircleIcon} tone="emerald" onClick={() => handleReviewPaymentProof(p.id)} title="Mark reviewed" />
+                    )}
+                    {canManage && <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDeletePaymentProof(p.id)} title="Delete" />}
+                  </div>
+                </MobileListAccordion>
+              ))}
+            </div>
+          </Accordion>
+        </div>
+      )}
 
       {invoice.notes && (
         <div className="mt-6">

@@ -44,7 +44,11 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
 // Default 100kb is too small for PUT /api/settings once it carries the
 // signature/stamp images (see routes/settings.js) — 2mb comfortably covers
 // two base64-encoded 400KB images plus the rest of the settings payload.
-app.use(express.json({ limit: '2mb' }));
+// Raised to 8mb once POST /api/portal/invoices/:id/payment-proof (see
+// routes/clientPortal.js) needed room for a base64-encoded payment slip —
+// a phone photo of a bank transfer receipt routinely runs 2-5MB before
+// base64 inflates it by another third, well past the old 2mb ceiling.
+app.use(express.json({ limit: '8mb' }));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);

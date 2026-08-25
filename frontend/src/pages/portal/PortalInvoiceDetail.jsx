@@ -1,9 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePortalAuth } from '../../context/PortalAuthContext';
 import StatusBadge from '../../components/StatusBadge';
-import { ChevronRightIcon, DownloadIcon } from '../../components/icons';
+import { ChevronRightIcon, DownloadIcon, UploadIcon } from '../../components/icons';
+
+const PROOF_FILE_TYPES = 'image/jpeg,image/png,image/webp,application/pdf';
+const PROOF_MAX_BYTES = 6 * 1024 * 1024;
+
+// Reads a File as a base64 data URI — the same storage shape
+// business_settings already uses for logo/signature/stamp images, see
+// db/index.js's own note on payment_proofs. FileReader's readAsDataURL is
+// async-only (no sync equivalent), hence the Promise wrapper.
+function fileToDataUri(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Could not read the selected file'));
+    reader.readAsDataURL(file);
+  });
+}
 
 // The portal counterpart to pages/PublicInvoice.jsx — same read-only
 // layout, plus a Payments section (routes/clientPortal.js's GET
@@ -15,13 +31,19 @@ export default function PortalInvoiceDetail() {
   const { token } = usePortalAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [uploadNote, setUploadNote] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState('');
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
+  function load() {
     api.portal.invoices
       .get(id, token)
       .then(setData)
       .catch((err) => setError(err.message));
-  }, [id, token]);
+  }
+
+  useEffect(load, [id, token]);
 
   async function handleViewPdf() {
     setError('');
@@ -41,6 +63,34 @@ export default function PortalInvoiceDetail() {
     }
   }
 
+  async function handleUploadProof(e) {
+    e.preventDefault();
+    setError('');
+    setUploadSuccess('');
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) {
+      setError('Please choose a file to upload.');
+      return;
+    }
+    if (file.size > PROOF_MAX_BYTES) {
+      setError('File is too large — please keep it under 6MB.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const fileData = await fileToDataUri(file);
+      await api.portal.invoices.uploadPaymentProof(id, { file_name: file.name, file_type: file.type, file_data: fileData, note: uploadNote }, token);
+      setUploadNote('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setUploadSuccess('Uploaded — thanks, we’ll review it shortly.');
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   if (error && !data) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>
@@ -50,7 +100,7 @@ export default function PortalInvoiceDetail() {
     return <div className="mx-auto max-w-2xl px-4 py-16 text-center text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
   }
 
-  const { invoice, items, client, payments, settings } = data;
+  const { invoice, items, client, payments, paymentProofs, settings } = data;
   const symbol = settings?.currency_symbol || '$';
 
   return (
@@ -241,6 +291,67 @@ export default function PortalInvoiceDetail() {
               ))}
             </div>
           </div>
+        )}
+
+        {paymentProofs.length > 0 && (
+          <div className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Payment proofs you've sent</p>
+            <div className="mt-2 flex flex-col gap-2">
+              {paymentProofs.map((proof) => (
+                <div key={proof.id} className="rounded-lg border border-slate-100 px-3 py-2 text-sm dark:border-slate-800">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="min-w-0 truncate font-medium text-slate-900 dark:text-white">{proof.file_name}</p>
+                    <StatusBadge status={proof.status} />
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400">{proof.uploaded_at.slice(0, 10)}</p>
+                  {proof.note && <p className="mt-1 text-slate-600 dark:text-slate-400">{proof.note}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Only offered while there's still something to prove payment of —
+            mirrors the backend's own balance_due <= 0 / void guard on
+            POST /invoices/:id/payment-proof, so this never shows for a
+            case that would just 409. Not a payment gateway — this is
+            evidence for a human to review against the real bank statement,
+            see db/index.js's own note on payment_proofs for the full
+            reasoning. */}
+        {invoice.balance_due > 0 && invoice.status !== 'void' && (
+          <form onSubmit={handleUploadProof} className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Uploaded a bank slip? Send it here</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              A photo or PDF of your transfer receipt or payment advice — we'll check it against our bank statement and record the payment.
+            </p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={PROOF_FILE_TYPES}
+                className="flex-1 text-sm text-slate-700 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 dark:text-slate-300 dark:file:border-slate-600 dark:file:bg-slate-900 dark:file:text-slate-200"
+              />
+            </div>
+            <label className="mt-3 block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Note (optional)</span>
+              <textarea
+                value={uploadNote}
+                onChange={(e) => setUploadNote(e.target.value)}
+                rows={2}
+                placeholder="e.g. transferred from account ending 1234"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={uploading}
+              className="mt-3 flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+            >
+              <UploadIcon width={16} height={16} />
+              {uploading ? 'Uploading…' : 'Upload proof'}
+            </button>
+            {uploadSuccess && <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{uploadSuccess}</p>}
+          </form>
         )}
 
         {error && <p className="mt-6 text-sm text-red-600 dark:text-red-400">{error}</p>}
