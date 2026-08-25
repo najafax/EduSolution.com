@@ -75,6 +75,7 @@ export default function Licenses() {
   const [summary, setSummary] = useState(null);
   const [clients, setClients] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -116,7 +117,16 @@ export default function Licenses() {
   useEffect(() => {
     loadSummary();
     api.clients.list(token).then(({ clients }) => setClients(clients));
-    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
+    // .finally flips settingsLoaded whether the fetch succeeds or fails —
+    // the loading gate below waits on this too (on the initial load only,
+    // same as the list itself — see load()'s own note), so the Amount
+    // column never flashes '$' before the real currency symbol arrives
+    // (see Dashboard.jsx's own note on this race for the full story).
+    api.settings
+      .get(token)
+      .then(({ settings }) => setSettings(settings))
+      .catch(() => {})
+      .finally(() => setSettingsLoaded(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -422,7 +432,7 @@ export default function Licenses() {
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        {loading ? (
+        {loading || !settingsLoaded ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={['w-32', 'w-28', 'w-24', 'w-20', 'w-20', 'w-32']} />
           </div>

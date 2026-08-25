@@ -18,6 +18,7 @@ export default function QuoteDetail() {
 
   const [data, setData] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -35,7 +36,15 @@ export default function QuoteDetail() {
 
   useEffect(load, [id, token]);
   useEffect(() => {
-    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
+    // .finally flips settingsLoaded whether the fetch succeeds or fails —
+    // the loading gate below waits on this too, so this page's money
+    // figures never flash '$' before the real currency symbol arrives
+    // (see Dashboard.jsx's own note on this race for the full story).
+    api.settings
+      .get(token)
+      .then(({ settings }) => setSettings(settings))
+      .catch(() => {})
+      .finally(() => setSettingsLoaded(true));
   }, [token]);
 
   async function handleDownload() {
@@ -92,7 +101,7 @@ export default function QuoteDetail() {
   }
 
   if (error && !data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
-  if (!data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
+  if (!data || !settingsLoaded) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
 
   const { quote, items, client } = data;
   const symbol = settings?.currency_symbol || '$';
