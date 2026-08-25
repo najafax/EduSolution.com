@@ -333,6 +333,22 @@ router.get('/activity', requireClientAuth, (req, res) => {
       entries.push({ type: 'license_renewed', label: `License "${l.name}" renewed`, date: l.last_renewed_at, link: `/portal/licenses/${l.id}`, amount: null }),
     );
 
+  db.prepare(
+    `SELECT invoices.id AS invoice_id, invoices.number, payment_proofs.reviewed_at
+     FROM payment_proofs JOIN invoices ON invoices.id = payment_proofs.invoice_id
+     WHERE invoices.client_id = ? AND payment_proofs.status = 'rejected'`,
+  )
+    .all(clientId)
+    .forEach((p) =>
+      entries.push({
+        type: 'payment_proof_rejected',
+        label: `Payment proof rejected for invoice ${p.number}`,
+        date: p.reviewed_at,
+        link: `/portal/invoices/${p.invoice_id}`,
+        amount: null,
+      }),
+    );
+
   entries.sort((a, b) => (a.date < b.date ? 1 : -1));
   res.json({ activity: entries.slice(0, ACTIVITY_LIMIT) });
 });
@@ -526,6 +542,31 @@ router.post('/invoices/:id/payment-proof', requireClientAuth, (req, res) => {
     .prepare('SELECT id, file_name, file_type, note, status, uploaded_at, review_note FROM payment_proofs WHERE id = ?')
     .get(result.lastInsertRowid);
   res.status(201).json({ proof });
+});
+
+// Backs PortalNotificationCenter.jsx's own "Payment proof rejected"
+// category — a client's own rejected proofs across every invoice, newest
+// review first. Deliberately not folded into GET /invoices/:id (which
+// already returns paymentProofs for one invoice) since the bell needs
+// this across the client's whole invoice set in one call, same reasoning
+// the bell's other three categories each already hit their own
+// already-scoped list endpoint rather than a per-invoice one. No
+// read/unread tracking — same "live, computed view" contract every other
+// notification-bell category and PortalDashboard.jsx's own activity feed
+// already follow; a rejection stops showing once staff deletes the proof
+// row (or, in practice, once the client's since uploaded and had a
+// replacement approved and the old row cleaned up).
+router.get('/payment-proofs/rejected', requireClientAuth, (req, res) => {
+  const proofs = db
+    .prepare(
+      `SELECT payment_proofs.id, payment_proofs.file_name, payment_proofs.review_note, payment_proofs.reviewed_at,
+              invoices.id AS invoice_id, invoices.number AS invoice_number
+       FROM payment_proofs JOIN invoices ON invoices.id = payment_proofs.invoice_id
+       WHERE invoices.client_id = ? AND payment_proofs.status = 'rejected'
+       ORDER BY payment_proofs.reviewed_at DESC`,
+    )
+    .all(req.clientAccount.client_id);
+  res.json({ proofs });
 });
 
 router.get('/invoices/:id/pdf', requireClientAuth, async (req, res) => {
