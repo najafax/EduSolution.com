@@ -224,6 +224,16 @@ function publicSettings(settings) {
   return rest;
 }
 
+// Same first-view stamping as routes/public.js's own markViewed() — a
+// client viewing their own document through the portal is exactly the
+// same "did they see it" signal as viewing it via the public_token link,
+// so both paths write to the same client_viewed_at column. Kept as its
+// own copy here rather than imported, same reasoning as every other
+// duplicated helper in this file.
+function markViewed(table, id) {
+  db.prepare(`UPDATE ${table} SET client_viewed_at = datetime('now') WHERE id = ? AND client_viewed_at IS NULL`).run(id);
+}
+
 // Same stripped shape as routes/public.js's own publicSettings() — a
 // client account is no more trusted with starting_balance/
 // session_timeout_minutes than an anonymous public_token holder is (see
@@ -270,6 +280,7 @@ function getClientQuote(clientId, id) {
 router.get('/quotes/:id', requireClientAuth, (req, res) => {
   const data = getClientQuote(req.clientAccount.client_id, req.params.id);
   if (!data) return res.status(404).json({ error: 'Quote not found' });
+  markViewed('quotes', data.quote.id);
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   res.json({ ...data, settings: publicSettings(settings) });
 });
@@ -349,6 +360,7 @@ function getClientInvoice(clientId, id) {
 router.get('/invoices/:id', requireClientAuth, (req, res) => {
   const data = getClientInvoice(req.clientAccount.client_id, req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  markViewed('invoices', data.invoice.id);
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   res.json({ ...data, settings: publicSettings(settings) });
 });

@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { todayStr } from '../../lib/date';
+import { todayStr, timeAgo } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
-import { PencilIcon, DownloadIcon, SendIcon, BellIcon, DuplicateIcon, XIcon, TrashIcon, PlusIcon } from '../../components/icons';
+import { PencilIcon, DownloadIcon, SendIcon, BellIcon, DuplicateIcon, XIcon, TrashIcon, PlusIcon, LinkIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 const METHODS = ['bank_transfer', 'cash', 'card', 'cheque', 'other'];
@@ -59,6 +59,22 @@ export default function InvoiceDetail() {
       await api.invoices.openPdf(id, token);
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  // Same domain the browser is actually running this page on — always
+  // correct for whichever environment the person copying the link is in
+  // (local dev, staging, production), unlike trusting the backend's own
+  // CLIENT_ORIGIN to match what's really being served.
+  async function handleCopyLink() {
+    setError('');
+    setNotice('');
+    const url = `${window.location.origin}/i/${invoice.public_token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice('Public link copied to clipboard.');
+    } catch {
+      setError('Could not copy the link — your browser may be blocking clipboard access.');
     }
   }
 
@@ -193,6 +209,10 @@ export default function InvoiceDetail() {
             <DownloadIcon width={16} height={16} />
             Download PDF
           </button>
+          <button onClick={handleCopyLink} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <LinkIcon width={16} height={16} />
+            Copy public link
+          </button>
           {canManage && invoice.status !== 'void' && (
             <button onClick={() => setEmailModal({ type: 'send' })} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
               <SendIcon width={16} height={16} />
@@ -241,6 +261,9 @@ export default function InvoiceDetail() {
       )}
       {invoice.last_reminder_sent_at && (
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Last reminder sent {invoice.last_reminder_sent_at}</p>
+      )}
+      {invoice.client_viewed_at && (
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Viewed by client {timeAgo(invoice.client_viewed_at)}</p>
       )}
 
       {/* Mobile-only summary hero — desktop already shows Total/Balance due
