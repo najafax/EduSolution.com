@@ -395,3 +395,28 @@ export function LinkIcon(props) {
     </svg>
   );
 }
+
+// A single person — "my account" (PortalLayout.jsx's own account link).
+// Deliberately distinct from UsersIcon (plural, used for Capital/Users
+// elsewhere in the app for a group of people) — a portal account
+// represents one client's own login, not a group.
+export function UserIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="10" cy="6.5" r="3" />
+      <path d="M4 17c0-3 2.5-5.5 6-5.5s6 2.5 6 5.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// A question mark in a circle — "need help / contact us"
+// (PortalLayout.jsx's own contact block).
+export function HelpCircleIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M7.8 7.8a2.2 2.2 0 1 1 3.3 1.9c-.7.4-1.1.9-1.1 1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="10" cy="14.2" r="0.15" fill="currentColor" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}

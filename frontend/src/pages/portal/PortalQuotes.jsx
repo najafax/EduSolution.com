@@ -7,6 +7,7 @@ import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
 import LineItemsEditor from '../../components/LineItemsEditor';
+import SearchInput from '../../components/SearchInput';
 import { QuoteIcon, PlusIcon } from '../../components/icons';
 
 // A request's summary line: item quantities/names when the client picked
@@ -25,6 +26,7 @@ export default function PortalQuotes() {
   const [quotes, setQuotes] = useState(null);
   const [requests, setRequests] = useState(null);
   const [products, setProducts] = useState([]);
+  const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [items, setItems] = useState([]);
@@ -138,7 +140,14 @@ export default function PortalQuotes() {
         </div>
       )}
 
-      <h2 className="mt-6 text-sm font-semibold text-slate-700 dark:text-slate-300">Sent to you</h2>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Sent to you</h2>
+        {quotes && quotes.length > 0 && (
+          <div className="w-full max-w-xs sm:w-56">
+            <SearchInput value={search} onChange={setSearch} placeholder="Search quotes…" />
+          </div>
+        )}
+      </div>
 
       {!quotes ? (
         <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">Loading…</p>
@@ -146,9 +155,11 @@ export default function PortalQuotes() {
         <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700">
           <EmptyState icon={<QuoteIcon />} title="No quotes yet." message="Any quotes prepared for you will show up here." />
         </div>
+      ) : quotes.filter((q) => q.number.toLowerCase().includes(search.trim().toLowerCase())).length === 0 ? (
+        <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">No quotes match "{search}".</p>
       ) : (
         <div className="mt-2 flex flex-col gap-2.5">
-          {quotes.map((quote) => (
+          {quotes.filter((q) => q.number.toLowerCase().includes(search.trim().toLowerCase())).map((quote) => (
             <Link
               key={quote.id}
               to={`/portal/quotes/${quote.id}`}

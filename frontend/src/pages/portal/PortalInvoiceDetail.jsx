@@ -188,6 +188,21 @@ export default function PortalInvoiceDetail() {
           </div>
         </div>
 
+        {/* Surfaces the business's bank/payment details directly here when
+            there's still a balance due, instead of requiring a PDF
+            download just to find out how to pay — the same
+            settings.bank_details every quote/invoice PDF already prints,
+            not a new field. Hidden once balance_due hits 0 (nothing left
+            to pay) and when the business hasn't filled bank_details in at
+            all, same "only show the exception case" convention the rest
+            of this app already follows. */}
+        {invoice.balance_due > 0 && settings?.bank_details && (
+          <div className="mt-6 rounded-lg border border-lagoon-100 bg-lagoon-50/60 p-4 text-sm dark:border-lagoon-900 dark:bg-lagoon-950/40">
+            <p className="font-medium text-slate-700 dark:text-slate-200">How to pay</p>
+            <p className="mt-1 whitespace-pre-line text-slate-600 dark:text-slate-400">{settings.bank_details}</p>
+          </div>
+        )}
+
         {invoice.notes && (
           <div className="mt-6 border-t border-slate-200 pt-4 text-sm dark:border-slate-700">
             <p className="font-medium text-slate-500 dark:text-slate-400">Notes</p>

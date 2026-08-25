@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePortalAuth } from '../../context/PortalAuthContext';
 import KpiCard from '../../components/KpiCard';
-import { QuoteIcon, InvoiceIcon, LicenseIcon } from '../../components/icons';
+import { QuoteIcon, InvoiceIcon, LicenseIcon, TrendUpIcon } from '../../components/icons';
 
 const SHORTCUTS = [
   { to: '/portal/quotes', label: 'Quotes', message: 'View and respond to quotes.', icon: QuoteIcon },
@@ -11,11 +11,25 @@ const SHORTCUTS = [
   { to: '/portal/licenses', label: 'Licenses', message: 'Check what’s active or expiring soon.', icon: LicenseIcon },
 ];
 
+// One icon per activity type, from routes/clientPortal.js's own GET
+// /activity — keyed by that route's `type` field so a future type just
+// needs an entry added here, same "one shared icon map" convention
+// components/NotificationCenter.jsx already establishes for its own
+// per-category icons.
+const ACTIVITY_ICONS = {
+  quote_sent: QuoteIcon,
+  quote_response: QuoteIcon,
+  invoice_issued: InvoiceIcon,
+  payment: TrendUpIcon,
+  license_renewed: LicenseIcon,
+};
+
 export default function PortalDashboard() {
   const { account, settings, token } = usePortalAuth();
   const [quotes, setQuotes] = useState(null);
   const [invoices, setInvoices] = useState(null);
   const [licenses, setLicenses] = useState(null);
+  const [activity, setActivity] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -26,6 +40,14 @@ export default function PortalDashboard() {
         setLicenses(l.licenses);
       })
       .catch((err) => setError(err.message));
+    // Independent, best-effort fetch — a failed activity feed shouldn't
+    // block the KPI strip/shortcut tiles above from rendering, same
+    // reasoning Dashboard.jsx's own "Needs attention" panel fetches are
+    // kept separate from its main financials-summary call.
+    api.portal
+      .activity(token)
+      .then(({ activity }) => setActivity(activity))
+      .catch(() => setActivity([]));
   }, [token]);
 
   const symbol = settings?.currency_symbol || '$';
@@ -79,6 +101,46 @@ export default function PortalDashboard() {
           </Link>
         ))}
       </div>
+
+      {/* A chronological "what's happened" feed — synthesized server-side
+          from the same quotes/invoices/payments/licenses tables the three
+          KPI cards above already read, not activity_log (see
+          routes/clientPortal.js's GET /activity for why). Renders nothing
+          at all once loaded-and-empty, same "only show the exception case"
+          convention this app already follows elsewhere — a brand-new
+          client with no history yet doesn't need an empty panel telling
+          them so. */}
+      {activity && activity.length > 0 && (
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h2 className="font-semibold text-slate-900 dark:text-white">Recent activity</h2>
+          <div className="mt-3 flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+            {activity.map((item, index) => {
+              const Icon = ACTIVITY_ICONS[item.type] || QuoteIcon;
+              return (
+                <Link
+                  key={`${item.type}-${index}`}
+                  to={item.link}
+                  className="flex items-center gap-3 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400">
+                    <Icon width={15} height={15} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-slate-900 dark:text-white">{item.label}</span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400">{item.date}</span>
+                  </span>
+                  {item.amount !== null && (
+                    <span className="shrink-0 font-medium text-slate-900 dark:text-white">
+                      {symbol}
+                      {item.amount.toFixed(2)}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
