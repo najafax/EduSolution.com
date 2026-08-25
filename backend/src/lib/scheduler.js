@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const crypto = require('crypto');
 const db = require('../db');
 const { renderInvoicePdf } = require('./pdf');
+const { renderProfitLossPdf } = require('./reportPdf');
 const { sendMail, textToHtml } = require('./mailer');
 const { computeTotals } = require('./totals');
 const { nextInvoiceNumber } = require('./numbering');
@@ -130,6 +131,101 @@ async function runLicenseExpiryAlerts() {
   }
 
   console.log(`[license-alerts] Sent ${sent} automated license expiry alert(s)`);
+  return { sent, skipped: false };
+}
+
+// Optional per-user preference (Settings → My account, `notify_monthly_report`):
+// an automated P&L summary for the *previous* calendar month, emailed on the
+// 1st. Same shape as runOverdueReminders()/runLicenseExpiryAlerts() above —
+// skips entirely with no SMTP configured — but with one more early exit:
+// this job's entire purpose is the staff notification (there's no
+// client-facing send here to fall back to), so if nobody has opted in there's
+// nothing to compute and it returns immediately rather than generating a PDF
+// no one will see. Reuses the exact same revenue/expense queries and
+// lib/reportPdf.js's renderProfitLossPdf() that routes/reports.js's own
+// GET /profit-loss/pdf uses for a manual download, so the automated email's
+// attached PDF can never drift from what a human clicking that button gets
+// for the same date range. Deliberately not logged via lib/emailLog.js's
+// logEmail() — same reasoning notifyStaffOfReminders() above documents:
+// this is an internal staff notification, not a client-facing send, so it
+// has no place in the Email Center's sent log.
+async function runMonthlyReport() {
+  if (!process.env.SMTP_HOST) {
+    console.log('[monthly-report] SMTP not configured, skipping automated monthly report');
+    return { sent: 0, skipped: true };
+  }
+
+  const recipients = db.prepare('SELECT name, email FROM users WHERE active = 1 AND notify_monthly_report = 1').all();
+  if (recipients.length === 0) {
+    console.log('[monthly-report] No recipients opted in, skipping');
+    return { sent: 0, skipped: true };
+  }
+
+  // The previous calendar month — this job runs on the 1st, so "this
+  // month" has no data of its own yet. new Date(y, m, 0) is the last day
+  // of month `m - 1` (JS Date's day-0 rollback trick, same one
+  // advanceDate() above relies on for month-end clamping).
+  const now = new Date();
+  const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthEnd = new Date(firstOfThisMonth.getTime() - 1);
+  const from = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1).toISOString().slice(0, 10);
+  const to = lastMonthEnd.toISOString().slice(0, 10);
+  const monthLabel = lastMonthEnd.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const symbol = settings.currency_symbol || '$';
+
+  // Same queries routes/reports.js's own /profit-loss/pdf and /sales/pdf
+  // routes use, duplicated rather than imported — see lib/scheduler.js's
+  // own EXPIRY_WARNING_DAYS precedent for why a handful of small,
+  // independently-evolving query duplications are an acceptable tradeoff
+  // in this codebase over a cross-file shared-helper import.
+  const revenueTotal = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at BETWEEN ? AND ?').get(from, to).total;
+  const expensesByCategory = db
+    .prepare('SELECT category, COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY category ORDER BY total DESC')
+    .all(from, to);
+  const totalExpenses = expensesByCategory.reduce((sum, c) => sum + c.total, 0);
+  const netProfit = Math.round((revenueTotal - totalExpenses) * 100) / 100;
+  const totalInvoiced = db
+    .prepare(`SELECT COALESCE(SUM(total), 0) AS total FROM invoices WHERE status != 'void' AND issue_date BETWEEN ? AND ?`)
+    .get(from, to).total;
+
+  let buffer;
+  try {
+    buffer = await renderProfitLossPdf({ revenueTotal, expensesByCategory, totalExpenses, from, to, settings });
+  } catch (err) {
+    console.error('[monthly-report] Failed to render P&L PDF:', err.message);
+    return { sent: 0, skipped: false, error: true };
+  }
+
+  const subject = `${monthLabel} summary: ${symbol}${netProfit.toFixed(2)} net ${netProfit >= 0 ? 'profit' : 'loss'}`;
+  const html = `
+    <p>Here's how ${monthLabel} went:</p>
+    <ul>
+      <li>Invoiced (accrual): ${symbol}${totalInvoiced.toFixed(2)}</li>
+      <li>Collected (cash): ${symbol}${revenueTotal.toFixed(2)}</li>
+      <li>Expenses: ${symbol}${totalExpenses.toFixed(2)}</li>
+      <li><strong>Net ${netProfit >= 0 ? 'profit' : 'loss'}: ${symbol}${Math.abs(netProfit).toFixed(2)}</strong></li>
+    </ul>
+    <p>The full profit &amp; loss statement is attached. You're getting this because you opted in under My account.</p>
+  `;
+
+  let sent = 0;
+  for (const recipient of recipients) {
+    try {
+      await sendMail({
+        to: recipient.email,
+        subject,
+        html,
+        attachments: [{ filename: `profit-loss-${from}-to-${to}.pdf`, content: buffer }],
+      });
+      sent += 1;
+    } catch (err) {
+      console.error(`[monthly-report] Failed to send to ${recipient.email}:`, err.message);
+    }
+  }
+
+  console.log(`[monthly-report] Sent ${sent} monthly report email(s) for ${monthLabel}`);
   return { sent, skipped: false };
 }
 
@@ -267,6 +363,13 @@ function startScheduler() {
   cron.schedule('0 3 * * *', () => {
     runBackup().catch((err) => console.error('[backup] job failed:', err));
   });
+  // 09:00 on the 1st of each month — after the daily jobs above have had
+  // their usual run, and comfortably after runBackup()'s 03:00 slot so a
+  // slow backup can never delay this. node-cron's 5-field expressions
+  // support a day-of-month field directly, no extra date-checking needed.
+  cron.schedule('0 9 1 * *', () => {
+    runMonthlyReport().catch((err) => console.error('[monthly-report] job failed:', err));
+  });
 }
 
 module.exports = {
@@ -275,5 +378,6 @@ module.exports = {
   generateDueRecurringInvoices,
   runLicenseExpiryAlerts,
   expireOverdueQuotes,
+  runMonthlyReport,
   runBackup,
 };

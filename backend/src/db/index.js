@@ -620,6 +620,15 @@ if (!userColumns.has('notify_quote_responses')) {
   db.exec(`ALTER TABLE users ADD COLUMN notify_quote_responses INTEGER NOT NULL DEFAULT 0;`);
 }
 
+// Same pattern once more: `notify_monthly_report` added to `users` — the
+// opt-in preference (MyAccount.jsx, mirroring `notify_overdue`/
+// `notify_quote_responses`) for the automated monthly P&L summary email
+// (see lib/scheduler.js's `runMonthlyReport()`) — after `users` already
+// had real accounts.
+if (!userColumns.has('notify_monthly_report')) {
+  db.exec(`ALTER TABLE users ADD COLUMN notify_monthly_report INTEGER NOT NULL DEFAULT 0;`);
+}
+
 db.pragma('foreign_keys = ON');
 
 // Bound params rather than string-interpolated into the exec() block above,

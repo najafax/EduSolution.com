@@ -17,6 +17,7 @@ export default function MyAccount() {
 
   const [notifyOverdue, setNotifyOverdue] = useState(Boolean(user?.notifyOverdue));
   const [notifyQuoteResponses, setNotifyQuoteResponses] = useState(Boolean(user?.notifyQuoteResponses));
+  const [notifyMonthlyReport, setNotifyMonthlyReport] = useState(Boolean(user?.notifyMonthlyReport));
   const [prefsError, setPrefsError] = useState('');
   const [prefsSuccess, setPrefsSuccess] = useState('');
   const [prefsSubmitting, setPrefsSubmitting] = useState(false);
@@ -60,8 +61,8 @@ export default function MyAccount() {
     setPrefsSuccess('');
     setPrefsSubmitting(true);
     try {
-      await api.updatePreferences({ notifyOverdue, notifyQuoteResponses }, token);
-      updateUser({ ...user, notifyOverdue, notifyQuoteResponses });
+      await api.updatePreferences({ notifyOverdue, notifyQuoteResponses, notifyMonthlyReport }, token);
+      updateUser({ ...user, notifyOverdue, notifyQuoteResponses, notifyMonthlyReport });
       setPrefsSuccess('Preferences saved.');
     } catch (err) {
       setPrefsError(err.message);
@@ -170,6 +171,15 @@ export default function MyAccount() {
             className="h-4 w-4 rounded border-slate-300"
           />
           <span className="text-sm text-slate-700 dark:text-slate-300">Email me when a client accepts a quote</span>
+        </label>
+        <label className="mt-2 flex min-h-11 items-center gap-2">
+          <input
+            type="checkbox"
+            checked={notifyMonthlyReport}
+            onChange={(e) => setNotifyMonthlyReport(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300"
+          />
+          <span className="text-sm text-slate-700 dark:text-slate-300">Email me a P&amp;L summary at the start of each month</span>
         </label>
         {prefsError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{prefsError}</p>}
         {prefsSuccess && <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{prefsSuccess}</p>}
