@@ -1470,6 +1470,21 @@ deliberately untouched by either, always returning every row.
   no headless browser). One shared header/items-table/totals layout, reused
   by `renderQuotePdf`/`renderInvoicePdf`/`renderReceiptPdf`, and by both the
   authenticated `:id/pdf` routes and the public `public.js` routes.
+  `renderInvoicePdf` targets its "PAID" stamp directly over the Balance Due
+  amount (via `drawTotals`'s own `info.balanceX`/`balanceY`/`pageIndex`
+  output — see that function's own comment) rather than the plain
+  page-center fallback `addPaidStamp`/`addMinimalPaidStamp` use with no
+  `target`; `renderReceiptPdf`/`renderReceiptPdfMinimal` follow the same
+  approach for their own stamp, targeting the "AMOUNT RECEIVED" box each
+  draws (`amountReceivedTarget`, computed right after that box is drawn —
+  `{ x: box's horizontal center, y: box's vertical center, pageIndex }`,
+  the `pageIndex` captured via `doc.bufferedPageRange()` the same way
+  `drawTotals` does, since `addPaidStamp` only runs once the whole document
+  is buffered and finished) — a receipt's stamp used to land at a fixed
+  page-center spot with no relation to where the amount was actually
+  printed, which read as arbitrary on a receipt that had a "REFERENCE"/
+  "NOTES" section long enough to push the rest of the page down; both PDF
+  templates get the same fix, not just the default one.
 - `lib/mailer.js` — `sendMail()` wraps `nodemailer` with SMTP settings from
   env (`SMTP_HOST`/`PORT`/`USER`/`PASS`/`FROM`/`SECURE`). If `SMTP_HOST`
   isn't set, it throws `EMAIL_NOT_CONFIGURED` rather than crashing — routes

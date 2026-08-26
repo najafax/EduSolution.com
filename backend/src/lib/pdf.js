@@ -1000,6 +1000,13 @@ function renderReceiptPdfMinimal({ payment, invoice, client, settings }) {
 
   doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.muted).text('AMOUNT RECEIVED', MARGIN, y);
   doc.font('Helvetica-Bold').fontSize(20).fillColor(MINIMAL_COLORS.heading).text(money(payment.amount, symbol), MARGIN, y + 14);
+  // Same target-the-amount approach renderInvoicePdfMinimal uses for its own
+  // PAID stamp over Balance Due — see renderReceiptPdf's own note on this.
+  const amountReceivedTarget = {
+    x: MARGIN + CONTENT_WIDTH / 2,
+    y: y + 17,
+    pageIndex: doc.bufferedPageRange().start + doc.bufferedPageRange().count - 1,
+  };
   y += 50;
 
   if (payment.reference) {
@@ -1016,7 +1023,7 @@ function renderReceiptPdfMinimal({ payment, invoice, client, settings }) {
   drawMinimalThankYouFooter(doc, settings, y + 10);
 
   return docToBuffer(doc, (d) => {
-    addMinimalPaidStamp(d, payment.paid_at);
+    addMinimalPaidStamp(d, payment.paid_at, amountReceivedTarget);
     addPageFooter(d, settings);
   });
 }
@@ -1137,6 +1144,16 @@ function renderReceiptPdf({ payment, invoice, client, settings }) {
   doc.rect(MARGIN, y, CONTENT_WIDTH, 60).fill(COLORS.headerFill);
   doc.font('Helvetica').fontSize(9).fillColor(COLORS.muted).text('AMOUNT RECEIVED', MARGIN + 16, y + 14);
   doc.font('Helvetica-Bold').fontSize(24).fillColor(COLORS.positive).text(money(payment.amount, symbol), MARGIN + 16, y + 28);
+  // Same target-the-amount approach renderInvoicePdf uses for its own PAID
+  // stamp over Balance Due — centers on this highlighted box (not the page
+  // center) so the stamp visibly marks the actual amount received, and
+  // captures which buffered page it landed on since addPaidStamp runs after
+  // the whole document is drawn.
+  const amountReceivedTarget = {
+    x: MARGIN + CONTENT_WIDTH / 2,
+    y: y + 30,
+    pageIndex: doc.bufferedPageRange().start + doc.bufferedPageRange().count - 1,
+  };
   y += 80;
 
   if (payment.reference) {
@@ -1153,7 +1170,7 @@ function renderReceiptPdf({ payment, invoice, client, settings }) {
   drawThankYouFooter(doc, settings, y + 10);
 
   return docToBuffer(doc, (d) => {
-    addPaidStamp(d, payment.paid_at);
+    addPaidStamp(d, payment.paid_at, amountReceivedTarget);
     addPageFooter(d, settings);
   });
 }
