@@ -158,27 +158,61 @@ export default function PortalQuotes() {
       ) : quotes.filter((q) => q.number.toLowerCase().includes(search.trim().toLowerCase())).length === 0 ? (
         <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">No quotes match "{search}".</p>
       ) : (
-        <div className="mt-2 flex flex-col gap-2.5">
-          {quotes.filter((q) => q.number.toLowerCase().includes(search.trim().toLowerCase())).map((quote) => (
-            <Link
-              key={quote.id}
-              to={`/portal/quotes/${quote.id}`}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-lagoon-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
-            >
-              <div className="min-w-0">
-                <p className="font-medium text-slate-900 dark:text-white">{quote.number}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Issued {quote.issue_date}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <span className="font-semibold text-slate-900 dark:text-white">
-                  {symbol}
-                  {quote.total.toFixed(2)}
-                </span>
-                <StatusBadge status={quote.status} />
-              </div>
-            </Link>
-          ))}
-        </div>
+        <>
+          <div className="mt-2 hidden overflow-x-auto rounded-lg border border-slate-200 bg-white sm:block dark:border-slate-700 dark:bg-slate-900">
+            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+              <thead>
+                <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                  <th className="px-4 py-3">Number</th>
+                  <th className="px-4 py-3">Issued</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {quotes.filter((q) => q.number.toLowerCase().includes(search.trim().toLowerCase())).map((quote) => (
+                  <tr key={quote.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <Link to={`/portal/quotes/${quote.id}`} className="font-medium text-lagoon-600 hover:text-lagoon-500">
+                        {quote.number}
+                      </Link>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{quote.issue_date}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <StatusBadge status={quote.status} />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
+                      {symbol}
+                      {quote.total.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-2 flex flex-col gap-2.5 sm:hidden">
+            {quotes.filter((q) => q.number.toLowerCase().includes(search.trim().toLowerCase())).map((quote) => (
+              <Link
+                key={quote.id}
+                to={`/portal/quotes/${quote.id}`}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-lagoon-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-900 dark:text-white">{quote.number}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Issued {quote.issue_date}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {symbol}
+                    {quote.total.toFixed(2)}
+                  </span>
+                  <StatusBadge status={quote.status} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
 
       <Modal open={showRequestForm} onClose={() => setShowRequestForm(false)} title="Request a quote" maxWidthClass="max-w-xl">
