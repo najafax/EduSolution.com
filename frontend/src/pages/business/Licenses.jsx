@@ -10,6 +10,7 @@ import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
+import HtmlEmailPreviewModal from '../../components/HtmlEmailPreviewModal';
 import SearchableSelect from '../../components/SearchableSelect';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import { TableSkeleton } from '../../components/Skeleton';
@@ -30,6 +31,7 @@ import {
   DownloadIcon,
   PlusIcon,
   ReportIcon,
+  SendIcon,
 } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
@@ -84,6 +86,7 @@ export default function Licenses() {
   const [submitting, setSubmitting] = useState(false);
   const [busy, setBusy] = useState(null); // { id, action } — tracks which row/action is in flight so buttons show the right busy label
   const [remindTarget, setRemindTarget] = useState(null);
+  const [renewalConfirmTarget, setRenewalConfirmTarget] = useState(null);
   const [historyTarget, setHistoryTarget] = useState(null);
   const [renewals, setRenewals] = useState(null);
   const [renewalsError, setRenewalsError] = useState('');
@@ -361,6 +364,14 @@ export default function Licenses() {
             tone="amber"
             onClick={() => setRemindTarget(l)}
             title="Send renewal reminder"
+          />
+        )}
+        {l.status !== 'cancelled' && !l.last_renewal_confirmation_sent_at && (
+          <IconActionButton
+            icon={SendIcon}
+            tone="emerald"
+            onClick={() => setRenewalConfirmTarget(l)}
+            title="Send renewal confirmation"
           />
         )}
         <IconActionButton icon={HistoryIcon} tone="slate" onClick={() => openHistory(l)} title="Renewal history" label="View renewal history" />
@@ -664,6 +675,20 @@ export default function Licenses() {
             api.licenses.remind(remindTarget.id, payload, token).then(() => {
               load();
               loadSummary();
+            })
+          }
+        />
+      )}
+
+      {renewalConfirmTarget && (
+        <HtmlEmailPreviewModal
+          open
+          onClose={() => setRenewalConfirmTarget(null)}
+          title="Send renewal confirmation"
+          loadPreview={() => api.licenses.renewalConfirmPreview(renewalConfirmTarget.id, token)}
+          onSend={() =>
+            api.licenses.sendRenewalConfirm(renewalConfirmTarget.id, token).then(() => {
+              load();
             })
           }
         />
