@@ -1134,7 +1134,23 @@ deliberately untouched by either, always returning every row.
   /:id/renewal-confirm` now returns `{ license: withComputed(...) }`,
   matching `/:id/remind`'s own response shape, rather than a bare message)
   so the row updates and the button vanishes the instant the modal closes,
-  with no manual refresh needed.
+  with no manual refresh needed. The row itself also gains a small
+  confirming note the instant `last_renewal_confirmation_sent_at` is set —
+  "Renewal confirmation sent {relative time}" in a small emerald line right
+  under the license name (`Licenses.jsx`'s desktop `<td>` and the mobile
+  accordion's summary both render it, same shared-markup convention every
+  other per-row detail in this app follows so the two breakpoints can't
+  drift), via `lib/date.js`'s `timeAgo()` — the same relative-time helper
+  `InvoiceDetail.jsx`'s own "Viewed by client {time}" line already uses.
+  This exists because the button disappearing on its own reads as "the
+  action isn't available," not "I already did this" — staff scanning the
+  list needs a positive, remembered signal that a confirmation really went
+  out for that license, not just the absence of a button that used to be
+  there. Only rendered when the column is actually set, same "only show
+  the exception case" convention every other optional per-row detail in
+  this app already follows (the `payee`/`address`/`url` rows above are the
+  closest precedent) — the common case (no confirmation sent yet, or
+  none needed) shows nothing extra.
   **Renewal history**: every `POST /:id/renew` above also inserts one row
   into `license_renewals` (`license_id`, `previous_expiry_date`,
   `new_expiry_date`, `renewed_by_name`, `renewed_at`), in the same

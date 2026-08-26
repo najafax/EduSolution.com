@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { todayStr, todayPlus } from '../../lib/date';
+import { todayStr, todayPlus, timeAgo } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import SearchInput from '../../components/SearchInput';
 import StatusFilterChips from '../../components/StatusFilterChips';
@@ -473,7 +473,14 @@ export default function Licenses() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {licenses.map((l) => (
                     <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{l.name}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <p className="font-medium text-slate-900 dark:text-white">{l.name}</p>
+                        {l.last_renewal_confirmation_sent_at && (
+                          <p className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">
+                            Renewal confirmation sent {timeAgo(l.last_renewal_confirmation_sent_at)}
+                          </p>
+                        )}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{l.client_name}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         {l.url ? (
@@ -520,6 +527,11 @@ export default function Licenses() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-slate-900 dark:text-white">{l.name}</p>
                         <p className="truncate text-slate-500 dark:text-slate-400">{l.client_name}</p>
+                        {l.last_renewal_confirmation_sent_at && (
+                          <p className="truncate text-xs text-emerald-600 dark:text-emerald-400">
+                            Renewal confirmation sent {timeAgo(l.last_renewal_confirmation_sent_at)}
+                          </p>
+                        )}
                       </div>
                       <StatusBadge status={l.display_status} />
                     </div>
