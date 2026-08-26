@@ -1068,12 +1068,19 @@ deliberately untouched by either, always returning every row.
   pagination — a single license's renewal count is inherently small (at
   most one per billing cycle since the license existed). `url`
   is an optional free-text field (no format validation beyond trimming,
-  stored/exported/imported alongside `notes` — same precedent: editable via
-  the form and included in CSV export/import, but not shown as its own list
-  or mobile-accordion column) for the client's activation/portal link;
-  nothing currently reads it back out — it's captured now so a future
-  activation-email template can interpolate it, not wired into
-  `lib/emailTemplates.js`'s `licenseRemindEmail()` yet. **Structured change
+  stored/exported/imported alongside `notes`) for the client's activation/
+  portal link; nothing currently reads it back out for an email — it's
+  captured now so a future activation-email template can interpolate it,
+  not wired into `lib/emailTemplates.js`'s `licenseRemindEmail()` yet.
+  Unlike `notes`, `url` **is** shown in the list itself: `Licenses.jsx`'s
+  desktop table gets its own "URL" column (a compact `LinkIcon` + "Open"
+  link, `target="_blank"`, falling back to an em dash when blank — same
+  "own column, em-dash fallback" convention `Expenses.jsx`'s own `payee`
+  column already established) and the mobile `MobileListAccordion` gets a
+  matching detail row, but only when `url` is actually set (same "only
+  show the exception case" convention `payee`'s own mobile row follows
+  too — most licenses have no URL, so most cards don't gain an extra row
+  for it). **Structured change
   tracking**: `PUT /:id` compares the incoming `billing_cycle`/`status`
   against the existing row and, on top of the generic `'updated'`
   `logActivity()` call every edit already gets, writes a second, distinct
@@ -3548,12 +3555,13 @@ frontend stops holding/sending it.
   recorded yet." empty state for a license that's never been renewed.
   The form's "Activation URL"
   field (a plain `type="url"` input, spanning both grid columns like
-  "License name" above it) follows the same not-in-the-list-or-card
-  precedent as "Notes" below it — captured on create/edit and round-tripped
-  through `startEdit()`, but never rendered as its own column or accordion
-  row, since nothing currently reads it back beyond the form itself (see
-  `routes/licenses.js` above for why: it's there for a future activation-
-  email template to interpolate, not wired to one yet).
+  "License name" above it) is captured on create/edit and round-tripped
+  through `startEdit()` the same as every other field — unlike "Notes"
+  below it, though, it **is** rendered outside the form: its own "URL"
+  column in the desktop table and its own conditional mobile-accordion
+  row (see `routes/licenses.js` above for the exact shape and why it's
+  worth showing — a link staff need to actually click, not free-text
+  worth hiding behind a tap the way `notes` is).
   **Row actions as icon buttons**: `rowActions()`'s Renew/Cancel/Reactivate/
   Remind/History/Edit/Delete buttons render as compact icon-only buttons
   (`components/IconActionButton.jsx` — see "Icon action buttons" below)
