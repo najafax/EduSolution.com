@@ -359,6 +359,25 @@ router.get('/:id/pdf', view, async (req, res) => {
   res.send(buffer);
 });
 
+// The frontend always passes along its own window.location.origin (as
+// ?client_origin= on the preview GET, client_origin in the send POST body)
+// so the link that actually goes out in the email is guaranteed to match
+// exactly what QuoteDetail.jsx's own "Copy public link" button produces —
+// see that button's own note on why it trusts the browser's real origin
+// rather than CLIENT_ORIGIN, which can silently drift from whatever domain
+// is actually being served (a custom domain added after CLIENT_ORIGIN was
+// set, a preview/staging deploy, etc.) and previously meant the copied
+// link and the emailed link could point at two different builds of the
+// app — one with a stale Navbar that still showed a "Log in" button on
+// this route, one without. CLIENT_ORIGIN stays the fallback for a
+// non-browser caller that skips this (or an unrecognized value).
+function resolveClientOrigin(candidate) {
+  if (typeof candidate === 'string' && /^https?:\/\/\S+$/.test(candidate)) {
+    return candidate.replace(/\/+$/, '');
+  }
+  return process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+}
+
 // Preview endpoint for the frontend's Send-preview modal: returns exactly
 // the { to, subject, message } the actual send below would use if the
 // caller doesn't override them, computed by the same emailTemplates.js
@@ -369,7 +388,7 @@ router.get('/:id/send-preview', manage, (req, res) => {
   const data = getQuoteWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Quote not found' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
-  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const clientOrigin = resolveClientOrigin(req.query.client_origin);
   const publicUrl = `${clientOrigin}/q/${data.quote.public_token}`;
   res.json(quoteSendEmail({ quote: data.quote, client: data.client, settings, publicUrl }));
 });
@@ -379,7 +398,7 @@ router.post('/:id/send', manage, async (req, res) => {
   if (!data) return res.status(404).json({ error: 'Quote not found' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
 
-  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const clientOrigin = resolveClientOrigin(req.body?.client_origin);
   const publicUrl = `${clientOrigin}/q/${data.quote.public_token}`;
   const defaults = quoteSendEmail({ quote: data.quote, client: data.client, settings, publicUrl });
   // subject/message are optional overrides from the Send-preview modal
