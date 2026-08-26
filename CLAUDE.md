@@ -436,6 +436,38 @@ deliberately untouched by either, always returning every row.
   point, since a client matching the invoice against their own purchase
   order is what a PO number is *for*), and the `GET /export.csv`/
   `GET /export.xlsx` invoice export.
+  **Quotes only, the mirror of invoices' own locked-status guard below**:
+  `PUT /:id` and `DELETE /:id` on `quotes.js` both reject with 409 once
+  `converted_invoice_id` is set — "This quote has already been converted to
+  an invoice and can no longer be edited"/"...cannot be deleted". Before
+  this, both were silently allowed: editing a converted quote had no effect
+  on the invoice it had already produced (the two documents share nothing
+  live, `POST /:id/convert-to-invoice` only ever *copies* the quote's
+  client/items/totals once at conversion time), so an edit here just
+  quietly diverged from the real, already-sent-or-paid invoice with nothing
+  telling staff that had happened; deleting one was worse — `invoices.
+  quote_id INTEGER REFERENCES quotes(id)` carries no `ON DELETE` clause of
+  its own (unlike `quote_items`' `ON DELETE CASCADE`), so with
+  `foreign_keys` actually enforced (see `db/index.js` above) that delete
+  would have 500'd on a raw `SQLITE_CONSTRAINT_FOREIGNKEY` the moment a
+  conversion existed, the exact kind of surfaced-as-a-crash-instead-of-a-
+  clean-409 case this app's own deletes are supposed to guard against
+  everywhere else. `QuoteForm.jsx` mirrors `InvoiceForm.jsx`'s own
+  `lockedStatus` pattern (a `locked` flag set after fetching the quote
+  being edited, short-circuiting to a "can no longer be edited" message +
+  "View quote" link instead of the form) so navigating straight to
+  `/quotes/:id/edit` by URL is blocked the same way, not just the button
+  that would normally lead there. `QuoteDetail.jsx`'s Edit/Delete header
+  buttons and `Quotes.jsx`'s row-action Edit/Delete `IconActionButton`s are
+  both gated on `!quote.converted_invoice_id` (same "never show a button
+  that would just error" convention every other locked-state gate in this
+  app already follows — `InvoiceDetail.jsx`'s own `isLocked`/`canVoid`
+  checks, `Licenses.jsx`'s Renew/Remind guards); every other action
+  (Download PDF, Copy public link, Email to client, Duplicate) stays
+  available, since none of those mutate the quote itself. `QuoteDetail.jsx`'s
+  existing "Converted to invoice" notice now reads "...and can no longer be
+  edited or deleted" so the reason the buttons are gone is stated
+  explicitly, not left for staff to infer from their absence.
   **Invoices only** (not quotes): `PUT /:id` rejects with 409 once
   `status` is `sent` or `paid` — "This invoice has already been sent or
   paid and can no longer be edited." A `void` invoice stays editable (it's

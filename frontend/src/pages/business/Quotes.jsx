@@ -127,7 +127,7 @@ export default function Quotes() {
     const isBusy = (action) => rowBusy && busy.action === action;
     return (
       <>
-        {canManage && (
+        {canManage && !quote.converted_invoice_id && (
           <IconActionButton
             icon={PencilIcon}
             tone="slate"
@@ -163,7 +163,7 @@ export default function Quotes() {
             label="Duplicate quote"
           />
         )}
-        {canManage && (
+        {canManage && !quote.converted_invoice_id && (
           <IconActionButton
             icon={TrashIcon}
             tone="red"

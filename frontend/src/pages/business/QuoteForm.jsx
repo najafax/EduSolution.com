@@ -56,6 +56,7 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
   const [loading, setLoading] = useState(isEditing);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [dirty, setDirty] = useState(false);
   const initializedRef = useRef(false);
 
@@ -81,6 +82,10 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
     api.quotes
       .get(id, token)
       .then(({ quote, items }) => {
+        if (quote.converted_invoice_id) {
+          setLocked(true);
+          return;
+        }
         setClientId(String(quote.client_id));
         setIssueDate(quote.issue_date);
         setExpiryDate(quote.expiry_date || '');
@@ -194,6 +199,18 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
   if (!canManage) {
     const deniedEl = <p className="text-sm text-slate-500 dark:text-slate-400">You don't have permission to view this page.</p>;
     return embedded ? deniedEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{deniedEl}</div>;
+  }
+  if (locked) {
+    const lockedEl = (
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        This quote has already been converted to an invoice and can no longer be edited.{' '}
+        <Link to={`/quotes/${id}`} className="text-lagoon-600 hover:text-lagoon-500">
+          View quote
+        </Link>
+        .
+      </p>
+    );
+    return embedded ? lockedEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{lockedEl}</div>;
   }
 
   const formEl = (

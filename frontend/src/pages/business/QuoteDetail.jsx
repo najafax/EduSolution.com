@@ -132,7 +132,7 @@ export default function QuoteDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canManage && (
+          {canManage && !quote.converted_invoice_id && (
             <Link to={`/quotes/${id}/edit`} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
               <PencilIcon width={16} height={16} />
               Edit
@@ -164,7 +164,7 @@ export default function QuoteDetail() {
               Duplicate
             </button>
           )}
-          {canManage && (
+          {canManage && !quote.converted_invoice_id && (
             <button onClick={handleDelete} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
               <TrashIcon width={16} height={16} />
               Delete
@@ -179,7 +179,7 @@ export default function QuoteDetail() {
 
       {quote.converted_invoice_id && (
         <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
-          Converted to invoice —{' '}
+          Converted to invoice and can no longer be edited or deleted —{' '}
           <Link to={`/invoices/${quote.converted_invoice_id}`} className="text-lagoon-600 hover:text-lagoon-500">
             view invoice
           </Link>
