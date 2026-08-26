@@ -24,6 +24,7 @@ export default function QuoteDetail() {
   const [busy, setBusy] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
   const [dueDate, setDueDate] = useState(todayPlus(14));
+  const [poNumber, setPoNumber] = useState('');
   const [showSendPreview, setShowSendPreview] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
 
@@ -107,7 +108,7 @@ export default function QuoteDetail() {
     setError('');
     setBusy(true);
     try {
-      const { invoiceId } = await api.quotes.convertToInvoice(id, { due_date: dueDate }, token);
+      const { invoiceId } = await api.quotes.convertToInvoice(id, { due_date: dueDate, po_number: poNumber }, token);
       navigate(`/invoices/${invoiceId}`);
     } catch (err) {
       setError(err.message);
@@ -199,6 +200,16 @@ export default function QuoteDetail() {
                 className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
               />
             </div>
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">PO number (optional)</span>
+            <input
+              type="text"
+              value={poNumber}
+              onChange={(e) => setPoNumber(e.target.value)}
+              placeholder="Client's purchase order #"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
           </label>
           <button type="submit" disabled={busy} className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
             Create invoice

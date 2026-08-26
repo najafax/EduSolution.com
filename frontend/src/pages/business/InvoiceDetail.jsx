@@ -361,6 +361,9 @@ export default function InvoiceDetail() {
           <dl className="space-y-1 text-sm">
             <div className="flex justify-between"><dt className="text-slate-500 dark:text-slate-400">Issue date</dt><dd className="text-slate-900 dark:text-white">{invoice.issue_date}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500 dark:text-slate-400">Due date</dt><dd className="text-slate-900 dark:text-white">{invoice.due_date}</dd></div>
+            {invoice.po_number && (
+              <div className="flex justify-between"><dt className="text-slate-500 dark:text-slate-400">PO number</dt><dd className="text-slate-900 dark:text-white">{invoice.po_number}</dd></div>
+            )}
             <div className="flex justify-between"><dt className="text-slate-500 dark:text-slate-400">Balance due</dt><dd className="text-slate-900 dark:text-white">{symbol}{invoice.balance_due.toFixed(2)}</dd></div>
           </dl>
         </Accordion>

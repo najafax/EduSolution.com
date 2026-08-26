@@ -116,6 +116,7 @@ db.exec(`
     last_reminder_sent_at TEXT,
     public_token TEXT UNIQUE,
     created_by_name TEXT NOT NULL DEFAULT '',
+    po_number TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -700,6 +701,19 @@ if (!quoteColumns.has('client_viewed_at')) {
 }
 if (!invoiceColumns.has('client_viewed_at')) {
   db.exec(`ALTER TABLE invoices ADD COLUMN client_viewed_at TEXT;`);
+}
+
+// po_number — an optional client-supplied purchase order reference,
+// captured when a quote is converted into an invoice (the point where a
+// client's own purchase order actually gets matched against the document
+// they're about to be billed against) but also editable afterward via the
+// regular invoice create/edit form, same as notes. Reuses the already-
+// declared invoiceColumns set from the created_by_name migration above.
+// Same ALTER TABLE treatment every other post-launch invoices column in
+// this file follows — invoices has carried real documents since the
+// app's first deploy.
+if (!invoiceColumns.has('po_number')) {
+  db.exec(`ALTER TABLE invoices ADD COLUMN po_number TEXT NOT NULL DEFAULT '';`);
 }
 
 db.pragma('foreign_keys = ON');

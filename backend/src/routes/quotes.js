@@ -461,7 +461,7 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
     return res.status(409).json({ error: 'This quote has already been converted to an invoice' });
   }
 
-  const { due_date } = req.body || {};
+  const { due_date, po_number = '' } = req.body || {};
   if (!due_date) return res.status(400).json({ error: 'due_date is required' });
 
   const number = nextInvoiceNumber();
@@ -471,8 +471,8 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
   const result = db
     .prepare(
       `INSERT INTO invoices (number, client_id, quote_id, status, issue_date, due_date, notes, discount_type, discount_value,
-         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name)
-       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name, po_number)
+       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       number,
@@ -490,6 +490,7 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
       data.quote.total,
       publicToken,
       req.user.name,
+      po_number,
     );
 
   const insertItem = db.prepare(

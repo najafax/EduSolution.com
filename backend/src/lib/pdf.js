@@ -192,7 +192,7 @@ const ICONS = { clipboard: drawClipboardIcon, pencil: drawPencilIcon, bank: draw
 // value), and an accent-colored divider closing off the block. Heights are
 // measured rather than assumed so a long business name/address or an extra
 // meta row never overlaps the divider.
-function drawHeader(doc, { title, numberLabel, number, dateValue, tin, preparedBy, settings }) {
+function drawHeader(doc, { title, numberLabel, number, dateValue, tin, preparedBy, poNumber, settings }) {
   // Left column (logo/name/contact) must stay clear of the right column's
   // meta labels, which start at x=300 — cap it 10pt short of that rather
   // than letting a long business name/address run into "Invoice #" etc.
@@ -218,6 +218,7 @@ function drawHeader(doc, { title, numberLabel, number, dateValue, tin, preparedB
   const titleHeight = doc.heightOfString(title, { width: 245 });
 
   const metaRows = [['Date', dateValue], [numberLabel, number]];
+  if (poNumber) metaRows.push(['PO Number', poNumber]);
   if (tin) metaRows.push(['TIN', tin]);
   if (preparedBy) metaRows.push(['Prepared By', preparedBy]);
 
@@ -635,7 +636,7 @@ const MINIMAL_COLORS = {
   border: '#cccccc',
 };
 
-function drawMinimalHeader(doc, { title, numberLabel, number, dateValue, tin, settings }) {
+function drawMinimalHeader(doc, { title, numberLabel, number, dateValue, tin, poNumber, settings }) {
   const logoBuffer = settings.logo_image ? decodeImageDataUri(settings.logo_image) : null;
   const logoSize = 36;
   const nameX = logoBuffer ? MARGIN + logoSize + 10 : MARGIN;
@@ -658,6 +659,7 @@ function drawMinimalHeader(doc, { title, numberLabel, number, dateValue, tin, se
   const metaLabelWidth = 90;
   const metaValueWidth = 155;
   const metaRows = [[numberLabel, number], ['Date', dateValue]];
+  if (poNumber) metaRows.push(['PO Number', poNumber]);
   if (tin) metaRows.push(['TIN', tin]);
   let metaY = 76;
   metaRows.forEach(([label, value]) => {
@@ -940,6 +942,7 @@ function renderInvoicePdfMinimal({ invoice, client, items, settings, payments })
     number: invoice.number,
     dateValue: invoice.issue_date,
     tin: settings.tax_id,
+    poNumber: invoice.po_number,
     settings,
   });
   y = drawMinimalBillTo(doc, { client, dueLabel: 'Due Date', dueValue: invoice.due_date }, y);
@@ -1073,6 +1076,7 @@ function renderInvoicePdf({ invoice, client, items, settings, payments }) {
     dateValue: invoice.issue_date,
     tin: settings.tax_id,
     preparedBy: invoice.created_by_name,
+    poNumber: invoice.po_number,
     settings,
   });
   y = drawBillTo(doc, { client, dueLabel: 'Due Date', dueValue: invoice.due_date }, y);

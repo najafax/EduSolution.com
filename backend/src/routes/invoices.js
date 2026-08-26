@@ -131,6 +131,7 @@ function loadInvoiceExport() {
       { label: 'Status', key: 'status' },
       { label: 'Issue date', key: 'issue_date' },
       { label: 'Due date', key: 'due_date' },
+      { label: 'PO number', key: 'po_number' },
       { label: 'Subtotal', key: 'subtotal' },
       { label: 'Discount', key: 'discount_amount' },
       { label: 'Tax', key: 'tax_amount' },
@@ -248,6 +249,7 @@ router.post('/', manage, (req, res) => {
     issue_date,
     due_date,
     notes = '',
+    po_number = '',
     tax_rate = 0,
     discount_type = 'percentage',
     discount_value = 0,
@@ -272,8 +274,8 @@ router.post('/', manage, (req, res) => {
   const result = db
     .prepare(
       `INSERT INTO invoices (number, client_id, status, issue_date, due_date, notes, discount_type, discount_value,
-         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name)
-       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name, po_number)
+       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       number,
@@ -290,6 +292,7 @@ router.post('/', manage, (req, res) => {
       totals.total,
       publicToken,
       req.user.name,
+      po_number,
     );
 
   saveItems(result.lastInsertRowid, totals.items);
@@ -316,6 +319,7 @@ router.put('/:id', manage, (req, res) => {
     issue_date,
     due_date,
     notes = '',
+    po_number = '',
     tax_rate = 0,
     discount_type = 'percentage',
     discount_value = 0,
@@ -343,7 +347,7 @@ router.put('/:id', manage, (req, res) => {
   const nextStatus = validStatuses.includes(status) ? status : existing.status;
 
   db.prepare(
-    `UPDATE invoices SET client_id = ?, status = ?, issue_date = ?, due_date = ?, notes = ?,
+    `UPDATE invoices SET client_id = ?, status = ?, issue_date = ?, due_date = ?, notes = ?, po_number = ?,
        discount_type = ?, discount_value = ?, subtotal = ?, discount_amount = ?, tax_rate = ?, tax_amount = ?, total = ?,
        updated_at = datetime('now')
      WHERE id = ?`,
@@ -353,6 +357,7 @@ router.put('/:id', manage, (req, res) => {
     issue_date,
     due_date,
     notes,
+    po_number,
     totals.discountType,
     totals.discountValue,
     totals.subtotal,

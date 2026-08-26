@@ -129,6 +129,12 @@ export default function PortalInvoiceDetail() {
             <p className="text-slate-900 dark:text-white">{invoice.issue_date}</p>
             <p className="mt-2 font-medium text-slate-500 dark:text-slate-400">Due date</p>
             <p className="text-slate-900 dark:text-white">{invoice.due_date}</p>
+            {invoice.po_number && (
+              <>
+                <p className="mt-2 font-medium text-slate-500 dark:text-slate-400">PO number</p>
+                <p className="text-slate-900 dark:text-white">{invoice.po_number}</p>
+              </>
+            )}
           </div>
         </div>
 
