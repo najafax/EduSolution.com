@@ -111,8 +111,13 @@ export const api = {
     create: (payload, token) => request('/quotes', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/quotes/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/quotes/${id}`, { method: 'DELETE', token }),
-    sendPreview: (id, token) => request(`/quotes/${id}/send-preview`, { token }),
-    send: (id, payload, token) => request(`/quotes/${id}/send`, { method: 'POST', body: payload, token }),
+    // client_origin is window.location.origin (see below) — passed along so
+    // the emailed public link matches exactly what "Copy public link"
+    // produces, rather than the backend's own CLIENT_ORIGIN env var, which
+    // can drift from whatever domain is actually being served.
+    sendPreview: (id, token) => request(`/quotes/${id}/send-preview${qs({ client_origin: window.location.origin })}`, { token }),
+    send: (id, payload, token) =>
+      request(`/quotes/${id}/send`, { method: 'POST', body: { ...payload, client_origin: window.location.origin }, token }),
     convertToInvoice: (id, payload, token) =>
       request(`/quotes/${id}/convert-to-invoice`, { method: 'POST', body: payload, token }),
     duplicate: (id, token) => request(`/quotes/${id}/duplicate`, { method: 'POST', token }),
@@ -136,8 +141,10 @@ export const api = {
     create: (payload, token) => request('/invoices', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/invoices/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/invoices/${id}`, { method: 'DELETE', token }),
-    sendPreview: (id, token) => request(`/invoices/${id}/send-preview`, { token }),
-    send: (id, payload, token) => request(`/invoices/${id}/send`, { method: 'POST', body: payload, token }),
+    // See quotes.sendPreview/send above for why client_origin is passed.
+    sendPreview: (id, token) => request(`/invoices/${id}/send-preview${qs({ client_origin: window.location.origin })}`, { token }),
+    send: (id, payload, token) =>
+      request(`/invoices/${id}/send`, { method: 'POST', body: { ...payload, client_origin: window.location.origin }, token }),
     remindPreview: (id, token) => request(`/invoices/${id}/remind-preview`, { token }),
     remind: (id, payload, token) => request(`/invoices/${id}/remind`, { method: 'POST', body: payload, token }),
     duplicate: (id, token) => request(`/invoices/${id}/duplicate`, { method: 'POST', token }),

@@ -430,6 +430,20 @@ router.get('/:id/pdf', view, async (req, res) => {
   res.send(buffer);
 });
 
+// See routes/quotes.js's own resolveClientOrigin()/send-preview for why
+// this exists: the frontend passes its own window.location.origin so the
+// emailed link matches exactly what InvoiceDetail.jsx's "Copy public link"
+// button produces, rather than trusting CLIENT_ORIGIN to still match
+// whatever domain is actually being served. Same duplicated helper, same
+// reasoning — this router has no shared module with quotes.js to put it
+// in without adding one for a single four-line function.
+function resolveClientOrigin(candidate) {
+  if (typeof candidate === 'string' && /^https?:\/\/\S+$/.test(candidate)) {
+    return candidate.replace(/\/+$/, '');
+  }
+  return process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+}
+
 // See routes/quotes.js's /:id/send-preview for why this exists: the exact
 // same emailTemplates.js function backs both this preview and the actual
 // send's fallback-when-not-overridden defaults below.
@@ -437,7 +451,7 @@ router.get('/:id/send-preview', manage, (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
-  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const clientOrigin = resolveClientOrigin(req.query.client_origin);
   const publicUrl = `${clientOrigin}/i/${data.invoice.public_token}`;
   res.json(invoiceSendEmail({ invoice: data.invoice, client: data.client, settings, publicUrl }));
 });
@@ -450,7 +464,7 @@ router.post('/:id/send', manage, async (req, res) => {
   }
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
 
-  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const clientOrigin = resolveClientOrigin(req.body?.client_origin);
   const publicUrl = `${clientOrigin}/i/${data.invoice.public_token}`;
   const defaults = invoiceSendEmail({ invoice: data.invoice, client: data.client, settings, publicUrl });
   const subject = (req.body?.subject || '').trim() || defaults.subject;

@@ -1169,6 +1169,36 @@ deliberately untouched by either, always returning every row.
   reaches clients over WhatsApp or another channel can grab the link and
   share it however they actually communicate, and staff get an easy way to
   eyeball the URL itself before relying on it.
+  **The emailed link now matches the copied link exactly, for the same
+  reason "Copy public link" avoids `CLIENT_ORIGIN` in the first place**: the
+  quote/invoice send routes (`GET /:id/send-preview`, `POST /:id/send`) used
+  to build their own `public_url` straight from `process.env.CLIENT_ORIGIN`
+  — so if that env var had ever drifted from the real, currently-served
+  frontend domain (a custom domain added after it was set, a
+  staging/preview deploy, a typo), the *emailed* link would point somewhere
+  different from the *copied* one, and specifically could land on an older
+  build of the app that still showed a "Log in" button on `/q/:token`/
+  `/i/:token` even though the current build (and the copied link) correctly
+  hides it (see `Navbar.jsx`'s own `isPublicDocLink` note above). Fixed by
+  having the frontend pass its own `window.location.origin` along with
+  every send-preview/send call — `?client_origin=` on the `GET
+  .../send-preview` query string, `client_origin` in the `POST .../send`
+  body (both added in `lib/api.js`'s `quotes.sendPreview`/`send` and
+  `invoices.sendPreview`/`send`, so every call site — `QuoteDetail.jsx`,
+  `InvoiceDetail.jsx`, and the `Quotes.jsx`/`Invoices.jsx` row-action
+  versions — picked this up with no changes of their own). Each route's own
+  `resolveClientOrigin(candidate)` (duplicated between `routes/quotes.js`
+  and `routes/invoices.js` — same small-duplication precedent as
+  `EXPIRY_WARNING_DAYS` between `routes/licenses.js`/`lib/scheduler.js`,
+  not worth a shared module for one four-line function) uses that value
+  when it's present and actually looks like an `http(s)://` URL, falling
+  back to `CLIENT_ORIGIN`/`localhost:5173` only for a non-browser caller
+  that skips it — so the email's `{{public_url}}` is now derived from the
+  same real, browser-verified origin as "Copy public link," not a
+  server-side env var that can silently go stale. `invoice_remind`/
+  `receipt_send`/`license_remind` don't carry a `public_url` placeholder at
+  all (see `PLACEHOLDERS` in `lib/emailTemplates.js`), so those send routes
+  are untouched by this.
 - `routes/activity.js` — `GET /` returns a paginated (30/page) read of the
   `activity_log` table, newest first. There's no write endpoint — every
   other route's mutations write to this table themselves via
