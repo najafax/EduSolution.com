@@ -2453,12 +2453,16 @@ accept/decline).
   fetches all three lists in parallel and shows three `KpiCard`s (quotes
   awaiting response, outstanding invoice balance, active licenses) plus
   three shortcut tiles. `PortalQuotes.jsx`/`PortalInvoices.jsx`/
-  `PortalLicenses.jsx` are simple card lists (not the staff list pages'
-  desktop-table + `MobileListAccordion` split) — a single client's own
-  document set is small enough that one responsive card layout serves both
-  breakpoints, so the added complexity of a separate desktop table isn't
-  worth it here the way it is for the staff-side global lists.
-  `PortalInvoices.jsx` gives an overdue invoice a red-tinted border and an
+  `PortalLicenses.jsx` originally rendered a single, simple card list at
+  every width (not the staff list pages' desktop-table +
+  `MobileListAccordion` split) — a single client's own document set is
+  small enough that one responsive card layout could serve both
+  breakpoints, so the added complexity of a separate desktop table wasn't
+  worth it here the way it is for the staff-side global lists. That
+  changed with the desktop-table addition below, once it turned out the
+  rest of the app's table-on-desktop convention was expected here too;
+  the card list itself is unchanged and still what phone/tablet clients
+  see. `PortalInvoices.jsx` gives an overdue invoice a red-tinted border and an
   "overdue" `StatusBadge` (`invoice.is_overdue ? 'overdue' : invoice.status`
   — the exact same ternary `Invoices.jsx` itself uses). `pages/portal/
   PortalQuoteDetail.jsx`/`PortalInvoiceDetail.jsx` are adapted directly
@@ -2645,6 +2649,32 @@ rather than eight overlapping diffs.
   shell) — a login form stretched edge-to-edge across a wide monitor
   would be a readability regression, not an improvement, and this was a
   request about the portal's actual content pages, not its auth screens.
+- **Desktop table view for the three portal list pages**: `PortalQuotes.jsx`/
+  `PortalInvoices.jsx`/`PortalLicenses.jsx` each gained a proper
+  `hidden overflow-x-auto sm:block` `<table>` for `sm` and up, mirroring the
+  staff-side list pages' own table columns/structure exactly (same
+  `min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700`
+  shell, same uppercase `<th>` treatment, a `Link` on the primary column,
+  `StatusBadge` in its own column, money right-aligned) — bringing these
+  three in line with the rest of the app's "table on desktop" convention
+  after all, which the original card-only design (see above) had
+  deliberately opted out of. The existing card list is untouched and now
+  wrapped in a matching `sm:hidden` block below the new table, so phone/
+  tablet clients see exactly what they always did; only the desktop
+  presentation changed. `PortalQuotes.jsx`'s table omits the client-only
+  "Your requests" section above it (unaffected either way — that's its own
+  card list, not one of the three tabled document lists) and carries
+  Number/Issued/Status/Total columns; `PortalInvoices.jsx`'s carries
+  Number/Due (with the same inline "· Overdue" red suffix the card uses)/
+  Status/Balance due (with a small "of {symbol}{total}" note when a
+  partial payment has been made, mirroring the card's own two-line
+  balance-then-total treatment in one row instead); `PortalLicenses.jsx`'s
+  carries Name/Billing cycle/Expires/Status/Amount. None of these gained
+  row actions or a mobile-accordion split the way a staff list page would
+  — there's nothing to act on from the list itself (every row already just
+  links to its own detail page, same as the card version), and a single
+  client's document set is still too small to need collapsing extra detail
+  behind a tap, which is exactly why the mobile card view didn't change.
 
 ### Payment proof upload (`backend/src/`, `frontend/src/`)
 

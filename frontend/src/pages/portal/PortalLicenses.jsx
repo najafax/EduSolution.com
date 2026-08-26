@@ -52,29 +52,67 @@ export default function PortalLicenses() {
       ) : filtered.length === 0 ? (
         <p className="mt-10 text-center text-sm text-slate-500 dark:text-slate-400">No licenses match "{search}".</p>
       ) : (
-        <div className="mt-6 flex flex-col gap-2.5">
-          {filtered.map((license) => (
-            <Link
-              key={license.id}
-              to={`/portal/licenses/${license.id}`}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-lagoon-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
-            >
-              <div className="min-w-0">
-                <p className="font-medium text-slate-900 dark:text-white">{license.name}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {license.billing_cycle === 'monthly' ? 'Monthly' : 'Yearly'} · Expires {license.expiry_date}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <span className="font-semibold text-slate-900 dark:text-white">
-                  {symbol}
-                  {license.amount.toFixed(2)}
-                </span>
-                <StatusBadge status={license.display_status} />
-              </div>
-            </Link>
-          ))}
-        </div>
+        <>
+          <div className="mt-6 hidden overflow-x-auto rounded-lg border border-slate-200 bg-white sm:block dark:border-slate-700 dark:bg-slate-900">
+            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+              <thead>
+                <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Billing cycle</th>
+                  <th className="px-4 py-3">Expires</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filtered.map((license) => (
+                  <tr key={license.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <Link to={`/portal/licenses/${license.id}`} className="font-medium text-lagoon-600 hover:text-lagoon-500">
+                        {license.name}
+                      </Link>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">
+                      {license.billing_cycle === 'monthly' ? 'Monthly' : 'Yearly'}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{license.expiry_date}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <StatusBadge status={license.display_status} />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
+                      {symbol}
+                      {license.amount.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-2.5 sm:hidden">
+            {filtered.map((license) => (
+              <Link
+                key={license.id}
+                to={`/portal/licenses/${license.id}`}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-lagoon-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-900 dark:text-white">{license.name}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {license.billing_cycle === 'monthly' ? 'Monthly' : 'Yearly'} · Expires {license.expiry_date}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {symbol}
+                    {license.amount.toFixed(2)}
+                  </span>
+                  <StatusBadge status={license.display_status} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

@@ -46,37 +46,77 @@ export default function PortalInvoices() {
       ) : filtered.length === 0 ? (
         <p className="mt-10 text-center text-sm text-slate-500 dark:text-slate-400">No invoices match "{search}".</p>
       ) : (
-        <div className="mt-6 flex flex-col gap-2.5">
-          {filtered.map((invoice) => (
-            <Link
-              key={invoice.id}
-              to={`/portal/invoices/${invoice.id}`}
-              className={`flex items-center justify-between gap-3 rounded-2xl border bg-white p-4 shadow-sm transition hover:shadow-md dark:bg-slate-900 ${
-                invoice.is_overdue ? 'border-red-200 dark:border-red-900' : 'border-slate-200 hover:border-lagoon-300 dark:border-slate-700'
-              }`}
-            >
-              <div className="min-w-0">
-                <p className="font-medium text-slate-900 dark:text-white">{invoice.number}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Due {invoice.due_date}
-                  {invoice.is_overdue && <span className="ml-1 font-medium text-red-600 dark:text-red-400">· Overdue</span>}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <div className="text-right">
-                  <p className="font-semibold text-slate-900 dark:text-white">
-                    {symbol}
-                    {invoice.balance_due.toFixed(2)}
+        <>
+          <div className="mt-6 hidden overflow-x-auto rounded-lg border border-slate-200 bg-white sm:block dark:border-slate-700 dark:bg-slate-900">
+            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+              <thead>
+                <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                  <th className="px-4 py-3">Number</th>
+                  <th className="px-4 py-3">Due</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Balance due</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filtered.map((invoice) => (
+                  <tr key={invoice.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <Link to={`/portal/invoices/${invoice.id}`} className="font-medium text-lagoon-600 hover:text-lagoon-500">
+                        {invoice.number}
+                      </Link>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">
+                      {invoice.due_date}
+                      {invoice.is_overdue && <span className="ml-1 font-medium text-red-600 dark:text-red-400">· Overdue</span>}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <StatusBadge status={invoice.is_overdue ? 'overdue' : invoice.status} />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
+                      {symbol}
+                      {invoice.balance_due.toFixed(2)}
+                      {invoice.balance_due > 0 && invoice.balance_due < invoice.total && (
+                        <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">of {symbol}{invoice.total.toFixed(2)}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-2.5 sm:hidden">
+            {filtered.map((invoice) => (
+              <Link
+                key={invoice.id}
+                to={`/portal/invoices/${invoice.id}`}
+                className={`flex items-center justify-between gap-3 rounded-2xl border bg-white p-4 shadow-sm transition hover:shadow-md dark:bg-slate-900 ${
+                  invoice.is_overdue ? 'border-red-200 dark:border-red-900' : 'border-slate-200 hover:border-lagoon-300 dark:border-slate-700'
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-900 dark:text-white">{invoice.number}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Due {invoice.due_date}
+                    {invoice.is_overdue && <span className="ml-1 font-medium text-red-600 dark:text-red-400">· Overdue</span>}
                   </p>
-                  {invoice.balance_due > 0 && invoice.balance_due < invoice.total && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400">balance due</p>
-                  )}
                 </div>
-                <StatusBadge status={invoice.is_overdue ? 'overdue' : invoice.status} />
-              </div>
-            </Link>
-          ))}
-        </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <div className="text-right">
+                    <p className="font-semibold text-slate-900 dark:text-white">
+                      {symbol}
+                      {invoice.balance_due.toFixed(2)}
+                    </p>
+                    {invoice.balance_due > 0 && invoice.balance_due < invoice.total && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">balance due</p>
+                    )}
+                  </div>
+                  <StatusBadge status={invoice.is_overdue ? 'overdue' : invoice.status} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
