@@ -3,6 +3,7 @@ const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { sendMail, textToHtml } = require('../lib/mailer');
 const { licenseRemindEmail } = require('../lib/emailTemplates');
+const { renderLicenseRenewalEmail } = require('../lib/licenseRenewalEmail');
 const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
@@ -452,6 +453,52 @@ router.post('/:id/remind', manage, async (req, res) => {
   logActivity({ userName: req.user.name, action: 'sent renewal reminder for', entityType: 'license', entityId: row.id, entityLabel: `${row.name} (${client.name})` });
   logEmail({ type: 'license_remind', to: client.email, subject, sentByName: req.user.name, entityType: 'license', entityId: row.id, entityLabel: row.name });
   res.json({ license: withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id)) });
+});
+
+// The "renewal confirmation" email — a manual, staff-triggered send
+// confirming to the client that their license is paid/renewed and current
+// (client, license, billing cycle, amount, expiry date, and the license's
+// own activation/portal `url` when set — see routes/licenses.js's own note
+// on that column, added specifically for a future email like this one).
+// Deliberately not tied to POST /:id/renew actually having just run —
+// staff might renew, then send this a moment later once they've double-
+// checked details, or resend it later if a client asks for confirmation
+// again, so this always reflects the license's *current* row, not a
+// snapshot from whenever it was last renewed. Same "no PDF, this isn't a
+// document" shape as /:id/remind, and same cancelled-license guard as
+// renew/remind (confirming a cancelled license's "renewal" makes no
+// sense). Unlike every other manual send in this app, there's no
+// subject/message override accepted on the POST — the email's whole point
+// is a fixed, designed summary of the license's own real data, not prose
+// an admin edits per send (see lib/licenseRenewalEmail.js's own note).
+router.get('/:id/renewal-confirm-preview', manage, (req, res) => {
+  const row = db.prepare('SELECT licenses.*, clients.name AS client_name, clients.email AS client_email FROM licenses JOIN clients ON clients.id = licenses.client_id WHERE licenses.id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'License not found' });
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const client = { name: row.client_name, email: row.client_email };
+  res.json(renderLicenseRenewalEmail({ license: row, client, settings }));
+});
+
+router.post('/:id/renewal-confirm', manage, async (req, res) => {
+  const row = db.prepare('SELECT licenses.*, clients.name AS client_name, clients.email AS client_email FROM licenses JOIN clients ON clients.id = licenses.client_id WHERE licenses.id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'License not found' });
+  if (row.status === 'cancelled') {
+    return res.status(409).json({ error: 'This license is cancelled' });
+  }
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const client = { name: row.client_name, email: row.client_email };
+  const { to, subject, html } = renderLicenseRenewalEmail({ license: row, client, settings });
+
+  try {
+    await sendMail({ to, subject, html });
+  } catch (err) {
+    const status = err.code === 'EMAIL_NOT_CONFIGURED' ? 503 : 500;
+    return res.status(status).json({ error: err.message });
+  }
+
+  logActivity({ userName: req.user.name, action: 'sent renewal confirmation for', entityType: 'license', entityId: row.id, entityLabel: `${row.name} (${client.name})` });
+  logEmail({ type: 'license_renewal_confirm', to, subject, sentByName: req.user.name, entityType: 'license', entityId: row.id, entityLabel: row.name });
+  res.json({ message: 'Renewal confirmation sent.' });
 });
 
 module.exports = router;

@@ -219,6 +219,8 @@ export const api = {
     renewals: (id, token) => request(`/licenses/${id}/renewals`, { token }),
     remindPreview: (id, token) => request(`/licenses/${id}/remind-preview`, { token }),
     remind: (id, payload, token) => request(`/licenses/${id}/remind`, { method: 'POST', body: payload, token }),
+    renewalConfirmPreview: (id, token) => request(`/licenses/${id}/renewal-confirm-preview`, { token }),
+    sendRenewalConfirm: (id, token) => request(`/licenses/${id}/renewal-confirm`, { method: 'POST', token }),
     exportCsv: (token) => downloadFile('/licenses/export.csv', token, 'licenses.csv'),
     exportXlsx: (token) => downloadFile('/licenses/export.xlsx', token, 'licenses.xlsx'),
   },

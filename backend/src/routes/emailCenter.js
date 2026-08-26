@@ -15,15 +15,20 @@ router.use(requireAdmin);
 // Human label for the log entry types that have no editable template — the
 // automated overdue-reminder digest and the automated license-expiry alert
 // (see lib/scheduler.js and lib/emailTemplates.js's own doc comment for why
-// those stay non-customizable). The editable types already carry a `label`
-// from getAllTemplates(), duplicated here too since this map backs a
-// different endpoint (the sent log, not the template editor).
+// those stay non-customizable), plus the manual license renewal
+// confirmation (lib/licenseRenewalEmail.js) — a fixed designed HTML
+// summary of the license's own data, not prose an admin would rewrite, so
+// it's outside the template system the same way the automated two are.
+// The editable types already carry a `label` from getAllTemplates(),
+// duplicated here too since this map backs a different endpoint (the sent
+// log, not the template editor).
 const TYPE_LABELS = {
   quote_send: 'Quote sent',
   invoice_send: 'Invoice sent',
   invoice_remind: 'Payment reminder',
   receipt_send: 'Payment receipt',
   license_remind: 'License renewal reminder',
+  license_renewal_confirm: 'License renewal confirmation',
   portal_invite: 'Portal invite',
   overdue_reminder: 'Automated overdue reminder',
   license_expiry_alert: 'Automated license expiry alert',

@@ -1054,6 +1054,42 @@ deliberately untouched by either, always returning every row.
   plain `sendMail({ to, subject, html })` with no buffer/attachment step.
   Blocked (409) the same as renew when `status` is `cancelled`. Every
   mutation (create/update/delete/renew/remind) calls `logActivity()`.
+  **Renewal confirmation email**: `GET /:id/renewal-confirm-preview` +
+  `POST /:id/renewal-confirm` are a second, distinct manual send — not a
+  reminder that a client should renew, but a confirmation *after* the fact
+  that they have, styled as a real designed HTML email rather than the
+  plain-text-through-`textToHtml()` shape every other send in this app
+  uses. `lib/licenseRenewalEmail.js`'s `renderLicenseRenewalEmail()`
+  builds it: a gradient header (this app's own `lagoon` palette, see
+  `frontend/src/index.css`) with the business name and "License Renewed",
+  a details table (client, license, billing cycle, amount, the license's
+  own `url` when set — see that column's own note above, this is the
+  "future activation-email template" it was captured for — and the new
+  expiry date), and an "Access license" button linking to `url` when
+  present. Table-based layout with inline styles throughout, and the
+  header's gradient is layered over a solid `background-color` fallback,
+  for the widest email-client compatibility. Deliberately **not** routed
+  through `lib/emailTemplates.js`'s admin-editable template system — a
+  renewal confirmation is a fixed structured summary of the license's own
+  data, not prose an admin would want to freely rewrite, so like the
+  automated overdue-reminder digest it stays outside that system by
+  design (see that file's own top-of-file note); accordingly, the `POST`
+  route accepts no `subject`/`message` override the way every other
+  manual send in this app does. Blocked (409) the same as renew/remind
+  when `status` is `cancelled`; no PDF attachment, same reasoning as
+  `remind`. Not tied to a renewal having *just* happened — it always
+  reflects the license's current row, so staff can resend it later if a
+  client asks again. Logged to `email_log` as type
+  `license_renewal_confirm` (`routes/emailCenter.js`'s own `TYPE_LABELS`
+  gained a matching entry, alongside a note on why this type has no
+  editable template either) and to `activity_log` as `'sent renewal
+  confirmation for'`. On the frontend, `Licenses.jsx`'s `rowActions()`
+  gains a `SendIcon`/`emerald` button (same `status !== 'cancelled'` gate
+  as Remind) opening `components/HtmlEmailPreviewModal.jsx` — the
+  read-only counterpart to `EmailPreviewModal.jsx`: since there's nothing
+  editable here, it shows To/Subject read-only and renders the actual
+  HTML in a sandboxed (`sandbox=""`) `<iframe srcDoc={html}>` so staff see
+  exactly what the client will receive before clicking "Send email".
   **Renewal history**: every `POST /:id/renew` above also inserts one row
   into `license_renewals` (`license_id`, `previous_expiry_date`,
   `new_expiry_date`, `renewed_by_name`, `renewed_at`), in the same
@@ -1373,7 +1409,10 @@ deliberately untouched by either, always returning every row.
   vars to set. Everything else (PDF download, payments, financials) works
   with no SMTP configured at all. Also exports `textToHtml()` — see "Email
   preview before sending" above — the plain-text-to-HTML conversion for a
-  user-edited email body.
+  user-edited email body — and its own internal `escapeHtml()`, reused by
+  `lib/licenseRenewalEmail.js` (see "Renewal confirmation email" under
+  Licenses above) to safely interpolate client/license names into a real
+  HTML template rather than plain text run through `textToHtml()`.
 - `lib/emailTemplates.js` — the default `{ subject, message }` for every
   client-facing send action; see "Email preview before sending" above. Now
   admin-editable via the Email Center (`routes/emailCenter.js`/
