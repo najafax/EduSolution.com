@@ -72,7 +72,7 @@ function renderLicenseRenewalEmail({ license, client, settings }) {
     </tr>
     <tr>
       <td style="padding:28px;">
-        <p style="margin:0 0 16px;font-size:15px;color:#1e293b;">Dear ${clientName},</p>
+        <p style="margin:0 0 16px;font-size:15px;color:#1e293b;">Dear Sir/Madam,</p>
         <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:#1e293b;">
           Your <strong>${licenseName}</strong> has been successfully renewed. Here are the details:
         </p>
