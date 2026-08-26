@@ -23,7 +23,7 @@ export default function QuoteDetail() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
-  const [dueDate, setDueDate] = useState(todayPlus(14));
+  const [dueDate, setDueDate] = useState(todayPlus(30));
   const [poNumber, setPoNumber] = useState('');
   const [showSendPreview, setShowSendPreview] = useState(false);
   const { confirm, confirmDialog } = useConfirm();

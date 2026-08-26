@@ -311,6 +311,7 @@ db.exec(`
     notes TEXT NOT NULL DEFAULT '',
     last_renewed_at TEXT,
     last_reminder_sent_at TEXT,
+    last_renewal_confirmation_sent_at TEXT,
     created_by_name TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -618,6 +619,19 @@ if (!invoiceColumns.has('created_by_name')) {
 const licenseColumns = new Set(db.prepare('PRAGMA table_info(licenses)').all().map((c) => c.name));
 if (!licenseColumns.has('url')) {
   db.exec(`ALTER TABLE licenses ADD COLUMN url TEXT NOT NULL DEFAULT '';`);
+}
+
+// Same pattern once more: last_renewal_confirmation_sent_at (routes/
+// licenses.js's POST /:id/renewal-confirm) stamped the moment a renewal
+// confirmation email actually goes out, so Licenses.jsx can hide that
+// action until the license is renewed again — same "suppress until the
+// next real reason to send it" idea last_reminder_sent_at already
+// establishes for the renewal reminder, just with no 7-day re-send
+// window of its own (a confirmation is a one-time fact about a specific
+// renewal, not a nag that should eventually repeat on a timer). Reuses
+// the already-declared licenseColumns set from the url migration above.
+if (!licenseColumns.has('last_renewal_confirmation_sent_at')) {
+  db.exec(`ALTER TABLE licenses ADD COLUMN last_renewal_confirmation_sent_at TEXT;`);
 }
 
 // Same pattern again: `payee` (who an expense was paid to — a shareholder,

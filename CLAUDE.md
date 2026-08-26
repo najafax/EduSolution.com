@@ -420,7 +420,12 @@ deliberately untouched by either, always returning every row.
   time: staff can add one to a manually-created invoice, or correct one
   after the fact, the same as any other editable invoice field.
   `QuoteDetail.jsx`'s inline "Convert to invoice" form gains a "PO number
-  (optional)" text input next to the existing due-date field;
+  (optional)" text input next to the existing due-date field (that field's
+  own default is `todayPlus(30)`, a still-usable placeholder rather than a
+  blank date input someone has to fill in themselves every time — same
+  reasoning `InvoiceForm.jsx`'s/`QuoteForm.jsx`'s own `todayPlus(...)`
+  defaults already document, just its own 30-day figure rather than either
+  of theirs);
   `InvoiceForm.jsx`'s create/edit form gains the identical field (loaded
   from the existing invoice on edit, so editing an invoice never silently
   wipes out a PO number set at conversion time — every other optional
@@ -1037,7 +1042,11 @@ deliberately untouched by either, always returning every row.
   needs paying," not for un-cancelling. Renewing also clears
   `last_reminder_sent_at` back to `NULL`, so a license that was reminded
   right before renewal doesn't inherit a stale suppression window blocking
-  its *next* expiry cycle's alerts. The actual expiry-advancing/
+  its *next* expiry cycle's alerts — and, same reasoning,
+  `last_renewal_confirmation_sent_at` too, so the "Send renewal
+  confirmation" action (see "Renewal confirmation email" below) becomes
+  available again for the license's new renewal rather than staying
+  suppressed by the previous one's. The actual expiry-advancing/
   `license_renewals`-writing logic lives in `lib/licenseRenewal.js`'s
   `renewLicense()`, not inline in this route — it's also called from
   `routes/invoices.js`'s `POST /:id/payments` for auto-renewal on a paid
@@ -1054,6 +1063,64 @@ deliberately untouched by either, always returning every row.
   plain `sendMail({ to, subject, html })` with no buffer/attachment step.
   Blocked (409) the same as renew when `status` is `cancelled`. Every
   mutation (create/update/delete/renew/remind) calls `logActivity()`.
+  **Renewal confirmation email**: `GET /:id/renewal-confirm-preview` +
+  `POST /:id/renewal-confirm` are a second, distinct manual send — not a
+  reminder that a client should renew, but a confirmation *after* the fact
+  that they have, styled as a real designed HTML email rather than the
+  plain-text-through-`textToHtml()` shape every other send in this app
+  uses. `lib/licenseRenewalEmail.js`'s `renderLicenseRenewalEmail()`
+  builds it: a gradient header (this app's own `lagoon` palette, see
+  `frontend/src/index.css`) with the business name and "License Renewed",
+  a details table (client, license, billing cycle, amount, the license's
+  own `url` when set — see that column's own note above, this is the
+  "future activation-email template" it was captured for — and the new
+  expiry date), and an "Access license" button linking to `url` when
+  present. Table-based layout with inline styles throughout, and the
+  header's gradient is layered over a solid `background-color` fallback,
+  for the widest email-client compatibility. Deliberately **not** routed
+  through `lib/emailTemplates.js`'s admin-editable template system — a
+  renewal confirmation is a fixed structured summary of the license's own
+  data, not prose an admin would want to freely rewrite, so like the
+  automated overdue-reminder digest it stays outside that system by
+  design (see that file's own top-of-file note); accordingly, the `POST`
+  route accepts no `subject`/`message` override the way every other
+  manual send in this app does. Blocked (409) the same as renew/remind
+  when `status` is `cancelled`; no PDF attachment, same reasoning as
+  `remind`. Not tied to a renewal having *just* happened when it's sent —
+  it always builds from the license's current row, not a snapshot from
+  whenever it was last renewed, so staff can renew and then send this a
+  moment later once they've double-checked details. Logged to `email_log`
+  as type `license_renewal_confirm` (`routes/emailCenter.js`'s own
+  `TYPE_LABELS` gained a matching entry, alongside a note on why this type
+  has no editable template either) and to `activity_log` as `'sent
+  renewal confirmation for'`. On the frontend, `Licenses.jsx`'s
+  `rowActions()` gains a `SendIcon`/`emerald` button opening
+  `components/HtmlEmailPreviewModal.jsx` — the read-only counterpart to
+  `EmailPreviewModal.jsx`: since there's nothing editable here, it shows
+  To/Subject read-only and renders the actual HTML in a sandboxed
+  (`sandbox=""`) `<iframe srcDoc={html}>` so staff see exactly what the
+  client will receive before clicking "Send email".
+  **One confirmation per renewal, not a repeatable action**: a successful
+  send also stamps `licenses.last_renewal_confirmation_sent_at`
+  (`db/index.js`, `ALTER TABLE`-guarded — `licenses` already had real
+  rows, same lesson `licenses.url` learned the hard way), and the button's
+  own gate on `Licenses.jsx` grew from just `status !== 'cancelled'` to
+  also require `!last_renewal_confirmation_sent_at` — so once a
+  confirmation actually goes out, the button disappears from that row
+  (both the desktop table and the mobile accordion) rather than staying
+  around to be clicked again for the same renewal. `lib/licenseRenewal.js`'s
+  `renewLicense()` — the one function both a human's `POST /:id/renew`
+  click and an invoice's auto-renewal-on-payment call to actually extend a
+  license — clears this column back to `NULL` in the same `UPDATE` that
+  already resets `last_reminder_sent_at`, so *any* real renewal (manual or
+  automatic) is what brings the button back, not a timer: the column
+  means "already confirmed for the license's current renewal," which is
+  only ever true again once there's been a new one. The `HtmlEmailPreviewModal`
+  instance's own `onSend` calls `load()` after a successful send (`POST
+  /:id/renewal-confirm` now returns `{ license: withComputed(...) }`,
+  matching `/:id/remind`'s own response shape, rather than a bare message)
+  so the row updates and the button vanishes the instant the modal closes,
+  with no manual refresh needed.
   **Renewal history**: every `POST /:id/renew` above also inserts one row
   into `license_renewals` (`license_id`, `previous_expiry_date`,
   `new_expiry_date`, `renewed_by_name`, `renewed_at`), in the same
@@ -1380,7 +1447,10 @@ deliberately untouched by either, always returning every row.
   vars to set. Everything else (PDF download, payments, financials) works
   with no SMTP configured at all. Also exports `textToHtml()` — see "Email
   preview before sending" above — the plain-text-to-HTML conversion for a
-  user-edited email body.
+  user-edited email body — and its own internal `escapeHtml()`, reused by
+  `lib/licenseRenewalEmail.js` (see "Renewal confirmation email" under
+  Licenses above) to safely interpolate client/license names into a real
+  HTML template rather than plain text run through `textToHtml()`.
 - `lib/emailTemplates.js` — the default `{ subject, message }` for every
   client-facing send action; see "Email preview before sending" above. Now
   admin-editable via the Email Center (`routes/emailCenter.js`/

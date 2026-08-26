@@ -61,4 +61,4 @@ function textToHtml(text) {
     .join('');
 }
 
-module.exports = { sendMail, textToHtml };
+module.exports = { sendMail, textToHtml, escapeHtml };
