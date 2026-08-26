@@ -332,7 +332,17 @@ deliberately untouched by either, always returning every row.
   (negative allowed — an overdraft on the day you started using the app is
   a valid starting point, see "Bank balance" in `routes/financials.js`
   below). `GET /` supports `?q=` (name/email) and
-  `?page=` (see "Pagination convention" above).
+  `?page=` (see "Pagination convention" above). `Clients.jsx`'s own list
+  shows `address` as its own column too, alongside the existing
+  `phone` — same `|| '—'` em-dash-when-blank treatment `phone` already
+  has, both on the desktop table and the mobile `MobileListAccordion`
+  detail rows. The desktop cell is capped (`max-w-xs truncate`, with a
+  `title` attribute carrying the full text) rather than `whitespace-nowrap`
+  like every other column in this table, since an address is free text
+  that can run much longer than a name/email/phone and would otherwise
+  force the table far wider than it needs to be; the mobile row has no
+  such cap, since it already wraps naturally onto its own line with no
+  competing columns to protect.
 - `routes/products.js` — plain CRUD for `products` (name/description/
   unit_price/`tax_rate`), `GET /` supports `?q=` search and `?page=` (see
   "Pagination convention" above). `tax_rate` (percent, 0–100, validated on

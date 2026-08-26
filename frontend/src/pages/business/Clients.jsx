@@ -247,7 +247,7 @@ export default function Clients() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={canManage || canSendCampaigns ? ['w-32', 'w-40', 'w-24', 'w-16'] : ['w-32', 'w-40', 'w-24']} />
+            <TableSkeleton rows={5} cols={canManage || canSendCampaigns ? ['w-32', 'w-40', 'w-24', 'w-32', 'w-16'] : ['w-32', 'w-40', 'w-24', 'w-32']} />
           </div>
         ) : visibleClients.length === 0 ? (
           <EmptyState
@@ -265,6 +265,7 @@ export default function Clients() {
                     <th className="px-4 py-3">Client</th>
                     <th className="px-4 py-3">Email</th>
                     <th className="px-4 py-3">Phone</th>
+                    <th className="px-4 py-3">Address</th>
                     {(canManage || canSendCampaigns) && <th className="px-4 py-3" />}
                   </tr>
                 </thead>
@@ -279,6 +280,9 @@ export default function Clients() {
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{client.phone || '—'}</td>
+                      <td className="max-w-xs truncate px-4 py-3 text-slate-600 dark:text-slate-400" title={client.address || undefined}>
+                        {client.address || '—'}
+                      </td>
                       {(canManage || canSendCampaigns) && (
                         <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex justify-end gap-1.5">{rowActions(client)}</div>
@@ -308,6 +312,10 @@ export default function Clients() {
                   <div className="flex justify-between">
                     <dt className="text-slate-500 dark:text-slate-400">Phone</dt>
                     <dd className="text-slate-900 dark:text-white">{client.phone || '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="shrink-0 text-slate-500 dark:text-slate-400">Address</dt>
+                    <dd className="text-right text-slate-900 dark:text-white">{client.address || '—'}</dd>
                   </div>
                   {(canManage || canSendCampaigns) && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(client)}</div>}
                 </MobileListAccordion>
