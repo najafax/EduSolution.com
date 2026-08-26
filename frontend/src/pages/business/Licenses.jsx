@@ -31,6 +31,7 @@ import {
   DownloadIcon,
   PlusIcon,
   ReportIcon,
+  LinkIcon,
   SendIcon,
 } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
@@ -445,7 +446,7 @@ export default function Licenses() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading || !settingsLoaded ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={['w-32', 'w-28', 'w-24', 'w-20', 'w-20', 'w-32']} />
+            <TableSkeleton rows={5} cols={['w-32', 'w-28', 'w-16', 'w-24', 'w-20', 'w-20', 'w-32']} />
           </div>
         ) : licenses.length === 0 ? (
           <EmptyState
@@ -462,6 +463,7 @@ export default function Licenses() {
                   <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
                     <th className="px-4 py-3">License</th>
                     <th className="px-4 py-3">Client</th>
+                    <th className="px-4 py-3">URL</th>
                     <th className="px-4 py-3">Expiry</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3 text-right">Amount</th>
@@ -473,6 +475,21 @@ export default function Licenses() {
                     <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{l.name}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{l.client_name}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {l.url ? (
+                          <a
+                            href={l.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-lagoon-600 hover:text-lagoon-500 dark:text-lagoon-400"
+                          >
+                            <LinkIcon width={14} height={14} />
+                            Open
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-600">—</span>
+                        )}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{l.expiry_date}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <StatusBadge status={l.display_status} />
@@ -523,6 +540,22 @@ export default function Licenses() {
                     <dt className="text-slate-500 dark:text-slate-400">Billing</dt>
                     <dd className="capitalize text-slate-900 dark:text-white">{l.billing_cycle}</dd>
                   </div>
+                  {l.url && (
+                    <div className="flex justify-between">
+                      <dt className="text-slate-500 dark:text-slate-400">URL</dt>
+                      <dd>
+                        <a
+                          href={l.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-lagoon-600 hover:text-lagoon-500 dark:text-lagoon-400"
+                        >
+                          <LinkIcon width={14} height={14} />
+                          Open
+                        </a>
+                      </dd>
+                    </div>
+                  )}
                   {canManage && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(l)}</div>}
                 </MobileListAccordion>
               ))}
