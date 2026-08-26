@@ -462,15 +462,21 @@ router.post('/:id/remind', manage, async (req, res) => {
 // on that column, added specifically for a future email like this one).
 // Deliberately not tied to POST /:id/renew actually having just run —
 // staff might renew, then send this a moment later once they've double-
-// checked details, or resend it later if a client asks for confirmation
-// again, so this always reflects the license's *current* row, not a
-// snapshot from whenever it was last renewed. Same "no PDF, this isn't a
-// document" shape as /:id/remind, and same cancelled-license guard as
-// renew/remind (confirming a cancelled license's "renewal" makes no
-// sense). Unlike every other manual send in this app, there's no
+// checked details, so this always reflects the license's *current* row,
+// not a snapshot from whenever it was last renewed. Same "no PDF, this
+// isn't a document" shape as /:id/remind, and same cancelled-license
+// guard as renew/remind (confirming a cancelled license's "renewal" makes
+// no sense). Unlike every other manual send in this app, there's no
 // subject/message override accepted on the POST — the email's whole point
 // is a fixed, designed summary of the license's own real data, not prose
 // an admin edits per send (see lib/licenseRenewalEmail.js's own note).
+// A successful send also stamps `last_renewal_confirmation_sent_at`,
+// which `Licenses.jsx` uses to hide the "Send renewal confirmation" row
+// action once it's been sent for the license's *current* renewal — one
+// confirmation per renewal, not a repeatable action, so staff can't send
+// the same confirmation twice by mistake; `lib/licenseRenewal.js`'s
+// `renewLicense()` clears it back to NULL on the next real renewal (see
+// that function's own note), which is what brings the button back.
 router.get('/:id/renewal-confirm-preview', manage, (req, res) => {
   const row = db.prepare('SELECT licenses.*, clients.name AS client_name, clients.email AS client_email FROM licenses JOIN clients ON clients.id = licenses.client_id WHERE licenses.id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'License not found' });
@@ -496,9 +502,10 @@ router.post('/:id/renewal-confirm', manage, async (req, res) => {
     return res.status(status).json({ error: err.message });
   }
 
+  db.prepare(`UPDATE licenses SET last_renewal_confirmation_sent_at = datetime('now') WHERE id = ?`).run(req.params.id);
   logActivity({ userName: req.user.name, action: 'sent renewal confirmation for', entityType: 'license', entityId: row.id, entityLabel: `${row.name} (${client.name})` });
   logEmail({ type: 'license_renewal_confirm', to, subject, sentByName: req.user.name, entityType: 'license', entityId: row.id, entityLabel: row.name });
-  res.json({ message: 'Renewal confirmation sent.' });
+  res.json({ license: withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id)) });
 });
 
 module.exports = router;

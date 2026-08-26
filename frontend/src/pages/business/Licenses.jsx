@@ -366,7 +366,7 @@ export default function Licenses() {
             title="Send renewal reminder"
           />
         )}
-        {l.status !== 'cancelled' && (
+        {l.status !== 'cancelled' && !l.last_renewal_confirmation_sent_at && (
           <IconActionButton
             icon={SendIcon}
             tone="emerald"
@@ -686,7 +686,11 @@ export default function Licenses() {
           onClose={() => setRenewalConfirmTarget(null)}
           title="Send renewal confirmation"
           loadPreview={() => api.licenses.renewalConfirmPreview(renewalConfirmTarget.id, token)}
-          onSend={() => api.licenses.sendRenewalConfirm(renewalConfirmTarget.id, token)}
+          onSend={() =>
+            api.licenses.sendRenewalConfirm(renewalConfirmTarget.id, token).then(() => {
+              load();
+            })
+          }
         />
       )}
 

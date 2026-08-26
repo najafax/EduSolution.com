@@ -25,13 +25,19 @@ function advanceExpiry(dateStr, cycle) {
 // name an active license auto-renews it the moment the invoice is paid in
 // full) so both paths extend/record a renewal identically — callers are
 // responsible for their own guards (e.g. status !== 'cancelled') before
-// calling this.
+// calling this. Also clears last_reminder_sent_at and
+// last_renewal_confirmation_sent_at back to NULL — a fresh renewal means
+// neither suppression should carry over from before it: the reminder
+// shouldn't stay silenced for the license's next expiry cycle, and the
+// "Send renewal confirmation" button (routes/licenses.js's own POST
+// /:id/renewal-confirm, gated on this column) should reappear so staff can
+// confirm *this* renewal, not read as already-confirmed from the last one.
 function renewLicense(license, renewedByName) {
   const nextExpiry = advanceExpiry(license.expiry_date, license.billing_cycle);
 
   db.transaction(() => {
     db.prepare(
-      `UPDATE licenses SET expiry_date = ?, last_renewed_at = datetime('now'), last_reminder_sent_at = NULL, updated_at = datetime('now') WHERE id = ?`,
+      `UPDATE licenses SET expiry_date = ?, last_renewed_at = datetime('now'), last_reminder_sent_at = NULL, last_renewal_confirmation_sent_at = NULL, updated_at = datetime('now') WHERE id = ?`,
     ).run(nextExpiry, license.id);
     db.prepare(
       `INSERT INTO license_renewals (license_id, previous_expiry_date, new_expiry_date, renewed_by_name) VALUES (?, ?, ?, ?)`,
