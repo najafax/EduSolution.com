@@ -1081,7 +1081,11 @@ deliberately untouched by either, always returning every row.
   uses. `lib/licenseRenewalEmail.js`'s `renderLicenseRenewalEmail()`
   builds it: a gradient header (this app's own `lagoon` palette, see
   `frontend/src/index.css`) with the business name and "License Renewed",
-  a details table (client, license, billing cycle, amount, the license's
+  a generic "Dear Sir/Madam," salutation (deliberately not the client's own
+  name — this table-based HTML email's own details section, immediately
+  below, already names the client explicitly, and a generic salutation
+  reads as more appropriate business correspondence than an informal
+  first-name-style greeting here), a details table (client, license, billing cycle, amount, the license's
   own `url` when set — see that column's own note above, this is the
   "future activation-email template" it was captured for — and the new
   expiry date), and an "Access license" button linking to `url` when
