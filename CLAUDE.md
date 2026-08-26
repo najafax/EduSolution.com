@@ -405,6 +405,37 @@ deliberately untouched by either, always returning every row.
   `discount_type` (`percentage|fixed`) and `discount_value` on create/update,
   computed via `lib/totals.js`. Every mutation (create/update/delete/send/
   duplicate/convert/payment) calls `lib/activity.js`'s `logActivity()`.
+  **PO number**: `invoices.po_number` (`db/index.js`, `ALTER TABLE`-guarded
+  — `invoices` has carried real documents since the app's first deploy,
+  same lesson `licenses.url` learned the hard way) is an optional,
+  free-text field for the *client's own* purchase-order reference, not
+  anything this app generates itself — a quote has no equivalent field,
+  since a PO number is specifically what a client issues once they've
+  actually decided to buy, which is exactly the moment a quote becomes an
+  invoice. `POST /:id/convert-to-invoice` accepts an optional `po_number`
+  in the body alongside the existing required `due_date` and stores it on
+  the new invoice; `POST /` (create) and `PUT /:id` (edit) both accept and
+  persist it too — same `notes = ''`-style default-to-empty-string
+  treatment `notes` itself gets — so it's not write-once at conversion
+  time: staff can add one to a manually-created invoice, or correct one
+  after the fact, the same as any other editable invoice field.
+  `QuoteDetail.jsx`'s inline "Convert to invoice" form gains a "PO number
+  (optional)" text input next to the existing due-date field;
+  `InvoiceForm.jsx`'s create/edit form gains the identical field (loaded
+  from the existing invoice on edit, so editing an invoice never silently
+  wipes out a PO number set at conversion time — every other optional
+  field on this form already round-trips the same explicit way). Shown
+  wherever the rest of an invoice's metadata already is, only when
+  non-blank (the common case has no PO number, same "only show the
+  exception case" convention every other optional field in this app
+  follows): `InvoiceDetail.jsx`'s "Details" card, the client-facing public
+  link (`PublicInvoice.jsx`) and portal (`PortalInvoiceDetail.jsx`) views,
+  the invoice PDF's own header meta rows (`lib/pdf.js`'s `drawHeader`/
+  `drawMinimalHeader`, both already conditionally render `TIN`/
+  `Prepared By` rows the same way — this is genuinely the field's whole
+  point, since a client matching the invoice against their own purchase
+  order is what a PO number is *for*), and the `GET /export.csv`/
+  `GET /export.xlsx` invoice export.
   **Invoices only** (not quotes): `PUT /:id` rejects with 409 once
   `status` is `sent` or `paid` — "This invoice has already been sent or
   paid and can no longer be edited." A `void` invoice stays editable (it's

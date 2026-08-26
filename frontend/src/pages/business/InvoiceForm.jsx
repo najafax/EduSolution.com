@@ -35,6 +35,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
   const [discountType, setDiscountType] = useState('percentage');
   const [discountValue, setDiscountValue] = useState(0);
   const [notes, setNotes] = useState('');
+  const [poNumber, setPoNumber] = useState('');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(isEditing);
   const [error, setError] = useState('');
@@ -52,7 +53,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
       return;
     }
     setDirty(true);
-  }, [clientId, issueDate, dueDate, taxRate, discountType, discountValue, notes, items, loading]);
+  }, [clientId, issueDate, dueDate, taxRate, discountType, discountValue, notes, poNumber, items, loading]);
 
   useEffect(() => {
     api.clients.list(token).then(({ clients }) => setClients(clients));
@@ -76,6 +77,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
         setDiscountType(invoice.discount_type);
         setDiscountValue(invoice.discount_value);
         setNotes(invoice.notes);
+        setPoNumber(invoice.po_number || '');
         setItems(items.map((i) => ({ description: i.description, quantity: i.quantity, unit_price: i.unit_price, product_id: i.product_id })));
       })
       .catch((err) => setError(err.message))
@@ -102,6 +104,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
       discount_type: discountType,
       discount_value: Number(discountValue),
       notes,
+      po_number: poNumber,
       items,
     };
     try {
@@ -229,6 +232,17 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
                 className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
               />
             </div>
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">PO number (optional)</span>
+            <input
+              type="text"
+              value={poNumber}
+              onChange={(e) => setPoNumber(e.target.value)}
+              placeholder="Client's purchase order #"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
           </label>
         </div>
 
