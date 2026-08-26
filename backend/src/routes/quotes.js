@@ -283,6 +283,9 @@ router.get('/:id', view, (req, res) => {
 router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM quotes WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Quote not found' });
+  if (existing.converted_invoice_id) {
+    return res.status(409).json({ error: 'This quote has already been converted to an invoice and can no longer be edited' });
+  }
 
   const {
     client_id,
@@ -341,6 +344,9 @@ router.put('/:id', manage, (req, res) => {
 router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM quotes WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Quote not found' });
+  if (existing.converted_invoice_id) {
+    return res.status(409).json({ error: 'This quote has already been converted to an invoice and cannot be deleted' });
+  }
   db.prepare('DELETE FROM quotes WHERE id = ?').run(req.params.id);
   logActivity({ userName: req.user.name, action: 'deleted', entityType: 'quote', entityId: existing.id, entityLabel: existing.number });
   res.status(204).end();
