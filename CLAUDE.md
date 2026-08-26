@@ -420,7 +420,12 @@ deliberately untouched by either, always returning every row.
   time: staff can add one to a manually-created invoice, or correct one
   after the fact, the same as any other editable invoice field.
   `QuoteDetail.jsx`'s inline "Convert to invoice" form gains a "PO number
-  (optional)" text input next to the existing due-date field;
+  (optional)" text input next to the existing due-date field (that field's
+  own default is `todayPlus(30)`, a still-usable placeholder rather than a
+  blank date input someone has to fill in themselves every time — same
+  reasoning `InvoiceForm.jsx`'s/`QuoteForm.jsx`'s own `todayPlus(...)`
+  defaults already document, just its own 30-day figure rather than either
+  of theirs);
   `InvoiceForm.jsx`'s create/edit form gains the identical field (loaded
   from the existing invoice on edit, so editing an invoice never silently
   wipes out a PO number set at conversion time — every other optional
