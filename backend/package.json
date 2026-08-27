@@ -11,7 +11,8 @@
     "backup": "node scripts/backup.js",
     "backup:list": "node scripts/list-backups.js",
     "backup:restore": "node scripts/restore.js",
-    "fix-license-renewals": "node scripts/fix-license-renewal-dates.js"
+    "fix-license-renewals": "node scripts/fix-license-renewal-dates.js",
+    "find-campaign-failures": "node scripts/find-campaign-failures.js"
   },
   "keywords": [],
   "author": "",
