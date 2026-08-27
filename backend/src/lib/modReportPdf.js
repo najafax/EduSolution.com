@@ -14,7 +14,11 @@
 // all pull that from lib/pdf.js's addPageFooter). This is a standalone
 // operations document for whichever resort is using the checklist, not a
 // document issued *by* EduSolution to a client, so it shouldn't read as
-// one — renderModReportPdf takes only { report }, no settings.
+// one. It does render its *own* optional branding — a name/logo an admin
+// sets specifically for this module (routes/modReports.js's GET/PUT
+// /settings, stored in db/index.js's mod_report_settings, a table
+// entirely separate from business_settings) — renderModReportPdf takes
+// { report, modSettings }, never the app's own settings.
 const {
   MARGIN, CONTENT_WIDTH, PAGE_BOTTOM, COLORS,
   newDoc, docToBuffer, decodeImageDataUri,
@@ -40,17 +44,34 @@ function fmtDate(iso) {
   return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-// Plain title bar + a 2x2 MOD Name/Date/Weather/Time Started meta table —
-// redrawn on every page (see ensurePage below). No logo, no property name:
-// this document is deliberately generic, not branded as coming from
-// EduSolution (see this file's own top-of-file note).
-function drawHeaderBlock(doc, report) {
+// Title bar + a 2x2 MOD Name/Date/Weather/Time Started meta table —
+// redrawn on every page (see ensurePage below). The optional logo/name in
+// the title bar come from mod_report_settings (see this file's own
+// top-of-file note), never from EduSolution's own business_settings — a
+// report with no logo/name set there renders a plain centered title with
+// no logo box at all, not a placeholder or an EduSolution fallback.
+function drawHeaderBlock(doc, report, propertyName, logoBuffer) {
   let y = MARGIN;
   const headerH = 32;
+  const logoSize = headerH;
 
-  doc.font('Helvetica-Bold').fontSize(15).fillColor('#000000').text('Manager on Duty Checklist', MARGIN, y + 9, { width: CONTENT_WIDTH, align: 'center' });
+  if (logoBuffer) {
+    doc.image(logoBuffer, MARGIN + 4, y + 4, { fit: [logoSize - 8, logoSize - 8] });
+  }
+
+  const titleX = logoBuffer ? MARGIN + logoSize : MARGIN;
+  const titleW = logoBuffer ? CONTENT_WIDTH - logoSize : CONTENT_WIDTH;
+  if (propertyName) {
+    doc.font('Helvetica-Bold').fontSize(13).fillColor('#000000').text('Manager on Duty Checklist', titleX, y + 4, { width: titleW, align: 'center' });
+    doc.font('Helvetica').fontSize(8.5).fillColor(NAVY).text(propertyName, titleX, y + 19, { width: titleW, align: 'center' });
+  } else {
+    doc.font('Helvetica-Bold').fontSize(15).fillColor('#000000').text('Manager on Duty Checklist', titleX, y + 9, { width: titleW, align: 'center' });
+  }
 
   doc.lineWidth(0.75).strokeColor('#000000').rect(MARGIN, y, CONTENT_WIDTH, headerH).stroke();
+  if (logoBuffer) {
+    doc.moveTo(MARGIN + logoSize, y).lineTo(MARGIN + logoSize, y + headerH).strokeColor('#000000').lineWidth(0.75).stroke();
+  }
   y += headerH;
 
   const metaRowH = 20;
@@ -107,11 +128,11 @@ function drawTableHead(doc, y) {
   return y + h1 + h2;
 }
 
-function makeEnsurePage(doc, report) {
+function makeEnsurePage(doc, report, propertyName, logoBuffer) {
   return (y, neededH) => {
     if (y + neededH <= PAGE_BOTTOM) return y;
     doc.addPage();
-    const headerBottom = drawHeaderBlock(doc, report);
+    const headerBottom = drawHeaderBlock(doc, report, propertyName, logoBuffer);
     return drawTableHead(doc, headerBottom);
   };
 }
@@ -240,11 +261,13 @@ function signatureRow(doc, y, signature, ensurePage) {
   return y + rowH;
 }
 
-function renderModReportPdf({ report }) {
+function renderModReportPdf({ report, modSettings }) {
   const doc = newDoc();
+  const propertyName = (modSettings && modSettings.business_name) || '';
+  const logoBuffer = modSettings && modSettings.logo_image ? decodeImageDataUri(modSettings.logo_image) : null;
 
-  const ensurePage = makeEnsurePage(doc, report);
-  let y = drawHeaderBlock(doc, report);
+  const ensurePage = makeEnsurePage(doc, report, propertyName, logoBuffer);
+  let y = drawHeaderBlock(doc, report, propertyName, logoBuffer);
   y = drawTableHead(doc, y);
   y = occupancyRow(doc, y, report, ensurePage);
 

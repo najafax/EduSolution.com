@@ -190,6 +190,99 @@ function Field({ label, children }) {
 }
 const inputClass = 'mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white';
 
+// Same shape as pages/business/Settings.jsx's own ImageField (PNG/JPEG,
+// 400KB cap, read as a data URI via FileReader) — a small, deliberate
+// duplication rather than an import, since this branding is stored in its
+// own mod_report_settings table (see routes/modReports.js) and is meant
+// to stay fully independent of the app's own business_settings.
+const MOD_MAX_IMAGE_BYTES = 400 * 1024;
+const MOD_ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg'];
+
+function ModLogoField({ value, onChange, onError }) {
+  function handleFile(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    onError('');
+    if (!MOD_ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      onError('Logo must be a PNG or JPEG image');
+      return;
+    }
+    if (file.size > MOD_MAX_IMAGE_BYTES) {
+      onError('Logo must be smaller than 400KB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => onChange(reader.result);
+    reader.onerror = () => onError('Could not read the selected logo file');
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div className="block">
+      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Logo</span>
+      {value ? (
+        <div className="mt-1 flex items-center gap-3">
+          <img src={value} alt="Logo" className="h-16 max-w-[160px] rounded-md border border-slate-200 object-contain dark:border-slate-700" />
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <input
+          type="file"
+          accept="image/png,image/jpeg"
+          onChange={handleFile}
+          className="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:min-h-11 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-50 dark:text-slate-400 dark:file:border-slate-600 dark:file:bg-slate-800 dark:file:text-slate-200 dark:hover:file:bg-slate-700"
+        />
+      )}
+      <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+        Printed at the top of the MOD report PDF. Separate from the business's own logo on Settings — this checklist is deliberately unbranded from EduSolution.
+      </span>
+    </div>
+  );
+}
+
+function ModSettingsForm({ settings, setSettings, onSubmit, submitting, error, setError, success }) {
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+      className="flex max-w-lg flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+    >
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Sets the name and logo printed on the MOD report PDF. This is its own, separate branding — it never reads from or writes to the business's own Settings page.
+      </p>
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {success && <p className="text-sm text-emerald-600 dark:text-emerald-400">Saved.</p>}
+      <ModLogoField value={settings.logo_image} onChange={(v) => setSettings((s) => ({ ...s, logo_image: v }))} onError={setError} />
+      <Field label="Business / property name">
+        <input
+          type="text"
+          value={settings.business_name}
+          onChange={(e) => setSettings((s) => ({ ...s, business_name: e.target.value }))}
+          placeholder="e.g. Miladhoo Island Resort"
+          className={inputClass}
+        />
+      </Field>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-md bg-lagoon-600 px-5 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+      >
+        <CheckCircleIcon className="h-4 w-4" />
+        {submitting ? 'Saving…' : 'Save'}
+      </button>
+    </form>
+  );
+}
+
 function ChecklistForm({ meta, draft, setDraft, editingId, onSubmit, onCancelEdit, submitting, error }) {
   const overall = { answered: 0, total: 0 };
   meta.sections.forEach((s) => {
@@ -637,6 +730,11 @@ export default function MODReport() {
   const [downloading, setDownloading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
+  const [modSettings, setModSettings] = useState(null);
+  const [modSettingsError, setModSettingsError] = useState('');
+  const [modSettingsSuccess, setModSettingsSuccess] = useState(false);
+  const [modSettingsSubmitting, setModSettingsSubmitting] = useState(false);
+
   useEffect(() => {
     if (user?.role !== 'admin') return;
     api.modReports
@@ -673,6 +771,16 @@ export default function MODReport() {
       .catch((err) => setListError(err.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openReportId]);
+
+  useEffect(() => {
+    if (user?.role !== 'admin' || tab !== 'settings') return;
+    setModSettingsSuccess(false);
+    api.modReports
+      .getSettings(token)
+      .then((res) => setModSettings(res.settings))
+      .catch((err) => setModSettingsError(err.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, user, tab]);
 
   if (user?.role !== 'admin') {
     return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">You don't have permission to view this page.</div>;
@@ -752,6 +860,21 @@ export default function MODReport() {
     }
   }
 
+  async function handleSaveModSettings() {
+    setModSettingsSubmitting(true);
+    setModSettingsError('');
+    setModSettingsSuccess(false);
+    try {
+      const res = await api.modReports.updateSettings(modSettings, token);
+      setModSettings(res.settings);
+      setModSettingsSuccess(true);
+    } catch (err) {
+      setModSettingsError(err.message);
+    } finally {
+      setModSettingsSubmitting(false);
+    }
+  }
+
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Manager on Duty Checklist</h1>
@@ -763,6 +886,7 @@ export default function MODReport() {
         {[
           { key: 'new', label: 'New checklist' },
           { key: 'log', label: `Reports${pageInfo ? ` (${pageInfo.total})` : ''}` },
+          { key: 'settings', label: 'Settings' },
         ].map((t) => (
           <button
             key={t.key}
@@ -837,6 +961,22 @@ export default function MODReport() {
               </>
             )}
           </>
+        )}
+
+        {tab === 'settings' && (
+          modSettings ? (
+            <ModSettingsForm
+              settings={modSettings}
+              setSettings={setModSettings}
+              onSubmit={handleSaveModSettings}
+              submitting={modSettingsSubmitting}
+              error={modSettingsError}
+              setError={setModSettingsError}
+              success={modSettingsSuccess}
+            />
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-400">{modSettingsError || 'Loading…'}</p>
+          )
         )}
       </div>
 

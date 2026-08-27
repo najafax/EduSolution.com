@@ -215,6 +215,19 @@ db.exec(`
     edited_at TEXT
   );
 
+  -- The MOD report module's own branding, entirely separate from
+  -- business_settings above (see lib/modReportPdf.js's own top-of-file
+  -- note on why the checklist PDF deliberately carries none of
+  -- EduSolution's own name/logo/footer) — a single-row table, same
+  -- id-locked-to-1 shape as business_settings, so whichever resort is
+  -- actually running the checklist can brand it as their own without
+  -- that ever touching or being touched by EduSolution's own settings.
+  CREATE TABLE IF NOT EXISTS mod_report_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    business_name TEXT NOT NULL DEFAULT '',
+    logo_image TEXT NOT NULL DEFAULT ''
+  );
+
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -776,5 +789,10 @@ db.pragma('foreign_keys = ON');
 db.prepare(
   `INSERT OR IGNORE INTO business_settings (id, business_name, address, phone) VALUES (1, ?, ?, ?)`,
 ).run('Edu Solutions Pvt Ltd', "Vinares tower, aboomaa hin'gun", '+960 7921335');
+
+// Left blank by default — deliberately not seeded with EduSolution's own
+// name, unlike business_settings above (see mod_report_settings's own
+// CREATE TABLE comment for why the two are kept apart).
+db.prepare(`INSERT OR IGNORE INTO mod_report_settings (id) VALUES (1)`).run();
 
 module.exports = db;

@@ -274,6 +274,8 @@ export const api = {
     update: (id, payload, token) => request(`/mod-reports/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/mod-reports/${id}`, { method: 'DELETE', token }),
     openPdf: (id, token) => openPdf(`/mod-reports/${id}/pdf`, token),
+    getSettings: (token) => request('/mod-reports/settings', { token }),
+    updateSettings: (payload, token) => request('/mod-reports/settings', { method: 'PUT', body: payload, token }),
   },
 
   users: {

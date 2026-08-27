@@ -181,6 +181,50 @@ router.get('/meta', (req, res) => {
   res.json({ sections: SECTIONS, villaItems: VILLA_ITEMS });
 });
 
+// The MOD report module's own branding — a business name/logo for
+// whichever resort is running the checklist, entirely separate from
+// routes/settings.js's business_settings (see db/index.js's
+// mod_report_settings table and lib/modReportPdf.js's own top-of-file
+// note for why: the generated PDF must never carry EduSolution's own
+// name/logo). Same validateImageField shape routes/settings.js already
+// uses for its own logo/signature/stamp fields — duplicated rather than
+// imported, since it's a few lines tied to a different table and the two
+// are meant to stay independently editable. Registered ahead of GET/PUT
+// /:id below so the literal path "settings" is never swallowed by the
+// :id param, same convention this app's other routers already follow for
+// GET /meta, GET /summary, GET /analytics, etc.
+const IMAGE_DATA_URI_RE = /^data:image\/(png|jpe?g);base64,([A-Za-z0-9+/]+=*)$/;
+const MAX_LOGO_BYTES = 400 * 1024;
+
+function validateLogoImage(value) {
+  if (!value) return '';
+  const match = IMAGE_DATA_URI_RE.exec(value);
+  if (!match) throw new Error('Logo must be a PNG or JPEG image');
+  const decodedBytes = Math.ceil((match[2].length * 3) / 4);
+  if (decodedBytes > MAX_LOGO_BYTES) throw new Error('Logo must be smaller than 400KB');
+  return value;
+}
+
+router.get('/settings', (req, res) => {
+  const settings = db.prepare('SELECT * FROM mod_report_settings WHERE id = 1').get();
+  res.json({ settings });
+});
+
+router.put('/settings', (req, res) => {
+  const { business_name = '' } = req.body;
+  let logoImage;
+  try {
+    logoImage = validateLogoImage(req.body.logo_image || '');
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  db.prepare('UPDATE mod_report_settings SET business_name = ?, logo_image = ? WHERE id = 1').run(business_name.trim(), logoImage);
+  const settings = db.prepare('SELECT * FROM mod_report_settings WHERE id = 1').get();
+  logActivity({ userName: req.user.name, action: 'updated MOD report settings', entityType: 'mod_report_settings', entityId: 1, entityLabel: business_name.trim() || '(no name set)' });
+  res.json({ settings });
+});
+
 function tally(itemMap, count) {
   let yes = 0, no = 0, na = 0, answered = 0;
   for (let i = 0; i < count; i++) {
@@ -389,6 +433,7 @@ router.get('/:id/pdf', (req, res) => {
   const row = db.prepare('SELECT * FROM mod_reports WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Report not found' });
   const parsed = parseRow(row);
+  const modSettings = db.prepare('SELECT * FROM mod_report_settings WHERE id = 1').get();
 
   const report = {
     ...parsed,
@@ -397,7 +442,7 @@ router.get('/:id/pdf', (req, res) => {
     villaItemLabels: VILLA_ITEMS,
   };
 
-  renderModReportPdf({ report })
+  renderModReportPdf({ report, modSettings })
     .then((buffer) => {
       const filename = `mod-report-${row.report_date}-${(row.mod_name || 'report').replace(/[^a-z0-9]+/gi, '-')}.pdf`;
       res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${filename}"` });
