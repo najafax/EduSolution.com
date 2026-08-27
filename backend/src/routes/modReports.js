@@ -389,7 +389,6 @@ router.get('/:id/pdf', (req, res) => {
   const row = db.prepare('SELECT * FROM mod_reports WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Report not found' });
   const parsed = parseRow(row);
-  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
 
   const report = {
     ...parsed,
@@ -398,7 +397,7 @@ router.get('/:id/pdf', (req, res) => {
     villaItemLabels: VILLA_ITEMS,
   };
 
-  renderModReportPdf({ report, settings })
+  renderModReportPdf({ report })
     .then((buffer) => {
       const filename = `mod-report-${row.report_date}-${(row.mod_name || 'report').replace(/[^a-z0-9]+/gi, '-')}.pdf`;
       res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${filename}"` });

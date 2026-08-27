@@ -7,9 +7,17 @@
 // is its own bordered-grid layout — nothing here looks like a quote/
 // invoice/receipt or a plain tabular report, so it isn't built on either
 // of those files' own row helpers.
+//
+// Deliberately carries none of EduSolution's own branding — no
+// business_settings name/logo in the header, no business address/phone/
+// email footer line (unlike every quote/invoice/receipt/report PDF, which
+// all pull that from lib/pdf.js's addPageFooter). This is a standalone
+// operations document for whichever resort is using the checklist, not a
+// document issued *by* EduSolution to a client, so it shouldn't read as
+// one — renderModReportPdf takes only { report }, no settings.
 const {
   MARGIN, CONTENT_WIDTH, PAGE_BOTTOM, COLORS,
-  newDoc, docToBuffer, decodeImageDataUri, addPageFooter,
+  newDoc, docToBuffer, decodeImageDataUri,
 } = require('./pdf');
 
 const NAVY = '#1b2a49';
@@ -32,27 +40,16 @@ function fmtDate(iso) {
   return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-// Logo/initial box + title + business name, then a 2x2 MOD Name/Date/
-// Weather/Time Started meta table — redrawn on every page (see ensurePage
-// below), matching the sample report's own repeating header.
-function drawHeaderBlock(doc, report, propertyName, logoBuffer, initial) {
+// Plain title bar + a 2x2 MOD Name/Date/Weather/Time Started meta table —
+// redrawn on every page (see ensurePage below). No logo, no property name:
+// this document is deliberately generic, not branded as coming from
+// EduSolution (see this file's own top-of-file note).
+function drawHeaderBlock(doc, report) {
   let y = MARGIN;
-  const logoSize = 45;
+  const headerH = 32;
 
-  doc.lineWidth(0.75).strokeColor('#000000');
-  if (logoBuffer) {
-    doc.image(logoBuffer, MARGIN, y, { fit: [logoSize, logoSize] });
-  } else {
-    doc.rect(MARGIN, y, logoSize, logoSize).fill(NAVY);
-    doc.font('Helvetica-Bold').fontSize(16).fillColor('#ffffff').text(initial, MARGIN, y + logoSize / 2 - 8, { width: logoSize, align: 'center' });
-  }
+  doc.font('Helvetica-Bold').fontSize(15).fillColor('#000000').text('Manager on Duty Checklist', MARGIN, y + 9, { width: CONTENT_WIDTH, align: 'center' });
 
-  doc.font('Helvetica-Bold').fontSize(15).fillColor('#000000').text('Manager on Duty Checklist', MARGIN, y + 6, { width: CONTENT_WIDTH, align: 'center' });
-  if (propertyName) {
-    doc.font('Helvetica').fontSize(9.5).fillColor(NAVY).text(propertyName, MARGIN, y + 24, { width: CONTENT_WIDTH, align: 'center' });
-  }
-
-  const headerH = logoSize;
   doc.lineWidth(0.75).strokeColor('#000000').rect(MARGIN, y, CONTENT_WIDTH, headerH).stroke();
   y += headerH;
 
@@ -110,13 +107,31 @@ function drawTableHead(doc, y) {
   return y + h1 + h2;
 }
 
-function makeEnsurePage(doc, report, propertyName, logoBuffer, initial) {
+function makeEnsurePage(doc, report) {
   return (y, neededH) => {
     if (y + neededH <= PAGE_BOTTOM) return y;
     doc.addPage();
-    const headerBottom = drawHeaderBlock(doc, report, propertyName, logoBuffer, initial);
+    const headerBottom = drawHeaderBlock(doc, report);
     return drawTableHead(doc, headerBottom);
   };
+}
+
+// The plain "Page X of Y" counterpart to lib/pdf.js's addPageFooter — no
+// business name/address/phone/email line, since this document carries none
+// of that branding (see this file's own top-of-file note). Silent on a
+// single-page report, same as addPageFooter's own "nothing to say" case.
+function addPlainPageFooter(doc) {
+  const range = doc.bufferedPageRange();
+  if (range.count <= 1) return;
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    const bottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    const footerY = doc.page.height - 30;
+    doc.moveTo(MARGIN, footerY).lineTo(MARGIN + CONTENT_WIDTH, footerY).strokeColor(COLORS.border).lineWidth(1).stroke();
+    doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted).text(`Page ${i - range.start + 1} of ${range.count}`, MARGIN, footerY + 8, { width: CONTENT_WIDTH, align: 'center' });
+    doc.page.margins.bottom = bottomMargin;
+  }
 }
 
 function sectionRow(doc, y, title, ensurePage) {
@@ -225,14 +240,11 @@ function signatureRow(doc, y, signature, ensurePage) {
   return y + rowH;
 }
 
-function renderModReportPdf({ report, settings }) {
+function renderModReportPdf({ report }) {
   const doc = newDoc();
-  const propertyName = settings.business_name || '';
-  const initial = (propertyName || 'M').trim().slice(0, 2).toUpperCase() || 'M';
-  const logoBuffer = settings.logo_image ? decodeImageDataUri(settings.logo_image) : null;
 
-  const ensurePage = makeEnsurePage(doc, report, propertyName, logoBuffer, initial);
-  let y = drawHeaderBlock(doc, report, propertyName, logoBuffer, initial);
+  const ensurePage = makeEnsurePage(doc, report);
+  let y = drawHeaderBlock(doc, report);
   y = drawTableHead(doc, y);
   y = occupancyRow(doc, y, report, ensurePage);
 
@@ -275,7 +287,7 @@ function renderModReportPdf({ report, settings }) {
 
   signatureRow(doc, y, report.signature, ensurePage);
 
-  return docToBuffer(doc, (d) => addPageFooter(d, settings));
+  return docToBuffer(doc, (d) => addPlainPageFooter(d));
 }
 
 module.exports = { renderModReportPdf };
