@@ -474,10 +474,31 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- Per-recipient detail for a campaign's own failed_count above — which
+  -- specific client(s) a bulk send didn't reach, and why. Originally the
+  -- send route only ever returned this in its one-time POST response
+  -- (never persisted anywhere), so once that response was gone — the page
+  -- reloaded, the toast dismissed — there was no way to find out which
+  -- recipients had failed after the fact. client_name/client_email are
+  -- denormalized snapshots (not just client_id) so this row still reads
+  -- sensibly if the client is later renamed or deleted; ON DELETE CASCADE
+  -- on campaign_id since a failure record only makes sense alongside the
+  -- campaign it belongs to. Brand-new table, no production data yet, so a
+  -- plain CREATE TABLE IF NOT EXISTS is enough.
+  CREATE TABLE IF NOT EXISTS campaign_failures (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    client_id INTEGER,
+    client_name TEXT NOT NULL DEFAULT '',
+    client_email TEXT NOT NULL DEFAULT '',
+    error TEXT NOT NULL DEFAULT ''
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_requests_client ON quote_requests(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_request_items_request ON quote_request_items(quote_request_id);
   CREATE INDEX IF NOT EXISTS idx_campaigns_created ON campaigns(created_at);
+  CREATE INDEX IF NOT EXISTS idx_campaign_failures_campaign ON campaign_failures(campaign_id);
   CREATE INDEX IF NOT EXISTS idx_invoices_client ON invoices(client_id);
   CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
   CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON quote_items(quote_id);

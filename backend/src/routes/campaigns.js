@@ -26,6 +26,16 @@ router.get('/', view, (req, res) => {
   res.json({ campaigns, page, pageSize: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) });
 });
 
+// Per-recipient detail behind a campaign's own failed_count — see
+// db/index.js's campaign_failures note for why this exists as its own
+// route rather than being folded into GET /.
+router.get('/:id/failures', view, (req, res) => {
+  const failures = db
+    .prepare('SELECT client_id, client_name, client_email, error FROM campaign_failures WHERE campaign_id = ? ORDER BY id')
+    .all(req.params.id);
+  res.json({ failures });
+});
+
 // Resolves the target recipient list server-side — the frontend only ever
 // sends *which* clients it means (recipientType + optional clientIds), never
 // the resolved email addresses themselves, so there's no way for a stale or
@@ -109,7 +119,7 @@ router.post('/', manage, async (req, res) => {
       if (err.code === 'EMAIL_NOT_CONFIGURED') {
         return res.status(503).json({ error: err.message });
       }
-      failures.push({ client_id: client.id, name: client.name, error: err.message });
+      failures.push({ client_id: client.id, name: client.name, email: client.email, error: err.message });
     }
   }
 
@@ -119,6 +129,23 @@ router.post('/', manage, async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(subject.trim(), message.trim(), type, recipients.length, sentCount, failures.length, req.user.name);
+
+  // Persist which specific recipients failed and why — the `failures`
+  // array above only ever lived in this one HTTP response before this;
+  // once the page reloaded or the toast dismissed, there was no way to
+  // find out who didn't get the email. GET /:id/failures below reads
+  // this back for the Campaigns page's "View failed recipients" action.
+  if (failures.length > 0) {
+    const insertFailure = db.prepare(
+      `INSERT INTO campaign_failures (campaign_id, client_id, client_name, client_email, error) VALUES (?, ?, ?, ?, ?)`,
+    );
+    const insertAll = db.transaction((rows) => {
+      for (const f of rows) {
+        insertFailure.run(campaign.lastInsertRowid, f.client_id, f.name, f.email, f.error);
+      }
+    });
+    insertAll(failures);
+  }
 
   logActivity({
     userName: req.user.name,

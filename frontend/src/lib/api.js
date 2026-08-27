@@ -264,6 +264,7 @@ export const api = {
   campaigns: {
     list: (token, page = 1) => request(`/campaigns?page=${page}`, { token }),
     send: (payload, token) => request('/campaigns', { method: 'POST', body: payload, token }),
+    failures: (id, token) => request(`/campaigns/${id}/failures`, { token }),
   },
 
   modReports: {

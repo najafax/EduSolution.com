@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import Pagination from '../../components/Pagination';
 import EmptyState from '../../components/EmptyState';
 import CampaignComposeModal from '../../components/CampaignComposeModal';
+import Modal from '../../components/Modal';
 import { MegaphoneIcon, PlusIcon } from '../../components/icons';
 
 // Bulk/promotional emails — newsletters, announcements, service updates —
@@ -25,6 +26,23 @@ export default function Campaigns() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCompose, setShowCompose] = useState(false);
+  const [failuresTarget, setFailuresTarget] = useState(null); // the campaign row whose failures modal is open
+  const [failures, setFailures] = useState(null); // null while loading, [] once loaded
+  const [failuresError, setFailuresError] = useState('');
+
+  // Which specific recipients failed and why — see routes/campaigns.js's
+  // campaign_failures note. Fetched fresh on open, not prefetched for
+  // every row up front, same "fetch on open" convention Licenses.jsx's own
+  // renewal-history modal already uses.
+  function openFailures(campaign) {
+    setFailuresTarget(campaign);
+    setFailures(null);
+    setFailuresError('');
+    api.campaigns
+      .failures(campaign.id, token)
+      .then(({ failures }) => setFailures(failures))
+      .catch((err) => setFailuresError(err.message));
+  }
 
   function load() {
     if (!data) setLoading(true);
@@ -94,7 +112,16 @@ export default function Campaigns() {
                 </div>
                 <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
                   {c.recipient_type === 'all' ? 'All clients' : 'Selected clients'} — sent to {c.sent_count} of {c.recipient_count}
-                  {c.failed_count > 0 && <span className="text-red-600 dark:text-red-400"> ({c.failed_count} failed)</span>}
+                  {c.failed_count > 0 && (
+                    <span className="text-red-600 dark:text-red-400">
+                      {' '}
+                      ({c.failed_count} failed —{' '}
+                      <button type="button" onClick={() => openFailures(c)} className="underline hover:no-underline">
+                        view
+                      </button>
+                      )
+                    </span>
+                  )}
                   {c.sent_by_name ? ` — sent by ${c.sent_by_name}` : ''}
                 </p>
               </li>
@@ -112,6 +139,31 @@ export default function Campaigns() {
       {canManage && (
         <CampaignComposeModal open={showCompose} onClose={() => setShowCompose(false)} token={token} onSent={handleSent} />
       )}
+
+      <Modal
+        open={!!failuresTarget}
+        onClose={() => setFailuresTarget(null)}
+        title={failuresTarget ? `Failed recipients — "${failuresTarget.subject}"` : ''}
+      >
+        {failuresError ? (
+          <p className="text-sm text-red-600 dark:text-red-400">{failuresError}</p>
+        ) : failures === null ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+        ) : failures.length === 0 ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">No failure detail was recorded for this send.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {failures.map((f, i) => (
+              <li key={i} className="py-2 text-sm">
+                <p className="font-medium text-slate-900 dark:text-white">
+                  {f.client_name} {f.client_email && <span className="font-normal text-slate-500 dark:text-slate-400">({f.client_email})</span>}
+                </p>
+                <p className="mt-0.5 text-red-600 dark:text-red-400">{f.error}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Modal>
     </div>
   );
 }
