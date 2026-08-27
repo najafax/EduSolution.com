@@ -326,6 +326,11 @@ export default function Licenses() {
   function rowActions(l) {
     const rowBusy = busy?.id === l.id;
     const isBusy = (action) => rowBusy && busy.action === action;
+    // Cancel and Send renewal reminder both disappear the moment a license
+    // has ever been renewed (last_renewed_at set — by a manual Renew click
+    // or the auto-renew-on-invoice-payment flow, either way), not just
+    // while it's active — a license someone's already paid to renew isn't
+    // meant to be casually cancelled or nagged about again.
     return (
       <>
         {l.status === 'active' && (
@@ -339,7 +344,7 @@ export default function Licenses() {
             label="Renew license"
           />
         )}
-        {l.status === 'active' && (
+        {l.status === 'active' && !l.last_renewed_at && (
           <IconActionButton
             icon={XIcon}
             tone="orange"
@@ -359,7 +364,7 @@ export default function Licenses() {
             label="Reactivate license"
           />
         )}
-        {l.status !== 'cancelled' && (
+        {l.status !== 'cancelled' && !l.last_renewed_at && (
           <IconActionButton
             icon={BellIcon}
             tone="amber"

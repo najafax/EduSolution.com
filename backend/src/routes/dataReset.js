@@ -19,11 +19,20 @@ const CONFIRM_PHRASE = 'DELETE';
 // behind would orphan them (invisible to every list page's INNER JOIN
 // against clients, but still sitting in the database forever). Same reason
 // "licenses" always pulls in license_renewals, which NOT NULL-references
-// license_id rather than client_id directly. Every other category is safe
-// to clear on its own. users, user_permissions, and business_settings are
-// never touched by any category: login and branding must survive a reset.
+// license_id rather than client_id directly. "clients" also pulls in
+// quote_request_items/quote_requests for the same reason — unlike every
+// other client-referencing table here, quote_requests.client_id actually
+// carries a real ON DELETE CASCADE in the schema, but that only fires with
+// foreign_keys enforcement on, and this route runs its whole transaction
+// with it off (see below), so it has to be listed explicitly here just
+// like the rest or it'd be left orphaned same as they would. Every other
+// category is safe to clear on its own — "campaigns" has no client_id
+// column at all (it logs recipient counts, not a live reference), and
+// "quote_requests" own child, quote_request_items, is cleared alongside it
+// automatically. users, user_permissions, and business_settings are never
+// touched by any category: login and branding must survive a reset.
 const CATEGORIES = {
-  clients: ['quote_items', 'quotes', 'invoice_items', 'payments', 'invoices', 'recurring_invoice_items', 'recurring_invoices', 'license_renewals', 'licenses', 'clients'],
+  clients: ['quote_items', 'quotes', 'invoice_items', 'payments', 'invoices', 'recurring_invoice_items', 'recurring_invoices', 'license_renewals', 'licenses', 'quote_request_items', 'quote_requests', 'clients'],
   quotes: ['quote_items', 'quotes'],
   invoices: ['invoice_items', 'payments', 'invoices'],
   recurring: ['recurring_invoice_items', 'recurring_invoices'],
@@ -33,6 +42,8 @@ const CATEGORIES = {
   owner_draws: ['owner_draws'],
   products: ['products'],
   activity: ['activity_log'],
+  campaigns: ['campaigns'],
+  quote_requests: ['quote_request_items', 'quote_requests'],
 };
 
 // Delete order matters for readability/consistency even though foreign_keys
@@ -48,11 +59,14 @@ const TABLE_ORDER = [
   'recurring_invoices',
   'license_renewals',
   'licenses',
+  'quote_request_items',
+  'quote_requests',
   'expenses',
   'capital_contributions',
   'owner_draws',
   'clients',
   'products',
+  'campaigns',
   'activity_log',
 ];
 
@@ -98,6 +112,15 @@ router.post('/', (req, res) => {
       }
       if (tablesToClear.has('recurring_invoices') && !tablesToClear.has('invoices')) {
         db.prepare('UPDATE invoices SET recurring_invoice_id = NULL WHERE recurring_invoice_id IS NOT NULL').run();
+      }
+      // quote_requests.quote_id IS a real REFERENCES quotes(id) (ON DELETE
+      // SET NULL — unlike the three soft/unenforced links above), so with
+      // enforcement back on after this transaction a quote_requests row
+      // still pointing at a quote that clearing "quotes" alone (without
+      // "quote_requests") just deleted would be exactly the kind of
+      // dangling reference this whole cleanup block exists to prevent.
+      if (tablesToClear.has('quotes') && !tablesToClear.has('quote_requests')) {
+        db.prepare('UPDATE quote_requests SET quote_id = NULL WHERE quote_id IS NOT NULL').run();
       }
     })();
   } finally {

@@ -100,8 +100,8 @@ const RESET_CATEGORIES = [
   {
     key: 'clients',
     label: 'Clients',
-    hint: 'Also deletes every quote, invoice, payment, recurring invoice, and license tied to them.',
-    forces: ['quotes', 'invoices', 'recurring', 'licenses'],
+    hint: 'Also deletes every quote, invoice, payment, recurring invoice, license, and quote request tied to them.',
+    forces: ['quotes', 'invoices', 'recurring', 'licenses', 'quote_requests'],
   },
   { key: 'quotes', label: 'Quotes' },
   { key: 'invoices', label: 'Invoices & payments' },
@@ -111,6 +111,8 @@ const RESET_CATEGORIES = [
   { key: 'capital_contributions', label: 'Capital contributions' },
   { key: 'products', label: 'Product catalog' },
   { key: 'activity', label: 'Activity log' },
+  { key: 'campaigns', label: 'Campaigns' },
+  { key: 'quote_requests', label: 'Quote requests' },
 ];
 
 const CLIENTS_FORCES = RESET_CATEGORIES.find((c) => c.key === 'clients').forces;
