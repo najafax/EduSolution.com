@@ -56,6 +56,23 @@ const ACCENT = {
   cancelled: 'bg-slate-300 dark:bg-slate-600',
 };
 
+// The default starting draft for the "Email cancelled clients" campaign —
+// CampaignComposeModal's defaultSubject/defaultMessage props (see that
+// component's own doc comment) just pre-fill these into the form, they're
+// still fully editable before sending. {{license_url}} is filled in per
+// recipient from campaignRecipientData below (blank for a client whose
+// license never had one on file — the sentence still reads fine either way).
+const CANCELLED_LICENSE_EMAIL_SUBJECT = 'Confirming Your License Status';
+const CANCELLED_LICENSE_EMAIL_MESSAGE = `Dear Sir/Madam,
+
+We noticed that your license with us is currently showing as cancelled. We wanted to reach out to confirm whether this is still accurate, or whether you'd like to reactivate it.
+
+If you still require the license, please let us know and we'll be happy to get it reactivated for you right away. If you no longer need it, no action is needed on your part.
+
+You can review your license details here: {{license_url}}
+
+Please don't hesitate to reach out if you have any questions or need any assistance.`;
+
 const EMPTY_FORM = {
   client_id: '',
   name: '',
@@ -831,6 +848,8 @@ export default function Licenses() {
         presetNote="Pre-filled with every client who currently has a cancelled license — review the list below before sending."
         mergeFields={[{ key: 'license_url', label: "Client's license URL" }]}
         recipientData={campaignRecipientData}
+        defaultSubject={CANCELLED_LICENSE_EMAIL_SUBJECT}
+        defaultMessage={CANCELLED_LICENSE_EMAIL_MESSAGE}
         onSent={({ sentCount, failedCount }) => {
           setCampaignModalOpen(false);
           setNotice(

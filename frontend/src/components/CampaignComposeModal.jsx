@@ -11,9 +11,14 @@ import SearchInput from './SearchInput';
 // see routes/campaigns.js's own doc comment for why "single & bulk" is
 // really one action underneath: a single-recipient send is just
 // recipientType: 'selected' with one clientId. Unlike EmailPreviewModal,
-// there's no pre-filled default subject/message to preview — a campaign is
-// original per-send copy, not a templated transactional email — so this
-// starts blank instead of fetching a preview on open.
+// there's no *admin-editable-in-Email-Center* template behind this — a
+// campaign is original per-send copy, not a recurring transactional email
+// — so most callers still start blank. A caller that always sends
+// essentially the same ask (Licenses.jsx's "Email cancelled clients") can
+// pass defaultSubject/defaultMessage to pre-fill a sensible starting draft
+// instead — still just a starting point the admin edits before sending,
+// not a fetched/stored template, and every other caller that omits these
+// props is unaffected.
 //
 // mergeFields/recipientData are how a caller gives each recipient their
 // own value inside otherwise-identical copy — e.g. Licenses.jsx's "Email
@@ -25,7 +30,20 @@ import SearchInput from './SearchInput';
 // server-side via the same renderTemplate() every transactional email in
 // this app already uses. A campaign with no mergeFields/recipientData
 // (every other caller) behaves exactly as before — this is purely additive.
-export default function CampaignComposeModal({ open, onClose, token, singleClient, presetClientIds, title, presetNote, mergeFields, recipientData, onSent }) {
+export default function CampaignComposeModal({
+  open,
+  onClose,
+  token,
+  singleClient,
+  presetClientIds,
+  title,
+  presetNote,
+  mergeFields,
+  recipientData,
+  defaultSubject,
+  defaultMessage,
+  onSent,
+}) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [recipientMode, setRecipientMode] = useState('all'); // 'all' | 'selected' — ignored when singleClient is set
@@ -39,8 +57,8 @@ export default function CampaignComposeModal({ open, onClose, token, singleClien
 
   useEffect(() => {
     if (!open) return;
-    setSubject('');
-    setMessage('');
+    setSubject(defaultSubject || '');
+    setMessage(defaultMessage || '');
     setError('');
     setClientSearch('');
     if (singleClient) return;
