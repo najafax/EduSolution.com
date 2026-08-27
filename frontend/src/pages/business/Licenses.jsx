@@ -17,6 +17,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import KpiCard from '../../components/KpiCard';
 import IconActionButton from '../../components/IconActionButton';
+import CampaignComposeModal from '../../components/CampaignComposeModal';
 import {
   LicenseIcon,
   CheckCircleIcon,
@@ -33,6 +34,7 @@ import {
   ReportIcon,
   LinkIcon,
   SendIcon,
+  MegaphoneIcon,
 } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
@@ -69,6 +71,7 @@ const EMPTY_FORM = {
 export default function Licenses() {
   const { token, can } = useAuth();
   const canManage = can('licenses', 'manage');
+  const canSendCampaigns = can('campaigns', 'manage');
   const [licenses, setLicenses] = useState([]);
   const [pageInfo, setPageInfo] = useState(null);
   const [page, setPage] = useState(1);
@@ -91,7 +94,36 @@ export default function Licenses() {
   const [historyTarget, setHistoryTarget] = useState(null);
   const [renewals, setRenewals] = useState(null);
   const [renewalsError, setRenewalsError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [campaignModalOpen, setCampaignModalOpen] = useState(false);
+  const [campaignPresetIds, setCampaignPresetIds] = useState([]);
+  const [campaignLoading, setCampaignLoading] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
+
+  // Every distinct client with at least one cancelled license, gathered
+  // fresh (not from this page's own paginated/filtered `licenses` state,
+  // which may not even include every cancelled license depending on the
+  // current search/status filter/page) — backs the "Email cancelled
+  // clients" header button below.
+  async function openCancelledLicensesCampaign() {
+    setError('');
+    setNotice('');
+    setCampaignLoading(true);
+    try {
+      const { licenses: cancelledLicenses } = await api.licenses.list(token, { status: 'cancelled' });
+      const clientIds = [...new Set(cancelledLicenses.map((l) => l.client_id))];
+      if (clientIds.length === 0) {
+        setError('No clients currently have a cancelled license.');
+        return;
+      }
+      setCampaignPresetIds(clientIds);
+      setCampaignModalOpen(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCampaignLoading(false);
+    }
+  }
 
   function load() {
     // Only show the loading skeleton on the very first load — once there's
@@ -418,6 +450,16 @@ export default function Licenses() {
             <DownloadIcon width={16} height={16} />
             Export Excel
           </button>
+          {canSendCampaigns && (
+            <button
+              onClick={openCancelledLicensesCampaign}
+              disabled={campaignLoading}
+              className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <MegaphoneIcon width={16} height={16} />
+              {campaignLoading ? 'Loading…' : 'Email cancelled clients'}
+            </button>
+          )}
           {canManage && (
             <button
               onClick={startCreate}
@@ -429,6 +471,8 @@ export default function Licenses() {
           )}
         </div>
       </div>
+
+      {notice && <p className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">{notice}</p>}
 
       {summary && (
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -766,6 +810,23 @@ export default function Licenses() {
       </Modal>
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New license" />}
+
+      <CampaignComposeModal
+        open={campaignModalOpen}
+        onClose={() => setCampaignModalOpen(false)}
+        token={token}
+        presetClientIds={campaignPresetIds}
+        title="Email clients with a cancelled license"
+        presetNote="Pre-filled with every client who currently has a cancelled license — review the list below before sending."
+        onSent={({ sentCount, failedCount }) => {
+          setCampaignModalOpen(false);
+          setNotice(
+            sentCount > 0
+              ? `Email sent to ${sentCount} client${sentCount === 1 ? '' : 's'}${failedCount ? ` (${failedCount} failed)` : ''}.`
+              : 'Email failed to send.',
+          );
+        }}
+      />
 
       {confirmDialog}
     </div>

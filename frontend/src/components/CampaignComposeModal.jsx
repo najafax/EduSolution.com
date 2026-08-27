@@ -4,15 +4,17 @@ import Modal from './Modal';
 import SearchInput from './SearchInput';
 
 // The single shared compose UI behind both the Campaigns page's "New
-// campaign" button (bulk — every client, or a hand-picked subset) and
+// campaign" button (bulk — every client, or a hand-picked subset),
 // Clients.jsx's per-row "Send campaign email" action (a fixed single
-// recipient) — see routes/campaigns.js's own doc comment for why "single &
-// bulk" is really one action underneath: a single-recipient send is just
+// recipient), and any caller that already knows *which* clients it means
+// (Licenses.jsx's "Email cancelled clients" — see presetClientIds below) —
+// see routes/campaigns.js's own doc comment for why "single & bulk" is
+// really one action underneath: a single-recipient send is just
 // recipientType: 'selected' with one clientId. Unlike EmailPreviewModal,
 // there's no pre-filled default subject/message to preview — a campaign is
 // original per-send copy, not a templated transactional email — so this
 // starts blank instead of fetching a preview on open.
-export default function CampaignComposeModal({ open, onClose, token, singleClient, onSent }) {
+export default function CampaignComposeModal({ open, onClose, token, singleClient, presetClientIds, title, presetNote, onSent }) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [recipientMode, setRecipientMode] = useState('all'); // 'all' | 'selected' — ignored when singleClient is set
@@ -30,8 +32,12 @@ export default function CampaignComposeModal({ open, onClose, token, singleClien
     setError('');
     setClientSearch('');
     if (singleClient) return;
-    setRecipientMode('all');
-    setSelectedIds(new Set());
+    // A caller that already knows which clients it means (presetClientIds)
+    // starts in "Select clients" mode with exactly those pre-checked —
+    // still a real, editable selection the admin can review/adjust before
+    // sending, not a silent send straight to a computed list.
+    setRecipientMode(presetClientIds && presetClientIds.length > 0 ? 'selected' : 'all');
+    setSelectedIds(presetClientIds ? new Set(presetClientIds) : new Set());
     setLoadingClients(true);
     // The full, unpaginated client list — same "no q/page means the whole
     // array" convention LineItemsEditor's own product picker relies on —
@@ -43,7 +49,7 @@ export default function CampaignComposeModal({ open, onClose, token, singleClien
       .catch((err) => setError(err.message))
       .finally(() => setLoadingClients(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, singleClient?.id]);
+  }, [open, singleClient?.id, presetClientIds]);
 
   const emailedClients = useMemo(() => allClients.filter((c) => c.email && c.email.trim()), [allClients]);
   const filteredClients = useMemo(() => {
@@ -109,11 +115,12 @@ export default function CampaignComposeModal({ open, onClose, token, singleClien
     <Modal
       open={open}
       onClose={onClose}
-      title={singleClient ? `Send email to ${singleClient.name}` : 'New campaign'}
+      title={title || (singleClient ? `Send email to ${singleClient.name}` : 'New campaign')}
       maxWidthClass="max-w-2xl"
     >
       <div className="flex flex-col gap-3">
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {presetNote && !singleClient && <p className="text-sm text-slate-600 dark:text-slate-400">{presetNote}</p>}
 
         {singleClient ? (
           <p className="text-sm text-slate-600 dark:text-slate-400">
