@@ -18,6 +18,32 @@ const manage = requirePermission('licenses', 'manage');
 const BILLING_CYCLES = ['monthly', 'yearly'];
 const today = () => new Date().toISOString().slice(0, 10);
 
+// Correcting a license's start_date on the Edit form (a typo, a date
+// entered wrong originally) implies the whole renewal timeline was off by
+// the same amount — not just the live expiry_date, but every recorded
+// previous/new expiry pair too. These two helpers shift a plain YYYY-MM-DD
+// date string by N calendar days, used by PUT /:id below to move every
+// license_renewals row (and the license's own expiry_date) by exactly the
+// same delta the start_date moved, so the whole chain stays internally
+// consistent — each row's new_expiry_date still equals the next row's
+// previous_expiry_date. Deliberately day-based rather than reapplying
+// advanceExpiry()'s cycle math from scratch: it preserves whatever the
+// real historical gaps were (which might not be a clean cycle multiple —
+// a partial first period, an early manual renewal, etc.) instead of
+// assuming a tidy "start_date + 1 cycle" formula that may never have been
+// true for this specific license.
+function daysBetween(aStr, bStr) {
+  const a = new Date(`${aStr}T00:00:00`);
+  const b = new Date(`${bStr}T00:00:00`);
+  return Math.round((b - a) / 86400000);
+}
+function shiftDateStr(dateStr, deltaDays) {
+  if (!deltaDays) return dateStr;
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+
 // How many days out a still-active license starts counting as "expiring
 // soon" — both for the `display_status` badge below and for which licenses
 // lib/scheduler.js's runLicenseExpiryAlerts() treats as candidates to email.
@@ -341,32 +367,71 @@ router.put('/:id', manage, (req, res) => {
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
   const nextStatus = ['active', 'cancelled'].includes(status) ? status : existing.status;
+  const startDateChanged = start_date !== existing.start_date;
   const expiryChanged = expiry_date !== existing.expiry_date;
 
-  db.transaction(() => {
-    db.prepare(
-      `UPDATE licenses SET client_id = ?, name = ?, status = ?, billing_cycle = ?, amount = ?, start_date = ?, expiry_date = ?, url = ?, notes = ?, updated_at = datetime('now')
-       WHERE id = ?`,
-    ).run(client_id, name.trim(), nextStatus, billing_cycle, Number(amount), start_date, expiry_date, url.trim(), notes, req.params.id);
+  // What actually gets written to licenses.expiry_date — starts out as
+  // whatever was submitted, but the startDateChanged branch below can
+  // override it with the shifted chain's own final value instead (see that
+  // branch's own comment for when and why).
+  let finalExpiryDate = expiry_date;
+  let historyRowsShifted = 0;
 
-    // Editing expiry_date here is a direct correction (a typo, a date that
-    // was simply entered wrong), not a real renewal — but lib/licenseRenewal.js's
-    // renewLicense() is the only other writer of license_renewals, and it
-    // always keeps that table's newest row's new_expiry_date equal to the
-    // license's own live expiry_date. Leaving that invariant broken after a
-    // manual correction would mean the "Renewal history" modal (and the
-    // next real Renew, which always advances from license.expiry_date, not
-    // from the stale renewal row) both keep showing the wrong date. Only
-    // the single most recent row is corrected — every earlier row is still
-    // an accurate record of what the expiry actually was at that point in
-    // history, so it's left untouched; a license with no renewals yet has
-    // no row to correct, so this UPDATE just affects zero rows.
-    if (expiryChanged) {
+  db.transaction(() => {
+    // Editing start_date and/or expiry_date here is a direct correction —
+    // not a real renewal — but lib/licenseRenewal.js's renewLicense() is
+    // the only other writer of license_renewals, and it always keeps the
+    // chain internally consistent: each row's new_expiry_date equals the
+    // next row's previous_expiry_date, and the license's live expiry_date
+    // always equals the newest row's new_expiry_date. A correction has to
+    // preserve that or the "Renewal history" modal (and the next real
+    // Renew, which always advances from license.expiry_date) keep
+    // showing/using the wrong dates.
+    if (startDateChanged) {
+      // A wrong start_date means the whole timeline was off by the same
+      // amount — so every renewal record shifts by that same day-delta,
+      // not just the newest one. Walked oldest-first so each row's shifted
+      // previous_expiry_date can be sanity-checked against the row before
+      // it if this is ever debugged, though nothing here actually depends
+      // on that ordering beyond identifying which row is the newest.
+      const deltaDays = daysBetween(existing.start_date, start_date);
+      const renewals = db
+        .prepare('SELECT id, previous_expiry_date, new_expiry_date FROM license_renewals WHERE license_id = ? ORDER BY renewed_at ASC, id ASC')
+        .all(req.params.id);
+      renewals.forEach((r, i) => {
+        const isNewest = i === renewals.length - 1;
+        const shiftedPrev = shiftDateStr(r.previous_expiry_date, deltaDays);
+        // The newest row's own new_expiry_date defers to an explicitly
+        // submitted expiry_date over the shift, when the two disagree — an
+        // admin who typed a specific "as of right now" expiry is a more
+        // authoritative signal for that one value than the day-delta shift;
+        // every other date in the chain (including this same row's own
+        // previous_expiry_date) has no equivalent explicit signal, so it's
+        // still purely shift-derived.
+        const shiftedNew = isNewest && expiryChanged ? expiry_date : shiftDateStr(r.new_expiry_date, deltaDays);
+        db.prepare('UPDATE license_renewals SET previous_expiry_date = ?, new_expiry_date = ? WHERE id = ?').run(shiftedPrev, shiftedNew, r.id);
+        if (isNewest) finalExpiryDate = shiftedNew;
+      });
+      historyRowsShifted = renewals.length;
+      // No renewal history yet — there's no chain to shift, so this is a
+      // plain field correction same as always: whatever was submitted.
+      if (renewals.length === 0) finalExpiryDate = expiry_date;
+    } else if (expiryChanged) {
+      // start_date is unchanged, so nothing implies the earlier history is
+      // wrong — only the single most recent row (which the live
+      // expiry_date is supposed to mirror) gets corrected; a license with
+      // no renewals yet has no row to correct, so this just affects zero
+      // rows.
       db.prepare(
         `UPDATE license_renewals SET new_expiry_date = ?
          WHERE id = (SELECT id FROM license_renewals WHERE license_id = ? ORDER BY renewed_at DESC, id DESC LIMIT 1)`,
       ).run(expiry_date, req.params.id);
     }
+
+    db.prepare(
+      `UPDATE licenses SET client_id = ?, name = ?, status = ?, billing_cycle = ?, amount = ?, start_date = ?, expiry_date = ?, url = ?, notes = ?, updated_at = datetime('now')
+       WHERE id = ?`,
+    ).run(client_id, name.trim(), nextStatus, billing_cycle, Number(amount), start_date, finalExpiryDate, url.trim(), notes, req.params.id);
   })();
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id));
@@ -375,8 +440,19 @@ router.put('/:id', manage, (req, res) => {
   // Distinct, structured entries on top of the generic 'updated' one above —
   // GET /analytics counts these by exact action string to report billing-
   // cycle changes and cancellations/reactivations per year, which the free-
-  // text 'updated' entry alone can't be queried for reliably.
-  if (expiryChanged) {
+  // text 'updated' entry alone can't be queried for reliably. Mutually
+  // exclusive with the plain expiry-only correction below — a start_date
+  // correction already covers (and supersedes) whatever happened to
+  // expiry_date in the same edit.
+  if (startDateChanged) {
+    logActivity({
+      userName: req.user.name,
+      action: 'corrected start date',
+      entityType: 'license',
+      entityId: license.id,
+      entityLabel: `${license.name} (${client.name}): ${existing.start_date} → ${start_date}` + (historyRowsShifted > 0 ? ` (${historyRowsShifted} renewal record${historyRowsShifted === 1 ? '' : 's'} shifted to match)` : ''),
+    });
+  } else if (expiryChanged) {
     logActivity({
       userName: req.user.name,
       action: 'corrected expiry date',
