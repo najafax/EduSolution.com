@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import Modal from './Modal';
 import SearchInput from './SearchInput';
@@ -14,7 +14,18 @@ import SearchInput from './SearchInput';
 // there's no pre-filled default subject/message to preview — a campaign is
 // original per-send copy, not a templated transactional email — so this
 // starts blank instead of fetching a preview on open.
-export default function CampaignComposeModal({ open, onClose, token, singleClient, presetClientIds, title, presetNote, onSent }) {
+//
+// mergeFields/recipientData are how a caller gives each recipient their
+// own value inside otherwise-identical copy — e.g. Licenses.jsx's "Email
+// cancelled clients" wants each client's own license link, not one shared
+// URL. mergeFields is just the *hint* shown here ([{ key, label }], so the
+// admin can click to insert {{key}}); recipientData is the actual
+// { [clientId]: { key: value } } map, sent straight through to
+// routes/campaigns.js, which does the real per-recipient substitution
+// server-side via the same renderTemplate() every transactional email in
+// this app already uses. A campaign with no mergeFields/recipientData
+// (every other caller) behaves exactly as before — this is purely additive.
+export default function CampaignComposeModal({ open, onClose, token, singleClient, presetClientIds, title, presetNote, mergeFields, recipientData, onSent }) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [recipientMode, setRecipientMode] = useState('all'); // 'all' | 'selected' — ignored when singleClient is set
@@ -24,6 +35,7 @@ export default function CampaignComposeModal({ open, onClose, token, singleClien
   const [clientSearch, setClientSearch] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const messageRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
@@ -85,6 +97,26 @@ export default function CampaignComposeModal({ open, onClose, token, singleClien
     });
   }
 
+  // Inserts {{key}} at the cursor rather than just appending it, so a merge
+  // tag can land mid-sentence ("...link here: {{license_url}}.") the same
+  // way typing it by hand would.
+  function insertMergeTag(key) {
+    const tag = `{{${key}}}`;
+    const el = messageRef.current;
+    if (!el) {
+      setMessage((m) => m + tag);
+      return;
+    }
+    const start = el.selectionStart ?? message.length;
+    const end = el.selectionEnd ?? message.length;
+    const next = message.slice(0, start) + tag + message.slice(end);
+    setMessage(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + tag.length, start + tag.length);
+    });
+  }
+
   const canSend =
     subject.trim() &&
     message.trim() &&
@@ -100,6 +132,7 @@ export default function CampaignComposeModal({ open, onClose, token, singleClien
         message: message.trim(),
         recipientType: singleClient ? 'selected' : recipientMode,
         clientIds: singleClient ? [singleClient.id] : recipientMode === 'selected' ? [...selectedIds] : undefined,
+        recipientData,
       };
       const result = await api.campaigns.send(payload, token);
       onSent?.(result);
@@ -216,6 +249,7 @@ export default function CampaignComposeModal({ open, onClose, token, singleClien
         <label className="block">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Message</span>
           <textarea
+            ref={messageRef}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={8}
@@ -223,6 +257,23 @@ export default function CampaignComposeModal({ open, onClose, token, singleClien
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
           />
         </label>
+        {mergeFields && mergeFields.length > 0 && (
+          <p className="-mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+            Insert:
+            {mergeFields.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => insertMergeTag(f.key)}
+                className="rounded-full border border-slate-300 px-2 py-0.5 font-mono text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                title={`Replaced with each recipient's own ${f.label.toLowerCase()}`}
+              >
+                {`{{${f.key}}}`}
+              </button>
+            ))}
+            <span>— each recipient gets their own value.</span>
+          </p>
+        )}
         <p className="text-xs text-slate-500 dark:text-slate-400">Plain text only — no attachments. Links are made clickable automatically.</p>
 
         <div className="mt-1 flex justify-end gap-2">

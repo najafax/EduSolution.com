@@ -97,6 +97,7 @@ export default function Licenses() {
   const [notice, setNotice] = useState('');
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [campaignPresetIds, setCampaignPresetIds] = useState([]);
+  const [campaignRecipientData, setCampaignRecipientData] = useState({});
   const [campaignLoading, setCampaignLoading] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
 
@@ -104,7 +105,10 @@ export default function Licenses() {
   // fresh (not from this page's own paginated/filtered `licenses` state,
   // which may not even include every cancelled license depending on the
   // current search/status filter/page) — backs the "Email cancelled
-  // clients" header button below.
+  // clients" header button below. Also builds the per-client
+  // {{license_url}} merge data CampaignComposeModal sends along — a client
+  // with more than one cancelled license just gets the first one found,
+  // since a single merge tag can only carry one value.
   async function openCancelledLicensesCampaign() {
     setError('');
     setNotice('');
@@ -112,6 +116,13 @@ export default function Licenses() {
     try {
       const { licenses: cancelledLicenses } = await api.licenses.list(token, { status: 'cancelled' });
       const clientIds = [...new Set(cancelledLicenses.map((l) => l.client_id))];
+      const recipientData = {};
+      cancelledLicenses.forEach((l) => {
+        if (!recipientData[l.client_id]) {
+          recipientData[l.client_id] = { license_url: l.url || '', license_name: l.name || '' };
+        }
+      });
+      setCampaignRecipientData(recipientData);
       if (clientIds.length === 0) {
         setError('No clients currently have a cancelled license.');
         return;
@@ -818,6 +829,8 @@ export default function Licenses() {
         presetClientIds={campaignPresetIds}
         title="Email clients with a cancelled license"
         presetNote="Pre-filled with every client who currently has a cancelled license — review the list below before sending."
+        mergeFields={[{ key: 'license_url', label: "Client's license URL" }]}
+        recipientData={campaignRecipientData}
         onSent={({ sentCount, failedCount }) => {
           setCampaignModalOpen(false);
           setNotice(

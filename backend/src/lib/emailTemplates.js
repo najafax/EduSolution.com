@@ -216,4 +216,5 @@ module.exports = {
   getAllTemplates,
   setTemplate,
   resetTemplate,
+  renderTemplate,
 };

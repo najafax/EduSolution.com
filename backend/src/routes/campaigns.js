@@ -4,6 +4,7 @@ const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { sendMail, textToHtml } = require('../lib/mailer');
+const { renderTemplate } = require('../lib/emailTemplates');
 
 const router = Router();
 router.use(requireAuth);
@@ -49,7 +50,7 @@ function resolveRecipients({ recipientType, clientIds }) {
 // is exactly how the Clients page's own per-row "Send email" shortcut
 // sends to just that one client, no separate code path needed.
 router.post('/', manage, async (req, res) => {
-  const { subject, message, recipientType } = req.body || {};
+  const { subject, message, recipientType, recipientData } = req.body || {};
   if (!subject || !subject.trim() || !message || !message.trim()) {
     return res.status(400).json({ error: 'Subject and message are required' });
   }
@@ -71,7 +72,6 @@ router.post('/', manage, async (req, res) => {
     });
   }
 
-  const html = textToHtml(message);
   const failures = [];
   let sentCount = 0;
 
@@ -80,13 +80,25 @@ router.post('/', manage, async (req, res) => {
   // single-business scale (a handful to low hundreds of clients) makes the
   // extra time negligible. One client's rejected/invalid address doesn't
   // abort the rest of the run.
+  //
+  // Subject/message are rendered per recipient via the same
+  // {{placeholder}} substitution lib/emailTemplates.js's own transactional
+  // sends already use (renderTemplate) — recipientData is an optional
+  // { [clientId]: { key: value } } map the caller supplies (e.g.
+  // Licenses.jsx's "Email cancelled clients" passes each client's own
+  // license_url), so a genuinely one-to-many campaign with no merge data
+  // renders identically to before (renderTemplate against an empty vars
+  // object just leaves any literal {{...}} in the text untouched).
   for (const client of recipients) {
+    const vars = (recipientData && recipientData[client.id]) || {};
+    const subjectForClient = renderTemplate(subject.trim(), vars);
+    const messageForClient = renderTemplate(message, vars);
     try {
-      await sendMail({ to: client.email, subject: subject.trim(), html });
+      await sendMail({ to: client.email, subject: subjectForClient, html: textToHtml(messageForClient) });
       logEmail({
         type: 'campaign',
         to: client.email,
-        subject: subject.trim(),
+        subject: subjectForClient,
         sentByName: req.user.name,
         entityType: 'client',
         entityId: client.id,
