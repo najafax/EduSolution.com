@@ -25,7 +25,10 @@ export default function Campaigns() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showCompose, setShowCompose] = useState(false);
+  // null = closed; {} = open blank ("New campaign"); a populated object
+  // (presetClientIds/defaultSubject/defaultMessage/title) = open pre-filled,
+  // e.g. by "Resend to failed recipients" below — same shared modal either way.
+  const [compose, setCompose] = useState(null);
   const [failuresTarget, setFailuresTarget] = useState(null); // the campaign row whose failures modal is open
   const [failures, setFailures] = useState(null); // null while loading, [] once loaded
   const [failuresError, setFailuresError] = useState('');
@@ -42,6 +45,26 @@ export default function Campaigns() {
       .failures(campaign.id, token)
       .then(({ failures }) => setFailures(failures))
       .catch((err) => setFailuresError(err.message));
+  }
+
+  // Re-opens the compose modal pre-selected to just the recipients who
+  // failed on a prior send, with that campaign's own subject/message as
+  // the starting draft (still fully editable, same defaultSubject/
+  // defaultMessage mechanism CampaignComposeModal already offers — see
+  // that component's own doc comment). Backend re-resolves the ids
+  // against the live clients table (routes/campaigns.js's
+  // resolveRecipients), so a client deleted since the original send is
+  // silently dropped rather than erroring.
+  function resendToFailed() {
+    const ids = failures.map((f) => f.client_id).filter((id) => id != null);
+    setCompose({
+      presetClientIds: ids,
+      title: `Resend to failed recipients — "${failuresTarget.subject}"`,
+      presetNote: 'Pre-filled with the clients this campaign failed to reach last time — review the list below before sending.',
+      defaultSubject: failuresTarget.subject,
+      defaultMessage: failuresTarget.message,
+    });
+    setFailuresTarget(null);
   }
 
   function load() {
@@ -76,7 +99,7 @@ export default function Campaigns() {
         </div>
         {canManage && (
           <button
-            onClick={() => setShowCompose(true)}
+            onClick={() => setCompose({})}
             className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
           >
             <PlusIcon width={16} height={16} />
@@ -95,7 +118,7 @@ export default function Campaigns() {
             icon={<MegaphoneIcon />}
             title="No campaigns sent yet."
             message={canManage ? 'Send your first newsletter or announcement to your clients.' : undefined}
-            action={canManage ? { label: 'New campaign', onClick: () => setShowCompose(true) } : undefined}
+            action={canManage ? { label: 'New campaign', onClick: () => setCompose({}) } : undefined}
           />
         ) : !error ? (
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -137,7 +160,17 @@ export default function Campaigns() {
       </div>
 
       {canManage && (
-        <CampaignComposeModal open={showCompose} onClose={() => setShowCompose(false)} token={token} onSent={handleSent} />
+        <CampaignComposeModal
+          open={!!compose}
+          onClose={() => setCompose(null)}
+          token={token}
+          presetClientIds={compose?.presetClientIds}
+          title={compose?.title}
+          presetNote={compose?.presetNote}
+          defaultSubject={compose?.defaultSubject}
+          defaultMessage={compose?.defaultMessage}
+          onSent={handleSent}
+        />
       )}
 
       <Modal
@@ -152,16 +185,29 @@ export default function Campaigns() {
         ) : failures.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">No failure detail was recorded for this send.</p>
         ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {failures.map((f, i) => (
-              <li key={i} className="py-2 text-sm">
-                <p className="font-medium text-slate-900 dark:text-white">
-                  {f.client_name} {f.client_email && <span className="font-normal text-slate-500 dark:text-slate-400">({f.client_email})</span>}
-                </p>
-                <p className="mt-0.5 text-red-600 dark:text-red-400">{f.error}</p>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+              {failures.map((f, i) => (
+                <li key={i} className="py-2 text-sm">
+                  <p className="font-medium text-slate-900 dark:text-white">
+                    {f.client_name} {f.client_email && <span className="font-normal text-slate-500 dark:text-slate-400">({f.client_email})</span>}
+                  </p>
+                  <p className="mt-0.5 text-red-600 dark:text-red-400">{f.error}</p>
+                </li>
+              ))}
+            </ul>
+            {canManage && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={resendToFailed}
+                  className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+                >
+                  Resend to these {failures.length} recipient{failures.length === 1 ? '' : 's'}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </Modal>
     </div>
