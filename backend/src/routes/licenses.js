@@ -341,11 +341,33 @@ router.put('/:id', manage, (req, res) => {
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
   const nextStatus = ['active', 'cancelled'].includes(status) ? status : existing.status;
+  const expiryChanged = expiry_date !== existing.expiry_date;
 
-  db.prepare(
-    `UPDATE licenses SET client_id = ?, name = ?, status = ?, billing_cycle = ?, amount = ?, start_date = ?, expiry_date = ?, url = ?, notes = ?, updated_at = datetime('now')
-     WHERE id = ?`,
-  ).run(client_id, name.trim(), nextStatus, billing_cycle, Number(amount), start_date, expiry_date, url.trim(), notes, req.params.id);
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE licenses SET client_id = ?, name = ?, status = ?, billing_cycle = ?, amount = ?, start_date = ?, expiry_date = ?, url = ?, notes = ?, updated_at = datetime('now')
+       WHERE id = ?`,
+    ).run(client_id, name.trim(), nextStatus, billing_cycle, Number(amount), start_date, expiry_date, url.trim(), notes, req.params.id);
+
+    // Editing expiry_date here is a direct correction (a typo, a date that
+    // was simply entered wrong), not a real renewal — but lib/licenseRenewal.js's
+    // renewLicense() is the only other writer of license_renewals, and it
+    // always keeps that table's newest row's new_expiry_date equal to the
+    // license's own live expiry_date. Leaving that invariant broken after a
+    // manual correction would mean the "Renewal history" modal (and the
+    // next real Renew, which always advances from license.expiry_date, not
+    // from the stale renewal row) both keep showing the wrong date. Only
+    // the single most recent row is corrected — every earlier row is still
+    // an accurate record of what the expiry actually was at that point in
+    // history, so it's left untouched; a license with no renewals yet has
+    // no row to correct, so this UPDATE just affects zero rows.
+    if (expiryChanged) {
+      db.prepare(
+        `UPDATE license_renewals SET new_expiry_date = ?
+         WHERE id = (SELECT id FROM license_renewals WHERE license_id = ? ORDER BY renewed_at DESC, id DESC LIMIT 1)`,
+      ).run(expiry_date, req.params.id);
+    }
+  })();
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id));
   logActivity({ userName: req.user.name, action: 'updated', entityType: 'license', entityId: license.id, entityLabel: `${license.name} (${client.name})` });
@@ -354,6 +376,15 @@ router.put('/:id', manage, (req, res) => {
   // GET /analytics counts these by exact action string to report billing-
   // cycle changes and cancellations/reactivations per year, which the free-
   // text 'updated' entry alone can't be queried for reliably.
+  if (expiryChanged) {
+    logActivity({
+      userName: req.user.name,
+      action: 'corrected expiry date',
+      entityType: 'license',
+      entityId: license.id,
+      entityLabel: `${license.name} (${client.name}): ${existing.expiry_date} → ${expiry_date}`,
+    });
+  }
   if (existing.billing_cycle !== billing_cycle) {
     logActivity({
       userName: req.user.name,
