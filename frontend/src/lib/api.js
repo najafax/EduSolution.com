@@ -266,6 +266,16 @@ export const api = {
     send: (payload, token) => request('/campaigns', { method: 'POST', body: payload, token }),
   },
 
+  modReports: {
+    meta: (token) => request('/mod-reports/meta', { token }),
+    list: (token, page = 1) => request(`/mod-reports?page=${page}`, { token }),
+    get: (id, token) => request(`/mod-reports/${id}`, { token }),
+    create: (payload, token) => request('/mod-reports', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/mod-reports/${id}`, { method: 'PUT', body: payload, token }),
+    remove: (id, token) => request(`/mod-reports/${id}`, { method: 'DELETE', token }),
+    openPdf: (id, token) => openPdf(`/mod-reports/${id}/pdf`, token),
+  },
+
   users: {
     list: (token, { q, page } = {}) => request(`/users${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/users/${id}`, { token }),

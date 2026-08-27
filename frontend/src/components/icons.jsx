@@ -420,3 +420,17 @@ export function HelpCircleIcon(props) {
     </svg>
   );
 }
+
+// A clipboard with a checkmark — the MOD Report (Manager on Duty
+// checklist), distinct from every other document-shaped icon in this file
+// (InvoiceIcon/QuoteIcon) since a MOD report is a checklist, not a
+// billing document.
+export function ClipboardCheckIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M7.5 3.5h5a1 1 0 0 1 1 1V5h1.5a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1H8v-.5a1 1 0 0 1 1-1Z" strokeLinejoin="round" />
+      <path d="M8 5V4a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1" />
+      <path d="m7.5 11 1.7 1.7L13 9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

@@ -33,6 +33,7 @@ export const BUSINESS_LINKS = [
   { to: '/activity', label: 'Activity', module: 'activity' },
   { to: '/users', label: 'Users', module: 'users' },
   { to: '/email-center', label: 'Email center', module: null, adminOnly: true },
+  { to: '/mod-reports', label: 'MOD report', module: null, adminOnly: true },
   { to: '/settings', label: 'Settings', module: 'settings' },
 ];
 

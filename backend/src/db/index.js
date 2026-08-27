@@ -177,6 +177,44 @@ db.exec(`
     reviewed_at TEXT
   );
 
+  -- Manager on Duty shift-handover checklist — a resort operations report,
+  -- unrelated to (and deliberately not mixed with) the billing/CRM data
+  -- everywhere else in this schema. Admin-only (see routes/modReports.js's
+  -- requireAdmin gate), so unlike every other business-module table there's
+  -- no per-user_permissions grant for it. The checklist's own shape (which
+  -- sections/items exist) is a fixed, code-defined constant
+  -- (routes/modReports.js's SECTIONS/VILLA_ITEMS), not user-configurable —
+  -- so the actual answers are stored as JSON rather than one column per
+  -- item, the same "the schema lives in code, not the database" call the
+  -- rest of this app never needs to make since every other form here has a
+  -- genuinely fixed, small field set. sections_json is a { [sectionKey]:
+  -- { [itemIndex]: { value: 'yes'|'no'|'na'|null, comment } } } object;
+  -- villas_json is a [{ villaNumber, items: { [itemIndex]: {...} } }]
+  -- array; issues_json is a [{ photo, caption }] array with photo as a
+  -- base64 data URI, same inline-
+  -- image storage approach payment_proofs.file_data and business_settings'
+  -- own logo/signature/stamp columns already use — this app has no
+  -- separate file storage service. edited_at is set only once a submitted
+  -- report is corrected after the fact (routes/modReports.js's PUT /:id),
+  -- left NULL for a report that's never been edited.
+  CREATE TABLE IF NOT EXISTS mod_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mod_name TEXT NOT NULL,
+    report_date TEXT NOT NULL,
+    weather TEXT NOT NULL DEFAULT '',
+    time_started TEXT NOT NULL DEFAULT '',
+    occupancy_percent REAL,
+    sections_json TEXT NOT NULL DEFAULT '{}',
+    villas_json TEXT NOT NULL DEFAULT '[]',
+    guest_interactions_json TEXT NOT NULL DEFAULT '[]',
+    issues_json TEXT NOT NULL DEFAULT '[]',
+    signature TEXT NOT NULL DEFAULT '',
+    submitted_by_user_id INTEGER REFERENCES users(id),
+    submitted_by_name TEXT NOT NULL DEFAULT '',
+    submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+    edited_at TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -463,6 +501,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_capital_contributions_date ON capital_contributions(contribution_date);
   CREATE INDEX IF NOT EXISTS idx_owner_draws_date ON owner_draws(draw_date);
   CREATE INDEX IF NOT EXISTS idx_license_renewals_license ON license_renewals(license_id);
+  CREATE INDEX IF NOT EXISTS idx_mod_reports_submitted_at ON mod_reports(submitted_at);
   CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status);
   CREATE INDEX IF NOT EXISTS idx_activity_entity ON activity_log(entity_type, action);
 `);

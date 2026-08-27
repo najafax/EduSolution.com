@@ -52,6 +52,7 @@ const Import = lazy(() => import('./pages/business/Import'));
 const Users = lazy(() => import('./pages/Users'));
 const MyAccount = lazy(() => import('./pages/MyAccount'));
 const EmailCenter = lazy(() => import('./pages/EmailCenter'));
+const MODReport = lazy(() => import('./pages/business/MODReport'));
 const Campaigns = lazy(() => import('./pages/business/Campaigns'));
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'));
 
@@ -150,6 +151,7 @@ export default function App() {
                 <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
                 <Route path="/users" element={<Protected><Users /></Protected>} />
                 <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
+                <Route path="/mod-reports" element={<Protected><MODReport /></Protected>} />
                 <Route path="/account" element={<Protected><MyAccount /></Protected>} />
               </Routes>
               </Suspense>

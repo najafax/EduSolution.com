@@ -23,6 +23,7 @@ import {
   SendIcon,
   SettingsIcon,
   LogoutIcon,
+  ClipboardCheckIcon,
 } from './icons';
 
 // One icon per BUSINESS_LINKS entry (see Navbar.jsx) — a few modules
@@ -48,6 +49,7 @@ const LINK_ICONS = {
   '/activity': HistoryIcon,
   '/users': UsersIcon,
   '/email-center': SendIcon,
+  '/mod-reports': ClipboardCheckIcon,
   '/settings': SettingsIcon,
 };
 
