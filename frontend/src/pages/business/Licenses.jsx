@@ -725,8 +725,8 @@ export default function Licenses() {
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit license' : 'New license'} maxWidthClass="max-w-2xl">
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block sm:col-span-2">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block col-span-2">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client</span>
               <SearchableSelect
                 options={clients.map((c) => ({ value: c.id, label: c.name }))}
@@ -736,7 +736,7 @@ export default function Licenses() {
               />
             </label>
 
-            <label className="block sm:col-span-2">
+            <label className="block col-span-2">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">License name</span>
               <input
                 type="text"
@@ -748,7 +748,7 @@ export default function Licenses() {
               />
             </label>
 
-            <label className="block sm:col-span-2">
+            <label className="block col-span-2">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Activation URL</span>
               <input
                 type="url"

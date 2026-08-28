@@ -3589,8 +3589,8 @@ frontend stops holding/sending it.
   the rest of the form already displays on, rather than relying on
   browser-native validation for just this one field.
   **Compact two-column layout**: the metadata fields above the line-items
-  editor sit in a `grid gap-3 sm:grid-cols-2`, Client on its own full-width
-  row (`sm:col-span-2` — a `SearchableSelect` combobox reads awkwardly
+  editor sit in a `grid grid-cols-2 gap-3`, Client on its own full-width
+  row (`col-span-2` — a `SearchableSelect` combobox reads awkwardly
   squeezed into a narrow column) with the short fields below it paired by
   what they're actually about rather than left in whatever order the state
   variables happen to be declared: Issue date next to Expiry date/Due date,
@@ -3601,7 +3601,13 @@ frontend stops holding/sending it.
   create/edit form, already built this way (Client/License name/Activation
   URL each full-width, Billing cycle+Renewal amount and Start date+Expiry
   date paired) — these two forms were brought in line with that existing
-  precedent rather than the reverse.
+  precedent rather than the reverse. The grid is unconditionally two
+  columns, not `sm:grid-cols-2` — asked for directly, so the pairing holds
+  even on a phone rather than collapsing to one column below `sm:`; checked
+  down to a 320px viewport (the narrowest realistic phone width) where the
+  date inputs/"Percentage" dropdown text clip slightly but nothing overflows
+  the page or becomes unreadable, and 375px and up (the large majority of
+  real phones) has full room to spare.
   `components/LineItemsEditor.jsx` and `components/StatusBadge.jsx` are
   shared between the quote and invoice form/detail pages — extend those
   rather than duplicating item-row or status-color logic per page.
