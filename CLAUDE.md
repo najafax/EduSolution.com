@@ -3422,7 +3422,7 @@ frontend stops holding/sending it.
 
   The page below the hero is intentionally light: a hero (eyebrow pill,
   "Welcome to Edu Solutions" headline, business-description paragraph,
-  "Visit edusolutionsmv.com" link), then a single EduPage panel, then an
+  "Visit edusolutionsmaldives.com" link), then a single EduPage panel, then an
   "Our mission" section, then the closing wordmark/link section. The
   hero's two-column grid (stacked on mobile, `lg:grid-cols-2` side by side
   on desktop) puts the login form *first* in source order — so it's what a
@@ -4348,8 +4348,12 @@ keeps its existing layout.
   `/logo-symbol.png` mark + "EduSolution.com" wordmark on one side, a
   dynamic `© {new Date().getFullYear()} Edu Solutions Pvt Ltd. All rights
   reserved.` — the year computed rather than a literal, so it never goes
-  stale — linking `https://www.edusolutionsmv.com`, the same real business
-  site `Login.jsx`'s own closing section already links, on the other; the
+  stale — linking `https://www.edusolutionsmaldives.com`, the same domain
+  `Login.jsx`'s own closing section already links (this app's actual own
+  domain, per `render.yaml` — an earlier version of both links pointed at
+  `edusolutionsmv.com` instead, which turned out to resolve to unrelated
+  infrastructure the business doesn't control or pay for, so both were
+  corrected to point here), on the other; the
   registered company name, not the "EduSolutions Maldives" trading name
   `Login.jsx`'s own copy uses elsewhere — a footer copyright line is the
   one place in the app that specifically calls for the legal entity name)
