@@ -124,13 +124,15 @@ export function QuoteIcon(props) {
   );
 }
 
-// Bottom-nav "More" tab: three dots, opens components/BottomSheet.jsx.
-export function MoreIcon(props) {
+// A hamburger (three horizontal lines) — BottomNav.jsx's phone-only "Menu"
+// tab, which opens Sidebar.jsx itself as a slide-in drawer (same drawer
+// Navbar.jsx's own tablet hamburger opens), and mirrors that button's inline
+// SVG at this file's usual 20x20/1.5px-stroke convention rather than
+// Navbar's own hand-rolled 24x24/2px one.
+export function MenuIcon(props) {
   return (
     <svg {...base} {...props}>
-      <circle cx="4.5" cy="10" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="10" cy="10" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="15.5" cy="10" r="1.4" fill="currentColor" stroke="none" />
+      <path d="M3 6h14M3 10h14M3 14h14" strokeLinecap="round" />
     </svg>
   );
 }

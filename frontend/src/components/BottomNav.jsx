@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import BottomSheet from './BottomSheet';
-import { BUSINESS_LINKS } from './Navbar';
-import { HomeIcon, InvoiceIcon, QuoteIcon, UsersIcon, LicenseIcon, MoreIcon, ChevronRightIcon, LogoutIcon } from './icons';
+import Sidebar from './Sidebar';
+import { HomeIcon, InvoiceIcon, QuoteIcon, UsersIcon, LicenseIcon, MenuIcon } from './icons';
 
 // The five most-used destinations get a permanent bottom tab (phone-only —
 // see App.jsx, this replaces the hamburger menu below the `sm` breakpoint
-// only; tablets/desktop keep Navbar.jsx's own nav). Everything else in
-// BUSINESS_LINKS, plus "My account" and "Log out" (same items the old
-// mobile drawer held), lives behind "More" so the bar never has to scroll
-// or shrink icons to fit.
+// only; tablets/desktop keep Navbar.jsx's own nav). The sixth tab opens
+// Sidebar.jsx itself as a slide-in drawer — the exact same drawer
+// Navbar.jsx's own tablet hamburger opens (same links/icons/search/account
+// row as the persistent desktop sidebar) — rather than the flatter
+// BottomSheet link-list this tab used to open; that gave phones the app's
+// full navigation instead of a "More"-only subset.
 const PRIMARY_TABS = [
   { to: '/dashboard', label: 'Home', module: null, Icon: HomeIcon },
   { to: '/invoices', label: 'Invoices', module: 'invoices', Icon: InvoiceIcon },
@@ -20,29 +21,14 @@ const PRIMARY_TABS = [
 ];
 
 export default function BottomNav() {
-  const { user, can, logout } = useAuth();
+  const { can } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const tabs = PRIMARY_TABS.filter((t) => !t.module || can(t.module, 'view'));
-  const primaryHrefs = new Set(tabs.map((t) => t.to));
-  const moreLinks = BUSINESS_LINKS.filter(
-    (link) =>
-      link.to !== '/dashboard' &&
-      !primaryHrefs.has(link.to) &&
-      (!link.module || can(link.module, 'view')) &&
-      (!link.adminOnly || user?.role === 'admin'),
-  );
 
   function isActive(to) {
     return location.pathname === to || location.pathname.startsWith(`${to}/`);
-  }
-
-  function handleLogout() {
-    setMoreOpen(false);
-    logout();
-    navigate('/');
   }
 
   return (
@@ -68,47 +54,22 @@ export default function BottomNav() {
         })}
         <button
           type="button"
-          onClick={() => setMoreOpen(true)}
+          onClick={() => setMenuOpen(true)}
+          aria-label="Open menu"
+          aria-expanded={menuOpen}
           className="flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10.5px] font-bold text-slate-500 dark:text-slate-400"
         >
           <span className="flex h-6 w-9 items-center justify-center rounded-lg">
-            <MoreIcon width={19} height={19} />
+            <MenuIcon width={19} height={19} />
           </span>
-          More
+          Menu
         </button>
       </nav>
 
-      <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
-        <div className="flex flex-col">
-          {moreLinks.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              onClick={() => setMoreOpen(false)}
-              className="flex min-h-12 items-center justify-between rounded-xl px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              {link.label}
-              <ChevronRightIcon width={16} height={16} className="text-slate-300 dark:text-slate-600" />
-            </Link>
-          ))}
-          <Link
-            to="/account"
-            onClick={() => setMoreOpen(false)}
-            className="flex min-h-12 items-center justify-between rounded-xl px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            My account
-            <ChevronRightIcon width={16} height={16} className="text-slate-300 dark:text-slate-600" />
-          </Link>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="mt-1 flex min-h-12 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
-          >
-            <LogoutIcon width={17} height={17} />
-            Log out
-          </button>
-        </div>
-      </BottomSheet>
+      {/* Only mounted while actually open, same as every other popup in this
+          app (Modal.jsx, the old BottomSheet) — no reason to keep Sidebar's
+          own GlobalSearch instance and effects alive in the background. */}
+      {menuOpen && <Sidebar mobileOpen onMobileClose={() => setMenuOpen(false)} />}
     </>
   );
 }

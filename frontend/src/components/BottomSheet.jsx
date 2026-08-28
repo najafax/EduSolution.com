@@ -1,11 +1,17 @@
 import { useEffect } from 'react';
 
-// Mobile "More" menu (components/BottomNav.jsx) and any other small
-// mobile-only action list — slides up from the bottom instead of
+// A generic mobile action-list popup — slides up from the bottom instead of
 // Modal.jsx's centered card, since that's the native mobile-app convention
 // for a menu triggered from a bottom tab bar. Same open/backdrop/Escape/
 // body-scroll-lock contract as Modal.jsx, just anchored and shaped
 // differently (rounded top corners only, a drag-handle bar for affordance).
+// Not currently used anywhere — components/BottomNav.jsx's own "Menu" tab
+// used to open this with a flat link list, but now opens Sidebar.jsx as a
+// drawer instead (the same drawer Navbar.jsx's tablet hamburger opens), so
+// every phone/tablet breakpoint gets the app's full navigation rather than
+// a "More"-only subset. Kept as a ready-made {open, onClose, title,
+// children} primitive like Modal.jsx, for the next small mobile-only action
+// list that needs one — not hardcoded to BottomNav.
 export default function BottomSheet({ open, onClose, title, children }) {
   useEffect(() => {
     if (!open) return;

@@ -63,8 +63,9 @@ export default function Navbar() {
         {user ? (
           <>
             {/* Mobile menu toggle. Below `sm` (phones), BottomNav.jsx's tab
-                bar + "More" sheet replaces this hamburger entirely — so the
-                hamburger itself only renders from `sm` up (tablets), while
+                bar + its own "Menu" tab (opening this same Sidebar drawer)
+                replaces this hamburger entirely — so the hamburger itself
+                only renders from `sm` up (tablets), while
                 the phone-only search toggle takes its place below `sm`
                 (GlobalSearch otherwise only appears inside this drawer, since
                 Sidebar.jsx now owns the desktop/xl+ search box). Opening it

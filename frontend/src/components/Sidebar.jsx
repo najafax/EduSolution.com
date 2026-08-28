@@ -62,10 +62,11 @@ const LINK_ICONS = {
 // means no per-page changes were needed to adopt this layout.
 //
 // Below `xl:`, this same component doubles as the tablet/phone nav drawer
-// — Navbar.jsx's hamburger toggles `mobileOpen`, which switches this from
-// its default `hidden` state to a `fixed` slide-in panel (plus a backdrop)
-// rather than the flat link-list dropdown this app used before. The `xl:`
-// classes below are untouched either way, so the persistent desktop
+// — Navbar.jsx's tablet hamburger and BottomNav.jsx's phone "Menu" tab both
+// toggle `mobileOpen`, which switches this from its default `hidden` state
+// to a `fixed` slide-in panel (plus a backdrop) rather than the flat
+// link-list dropdown/sheet this app used before on either breakpoint. The
+// `xl:` classes below are untouched either way, so the persistent desktop
 // sidebar keeps working exactly as it did — only the below-`xl:` styling
 // branches on `mobileOpen`.
 export default function Sidebar({ mobileOpen = false, onMobileClose }) {
@@ -73,11 +74,12 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Same Escape-to-close + body-scroll-lock contract as Modal.jsx/
-  // BottomSheet.jsx — mobileOpen is only ever true for the tablet drawer
-  // instance (Navbar.jsx mounts this component fresh each time it opens),
-  // so there's no risk of this stepping on the persistent desktop sidebar,
-  // which never sets mobileOpen at all.
+  // Same Escape-to-close + body-scroll-lock contract as Modal.jsx —
+  // mobileOpen is only ever true for a drawer instance (Navbar.jsx's own
+  // tablet hamburger, or BottomNav.jsx's phone "Menu" tab — both mount this
+  // component fresh each time they open it), so there's no risk of this
+  // stepping on the persistent desktop sidebar, which never sets mobileOpen
+  // at all.
   useEffect(() => {
     if (!mobileOpen) return;
     function handleKeyDown(e) {
