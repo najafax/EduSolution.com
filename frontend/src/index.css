@@ -30,6 +30,22 @@
   --color-lagoon-950: #06282b;
 
   --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
+
+  /* Refined shadow scale — overrides Tailwind's default shadow-* utilities
+     app-wide with no per-file changes needed, the same "one token, cascades
+     everywhere" lever the lagoon palette itself uses. Softer/more layered
+     than Tailwind's defaults (lower opacity, more blur relative to spread,
+     so surfaces read as floating rather than dropped) and tinted toward a
+     very dark teal (#0f2a2c) instead of pure black — a small, consistent
+     nod to the brand's own hue rather than a generic neutral shadow, in
+     the same "premium/minimal" register as Stripe/Linear's own shadow
+     language, which does the same brand-tinted-shadow trick. */
+  --shadow-sm: 0 1px 2px 0 rgb(15 42 44 / 0.04);
+  --shadow: 0 1px 2px -1px rgb(15 42 44 / 0.06), 0 2px 4px -2px rgb(15 42 44 / 0.04);
+  --shadow-md: 0 2px 4px -2px rgb(15 42 44 / 0.06), 0 4px 12px -4px rgb(15 42 44 / 0.06);
+  --shadow-lg: 0 4px 8px -4px rgb(15 42 44 / 0.06), 0 12px 24px -8px rgb(15 42 44 / 0.08);
+  --shadow-xl: 0 8px 16px -8px rgb(15 42 44 / 0.08), 0 20px 40px -12px rgb(15 42 44 / 0.12);
+  --shadow-2xl: 0 25px 50px -12px rgb(15 42 44 / 0.18);
 }
 
 @font-face {
@@ -72,6 +88,31 @@ body {
 }
 .dark .nav-links-scroll::-webkit-scrollbar-thumb {
   background-color: rgb(71 85 105);
+}
+
+/* A subtle press-down on every clickable control app-wide — button, link
+   with role="button" (icon buttons, etc.) — the "smooth transition on
+   every click" ask, applied once here rather than touching every one of
+   the hundreds of buttons across the app individually. Scoped to
+   :not(:disabled) so a disabled/busy button doesn't visually react to a
+   click that isn't actually going to do anything. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']) {
+  transition: transform 0.1s ease;
+}
+button:not(:disabled):active,
+[role='button']:not([aria-disabled='true']):active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  button,
+  [role='button'] {
+    transition: none;
+  }
+  button:active,
+  [role='button']:active {
+    transform: none;
+  }
 }
 
 /* BottomSheet.jsx's slide-up entrance. */

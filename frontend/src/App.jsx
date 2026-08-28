@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
+import { MotionConfig, motion } from 'motion/react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import Footer from './components/Footer';
@@ -79,6 +80,12 @@ export default function App() {
   const isPortalRoute = location.pathname.startsWith('/portal');
 
   return (
+    // reducedMotion="user" makes every motion component in the app (this
+    // page-transition wrapper, Modal/ConfirmDialog's own open/close
+    // animations) automatically collapse to an instant, no-motion state
+    // when the OS-level "reduce motion" preference is on — one place to
+    // honor it rather than checking prefers-reduced-motion per component.
+    <MotionConfig reducedMotion="user">
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 xl:flex-row">
       {/* Sidebar (xl: and up) and Navbar (below xl) are mutually exclusive —
           each hides itself at the other's breakpoint (see Sidebar.jsx/
@@ -102,8 +109,20 @@ export default function App() {
           <div className="flex-1">
             {/* Keyed by pathname so a crash on one page doesn't linger once
                 the user navigates elsewhere — remounting clears the
-                boundary's caught-error state along with everything else. */}
+                boundary's caught-error state along with everything else.
+                The same key also drives the page's own enter transition
+                (a quick fade + slight rise) — no exit animation, since that
+                would need react-router's own location prop threaded through
+                AnimatePresence just to avoid a blank gap between pages,
+                real complexity for a subtle effect nobody would consciously
+                notice missing. */}
             <ErrorBoundary key={location.pathname}>
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            >
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 {/* Login is also the app's landing page — see pages/Login.jsx's
@@ -155,6 +174,7 @@ export default function App() {
                 <Route path="/account" element={<Protected><MyAccount /></Protected>} />
               </Routes>
               </Suspense>
+            </motion.div>
             </ErrorBoundary>
           </div>
           {/* Hidden on phones while logged in: BottomNav + each page's own
@@ -171,5 +191,6 @@ export default function App() {
       </div>
       {!isPortalRoute && user && <BottomNav />}
     </div>
+    </MotionConfig>
   );
 }
