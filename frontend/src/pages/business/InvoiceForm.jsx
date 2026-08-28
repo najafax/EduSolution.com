@@ -149,8 +149,8 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
 
   const formEl = (
       <form onSubmit={handleSubmit} className={embedded ? 'flex flex-col gap-3' : 'mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900'}>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <label className="block">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block sm:col-span-2">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client</span>
             <SearchableSelect
               options={clients.map((c) => ({ value: c.id, label: c.name }))}
@@ -163,6 +163,32 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
                 No clients yet — <Link to="/clients" className="text-lagoon-600">add one first</Link>.
               </span>
             )}
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Issue date</span>
+            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
+              <input
+                type="date"
+                required
+                value={issueDate}
+                onChange={(e) => setIssueDate(e.target.value)}
+                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
+              />
+            </div>
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Due date</span>
+            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
+              <input
+                type="date"
+                required
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
+              />
+            </div>
           </label>
 
           <label className="block">
@@ -206,32 +232,6 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
               onChange={(e) => setDiscountValue(e.target.value)}
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Issue date</span>
-            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
-              <input
-                type="date"
-                required
-                value={issueDate}
-                onChange={(e) => setIssueDate(e.target.value)}
-                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
-              />
-            </div>
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Due date</span>
-            <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
-              <input
-                type="date"
-                required
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
-              />
-            </div>
           </label>
 
           <label className="block">

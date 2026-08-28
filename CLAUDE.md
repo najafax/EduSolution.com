@@ -3588,6 +3588,20 @@ frontend stops holding/sending it.
   `if (!clientId)` itself in `handleSubmit` and sets the same `error` state
   the rest of the form already displays on, rather than relying on
   browser-native validation for just this one field.
+  **Compact two-column layout**: the metadata fields above the line-items
+  editor sit in a `grid gap-3 sm:grid-cols-2`, Client on its own full-width
+  row (`sm:col-span-2` — a `SearchableSelect` combobox reads awkwardly
+  squeezed into a narrow column) with the short fields below it paired by
+  what they're actually about rather than left in whatever order the state
+  variables happen to be declared: Issue date next to Expiry date/Due date,
+  Tax rate next to Discount type, Discount value next to (for invoices)
+  PO number — an even number of fields on `InvoiceForm.jsx` fills every row
+  exactly, `QuoteForm.jsx`'s one field fewer leaves Discount value alone in
+  a trailing row, which reads fine. This mirrors `Licenses.jsx`'s own
+  create/edit form, already built this way (Client/License name/Activation
+  URL each full-width, Billing cycle+Renewal amount and Start date+Expiry
+  date paired) — these two forms were brought in line with that existing
+  precedent rather than the reverse.
   `components/LineItemsEditor.jsx` and `components/StatusBadge.jsx` are
   shared between the quote and invoice form/detail pages — extend those
   rather than duplicating item-row or status-color logic per page.
