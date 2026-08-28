@@ -31,6 +31,14 @@
 
   --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
 
+  /* A brand-tinted near-black for the highest-emphasis display text (page
+     H1s, hero figures) — a deliberate, chosen neutral rather than the
+     generic slate-900 every other text weight in the app still uses, the
+     same "grey with a hue bias toward the accent reads as chosen" idea the
+     shadow tint above already applies. Used sparingly, opt-in per element
+     (text-ink), not a replacement for slate-900 app-wide. */
+  --color-ink: #10262a;
+
   /* Refined shadow scale — overrides Tailwind's default shadow-* utilities
      app-wide with no per-file changes needed, the same "one token, cascades
      everywhere" lever the lagoon palette itself uses. Softer/more layered

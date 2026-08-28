@@ -6,8 +6,8 @@
 export default function Accordion({ title, action, defaultOpen = true, children }) {
   return (
     <details open={defaultOpen} className="group rounded-2xl border border-slate-200 bg-white shadow-sm sm:[&_.acc-body]:!block dark:border-slate-700 dark:bg-slate-900">
-      <summary className="flex min-h-11 list-none items-center justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden sm:pointer-events-none sm:cursor-default">
-        <span className="text-sm font-semibold text-slate-900 dark:text-white">{title}</span>
+      <summary className="flex min-h-11 list-none items-center justify-between gap-3 px-7 py-5 [&::-webkit-details-marker]:hidden sm:pointer-events-none sm:cursor-default">
+        <span className="text-sm font-semibold text-ink dark:text-white">{title}</span>
         <div className="flex items-center gap-3">
           {action && (
             // Real action (e.g. "Record payment"), not the collapse toggle — stop the
@@ -31,7 +31,7 @@ export default function Accordion({ title, action, defaultOpen = true, children 
           </svg>
         </div>
       </summary>
-      <div className="acc-body border-t border-slate-200 px-6 py-4 dark:border-slate-700">{children}</div>
+      <div className="acc-body border-t border-slate-200 px-7 py-5 dark:border-slate-700">{children}</div>
     </details>
   );
 }

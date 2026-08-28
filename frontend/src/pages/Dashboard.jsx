@@ -124,7 +124,7 @@ export default function Dashboard() {
             <Link
               key={s.to}
               to={s.to}
-              className="flex min-h-11 items-center rounded-full border border-slate-300 px-5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="flex min-h-11 items-center rounded-full border border-slate-300 px-5 text-sm font-medium text-slate-700 shadow-sm transition-shadow hover:shadow-md dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               {s.label}
             </Link>
@@ -144,7 +144,7 @@ export default function Dashboard() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{greeting()}</p>
-      <h1 className="font-display text-3xl font-extrabold text-slate-900 dark:text-white">{firstName}</h1>
+      <h1 className="font-display text-3xl font-extrabold text-ink dark:text-white">{firstName}</h1>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{settings?.business_name || user?.email}</p>
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -160,14 +160,19 @@ export default function Dashboard() {
               actually vouch for (see routes/financials.js's own bankBalance
               note on why it's a running proxy, not a live bank connection) —
               no invented month-over-month delta, since summary/GET doesn't
-              return a prior-period figure to compare against. */}
-          <div className="mt-8 flex flex-col gap-6 rounded-2xl border border-lagoon-100 bg-lagoon-50 p-6 sm:p-9 md:flex-row md:items-center md:justify-between dark:border-lagoon-900 dark:bg-lagoon-950/40">
+              return a prior-period figure to compare against. A clean white/
+              surface card with a slim top accent bar, not a full tinted
+              lagoon-50 fill — reserves color for the one thing that matters
+              (the figure itself, and the accent line), which reads quieter
+              and more considered than a colored panel. */}
+          <div className="relative mt-8 flex flex-col gap-6 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-md sm:p-9 md:flex-row md:items-center md:justify-between dark:border-slate-700 dark:bg-slate-900">
+            <div aria-hidden className="absolute inset-x-0 top-0 h-1 bg-lagoon-600" />
             <div>
-              <p className="text-sm font-semibold text-lagoon-700 dark:text-lagoon-400">Bank balance</p>
-              <p className={`font-display mt-1 text-4xl font-extrabold sm:text-5xl ${isPositiveBalance ? 'text-slate-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
+              <p className="text-sm font-semibold text-lagoon-600 dark:text-lagoon-400">Bank balance</p>
+              <p className={`font-display mt-1.5 text-4xl font-extrabold tabular-nums sm:text-5xl ${isPositiveBalance ? 'text-ink dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
                 {money(symbol, summary.bankBalance)}
               </p>
-              <p className="mt-3 max-w-md text-sm text-slate-700 dark:text-slate-300">
+              <p className="mt-3 max-w-md text-sm text-slate-500 dark:text-slate-400">
                 {summary.clientCount} active client{summary.clientCount === 1 ? '' : 's'}, {money(symbol, summary.totalPaid)} collected,
                 and {money(symbol, summary.netProfit)} in net profit so far.
               </p>
@@ -175,38 +180,38 @@ export default function Dashboard() {
             <div className="flex gap-9">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Net profit</p>
-                <p className={`font-display mt-1 text-2xl font-extrabold ${summary.netProfit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
+                <p className={`font-display mt-1.5 text-2xl font-extrabold tabular-nums ${summary.netProfit >= 0 ? 'text-ink dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
                   {money(symbol, summary.netProfit)}
                 </p>
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Outstanding</p>
-                <p className="font-display mt-1 text-2xl font-extrabold text-slate-900 dark:text-white">{money(symbol, summary.totalOutstanding)}</p>
+                <p className="font-display mt-1.5 text-2xl font-extrabold tabular-nums text-ink dark:text-white">{money(symbol, summary.totalOutstanding)}</p>
               </div>
             </div>
           </div>
 
           {/* Secondary strip — de-emphasized on purpose: these back up the
               hero number above rather than competing with it. */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl border border-slate-200 bg-white px-6 py-5 dark:border-slate-700 dark:bg-slate-900">
+          <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Clients</p>
-              <p className="font-display mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">{summary.clientCount}</p>
+              <p className="font-display mt-0.5 text-lg font-extrabold tabular-nums text-ink dark:text-white">{summary.clientCount}</p>
             </div>
             <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-700" />
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Invoiced</p>
-              <p className="font-display mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">{money(symbol, summary.totalInvoiced)}</p>
+              <p className="font-display mt-0.5 text-lg font-extrabold tabular-nums text-ink dark:text-white">{money(symbol, summary.totalInvoiced)}</p>
             </div>
             <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-700" />
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Paid</p>
-              <p className="font-display mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">{money(symbol, summary.totalPaid)}</p>
+              <p className="font-display mt-0.5 text-lg font-extrabold tabular-nums text-ink dark:text-white">{money(symbol, summary.totalPaid)}</p>
             </div>
             <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-700" />
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Overdue</p>
-              <p className={`font-display mt-0.5 text-lg font-extrabold ${summary.overdueCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>
+              <p className={`font-display mt-0.5 text-lg font-extrabold tabular-nums ${summary.overdueCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-ink dark:text-white'}`}>
                 {money(symbol, summary.overdueAmount)}
               </p>
             </div>
@@ -215,7 +220,7 @@ export default function Dashboard() {
                 <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-700" />
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Capital in</p>
-                  <p className="font-display mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">{money(symbol, summary.totalCapitalContributions)}</p>
+                  <p className="font-display mt-0.5 text-lg font-extrabold tabular-nums text-ink dark:text-white">{money(symbol, summary.totalCapitalContributions)}</p>
                 </div>
               </>
             )}
