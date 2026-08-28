@@ -23,7 +23,7 @@ export default function Footer({ className = '' }) {
         <p className="text-xs text-slate-500 dark:text-slate-400">
           &copy; {year}{' '}
           <a
-            href="https://www.edusolutionsmv.com"
+            href="https://www.edusolutionsmaldives.com"
             target="_blank"
             rel="noreferrer"
             className="font-medium hover:text-lagoon-600 dark:hover:text-lagoon-400"

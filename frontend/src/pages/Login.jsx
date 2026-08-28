@@ -164,12 +164,12 @@ export default function Login() {
             </p>
             <div className="mt-8 flex justify-center lg:justify-start">
               <a
-                href="https://www.edusolutionsmv.com"
+                href="https://www.edusolutionsmaldives.com"
                 target="_blank"
                 rel="noreferrer"
                 className="flex min-h-11 items-center justify-center rounded-md border border-slate-300 px-6 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                Visit edusolutionsmv.com
+                Visit edusolutionsmaldives.com
               </a>
             </div>
           </div>
@@ -234,12 +234,12 @@ export default function Login() {
       <section className="mx-auto max-w-6xl px-4 py-10 text-center sm:px-6">
         <img src="/logo-wordmark.png" alt="Edu Solutions" className="mx-auto h-10 w-auto dark:brightness-0 dark:invert" />
         <a
-          href="https://www.edusolutionsmv.com"
+          href="https://www.edusolutionsmaldives.com"
           target="_blank"
           rel="noreferrer"
           className="mt-3 inline-block text-sm font-medium text-lagoon-600 hover:text-lagoon-500"
         >
-          www.edusolutionsmv.com
+          www.edusolutionsmaldives.com
         </a>
       </section>
     </div>
