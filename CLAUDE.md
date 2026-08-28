@@ -996,7 +996,7 @@ deliberately untouched by either, always returning every row.
   takes for `is_overdue`/`is_partially_paid` — every response carries both
   the raw `status` and a computed `display_status` (`active` | `expiring_soon`
   | `expired` | `cancelled`), and only `display_status` is what
-  `StatusBadge`/the mobile accent stripe render. `EXPIRY_WARNING_DAYS = 14`
+  `StatusBadge`/the mobile accent stripe render. `EXPIRY_WARNING_DAYS = 30`
   is the one threshold controlling both when a still-active license starts
   reading as `expiring_soon` and which licenses `lib/scheduler.js`'s
   automated alert job (below) treats as candidates — duplicated as a literal
@@ -1979,10 +1979,10 @@ deliberately untouched by either, always returning every row.
     `runOverdueReminders()` — skips entirely if `SMTP_HOST` isn't set,
     same 7-day `last_reminder_sent_at` re-send suppression — but selects
     `licenses` where `status = 'active'` and `expiry_date` is within
-    `routes/licenses.js`'s `EXPIRY_WARNING_DAYS` (14, duplicated here as a
+    `routes/licenses.js`'s `EXPIRY_WARNING_DAYS` (30, duplicated here as a
     literal — see that file's own comment) of today, which naturally
     includes already-lapsed licenses too (a past `expiry_date` is always
-    `<=` today+14). Emails via `licenseRemindEmail()` — the same
+    `<=` today+30). Emails via `licenseRemindEmail()` — the same
     admin-editable template the manual "Remind" button on `Licenses.jsx`
     uses, see `lib/emailTemplates.js` above for why this is the one
     automated job that reuses an editable template instead of hardcoding
@@ -2582,7 +2582,7 @@ rather than eight overlapping diffs.
   its own dedicated endpoint rather than one of these three): **overdue
   invoices** (`is_overdue`),
   **due soon** (not yet overdue, `balance_due > 0`, `due_date` within
-  `DUE_SOON_DAYS` = 7 — a shorter window than licenses' own 14-day
+  `DUE_SOON_DAYS` = 7 — a shorter window than licenses' own 30-day
   `EXPIRY_WARNING_DAYS`, since a bill due in two weeks isn't urgent the way
   one due in a few days is), **expiring licenses**
   (`display_status === 'expiring_soon'`), and **awaiting your response**

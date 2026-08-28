@@ -24,7 +24,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 // Duplicated as a literal over there (with a cross-reference comment) rather
 // than imported, same acceptable-duplication call as EXPENSE_CATEGORIES
 // between routes/expenses.js and routes/import.js — keep both in sync.
-const EXPIRY_WARNING_DAYS = 14;
+const EXPIRY_WARNING_DAYS = 30;
 
 function warningDate() {
   return new Date(Date.now() + EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);

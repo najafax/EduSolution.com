@@ -231,7 +231,7 @@ function withComputedInvoice(invoice) {
 
 // Duplicated literal, same as routes/licenses.js's own EXPIRY_WARNING_DAYS
 // — keep both in sync.
-const EXPIRY_WARNING_DAYS = 14;
+const EXPIRY_WARNING_DAYS = 30;
 function warningDate() {
   return new Date(Date.now() + EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }

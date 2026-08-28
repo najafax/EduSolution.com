@@ -159,7 +159,7 @@ async function notifyStaffOfReminders(reminded, settings) {
 
 // Same shape as runOverdueReminders() above: emails clients whose license
 // is within the expiry-warning window (or already lapsed) and hasn't been
-// reminded — manually or automatically — in the last 7 days. `14` here is
+// reminded — manually or automatically — in the last 7 days. `30` here is
 // routes/licenses.js's EXPIRY_WARNING_DAYS duplicated as a literal (same
 // acceptable-duplication call as that file's own comment explains) — keep
 // both in sync if the window ever changes. Licenses don't attach a PDF
@@ -173,7 +173,7 @@ async function runLicenseExpiryAlerts() {
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
-  const warningDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const warningDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const candidates = db
     .prepare(
