@@ -1,21 +1,25 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { HomeIcon, InvoiceIcon, QuoteIcon, UsersIcon, LicenseIcon } from './icons';
+import { HomeIcon, InvoiceIcon, QuoteIcon, UsersIcon, LicenseIcon, SettingsIcon } from './icons';
 
-// The five most-used destinations get a permanent bottom tab (phone-only —
+// The six most-used destinations get a permanent bottom tab (phone-only —
 // see App.jsx, this replaces the hamburger menu below the `sm` breakpoint
 // only; tablets/desktop keep Navbar.jsx's own nav). Full navigation (every
-// link, search, the account row, theme toggle, logout) lives behind
+// other link, search, the account row, theme toggle, logout) lives behind
 // Navbar.jsx's own hamburger, in the top-left corner of the header at every
-// width below `xl:` — this bar carries only the five shortcuts, not a
-// mirror of that trigger, so there's exactly one way to reach the full nav
-// rather than two.
+// width below `xl:` — this bar carries only these shortcuts, not a mirror
+// of that trigger, so there's exactly one way to reach the rest of the nav.
+// Settings joined the original five (Home/Invoices/Quotes/Clients/Licenses)
+// on its own explicit request — it's reached often enough on a phone (the
+// business's own branding/bank details/session policy) to be worth a
+// permanent tab rather than living only in the hamburger drawer.
 const PRIMARY_TABS = [
   { to: '/dashboard', label: 'Home', module: null, Icon: HomeIcon },
   { to: '/invoices', label: 'Invoices', module: 'invoices', Icon: InvoiceIcon },
   { to: '/quotes', label: 'Quotes', module: 'quotes', Icon: QuoteIcon },
   { to: '/clients', label: 'Clients', module: 'clients', Icon: UsersIcon },
   { to: '/licenses', label: 'Licenses', module: 'licenses', Icon: LicenseIcon },
+  { to: '/settings', label: 'Settings', module: 'settings', Icon: SettingsIcon },
 ];
 
 export default function BottomNav() {

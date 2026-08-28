@@ -4337,13 +4337,15 @@ keeps its existing layout.
   rename, not a breaking prop change).
 - `components/BottomNav.jsx` — a fixed, phone-only (`sm:hidden`) tab bar
   that replaces `Navbar.jsx`'s hamburger drawer below the `sm` breakpoint
-  (tablets and up still get the hamburger — see `Navbar.jsx` below). Five
-  permanent tabs (`PRIMARY_TABS`: Home/Invoices/Quotes/Clients/Licenses,
-  each filtered through `can(module, 'view')` the same way `Navbar.jsx`'s
-  `visibleLinks` is — Licenses was added as a 5th primary tab rather than
-  folded into a catch-all "more" destination, since a license's expiry is
-  time-sensitive enough to check as often as an invoice/quote). This bar
-  briefly carried a sixth "Menu" tab too (first opening a
+  (tablets and up still get the hamburger — see `Navbar.jsx` below). Six
+  permanent tabs (`PRIMARY_TABS`: Home/Invoices/Quotes/Clients/Licenses/
+  Settings, each filtered through `can(module, 'view')` the same way
+  `Navbar.jsx`'s `visibleLinks` is — Licenses was added as a primary tab
+  rather than folded into a catch-all "more" destination since a license's
+  expiry is time-sensitive enough to check as often as an invoice/quote;
+  Settings was added later on its own explicit request, for the same
+  "worth a permanent tab, not just the hamburger drawer" reasoning). This
+  bar briefly carried a seventh "Menu" tab too (first opening a
   `components/BottomSheet.jsx` flat link list, later `Sidebar.jsx` itself as
   a slide-in drawer) so phones could reach the app's full navigation — that
   tab was then removed outright once the *same* full-navigation trigger
@@ -4409,7 +4411,7 @@ keeps its existing layout.
   `flex` unconditionally, visible at every width this header renders at
   (phones included, not just tablets), and is this app's one route into
   `Sidebar.jsx`'s full-navigation drawer below `xl:`; `BottomNav.jsx`'s own
-  tab bar (see above) carries only its five primary shortcuts, not a second
+  tab bar (see above) carries only its six primary shortcuts, not a second
   copy of this trigger. `menuOpen`'s `aria-label` swaps between "Open menu"/
   "Close menu" and the icon between `MenuIcon`/`XIcon` the same way it
   already did. The avatar is the same image-or-initials pattern
@@ -4732,8 +4734,9 @@ persistent desktop sidebar either way.
   outright once the *same* trigger moved into `Navbar.jsx`'s own header
   instead — top-left corner, every width below `xl:` including phones (see
   "Top-left hamburger, top-right avatar" under "Mobile design system"
-  above) — leaving `BottomNav.jsx` with just its five primary tabs and
-  exactly one way to reach the full nav, not two.
+  above) — leaving `BottomNav.jsx` with just its primary shortcut tabs
+  (Settings joined them later, see that section's own note) and exactly
+  one way to reach the full nav, not two.
 
 ### Notification center
 
