@@ -4189,6 +4189,63 @@ frontend stops holding/sending it.
   "Needs attention" full width right below it, `flex flex-col gap-6`
   instead of a two-column `grid`) — every panel on the page reads as the
   same width now, whatever width the container itself happens to be.
+- **Dashboard redesign — ring KPIs + widget rail**: the hero/strip pairing
+  described just above was itself later superseded on `pages/Dashboard.jsx`
+  (only there — `Financials.jsx` keeps its own plain `KpiCard` grid
+  unchanged) by a combination of two directions explored on a design
+  canvas and picked by the business owner: circular progress-ring KPI
+  cards in place of the hero/strip, and a right-hand "widget rail" (a
+  desktop-only companion column, not a new persistent app-wide layout
+  element the way `components/Sidebar.jsx` is) holding a profile card,
+  shortcuts, and a compact "needs attention" feed. `components/
+  RingKpiCard.jsx` replaces the old hero card + secondary strip with a
+  `grid grid-cols-1 gap-4 sm:grid-cols-2` of four cards — Bank balance
+  (the one `filled` card, solid `bg-lagoon-600` with a white ring,
+  reserving that treatment for the single figure this app can most vouch
+  for), Paid (`tone="positive"`), Outstanding (`tone="warning"`), and
+  Overdue (`tone="negative"`). Each ring's `percent` is deliberately the
+  same denominator across all four — `value / summary.totalInvoiced * 100`
+  (clamped 0–100, `ringPct()` in `Dashboard.jsx`) — so the four cards are
+  directly comparable ("this much of what's been invoiced") rather than
+  four unrelated, harder-to-read percentages; Bank balance's own ring uses
+  `Math.max(0, bankBalance)` as the numerator since a ring can't represent
+  a negative share. The ring math itself is the two-value
+  `stroke-dasharray="<arc-length> <full-circumference>"` technique (a
+  single-value dasharray equal to the full circumference renders as a
+  solid circle regardless of `stroke-dashoffset` — a real bug caught and
+  fixed on the design canvas this was drawn from before it ever reached
+  real code), rotated via a single Tailwind `-rotate-90` class on the
+  `<svg>` itself rather than a competing SVG `transform` attribute (a CSS
+  transform silently overrides an SVG transform attribute on the same
+  element — the design canvas's other caught bug). "Invoices by status"
+  swapped from `StatusBreakdownChart`'s horizontal bars to
+  `components/StatusDonutChart.jsx` — same `STATUS_META` colors/keys, same
+  "status is state, not series identity" reasoning, just a donut instead
+  of bars, built once for this page only (`Financials.jsx`/
+  `InvoiceAnalytics.jsx` keep the original bar version, so this is its own
+  component rather than a mode flag on the shared one) — each segment's
+  position is a cascading *negative* `stroke-dashoffset` (segment N's
+  offset is the negative sum of every prior segment's arc length) instead
+  of a per-segment `rotate()` attribute, for the identical
+  transform-attribute-gets-overridden reason above. `components/
+  DashboardRail.jsx` is the right rail itself — a profile card (avatar or
+  initials, name, "Administrator"/"Staff", linking to `/account`), a
+  "Shortcuts" list (`permittedShortcuts.slice(0, RAIL_SHORTCUT_LIMIT)`,
+  6, each `SHORTCUTS` entry now also carries an `icon` component), and a
+  "Needs attention" list reusing the exact same `attentionItems` array
+  (overdue invoices + expiring licenses, unified into one shape with a
+  colored icon chip per tone: red for overdue, amber for expiring) that
+  also backs the plain-Accordion rendering below `xl:`. The rail is
+  `hidden shrink-0 xl:block xl:w-[300px]` — desktop-only, matching this
+  app's other `xl:`-gated persistent-layout elements (`Sidebar.jsx`) —
+  and the page's own "Needs attention" `Accordion` and the shortcut pill
+  row are the mirror image, `xl:hidden`, so the two never render at once:
+  below `xl:` (most of this app's phone/tablet-first user base) the data
+  stays exactly where it already was, in the Accordion/pill-row shapes
+  documented above; at `xl:` and up the rail takes over and those two
+  collapse away. `RingKpiCard`/`DashboardRail`/`StatusDonutChart` are used
+  only on `Dashboard.jsx` — no other page needed this treatment yet, so
+  none of the three were generalized further than that one caller needs.
 - `pages/Dashboard.jsx` and `pages/business/Financials.jsx` charts
   (`components/RevenueTrendChart.jsx`, `components/StatusBreakdownChart.jsx`)
   are hand-rolled SVG/CSS, no charting library. Status colors there are
