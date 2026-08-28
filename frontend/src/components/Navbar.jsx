@@ -5,7 +5,7 @@ import GlobalSearch from './GlobalSearch';
 import Sidebar from './Sidebar';
 import ThemeToggle from './ThemeToggle';
 import NotificationCenter from './NotificationCenter';
-import { SearchIcon, XIcon } from './icons';
+import { SearchIcon, XIcon, MenuIcon } from './icons';
 
 // `module: null` means always visible to any logged-in user regardless of
 // permissions (Dashboard). Everything else is filtered by that module's
@@ -50,29 +50,47 @@ export default function Navbar() {
   // invitation to poke at staff-only auth) rather than a useful action.
   const isPublicDocLink = location.pathname.startsWith('/q/') || location.pathname.startsWith('/i/');
 
+  const initials = (user?.name || user?.email || '?')
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
   return (
     <header
       className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10 xl:hidden dark:border-slate-800 dark:bg-slate-950/80"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <nav className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4">
-        <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
-          EduSolution<span className="text-lagoon-600">.com</span>
-        </Link>
-
+      <nav className="flex w-full items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4">
         {user ? (
           <>
-            {/* Mobile menu toggle. Below `sm` (phones), BottomNav.jsx's tab
-                bar + its own "Menu" tab (opening this same Sidebar drawer)
-                replaces this hamburger entirely — so the hamburger itself
-                only renders from `sm` up (tablets), while
-                the phone-only search toggle takes its place below `sm`
-                (GlobalSearch otherwise only appears inside this drawer, since
-                Sidebar.jsx now owns the desktop/xl+ search box). Opening it
-                renders Sidebar itself as a slide-in drawer (see below) rather
-                than a separate flat link list, so the tablet nav is the same
+            {/* Top-left corner: hamburger, then wordmark. The hamburger
+                opens Sidebar itself as a slide-in drawer (see below) rather
+                than a separate flat link list, so this nav is the same
                 component/links/icons as the persistent desktop sidebar, just
-                toggled instead of always-on. */}
+                toggled instead of always-on — visible at every width below
+                `xl:` (phones included) since it's this app's one route into
+                the full nav below that breakpoint; `BottomNav.jsx`'s own tab
+                bar only carries the five primary shortcuts, not a mirror of
+                this trigger. */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={menuOpen}
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-700 dark:text-slate-300"
+              >
+                {menuOpen ? <XIcon width={22} height={22} /> : <MenuIcon width={22} height={22} />}
+              </button>
+              <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
+                EduSolution<span className="text-lagoon-600">.com</span>
+              </Link>
+            </div>
+
+            {/* Top-right corner: search/notifications/theme, then the
+                account avatar last so it sits in the very corner. */}
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPhoneSearchOpen((v) => !v)}
@@ -84,36 +102,38 @@ export default function Navbar() {
               </button>
               <NotificationCenter />
               <ThemeToggle />
-              <button
-                onClick={() => setMenuOpen((v) => !v)}
-                aria-label="Toggle menu"
-                aria-expanded={menuOpen}
-                className="hidden min-h-11 min-w-11 items-center justify-center rounded-md text-slate-700 sm:flex dark:text-slate-300"
+              <Link
+                to="/account"
+                aria-label="My account"
+                className="ml-0.5 flex shrink-0 items-center justify-center rounded-full"
               >
-                {menuOpen ? (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-                  </svg>
+                {user.avatarImage ? (
+                  <img src={user.avatarImage} alt="" className="h-8 w-8 rounded-full object-cover" />
                 ) : (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-                  </svg>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
+                    {initials}
+                  </span>
                 )}
-              </button>
+              </Link>
             </div>
           </>
         ) : (
-          <div className="flex items-center gap-2 sm:gap-4">
-            <ThemeToggle />
-            {!isPublicDocLink && (
-              <Link
-                to="/login"
-                className="flex min-h-11 items-center rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 sm:px-4"
-              >
-                Log in
-              </Link>
-            )}
-          </div>
+          <>
+            <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
+              EduSolution<span className="text-lagoon-600">.com</span>
+            </Link>
+            <div className="flex items-center gap-2 sm:gap-4">
+              <ThemeToggle />
+              {!isPublicDocLink && (
+                <Link
+                  to="/login"
+                  className="flex min-h-11 items-center rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 sm:px-4"
+                >
+                  Log in
+                </Link>
+              )}
+            </div>
+          </>
         )}
       </nav>
 
@@ -126,14 +146,15 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* Tablet menu, opened by the hamburger above: Sidebar itself in
-          drawer mode (see Sidebar.jsx's `mobileOpen` prop) rather than the
-          flat link-list dropdown this used to render — same links, same
-          icons, same account/theme/logout row as the persistent desktop
-          sidebar, just slid in over the page instead of always visible.
-          Only mounted while actually open, same as every other popup in
-          this app (Modal.jsx, BottomSheet.jsx) — no reason to keep its
-          GlobalSearch instance and effects alive in the background. */}
+      {/* Menu drawer, opened by the top-left hamburger above (every width
+          below `xl:`, phones included): Sidebar itself in drawer mode (see
+          Sidebar.jsx's `mobileOpen` prop) rather than a flat link-list
+          dropdown — same links, same icons, same account/theme/logout row
+          as the persistent desktop sidebar, just slid in over the page
+          instead of always visible. Only mounted while actually open, same
+          as every other popup in this app (Modal.jsx, BottomSheet.jsx) — no
+          reason to keep its GlobalSearch instance and effects alive in the
+          background. */}
       {user && menuOpen && <Sidebar mobileOpen onMobileClose={() => setMenuOpen(false)} />}
     </header>
   );

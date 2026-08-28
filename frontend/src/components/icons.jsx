@@ -124,11 +124,9 @@ export function QuoteIcon(props) {
   );
 }
 
-// A hamburger (three horizontal lines) — BottomNav.jsx's phone-only "Menu"
-// tab, which opens Sidebar.jsx itself as a slide-in drawer (same drawer
-// Navbar.jsx's own tablet hamburger opens), and mirrors that button's inline
-// SVG at this file's usual 20x20/1.5px-stroke convention rather than
-// Navbar's own hand-rolled 24x24/2px one.
+// A hamburger (three horizontal lines) — Navbar.jsx's own menu toggle, in
+// the top-left corner of the header at every width below `xl:` (phones
+// included), opening Sidebar.jsx itself as a slide-in drawer.
 export function MenuIcon(props) {
   return (
     <svg {...base} {...props}>

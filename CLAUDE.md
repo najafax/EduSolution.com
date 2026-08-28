@@ -4341,19 +4341,15 @@ keeps its existing layout.
   permanent tabs (`PRIMARY_TABS`: Home/Invoices/Quotes/Clients/Licenses,
   each filtered through `can(module, 'view')` the same way `Navbar.jsx`'s
   `visibleLinks` is — Licenses was added as a 5th primary tab rather than
-  folded into "More," since a license's expiry is time-sensitive enough
-  to check as often as an invoice/quote) plus a sixth "Menu" tab. That tab
-  originally opened a `components/BottomSheet.jsx` listing everything else
-  from `Navbar.jsx`'s exported `BUSINESS_LINKS` plus "My account" and "Log
-  out" as a flat link list (the same set the old mobile drawer held) — it
-  now instead opens `Sidebar.jsx` itself as a slide-in drawer
-  (`<Sidebar mobileOpen onMobileClose={...} />`), the exact same drawer
-  `Navbar.jsx`'s own tablet hamburger opens (see "Sidebar navigation
-  (desktop)" below), so phones get the app's full navigation — search, every
-  link with its icon, the account row, theme toggle, and logout — instead of
-  a flatter "More"-only subset. `BottomSheet.jsx` itself is unused now but
-  kept as a generic popup primitive (see its own note below) rather than
-  deleted, since it isn't hardcoded to this one caller. `App.jsx` renders `<BottomNav />` only when `user` is
+  folded into a catch-all "more" destination, since a license's expiry is
+  time-sensitive enough to check as often as an invoice/quote). This bar
+  briefly carried a sixth "Menu" tab too (first opening a
+  `components/BottomSheet.jsx` flat link list, later `Sidebar.jsx` itself as
+  a slide-in drawer) so phones could reach the app's full navigation — that
+  tab was then removed outright once the *same* full-navigation trigger
+  moved into `Navbar.jsx`'s own header instead (top-left corner, every
+  width below `xl:` — see "Top-left hamburger, top-right avatar" below), so
+  there's exactly one way to reach it rather than two. `App.jsx` renders `<BottomNav />` only when `user` is
   truthy (mirroring `Navbar.jsx`'s own `{user ? ... }` split) and wraps the
   routed `<Routes>` in a `pb-16 sm:pb-0` div so the fixed bar never covers
   a page's last content or action buttons; `FloatingActionButton.jsx`'s
@@ -4394,25 +4390,38 @@ keeps its existing layout.
   from the bottom with rounded top corners and a drag-handle bar instead of
   a centered card, matching the native-mobile-app convention for a menu
   triggered from a bottom tab. Originally backed `BottomNav.jsx`'s "More"
-  tab; that tab now opens `Sidebar.jsx`'s own drawer instead (see just
-  above), so this component currently has no caller — kept anyway as a
-  generic `{ open, onClose, title, children }` popup primitive like
-  `Modal.jsx`, ready for the next small mobile-only action list that needs
-  one, rather than deleted along with its one-time caller (unlike
+  tab (see just above for that tab's own history — it briefly opened
+  `Sidebar.jsx`'s drawer instead before being removed entirely), so this
+  component currently has no caller — kept anyway as a generic
+  `{ open, onClose, title, children }` popup primitive like `Modal.jsx`,
+  ready for the next small mobile-only action list that needs one, rather
+  than deleted along with its one-time caller (unlike
   `components/BulkActionBar.jsx`, which really was built for, and removed
   with, a single specific feature — see "Mobile design system" above).
-- `components/Navbar.jsx` now splits its previously-single `xl:hidden`
-  mobile treatment into two: a phone-only search icon toggle (`sm:hidden`)
-  that reveals an inline `GlobalSearch` row below the header (`GlobalSearch`
-  gained an `autoFocus` prop for this), since `BottomNav.jsx` replaced
-  phones' only other route to `GlobalSearch` (the hamburger drawer, though
-  `BottomNav.jsx`'s own "Menu" tab now reaches the same `GlobalSearch`
-  instance again via the `Sidebar.jsx` drawer it opens — this toggle stays
-  regardless, as the faster one-tap route to search from the tab bar
-  itself); and the hamburger toggle itself + its dropdown drawer, now
-  `hidden sm:flex`/`hidden sm:block` — visible from `sm` up to `xl`
-  (tablets) only, since phones use `BottomNav.jsx` instead. `xl:flex`
-  desktop nav is unchanged.
+- **Top-left hamburger, top-right avatar**: `components/Navbar.jsx`'s
+  header is a left cluster (hamburger, then the wordmark) and a right
+  cluster (phone-only search toggle, notifications, theme toggle, then the
+  account avatar last so it sits in the literal corner) — asked for
+  directly as a standard mobile-app layout, replacing an earlier
+  arrangement where the hamburger sat tablet-only on the right (next to the
+  wordmark on the left) and there was no avatar in this header at all. The
+  hamburger button itself lost its `hidden sm:flex` gating — it's now
+  `flex` unconditionally, visible at every width this header renders at
+  (phones included, not just tablets), and is this app's one route into
+  `Sidebar.jsx`'s full-navigation drawer below `xl:`; `BottomNav.jsx`'s own
+  tab bar (see above) carries only its five primary shortcuts, not a second
+  copy of this trigger. `menuOpen`'s `aria-label` swaps between "Open menu"/
+  "Close menu" and the icon between `MenuIcon`/`XIcon` the same way it
+  already did. The avatar is the same image-or-initials pattern
+  `Sidebar.jsx`'s own account row and `DashboardRail.jsx`'s profile card
+  use (`user.avatarImage` if set, else a `bg-lagoon-600` initials circle),
+  linking to `/account` — the header's one piece of account-specific UI, so
+  a phone/tablet user has a one-tap route there without opening the drawer
+  first. The phone-only search icon toggle (`sm:hidden`, reveals an inline
+  `GlobalSearch` row below the header, `GlobalSearch` gained an `autoFocus`
+  prop for this) is unchanged — it's still the faster one-tap route to
+  search from the header itself, alongside the drawer's own `GlobalSearch`
+  instance. `xl:flex` desktop `Sidebar` nav is unaffected either way.
 - `components/Footer.jsx` — a small global closing bar (small
   `/logo-symbol.png` mark + "EduSolution.com" wordmark on one side, a
   dynamic `© {new Date().getFullYear()} Edu Solutions Pvt Ltd. All rights
@@ -4574,11 +4583,14 @@ breakpoint — a deliberate, app-wide layout change (not a Dashboard-only
 one), landed via a round of mocked-up visual directions the business
 owner reviewed and picked a combination from before this was built for
 real. Below `xl:`, the phone `BottomNav` tab bar's five primary tabs are
-exactly what they were before; the tablet hamburger, and — later —
-`BottomNav`'s own sixth tab, both now open `Sidebar` itself as a slide-in
-drawer rather than a flat link-list dropdown/sheet each used to (see
-"Mobile/tablet drawer mode" below) — same component, same links, same
-icons as the persistent desktop sidebar either way.
+exactly what they were before; the hamburger that opens `Sidebar` itself as
+a slide-in drawer (rather than a flat link-list dropdown/sheet) now lives
+in `Navbar.jsx`'s own header, top-left corner, at every width below `xl:`
+(phones included — see "Top-left hamburger, top-right avatar" under
+"Mobile design system" above; `BottomNav.jsx` itself briefly carried a
+second copy of this trigger as its own sixth tab, later removed once the
+header took over the job) — same component, same links, same icons as the
+persistent desktop sidebar either way.
 
 - `components/Sidebar.jsx` — takes an optional `mobileOpen`/`onMobileClose`
   pair (both unused/`undefined` for the persistent desktop instance
@@ -4659,9 +4671,11 @@ icons as the persistent desktop sidebar either way.
   toggle / tablet dropdown's own now-redundant `xl:hidden` qualifiers
   were dropped (the parent already hides at that breakpoint) rather than
   left as harmless-but-confusing dead specificity.
-- **Mobile/tablet drawer mode**: the hamburger button (`sm:` up, hidden
-  below `sm:` where `BottomNav` takes over — see `Navbar.jsx` above) used
-  to open a flat, separately-maintained link-list dropdown; it now opens
+- **Mobile/tablet drawer mode**: the hamburger button (top-left of
+  `Navbar.jsx`'s header, visible at every width that header itself renders
+  at — phones included, not just tablets, see "Top-left hamburger,
+  top-right avatar" under "Mobile design system" above) used to open a
+  flat, separately-maintained link-list dropdown; it now opens
   `Sidebar` itself (`{user && menuOpen && <Sidebar mobileOpen
   onMobileClose={() => setMenuOpen(false)} />}`), only mounted while
   actually open — same "don't keep a popup's effects alive in the
@@ -4706,25 +4720,20 @@ icons as the persistent desktop sidebar either way.
   `backdrop-blur`/`filter`/`perspective`/`will-change: transform` ancestor)
   needs the same portal treatment — this isn't a one-off Sidebar quirk, it's
   how CSS containing blocks work.
-- **`BottomNav.jsx`'s own "Menu" tab** (phones, added after the above)
-  follows the identical pattern: its sixth tab used to open
-  `components/BottomSheet.jsx` with a flat link list (Products, Recurring,
-  Expenses, Capital, Financials, Reports, Activity, Users, Email Center,
-  Settings, plus "My account"/"Log out") built from whatever of
-  `BUSINESS_LINKS` wasn't already one of the five primary tabs; it now
-  opens the same `<Sidebar mobileOpen onMobileClose={...} />` the tablet
-  hamburger opens, so phones get the app's *full* navigation (every link,
-  search, the account row, theme toggle, logout) rather than a "More"-only
-  subset. `BottomNav.jsx`'s own `<nav>` also carries `backdrop-blur`
-  (matching pills against the page scrolling behind it), which would hit
-  the exact same containing-block bug described just above if `Sidebar`
-  didn't already portal its drawer-mode content to `document.body`
-  itself — since that fix lives inside `Sidebar.jsx`, not per-caller, this
-  second caller needed no bug-avoidance work of its own, just the same
-  `mobileOpen`/`onMobileClose` wiring. `components/BottomSheet.jsx` has no
-  remaining caller after this (see its own note above) but was kept rather
-  than deleted, being generic, reusable infrastructure rather than a
-  single-feature component.
+- **`BottomNav.jsx`'s own "Menu" tab — added, then removed again.** Phones
+  briefly got a second route into this same drawer: a sixth `BottomNav.jsx`
+  tab that first opened `components/BottomSheet.jsx` with a flat link list,
+  then (following the identical pattern described just above)
+  `<Sidebar mobileOpen onMobileClose={...} />` directly — `BottomNav.jsx`'s
+  own `<nav>` also carries `backdrop-blur`, which would have hit the exact
+  same containing-block bug described above if `Sidebar` didn't already
+  portal its drawer-mode content to `document.body` itself, so this second
+  caller needed no bug-avoidance work of its own. That tab was then removed
+  outright once the *same* trigger moved into `Navbar.jsx`'s own header
+  instead — top-left corner, every width below `xl:` including phones (see
+  "Top-left hamburger, top-right avatar" under "Mobile design system"
+  above) — leaving `BottomNav.jsx` with just its five primary tabs and
+  exactly one way to reach the full nav, not two.
 
 ### Notification center
 
