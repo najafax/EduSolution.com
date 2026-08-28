@@ -199,9 +199,13 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
             onClick={handleLinkClick}
             className="flex min-w-0 items-center gap-2 rounded-lg py-1 hover:bg-white/5"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
-              {initials}
-            </span>
+            {user.avatarImage ? (
+              <img src={user.avatarImage} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+            ) : (
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
+                {initials}
+              </span>
+            )}
             <span className="min-w-0 truncate text-xs font-medium text-white">{user.name}</span>
           </Link>
           <div className="flex shrink-0 items-center gap-0.5">

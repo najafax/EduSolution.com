@@ -761,6 +761,17 @@ if (!userColumns.has('notify_payment_proofs')) {
   db.exec(`ALTER TABLE users ADD COLUMN notify_payment_proofs INTEGER NOT NULL DEFAULT 0;`);
 }
 
+// Same pattern once more: `avatar_image` on `users` — a profile photo,
+// same inline base64-data-URI storage business_settings' logo/signature/
+// stamp and payment_proofs.file_data already use (no separate file
+// storage service in this app). Blank default means "no photo," which
+// every reader (MyAccount.jsx, Sidebar.jsx's account row) falls back to
+// initials for, same "only show the exception case" convention this app
+// already follows elsewhere.
+if (!userColumns.has('avatar_image')) {
+  db.exec(`ALTER TABLE users ADD COLUMN avatar_image TEXT NOT NULL DEFAULT '';`);
+}
+
 // Same pattern once more for `payment_proofs.review_note` — the staff
 // note attached when rejecting a proof (see "Payment proof upload" below,
 // the reject action). Unlike `payment_proofs` itself, this can't go

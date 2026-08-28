@@ -12,6 +12,14 @@ const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
+// Profile photo — same base64-data-URI validation shape
+// routes/clientPortal.js's own payment-proof upload uses (checked against
+// the actual decoded byte length, never trusted from the client), just
+// images only (no PDF — a profile photo isn't a document) and a smaller
+// cap, since this is a small avatar, not a scanned bank slip.
+const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
+
 const router = Router();
 
 function signToken(user) {
@@ -41,6 +49,7 @@ function publicUser(user) {
     notifyQuoteResponses: Boolean(user.notify_quote_responses),
     notifyMonthlyReport: Boolean(user.notify_monthly_report),
     notifyPaymentProofs: Boolean(user.notify_payment_proofs),
+    avatarImage: user.avatar_image || '',
     createdAt: user.created_at,
   };
 }
@@ -164,6 +173,35 @@ router.put('/me', requireAuth, (req, res) => {
   if (taken) return res.status(409).json({ error: 'An account with this email already exists' });
 
   db.prepare('UPDATE users SET name = ?, email = ? WHERE id = ?').run(name.trim(), email, req.user.id);
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  res.json({ user: publicUser(user) });
+});
+
+// Also ungated by the 'users' permission, same reasoning as PUT /me above
+// — every account can set its own photo regardless of module grants.
+router.put('/avatar', requireAuth, (req, res) => {
+  const { image } = req.body || {};
+  if (!image) return res.status(400).json({ error: 'An image is required' });
+
+  const typeMatch = /^data:([^;]+);base64,/.exec(image);
+  const mimeType = typeMatch ? typeMatch[1] : null;
+  if (!mimeType || !AVATAR_TYPES.includes(mimeType)) {
+    return res.status(400).json({ error: 'Only JPEG, PNG, or WEBP images are accepted' });
+  }
+  const match = new RegExp(`^data:${mimeType.replace('/', '\\/')};base64,([A-Za-z0-9+/]+=*)$`).exec(image);
+  if (!match) return res.status(400).json({ error: 'The uploaded image could not be read' });
+  const byteLength = Buffer.byteLength(match[1], 'base64');
+  if (byteLength > AVATAR_MAX_BYTES) {
+    return res.status(400).json({ error: 'Image is too large — please keep it under 3MB' });
+  }
+
+  db.prepare('UPDATE users SET avatar_image = ? WHERE id = ?').run(image, req.user.id);
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  res.json({ user: publicUser(user) });
+});
+
+router.delete('/avatar', requireAuth, (req, res) => {
+  db.prepare("UPDATE users SET avatar_image = '' WHERE id = ?").run(req.user.id);
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   res.json({ user: publicUser(user) });
 });

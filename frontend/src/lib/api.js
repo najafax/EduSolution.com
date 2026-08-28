@@ -79,6 +79,8 @@ export const api = {
   updateMe: (payload, token) => request('/auth/me', { method: 'PUT', body: payload, token }),
   changePassword: (payload, token) => request('/auth/change-password', { method: 'POST', body: payload, token }),
   updatePreferences: (payload, token) => request('/auth/preferences', { method: 'PUT', body: payload, token }),
+  updateAvatar: (image, token) => request('/auth/avatar', { method: 'PUT', body: { image }, token }),
+  removeAvatar: (token) => request('/auth/avatar', { method: 'DELETE', token }),
 
   settings: {
     get: (token) => request('/settings', { token }),
