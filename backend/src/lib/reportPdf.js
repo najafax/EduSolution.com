@@ -87,7 +87,23 @@ function drawReportTable(doc, { columns, rows }, startY) {
   let y = drawTableHeaderRow(doc, columns, startY);
 
   rows.forEach((row, index) => {
-    const rowHeight = 18;
+    // A cell's value can be wider than its column — a long client/company
+    // name, or a money figure under a multi-character currency symbol
+    // (e.g. "MVR 12,345.67") — and pdfkit's own text() wraps rather than
+    // clips in that case. A fixed 18px row height ignored that: the
+    // wrapped second line rendered UNDER the next row instead of growing
+    // the row to fit, which is what actually made a value look cut off/
+    // garbled rather than simply narrow. Measuring every cell's real
+    // wrapped height up front and sizing the row to the tallest one means
+    // a long value always grows its own row instead of colliding with the
+    // one below it.
+    const cellHeights = columns.map((col) => {
+      const value = col.format ? col.format(row) : row[col.key];
+      doc.font(col.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9);
+      return doc.heightOfString(String(value), { width: col.width, align: col.align || 'left' });
+    });
+    const rowHeight = Math.max(18, Math.max(...cellHeights) + 8);
+
     if (y + rowHeight > PAGE_BOTTOM) {
       doc.addPage();
       y = drawTableHeaderRow(doc, columns, MARGIN);
@@ -117,7 +133,19 @@ function drawReportTable(doc, { columns, rows }, startY) {
 function drawSummaryBox(doc, rows, y, { dividerBeforeLast = false } = {}) {
   const boxX = 300;
   const boxWidth = 245;
-  const blockHeight = rows.length * 18 + 20;
+  // Value gets more room than label — a fixed label string ("Total
+  // collected") is known to fit, a formatted money value under a
+  // multi-character currency symbol (e.g. "MVR 1,234,567.89") is the one
+  // more likely to run long.
+  const labelWidth = 120;
+  const valueWidth = 125;
+
+  // A rough up-front estimate to decide whether the whole block needs a
+  // fresh page; each row's real height (below) can still exceed this if a
+  // value wraps, which is fine — it just grows that one row rather than
+  // overlapping the next, the same protection drawReportTable's own rows
+  // get.
+  const blockHeight = rows.length * 20 + 20;
   if (y + blockHeight > PAGE_BOTTOM) {
     doc.addPage();
     y = MARGIN;
@@ -132,9 +160,13 @@ function drawSummaryBox(doc, rows, y, { dividerBeforeLast = false } = {}) {
     }
     const bold = row.bold || (dividerBeforeLast && isLast);
     const size = bold ? 12 : 10;
-    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(size).fillColor(row.color || COLORS.body).text(row.label, boxX, rowY, { width: 130 });
-    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(size).fillColor(row.color || COLORS.heading).text(row.value, boxX + 130, rowY, { width: 115, align: 'right' });
-    rowY += bold ? 20 : 18;
+    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(size);
+    const valueHeight = doc.heightOfString(row.value, { width: valueWidth, align: 'right' });
+    const rowHeight = Math.max(bold ? 20 : 18, valueHeight + (bold ? 8 : 6));
+
+    doc.fillColor(row.color || COLORS.body).text(row.label, boxX, rowY, { width: labelWidth });
+    doc.fillColor(row.color || COLORS.heading).text(row.value, boxX + labelWidth, rowY, { width: valueWidth, align: 'right' });
+    rowY += rowHeight;
   });
 
   return rowY + 14;
@@ -193,14 +225,21 @@ function renderSalesReportPdf({ invoices, from, to, settings }) {
     return docToBuffer(doc, (d) => addPageFooter(d, settings));
   }
 
+  // Widths give CLIENT and the three money columns more room than a
+  // simple even split would (DATE/STATUS never need much — a status is
+  // one short word, a date is a fixed-format string) — a client/company
+  // name and a money figure under a multi-character currency symbol (e.g.
+  // "MVR 12,345.67") are the two things most likely to run long, so they
+  // get the width; drawReportTable's own dynamic row height still covers
+  // anything longer than even this.
   const columns = [
-    { key: 'number', label: 'INVOICE #', x: 0, width: 75 },
-    { key: 'client_name', label: 'CLIENT', x: 78, width: 110 },
-    { key: 'issue_date', label: 'DATE', x: 190, width: 60 },
-    { key: 'status', label: 'STATUS', x: 252, width: 55, format: (r) => r.status.toUpperCase() },
-    { key: 'total', label: 'TOTAL', x: 309, width: 65, align: 'right', format: (r) => money(r.total, symbol) },
-    { key: 'amount_paid', label: 'PAID', x: 376, width: 60, align: 'right', format: (r) => money(r.amount_paid, symbol) },
-    { key: 'balance', label: 'BALANCE', x: 438, width: 57, align: 'right', format: (r) => money(r.total - r.amount_paid, symbol) },
+    { key: 'number', label: 'INVOICE #', x: 0, width: 68 },
+    { key: 'client_name', label: 'CLIENT', x: 71, width: 120 },
+    { key: 'issue_date', label: 'DATE', x: 194, width: 50 },
+    { key: 'status', label: 'STATUS', x: 247, width: 42, format: (r) => r.status.toUpperCase() },
+    { key: 'total', label: 'TOTAL', x: 292, width: 68, align: 'right', format: (r) => money(r.total, symbol) },
+    { key: 'amount_paid', label: 'PAID', x: 363, width: 65, align: 'right', format: (r) => money(r.amount_paid, symbol) },
+    { key: 'balance', label: 'BALANCE', x: 431, width: 64, align: 'right', format: (r) => money(r.total - r.amount_paid, symbol) },
   ];
   y = drawReportTable(doc, { columns, rows: invoices }, y);
 
@@ -235,14 +274,17 @@ function renderTaxReportPdf({ invoices, from, to, settings }) {
   // computed against — see lib/totals.js: subtotal -> discount -> tax.
   const rows = invoices.map((inv) => ({ ...inv, taxable_base: inv.subtotal - inv.discount_amount }));
 
+  // Same reasoning as the sales report's own column widths above — CLIENT
+  // and the money columns get the room; RATE never needs more than a few
+  // characters ("16%").
   const columns = [
-    { key: 'number', label: 'INVOICE #', x: 0, width: 75 },
-    { key: 'client_name', label: 'CLIENT', x: 78, width: 115 },
-    { key: 'issue_date', label: 'DATE', x: 196, width: 55 },
-    { key: 'taxable_base', label: 'TAXABLE AMT', x: 254, width: 80, align: 'right', format: (r) => money(r.taxable_base, symbol) },
-    { key: 'tax_rate', label: 'RATE', x: 337, width: 40, align: 'right', format: (r) => `${r.tax_rate}%` },
-    { key: 'tax_amount', label: 'TAX', x: 380, width: 55, align: 'right', format: (r) => money(r.tax_amount, symbol) },
-    { key: 'total', label: 'TOTAL', x: 438, width: 57, align: 'right', format: (r) => money(r.total, symbol) },
+    { key: 'number', label: 'INVOICE #', x: 0, width: 65 },
+    { key: 'client_name', label: 'CLIENT', x: 68, width: 118 },
+    { key: 'issue_date', label: 'DATE', x: 189, width: 48 },
+    { key: 'taxable_base', label: 'TAXABLE AMT', x: 240, width: 78, align: 'right', format: (r) => money(r.taxable_base, symbol) },
+    { key: 'tax_rate', label: 'RATE', x: 321, width: 35, align: 'right', format: (r) => `${r.tax_rate}%` },
+    { key: 'tax_amount', label: 'TAX', x: 359, width: 62, align: 'right', format: (r) => money(r.tax_amount, symbol) },
+    { key: 'total', label: 'TOTAL', x: 424, width: 71, align: 'right', format: (r) => money(r.total, symbol) },
   ];
   y = drawReportTable(doc, { columns, rows }, y);
 
@@ -283,10 +325,14 @@ function renderExpenseReportPdf({ expenses, from, to, settings }) {
     byCategory.get(e.category).push(e);
   }
 
+  // The original x/width pairs left a 60pt gap sitting unused between
+  // DESCRIPTION and AMOUNT (280+75=355, but AMOUNT started at 415) — pure
+  // waste on the one column (DESCRIPTION) most likely to actually need
+  // it for a long expense description.
   const columns = [
-    { key: 'expense_date', label: 'DATE', x: 0, width: 70 },
-    { key: 'description', label: 'DESCRIPTION', x: 75, width: 280 },
-    { key: 'amount', label: 'AMOUNT', x: 415, width: 80, align: 'right', format: (r) => money(r.amount, symbol) },
+    { key: 'expense_date', label: 'DATE', x: 0, width: 65 },
+    { key: 'description', label: 'DESCRIPTION', x: 70, width: 335 },
+    { key: 'amount', label: 'AMOUNT', x: 410, width: 85, align: 'right', format: (r) => money(r.amount, symbol) },
   ];
 
   let grandTotal = 0;
