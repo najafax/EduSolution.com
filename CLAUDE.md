@@ -4634,6 +4634,25 @@ keeps its existing layout.
   per-record detail pages and, like the public pages, get `settings` from
   their own document-fetch response rather than context or a separate
   call — also no race.
+  **The same race, on a value that isn't a currency symbol**: reported
+  later as "the greeting briefly shows my email, then swaps to the
+  business name" — `pages/Dashboard.jsx`'s own greeting subtitle
+  (`settings?.business_name || user?.email`, directly under the "Good
+  morning, {name}" heading) sits *outside* the `!summary || !settingsLoaded`
+  gate the rest of this page's content already waits on, so it painted
+  immediately off `user?.email` (always available, no fetch needed) and
+  only swapped to `settings.business_name` once the same independent
+  settings fetch this whole section is about actually resolved — the exact
+  same race, just never swept up in the pass above since the symptom
+  wasn't a `$`. Fixed the same way, narrowed to just this one line rather
+  than delaying the page's own already-`settingsLoaded`-gated main content
+  any further: `settingsLoaded ? settings?.business_name || user?.email :
+  ' '` — a single space holds the line's height so nothing shifts once the
+  real value lands, rather than the line collapsing to zero height and
+  back. Verified with the same throttled-`/api/settings` Playwright
+  technique as the rest of this fix: a mid-load screenshot shows the blank
+  line (not the email), and the settled state shows the business name with
+  no flash in between.
 - `pages/business/InvoiceDetail.jsx` gained a mobile-only (`sm:hidden`)
   gradient hero card between the header actions and the existing Bill-to/
   Details grid: total due in `font-display`, a paid-vs-total progress bar,

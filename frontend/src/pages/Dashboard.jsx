@@ -240,7 +240,17 @@ export default function Dashboard() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{greeting()}</p>
       <h1 className="font-display text-3xl font-extrabold text-ink dark:text-white">{firstName}</h1>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{settings?.business_name || user?.email}</p>
+      {/* Waits on the same `settingsLoaded` flag the financial content below
+          gates on (see that section's own currency-symbol-flash note) —
+          painting `user?.email` immediately and swapping to
+          `settings.business_name` a moment later, once the independent
+          settings fetch resolves, read as a visible flash/flicker rather
+          than a clean single paint. A non-breaking space holds the line's
+          height in the meantime so nothing shifts once the real value
+          arrives. */}
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        {settingsLoaded ? settings?.business_name || user?.email : ' '}
+      </p>
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
