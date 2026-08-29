@@ -23,6 +23,24 @@ function signedMoney(amount, symbol) {
   return `${sign}${money(Math.abs(amount), symbol)}`;
 }
 
+// Report tables/summaries carry a dozen-plus money figures on one page —
+// repeating the currency symbol beside every single one was pure visual
+// noise (and exactly what narrowed the money columns enough to trigger
+// the wrapping drawReportTable/drawSummaryBox now guard against above)
+// once the currency itself is stated once near the report's own title
+// (see drawReportHeader's "Amounts in ..." line below) instead. Reuses
+// money()/signedMoney() with an empty symbol rather than a parallel
+// formatter, so the number formatting itself (thousands separators, 2dp,
+// sign placement) can never drift from the symbol-carrying version
+// quote/invoice/receipt PDFs still use — those are single documents with
+// only a handful of money lines each, where the symbol pulls its weight.
+function amountOnly(amount) {
+  return money(amount, '');
+}
+function signedAmountOnly(amount) {
+  return signedMoney(amount, '');
+}
+
 // Logo + business name/contact (left) and report title + period + a
 // "Generated <date>" timestamp (right), closed off with a brand divider —
 // the report equivalent of drawHeader/drawMinimalHeader in lib/pdf.js, but
@@ -55,6 +73,13 @@ function drawReportHeader(doc, { title, subtitle, settings }) {
   let rightY = 48 + doc.heightOfString(title, { width: 245 }) + 4;
   doc.font('Helvetica').fontSize(9.5).fillColor(COLORS.body).text(subtitle, 300, rightY, { width: 245, align: 'right' });
   rightY += doc.heightOfString(subtitle, { width: 245 }) + 4;
+  // Stated once here rather than repeated beside every figure in the
+  // table/summary below (see amountOnly/signedAmountOnly above) — every
+  // money value on the rest of this report is in this currency, with no
+  // per-value symbol.
+  const symbol = (settings.currency_symbol || '$').trim();
+  doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted).text(`Amounts in ${symbol}`, 300, rightY, { width: 245, align: 'right' });
+  rightY += 12;
   doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted).text(`Generated ${new Date().toISOString().slice(0, 10)}`, 300, rightY, { width: 245, align: 'right' });
   rightY += 12;
 
@@ -217,7 +242,6 @@ function drawNetProfitBar(doc, { value, positive }, y) {
 
 function renderSalesReportPdf({ invoices, from, to, settings }) {
   const doc = newDoc();
-  const symbol = settings.currency_symbol || '$';
   let y = drawReportHeader(doc, { title: 'SALES REPORT', subtitle: `${from} to ${to}`, settings });
 
   if (invoices.length === 0) {
@@ -237,9 +261,9 @@ function renderSalesReportPdf({ invoices, from, to, settings }) {
     { key: 'client_name', label: 'CLIENT', x: 71, width: 120 },
     { key: 'issue_date', label: 'DATE', x: 194, width: 50 },
     { key: 'status', label: 'STATUS', x: 247, width: 42, format: (r) => r.status.toUpperCase() },
-    { key: 'total', label: 'TOTAL', x: 292, width: 68, align: 'right', format: (r) => money(r.total, symbol) },
-    { key: 'amount_paid', label: 'PAID', x: 363, width: 65, align: 'right', format: (r) => money(r.amount_paid, symbol) },
-    { key: 'balance', label: 'BALANCE', x: 431, width: 64, align: 'right', format: (r) => money(r.total - r.amount_paid, symbol) },
+    { key: 'total', label: 'TOTAL', x: 292, width: 68, align: 'right', format: (r) => amountOnly(r.total) },
+    { key: 'amount_paid', label: 'PAID', x: 363, width: 65, align: 'right', format: (r) => amountOnly(r.amount_paid) },
+    { key: 'balance', label: 'BALANCE', x: 431, width: 64, align: 'right', format: (r) => amountOnly(r.total - r.amount_paid) },
   ];
   y = drawReportTable(doc, { columns, rows: invoices }, y);
 
@@ -249,9 +273,9 @@ function renderSalesReportPdf({ invoices, from, to, settings }) {
     doc,
     [
       { label: 'Invoices', value: String(invoices.length) },
-      { label: 'Total sales', value: money(totalSales, symbol) },
-      { label: 'Total collected', value: money(totalPaid, symbol) },
-      { label: 'Outstanding', value: money(totalSales - totalPaid, symbol) },
+      { label: 'Total sales', value: amountOnly(totalSales) },
+      { label: 'Total collected', value: amountOnly(totalPaid) },
+      { label: 'Outstanding', value: amountOnly(totalSales - totalPaid) },
     ],
     y,
     { dividerBeforeLast: true },
@@ -262,7 +286,6 @@ function renderSalesReportPdf({ invoices, from, to, settings }) {
 
 function renderTaxReportPdf({ invoices, from, to, settings }) {
   const doc = newDoc();
-  const symbol = settings.currency_symbol || '$';
   let y = drawReportHeader(doc, { title: 'TAX REPORT', subtitle: `${from} to ${to}`, settings });
 
   if (invoices.length === 0) {
@@ -281,10 +304,10 @@ function renderTaxReportPdf({ invoices, from, to, settings }) {
     { key: 'number', label: 'INVOICE #', x: 0, width: 65 },
     { key: 'client_name', label: 'CLIENT', x: 68, width: 118 },
     { key: 'issue_date', label: 'DATE', x: 189, width: 48 },
-    { key: 'taxable_base', label: 'TAXABLE AMT', x: 240, width: 78, align: 'right', format: (r) => money(r.taxable_base, symbol) },
+    { key: 'taxable_base', label: 'TAXABLE AMT', x: 240, width: 78, align: 'right', format: (r) => amountOnly(r.taxable_base) },
     { key: 'tax_rate', label: 'RATE', x: 321, width: 35, align: 'right', format: (r) => `${r.tax_rate}%` },
-    { key: 'tax_amount', label: 'TAX', x: 359, width: 62, align: 'right', format: (r) => money(r.tax_amount, symbol) },
-    { key: 'total', label: 'TOTAL', x: 424, width: 71, align: 'right', format: (r) => money(r.total, symbol) },
+    { key: 'tax_amount', label: 'TAX', x: 359, width: 62, align: 'right', format: (r) => amountOnly(r.tax_amount) },
+    { key: 'total', label: 'TOTAL', x: 424, width: 71, align: 'right', format: (r) => amountOnly(r.total) },
   ];
   y = drawReportTable(doc, { columns, rows }, y);
 
@@ -295,9 +318,9 @@ function renderTaxReportPdf({ invoices, from, to, settings }) {
     doc,
     [
       { label: 'Invoices', value: String(invoices.length) },
-      { label: 'Total taxable amount', value: money(totalTaxable, symbol) },
-      { label: 'Total sales (incl. tax)', value: money(totalSales, symbol) },
-      { label: 'Total tax collected', value: money(totalTax, symbol) },
+      { label: 'Total taxable amount', value: amountOnly(totalTaxable) },
+      { label: 'Total sales (incl. tax)', value: amountOnly(totalSales) },
+      { label: 'Total tax collected', value: amountOnly(totalTax) },
     ],
     y,
     { dividerBeforeLast: true },
@@ -308,7 +331,6 @@ function renderTaxReportPdf({ invoices, from, to, settings }) {
 
 function renderExpenseReportPdf({ expenses, from, to, settings }) {
   const doc = newDoc();
-  const symbol = settings.currency_symbol || '$';
   let y = drawReportHeader(doc, { title: 'EXPENSE REPORT', subtitle: `${from} to ${to}`, settings });
 
   if (expenses.length === 0) {
@@ -332,7 +354,7 @@ function renderExpenseReportPdf({ expenses, from, to, settings }) {
   const columns = [
     { key: 'expense_date', label: 'DATE', x: 0, width: 65 },
     { key: 'description', label: 'DESCRIPTION', x: 70, width: 335 },
-    { key: 'amount', label: 'AMOUNT', x: 410, width: 85, align: 'right', format: (r) => money(r.amount, symbol) },
+    { key: 'amount', label: 'AMOUNT', x: 410, width: 85, align: 'right', format: (r) => amountOnly(r.amount) },
   ];
 
   let grandTotal = 0;
@@ -347,45 +369,44 @@ function renderExpenseReportPdf({ expenses, from, to, settings }) {
 
     const subtotal = rows.reduce((s, r) => s + r.amount, 0);
     grandTotal += subtotal;
-    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(COLORS.heading).text(`Subtotal: ${money(subtotal, symbol)}`, MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(COLORS.heading).text(`Subtotal: ${amountOnly(subtotal)}`, MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
     y += 26;
   }
 
-  drawSummaryBox(doc, [{ label: 'Total expenses', value: money(grandTotal, symbol), bold: true }], y);
+  drawSummaryBox(doc, [{ label: 'Total expenses', value: amountOnly(grandTotal), bold: true }], y);
 
   return docToBuffer(doc, (d) => addPageFooter(d, settings));
 }
 
 function renderProfitLossPdf({ revenueTotal, expensesByCategory, totalExpenses, from, to, settings }) {
   const doc = newDoc();
-  const symbol = settings.currency_symbol || '$';
   let y = drawReportHeader(doc, { title: 'PROFIT & LOSS', subtitle: `${from} to ${to}`, settings });
 
   y = drawStatementSection(
     doc,
     {
       title: 'REVENUE',
-      rows: [{ label: 'Payments received', value: money(revenueTotal, symbol) }],
+      rows: [{ label: 'Payments received', value: amountOnly(revenueTotal) }],
       totalLabel: 'Total revenue',
-      totalValue: money(revenueTotal, symbol),
+      totalValue: amountOnly(revenueTotal),
     },
     y,
   );
 
-  const expenseRows = expensesByCategory.map((c) => ({ label: titleCase(c.category), value: money(c.total, symbol) }));
+  const expenseRows = expensesByCategory.map((c) => ({ label: titleCase(c.category), value: amountOnly(c.total) }));
   y = drawStatementSection(
     doc,
     {
       title: 'EXPENSES',
-      rows: expenseRows.length ? expenseRows : [{ label: 'No expenses recorded', value: money(0, symbol) }],
+      rows: expenseRows.length ? expenseRows : [{ label: 'No expenses recorded', value: amountOnly(0) }],
       totalLabel: 'Total expenses',
-      totalValue: money(totalExpenses, symbol),
+      totalValue: amountOnly(totalExpenses),
     },
     y,
   );
 
   const netProfit = Math.round((revenueTotal - totalExpenses) * 100) / 100;
-  y = drawNetProfitBar(doc, { value: signedMoney(netProfit, symbol), positive: netProfit >= 0 }, y);
+  y = drawNetProfitBar(doc, { value: signedAmountOnly(netProfit), positive: netProfit >= 0 }, y);
 
   doc
     .font('Helvetica')
@@ -406,19 +427,18 @@ function renderProfitLossPdf({ revenueTotal, expensesByCategory, totalExpenses, 
 // category-by-category breakdown.
 function renderBankBalancePdf({ openingBalance, totalPayments, totalContributions, totalExpenses, totalDraws, totalReturns, closingBalance, from, to, settings }) {
   const doc = newDoc();
-  const symbol = settings.currency_symbol || '$';
   let y = drawReportHeader(doc, { title: 'BANK BALANCE STATEMENT', subtitle: `${from} to ${to}`, settings });
 
-  const rows = [{ label: 'Opening balance', value: signedMoney(openingBalance, symbol) }, { label: 'Payments received', value: money(totalPayments, symbol) }];
+  const rows = [{ label: 'Opening balance', value: signedAmountOnly(openingBalance) }, { label: 'Payments received', value: amountOnly(totalPayments) }];
   // Only shown when relevant — most businesses never have one, and a
   // zero-value "Capital contributions"/"Owner draws"/"Owner returns" row on
   // every statement would just be noise for the common case.
-  if (totalContributions) rows.push({ label: 'Capital contributions', value: money(totalContributions, symbol) });
-  if (totalDraws) rows.push({ label: 'Owner draws', value: signedMoney(-totalDraws, symbol) });
-  if (totalReturns) rows.push({ label: 'Owner returns', value: money(totalReturns, symbol) });
+  if (totalContributions) rows.push({ label: 'Capital contributions', value: amountOnly(totalContributions) });
+  if (totalDraws) rows.push({ label: 'Owner draws', value: signedAmountOnly(-totalDraws) });
+  if (totalReturns) rows.push({ label: 'Owner returns', value: amountOnly(totalReturns) });
   rows.push(
-    { label: 'Expenses', value: signedMoney(-totalExpenses, symbol) },
-    { label: 'Closing balance', value: signedMoney(closingBalance, symbol), bold: true },
+    { label: 'Expenses', value: signedAmountOnly(-totalExpenses) },
+    { label: 'Closing balance', value: signedAmountOnly(closingBalance), bold: true },
   );
 
   y = drawSummaryBox(doc, rows, y, { dividerBeforeLast: true });

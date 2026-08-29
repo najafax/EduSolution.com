@@ -1449,6 +1449,43 @@ deliberately untouched by either, always returning every row.
   business's balance can start (and stay) negative; expenses render as a
   negative value too (`signedMoney(-totalExpenses, symbol)`) so the box
   reads as a literal running sum top to bottom.
+  **Wrapped cells no longer overlap the row below them**: `drawReportTable`
+  used to draw every row at a fixed 18px height, but `pdfkit`'s own
+  `.text()` wraps (rather than clips) a value wider than its column — a
+  long client/company name, or a money figure under a multi-character
+  currency symbol (e.g. `MVR 12,345.67`), would wrap onto a second line
+  that rendered *underneath the next row* instead of growing the row to
+  fit, reading as cut-off/garbled text rather than simply narrow. Each
+  row's height is now measured up front from its own tallest wrapped cell
+  (`doc.heightOfString` per column, same font/size the row is actually
+  drawn with) and sized to the tallest one, so a long value always grows
+  its own row instead of colliding with the one below it — `drawSummaryBox`
+  gets the identical treatment on its value column. Column widths on the
+  sales/tax report tables were also rebalanced (CLIENT and the money
+  columns get more room; DATE/STATUS/RATE never need much) and the expense
+  report's DESCRIPTION/AMOUNT columns absorbed a 60pt gap that used to sit
+  entirely unused between them — none of this is a substitute for the
+  dynamic-height fix above, just less likely to need it in the first
+  place. **Every individual money figure in these five reports is now
+  symbol-free** — `amountOnly()`/`signedAmountOnly()` (both call
+  `money()`/`signedMoney()` with an empty symbol string, so the number
+  formatting itself — thousands separators, 2dp, sign placement — can
+  never drift from the symbol-carrying version) replace every
+  `money(x, symbol)`/`signedMoney(x, symbol)` call in
+  `drawReportTable`'s columns, `drawSummaryBox`'s rows, and
+  `drawStatementSection`'s rows/`drawNetProfitBar`'s value across all five
+  render functions. With a dozen-plus money figures on one report page,
+  repeating the symbol beside every single one was pure visual noise (and
+  exactly what narrowed the money columns enough to trigger the wrapping
+  bug above) — `drawReportHeader` instead states it once, as a small
+  `Amounts in {symbol}` line under the title/date-range (right above
+  "Generated ..."), trimmed from `settings.currency_symbol` (which itself
+  carries a trailing space for spacing before a value, e.g. `'MVR '` — the
+  note trims that back to a bare `MVR`). This is deliberately scoped to
+  just these five report PDFs — the quote/invoice/receipt PDFs `lib/pdf.js`
+  renders are single documents with only a handful of money lines each,
+  where the symbol still pulls its weight, so those keep it on every line
+  unchanged.
 - `lib/totals.js` — `computeTotals(items, taxRate, discountType, discountValue)`
   validates a raw line-items payload and computes subtotal → discount → tax
   → total, in that order (tax applies to the post-discount amount).
