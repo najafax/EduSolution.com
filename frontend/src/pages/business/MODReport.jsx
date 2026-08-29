@@ -405,7 +405,7 @@ function ChecklistForm({ meta, draft, setDraft, editingId, onSubmit, onCancelEdi
       <h3 className="mt-2 text-base font-semibold text-slate-900 dark:text-white">Villa Check</h3>
       <div className="flex flex-col gap-2.5">
         {draft.villas.map((v, vIdx) => (
-          <details key={vIdx} open={vIdx === 0} className="group rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <details key={vIdx} className="group rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-3 [&::-webkit-details-marker]:hidden group-open:rounded-b-none">
               <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-slate-400 transition-transform group-open:rotate-90">
                 <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
