@@ -3236,6 +3236,51 @@ that shortcut.
   permission correctly. Hidden entirely for a client with no email on
   file (nothing to send to), same as the portal-invite action's own
   `client.email`-independent guards elsewhere on this page.
+- **License-related campaign shortcuts, on `Campaigns.jsx` itself**: two
+  more header buttons, "Email cancelled clients" and "Notify price
+  increase" — both open the same shared `CampaignComposeModal` as "New
+  campaign," just pre-populated with a computed recipient list and a
+  starting subject/message, via the identical `compose` state object
+  `resendToFailed()` already builds (`presetClientIds`/`title`/
+  `presetNote`/`defaultSubject`/`defaultMessage`, plus `mergeFields`/
+  `recipientData` for the cancelled-clients case — see below). These two
+  buttons originally lived on `pages/business/Licenses.jsx` (a business
+  reason to reach for a license-specific campaign from the page already
+  showing licenses) but were moved here on explicit request, since a
+  bulk client email is squarely this page's own job regardless of which
+  page's data seeded the recipient list; `Licenses.jsx` itself no longer
+  imports `CampaignComposeModal` or the `campaigns` permission at all.
+  "Email cancelled clients" (`openCancelledLicensesCampaign`) fetches
+  every currently-`cancelled` license (`api.licenses.list(token, {status:
+  'cancelled'})`), pre-selects the distinct set of clients that own one,
+  and passes a `{{license_url}}` merge tag (`mergeFields`) with each
+  client's own license `url` as `recipientData` — the one campaign on
+  this page that isn't identical copy to everyone, since a client's own
+  license link is specific to them; a client with more than one cancelled
+  license just gets the first one found, since a single merge tag can
+  only carry one value. `mergeFields` is the *hint* shown in the compose
+  form (a `{{key}}` button next to the message box that inserts the tag
+  at the cursor — see `CampaignComposeModal.jsx`'s own `insertMergeTag`);
+  `recipientData` is the real `{ [clientId]: { key: value } }` map sent to
+  `routes/campaigns.js`, which substitutes it per-recipient server-side
+  through the same `renderTemplate()` every other transactional email in
+  this app already uses. "Notify price increase"
+  (`openPriceIncreaseCampaign`) instead fetches the full client list
+  (`api.clients.list`) and the cancelled-license list together, then
+  targets every client with an email on file *except* those with a
+  currently-cancelled license (nothing to raise the price on if the
+  license itself isn't active) — no merge fields, since this one really
+  is identical copy to everyone. Both set a `campaignLoading` busy state
+  (shared with nothing else on the page) while resolving recipients, and
+  both write a default subject/message tuned for this specific ask
+  (`CANCELLED_LICENSE_EMAIL_SUBJECT`/`_MESSAGE`,
+  `PRICE_INCREASE_EMAIL_SUBJECT`/`_MESSAGE`, both top-of-file constants in
+  `Campaigns.jsx`) — still just a starting draft the admin can freely
+  edit before sending, same as `resendToFailed()`'s own preset. A
+  successful send from either button goes through the exact same
+  `handleSent()` the "New campaign"/"Resend to failed" flows already use
+  (a toast, then reloading the campaign history feed), so these two don't
+  need their own success-notice plumbing.
 
 ### Idle session timeout
 

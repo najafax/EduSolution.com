@@ -17,7 +17,6 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import KpiCard from '../../components/KpiCard';
 import IconActionButton from '../../components/IconActionButton';
-import CampaignComposeModal from '../../components/CampaignComposeModal';
 import {
   LicenseIcon,
   CheckCircleIcon,
@@ -34,8 +33,6 @@ import {
   ReportIcon,
   LinkIcon,
   SendIcon,
-  MegaphoneIcon,
-  TrendUpIcon,
 } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
@@ -57,48 +54,6 @@ const ACCENT = {
   cancelled: 'bg-slate-300 dark:bg-slate-600',
 };
 
-// The default starting draft for the "Email cancelled clients" campaign —
-// CampaignComposeModal's defaultSubject/defaultMessage props (see that
-// component's own doc comment) just pre-fill these into the form, they're
-// still fully editable before sending. {{license_url}} is filled in per
-// recipient from campaignRecipientData below (blank for a client whose
-// license never had one on file — the sentence still reads fine either way).
-const CANCELLED_LICENSE_EMAIL_SUBJECT = 'Confirming Your License Status';
-const CANCELLED_LICENSE_EMAIL_MESSAGE = `Dear Sir/Madam,
-
-We noticed that your license with us is currently showing as cancelled. We wanted to reach out to confirm whether this is still accurate, or whether you'd like to reactivate it.
-
-If you still require the license, please let us know and we'll be happy to get it reactivated for you right away. If you no longer need it, no action is needed on your part.
-
-You can review your license details here: {{license_url}}
-
-Please don't hesitate to reach out if you have any questions or need any assistance.`;
-
-// The default starting draft for the "Notify clients of price increase"
-// campaign below — same defaultSubject/defaultMessage mechanism as the
-// cancelled-license draft above, just a different starting copy for a
-// different recipient set (every client with an email, except those whose
-// license is currently cancelled — see openPriceIncreaseCampaign).
-const PRICE_INCREASE_EMAIL_SUBJECT = 'Important Update: Pricing Adjustment for EduPage Licenses';
-const PRICE_INCREASE_EMAIL_MESSAGE = `Dear Sir/Madam,
-
-We hope this email finds you well.
-
-We are writing to inform you of an upcoming adjustment to the pricing of your EduPage license, which will take effect from your next invoice.
-
-This change is due to the increasing difficulty and cost of acquiring US Dollars for our international payments. As an authorized distributor of EduPage, we are required to make our license payments to the provider in USD. While client payments to us are made in MVR, the ongoing rise in USD exchange rates — along with the added difficulty in sourcing foreign currency — has significantly increased our cost of doing business, even as your payments to us remain in local currency.
-
-To continue providing uninterrupted access to your EduPage license and maintain the quality of service you rely on, we must adjust our pricing to reflect these rising costs.
-
-We understand that pricing changes are never entirely welcome news, and we want to assure you that this decision was not made lightly. We remain fully committed to supporting your school and ensuring a smooth transition.
-
-Should you have any questions about this change or your upcoming invoice, please don't hesitate to reach out to us — we're happy to discuss this further.
-
-Thank you for your continued trust and partnership with Edu Solutions.
-
-Warm regards,
-Edu Solutions Pvt Ltd`;
-
 const EMPTY_FORM = {
   client_id: '',
   name: '',
@@ -114,7 +69,6 @@ const EMPTY_FORM = {
 export default function Licenses() {
   const { token, can } = useAuth();
   const canManage = can('licenses', 'manage');
-  const canSendCampaigns = can('campaigns', 'manage');
   const [licenses, setLicenses] = useState([]);
   const [pageInfo, setPageInfo] = useState(null);
   const [page, setPage] = useState(1);
@@ -137,78 +91,7 @@ export default function Licenses() {
   const [historyTarget, setHistoryTarget] = useState(null);
   const [renewals, setRenewals] = useState(null);
   const [renewalsError, setRenewalsError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [campaignModalOpen, setCampaignModalOpen] = useState(false);
-  const [campaignKind, setCampaignKind] = useState('cancelled'); // 'cancelled' | 'price_increase' — picks which title/copy/merge-fields the shared modal below renders
-  const [campaignPresetIds, setCampaignPresetIds] = useState([]);
-  const [campaignRecipientData, setCampaignRecipientData] = useState({});
-  const [campaignLoading, setCampaignLoading] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
-
-  // Every distinct client with at least one cancelled license, gathered
-  // fresh (not from this page's own paginated/filtered `licenses` state,
-  // which may not even include every cancelled license depending on the
-  // current search/status filter/page) — backs the "Email cancelled
-  // clients" header button below. Also builds the per-client
-  // {{license_url}} merge data CampaignComposeModal sends along — a client
-  // with more than one cancelled license just gets the first one found,
-  // since a single merge tag can only carry one value.
-  async function openCancelledLicensesCampaign() {
-    setError('');
-    setNotice('');
-    setCampaignLoading(true);
-    try {
-      const { licenses: cancelledLicenses } = await api.licenses.list(token, { status: 'cancelled' });
-      const clientIds = [...new Set(cancelledLicenses.map((l) => l.client_id))];
-      const recipientData = {};
-      cancelledLicenses.forEach((l) => {
-        if (!recipientData[l.client_id]) {
-          recipientData[l.client_id] = { license_url: l.url || '', license_name: l.name || '' };
-        }
-      });
-      setCampaignRecipientData(recipientData);
-      if (clientIds.length === 0) {
-        setError('No clients currently have a cancelled license.');
-        return;
-      }
-      setCampaignKind('cancelled');
-      setCampaignPresetIds(clientIds);
-      setCampaignModalOpen(true);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setCampaignLoading(false);
-    }
-  }
-
-  // Every client with an email on file, minus every client who currently
-  // has a cancelled license — backs the "Notify clients of price increase"
-  // header button below. Fetched fresh (not from this page's own
-  // paginated/filtered `licenses` state) for the same reason
-  // openCancelledLicensesCampaign fetches fresh above; `clients` (loaded
-  // once on mount) already holds the full client list, so only the
-  // cancelled-license lookup needs its own request.
-  async function openPriceIncreaseCampaign() {
-    setError('');
-    setNotice('');
-    setCampaignLoading(true);
-    try {
-      const { licenses: cancelledLicenses } = await api.licenses.list(token, { status: 'cancelled' });
-      const cancelledClientIds = new Set(cancelledLicenses.map((l) => l.client_id));
-      const clientIds = clients.filter((c) => c.email && c.email.trim() && !cancelledClientIds.has(c.id)).map((c) => c.id);
-      if (clientIds.length === 0) {
-        setError('No clients to notify — every client either has no email on file or currently has a cancelled license.');
-        return;
-      }
-      setCampaignKind('price_increase');
-      setCampaignPresetIds(clientIds);
-      setCampaignModalOpen(true);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setCampaignLoading(false);
-    }
-  }
 
   function load() {
     // Only show the loading skeleton on the very first load — once there's
@@ -535,26 +418,6 @@ export default function Licenses() {
             <DownloadIcon width={16} height={16} />
             Export Excel
           </button>
-          {canSendCampaigns && (
-            <button
-              onClick={openCancelledLicensesCampaign}
-              disabled={campaignLoading}
-              className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              <MegaphoneIcon width={16} height={16} />
-              {campaignLoading ? 'Loading…' : 'Email cancelled clients'}
-            </button>
-          )}
-          {canSendCampaigns && (
-            <button
-              onClick={openPriceIncreaseCampaign}
-              disabled={campaignLoading}
-              className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              <TrendUpIcon width={16} height={16} />
-              {campaignLoading ? 'Loading…' : 'Notify price increase'}
-            </button>
-          )}
           {canManage && (
             <button
               onClick={startCreate}
@@ -566,8 +429,6 @@ export default function Licenses() {
           )}
         </div>
       </div>
-
-      {notice && <p className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">{notice}</p>}
 
       {summary && (
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -905,34 +766,6 @@ export default function Licenses() {
       </Modal>
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New license" />}
-
-      {/* One shared modal instance for both campaign buttons above — which
-          title/copy/merge-fields it renders is picked by campaignKind, set
-          by whichever open*Campaign() function was actually called. */}
-      <CampaignComposeModal
-        open={campaignModalOpen}
-        onClose={() => setCampaignModalOpen(false)}
-        token={token}
-        presetClientIds={campaignPresetIds}
-        title={campaignKind === 'price_increase' ? 'Notify clients of a license price increase' : 'Email clients with a cancelled license'}
-        presetNote={
-          campaignKind === 'price_increase'
-            ? 'Pre-filled with every client who has an email on file, except those whose license is currently cancelled — review the list below before sending.'
-            : 'Pre-filled with every client who currently has a cancelled license — review the list below before sending.'
-        }
-        mergeFields={campaignKind === 'cancelled' ? [{ key: 'license_url', label: "Client's license URL" }] : undefined}
-        recipientData={campaignKind === 'cancelled' ? campaignRecipientData : undefined}
-        defaultSubject={campaignKind === 'price_increase' ? PRICE_INCREASE_EMAIL_SUBJECT : CANCELLED_LICENSE_EMAIL_SUBJECT}
-        defaultMessage={campaignKind === 'price_increase' ? PRICE_INCREASE_EMAIL_MESSAGE : CANCELLED_LICENSE_EMAIL_MESSAGE}
-        onSent={({ sentCount, failedCount }) => {
-          setCampaignModalOpen(false);
-          setNotice(
-            sentCount > 0
-              ? `Email sent to ${sentCount} client${sentCount === 1 ? '' : 's'}${failedCount ? ` (${failedCount} failed)` : ''}.`
-              : 'Email failed to send.',
-          );
-        }}
-      />
 
       {confirmDialog}
     </div>
