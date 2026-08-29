@@ -241,7 +241,7 @@ function DangerZone({ token }) {
 }
 
 export default function Import() {
-  const { token, can, user } = useAuth();
+  const { token, can, isAdmin } = useAuth();
   const canManage = can('import', 'manage');
   const [type, setType] = useState('clients');
   const [fileName, setFileName] = useState('');
@@ -413,7 +413,7 @@ export default function Import() {
         </div>
       )}
 
-      {user?.role === 'admin' && <DangerZone token={token} />}
+      {isAdmin && <DangerZone token={token} />}
     </div>
   );
 }

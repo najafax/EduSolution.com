@@ -21,10 +21,24 @@ const MODULES = [
   'campaigns',
 ];
 
+// Both admin tiers bypass the per-module grant system entirely — super_admin
+// is a strict superset of admin (everything admin can do, plus exclusive
+// control over admin/super_admin *accounts* themselves, enforced in
+// routes/users.js — see "Roles and permissions" in CLAUDE.md), never a
+// narrower or parallel role. Centralized here so every other admin-role
+// check in the app (hasPermission/effectivePermissions below,
+// middleware/auth.js's requireAdmin, every frontend `role === 'admin'`
+// check) reads from the same single place rather than re-deriving which
+// role strings count as "admin-tier."
+function isAdminRole(role) {
+  return role === 'admin' || role === 'super_admin';
+}
+
 // Staff default-deny: a module with no row is { can_view: false, can_manage:
-// false }, never falls back to "allowed". Admins never consult this table —
-// hasPermission() short-circuits to true for them — so there's nothing to
-// keep in sync when a new module is added; only staff grants need seeding.
+// false }, never falls back to "allowed". Neither admin tier ever consults
+// this table — hasPermission() short-circuits to true for them — so
+// there's nothing to keep in sync when a new module is added; only staff
+// grants need seeding.
 function getPermissions(userId) {
   const rows = db.prepare('SELECT module, can_view, can_manage FROM user_permissions WHERE user_id = ?').all(userId);
   const map = {};
@@ -41,7 +55,7 @@ function getPermissions(userId) {
 // can edit clients can obviously also see them), but not the reverse.
 function hasPermission(user, module, level = 'view') {
   if (!user) return false;
-  if (user.role === 'admin') return true;
+  if (isAdminRole(user.role)) return true;
   const entry = getPermissions(user.id)[module];
   if (!entry) return false;
   return level === 'manage' ? entry.can_manage : entry.can_view || entry.can_manage;
@@ -73,11 +87,11 @@ function setPermissions(userId, permissionsMap) {
 
 // What the frontend actually wants: a single resolved map it can read
 // directly without re-implementing the "admin bypasses everything" rule
-// itself. Admins get every module at { can_view: true, can_manage: true };
-// staff get their real grants from getPermissions().
+// itself. Both admin tiers get every module at { can_view: true, can_manage:
+// true }; staff get their real grants from getPermissions().
 function effectivePermissions(user) {
   if (!user) return {};
-  if (user.role === 'admin') {
+  if (isAdminRole(user.role)) {
     const map = {};
     for (const m of MODULES) map[m] = { can_view: true, can_manage: true };
     return map;
@@ -85,4 +99,4 @@ function effectivePermissions(user) {
   return getPermissions(user.id);
 }
 
-module.exports = { MODULES, getPermissions, hasPermission, setPermissions, effectivePermissions };
+module.exports = { MODULES, isAdminRole, getPermissions, hasPermission, setPermissions, effectivePermissions };

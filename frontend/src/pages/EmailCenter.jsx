@@ -171,7 +171,7 @@ function SentLog({ token }) {
 }
 
 export default function EmailCenter() {
-  const { user, token } = useAuth();
+  const { token, isAdmin } = useAuth();
   const [templates, setTemplates] = useState(null);
   const [error, setError] = useState('');
 
@@ -183,11 +183,11 @@ export default function EmailCenter() {
   }
 
   useEffect(() => {
-    if (user?.role === 'admin') loadTemplates();
+    if (isAdmin) loadTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, user]);
+  }, [token, isAdmin]);
 
-  if (user?.role !== 'admin') {
+  if (!isAdmin) {
     return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">You don't have permission to view this page.</div>;
   }
 

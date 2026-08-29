@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { roleLabel } from '../lib/roles';
 
 // Client-side gate before ever attempting the upload — mirrors
 // PortalInvoiceDetail.jsx's own PROOF_MAX_BYTES precedent, giving an
@@ -143,7 +144,7 @@ export default function MyAccount() {
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My account</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        {user?.role === 'admin' ? 'Administrator' : 'Staff'} account. Contact an admin to change your role or module
+        {roleLabel(user?.role)} account. Contact an admin to change your role or module
         permissions.
       </p>
 

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { isAdminRole } from '../lib/roles';
 
 const AuthContext = createContext(null);
 const TOKEN_KEY = 'edusolution_token';
@@ -95,9 +96,32 @@ export function AuthProvider({ children }) {
     return level === 'manage' ? entry.can_manage : entry.can_view || entry.can_manage;
   }
 
+  // Both admin tiers ('admin' and 'super_admin') are "admin-tier" — see
+  // lib/roles.js's isAdminRole(), which mirrors the backend's own, so every
+  // frontend `user.role === 'admin'` check has one place to read from
+  // instead of re-deriving which role strings count as admin-tier.
+  // isSuperAdmin is the narrower check for the handful of places (Users.jsx's
+  // admin-tier account controls) that specifically need the super_admin
+  // tier itself, not just "some kind of admin."
+  const isAdmin = isAdminRole(user?.role);
+  const isSuperAdmin = user?.role === 'super_admin';
+
   return (
     <AuthContext.Provider
-      value={{ token, user, permissions, sessionTimeoutMinutes, loading, login, logout, updateUser, updateToken, can }}
+      value={{
+        token,
+        user,
+        permissions,
+        sessionTimeoutMinutes,
+        loading,
+        login,
+        logout,
+        updateUser,
+        updateToken,
+        can,
+        isAdmin,
+        isSuperAdmin,
+      }}
     >
       {children}
     </AuthContext.Provider>

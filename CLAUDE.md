@@ -2066,26 +2066,45 @@ Status/derived-field conventions worth knowing before touching this code:
 
 ### Roles and permissions (`backend/src/`)
 
-- Two roles: `admin` (bypasses `user_permissions` entirely — see
-  `hasPermission()` in `lib/permissions.js` above) and `staff` (subject to
-  granular per-module `can_view`/`can_manage` grants, default-deny). New
-  rows default to `role: 'staff'`, but the migration that introduced this
-  column (see `db/index.js` above) one-time-promoted every pre-existing
-  user to `admin` so shipping this feature could never silently strip
-  access from someone already using the app.
+- Three roles: `admin` and `super_admin` (together, "admin-tier" — both
+  bypass `user_permissions` entirely, see `hasPermission()` in
+  `lib/permissions.js` above) and `staff` (subject to granular per-module
+  `can_view`/`can_manage` grants, default-deny). New rows default to
+  `role: 'staff'`, but the migration that introduced the `role` column
+  (see `db/index.js` above) one-time-promoted every pre-existing user to
+  `admin` so shipping that feature could never silently strip access from
+  someone already using the app; `super_admin` needed no equivalent
+  migration since `users.role` is a plain `TEXT` column with no `CHECK`
+  constraint — a third value just needed application code to recognize it,
+  not a schema change.
+- `lib/permissions.js`'s `isAdminRole(role)` (`role === 'admin' || role ===
+  'super_admin'`) is the single place that answers "does this role string
+  count as admin-tier" — every other admin-role check in the app,
+  backend and frontend, reads from here (or its frontend mirror,
+  `frontend/src/lib/roles.js`'s own `isAdminRole()`) rather than
+  re-deriving the rule with a literal `=== 'admin'`. `super_admin` is a
+  **strict superset** of `admin` — `hasPermission()`/`effectivePermissions()`
+  treat the two identically (both bypass `user_permissions` and get an
+  all-true permissions map), and `middleware/auth.js`'s `requireAdmin`
+  passes for either — the *only* place the two tiers diverge is
+  `routes/users.js`'s exclusive control over admin-tier **accounts**
+  themselves, described below. `super_admin` is never a narrower or
+  parallel role to `admin` — there is no capability an `admin` has that a
+  `super_admin` doesn't.
 - `middleware/auth.js`'s `requireAdmin` is a second, stricter gate than
-  `requirePermission` — it checks `req.user.role === 'admin'` directly
+  `requirePermission` — it checks `isAdminRole(req.user.role)` directly
   rather than consulting `user_permissions`, so no staff grant can ever
   unlock it (unlike every other module in this app, which a staff member
-  can be granted access to). Reserved for actions with no per-row undo
-  (`routes/dataReset.js`) or, as of the Email Center, for a feature that's
-  simply admin-only *for now* by deliberate scope decision rather than a
-  no-undo action — `routes/emailCenter.js` reuses the same middleware
-  rather than adding a new gatable module to `lib/permissions.js`'s
-  `MODULES`, since opening it to staff later (if that turns out to be
-  wanted) is a one-line change to `requirePermission('email_center', ...)`
-  plus a `MODULES` entry, not a reason to add that plumbing speculatively
-  now.
+  can be granted access to), and passes for either admin tier since
+  `super_admin` is a strict superset of `admin`. Reserved for actions with
+  no per-row undo (`routes/dataReset.js`) or, as of the Email Center, for
+  a feature that's simply admin-only *for now* by deliberate scope
+  decision rather than a no-undo action — `routes/emailCenter.js` reuses
+  the same middleware rather than adding a new gatable module to
+  `lib/permissions.js`'s `MODULES`, since opening it to staff later (if
+  that turns out to be wanted) is a one-line change to
+  `requirePermission('email_center', ...)` plus a `MODULES` entry, not a
+  reason to add that plumbing speculatively now.
 - `routes/dataReset.js` (mounted at `/api/data-reset`, `requireAuth` +
   `requireAdmin`, its own `router.use()` chain independent of the
   `requirePermission`/module system entirely) — `POST /` bulk-deletes
@@ -2125,9 +2144,10 @@ Status/derived-field conventions worth knowing before touching this code:
   delete (not before), so it survives even when `activity_log` was itself
   one of the cleared tables, becoming the first fresh entry for anyone
   auditing later. `pages/business/Import.jsx`'s `DangerZone` component
-  (rendered only when `user.role === 'admin'`, re-checking the same
-  condition the backend enforces rather than trusting a hidden button) is
-  the only caller — a checkbox per category (`RESET_CATEGORIES`), with
+  (rendered only when `isAdmin` — `useAuth()`'s admin-tier check, see
+  "Super admin and the Finance permission preset" below — re-checking the
+  same condition the backend enforces rather than trusting a hidden
+  button) is the only caller — a checkbox per category (`RESET_CATEGORIES`), with
   checking "Clients" auto-checking and disabling its four dependent
   categories client-side (mirroring the backend's forced cascade, with an
   "Included automatically with Clients." hint rather than letting someone
@@ -2164,12 +2184,27 @@ Status/derived-field conventions worth knowing before touching this code:
   (admin sets a new password directly, no current-password check), `DELETE
   /:id`, and `GET /meta/modules` (returns `MODULES`, for building the
   permissions checkbox grid client-side). `GET /` supports `?q=` (name or
-  email) and `?page=` (see "Pagination convention" above). Two safety guards, both checked
-  via `activeAdminCount(excludingUserId)`: you can't demote/deactivate/
-  delete the last active admin (409), and `DELETE /:id` also blocks
-  deleting your own account (400) — both prevent a click from locking
-  everyone out. `publicUser()` here (separate from `routes/auth.js`'s) is
-  the shape sent for user-management views:
+  email) and `?page=` (see "Pagination convention" above). `ROLES` is
+  `['admin', 'staff', 'super_admin']` — see "Super admin and the Finance
+  permission preset" below for the admin-tier account controls layered on
+  top of this route's plain `requirePermission('users', 'manage')` gate.
+  Two families of safety guards prevent a click from locking everyone out:
+  `activeAdminCount(excludingUserId)` counts **both** admin-tier roles
+  together (`role IN ('admin', 'super_admin')`) — a business with zero
+  plain `admin` accounts but at least one active `super_admin` isn't
+  actually locked out of full business-data access, since `super_admin`
+  already implies everything `admin` does — and blocks demoting/
+  deactivating/deleting the last active admin-tier account (409);
+  `activeSuperAdminCount(excludingUserId)` is a separate, narrower count
+  (`role = 'super_admin'` only) with its own 409 guard in `PUT /:id`/
+  `DELETE /:id`, since running out of super admins specifically really
+  would be unrecoverable in-app (nobody left who can manage admin-tier
+  accounts or promote anyone into either tier — the only way back would be
+  the CLI bootstrap path in `scripts/create-user.js`, see below) even with
+  plenty of plain admins still active. `DELETE /:id` also independently
+  blocks deleting your own account (400, checked before either
+  last-active guard). `publicUser()` here (separate from `routes/auth.js`'s)
+  is the shape sent for user-management views:
   `{id, name, email, role, active, notify_overdue, created_at}`.
 - `routes/search.js` doesn't use `requirePermission` as route middleware
   the way every other business route does — instead each of its four
@@ -2193,6 +2228,143 @@ Status/derived-field conventions worth knowing before touching this code:
   'view')` once via `router.use()` rather than gating individual routes —
   and reuses the `financials` module rather than declaring its own, since
   these reports surface the same data at the same sensitivity level.
+
+### Super admin and the Finance permission preset (`backend/src/`, `frontend/src/`)
+
+Two related additions on top of the two-role system above: a `super_admin`
+tier with exclusive control over admin-tier **accounts**, and a "Finance"
+quick-select preset on the Users form for staff accounts that only need
+money-related modules. Built together after an explicit ask for "a super
+admin who can control everything" plus "another category like finance" —
+clarified up front into a narrower, deliberately scoped shape rather than
+the broadest possible reading of either: `super_admin` adds nothing to
+what `admin` can already do with *business data* (both tiers already have
+full, unrestricted access to every module, see `isAdminRole()` above) —
+it only adds control over who else gets to be `admin`/`super_admin` in the
+first place. And "Finance" isn't a fourth stored role at all — it's a
+preset button that fills in a `staff` account's existing permission grid,
+exactly as adjustable afterward as if an admin had ticked every box by
+hand. Both choices trade a broader, more powerful (and more speculative)
+feature for a narrower one that's fully reversible and easy to reason
+about — see the "None — keep every rule as-is" decision below for the
+same reasoning applied to this feature's third question.
+
+- **What `super_admin` actually adds**: exclusive control over admin-tier
+  *accounts* — creating one, editing one's name/email/role/active state/
+  permissions, resetting one's password, deleting one, and promoting
+  anyone (including staff) into either admin-tier role. A plain `admin`
+  keeps everything it already had — full, unrestricted access to every
+  business-data module, and full CRUD on `staff` accounts via the existing
+  `users:manage` permission — but can no longer touch another admin's or
+  super_admin's account, or its own admin-tier status. This is
+  deliberately the *only* thing that changes: `super_admin` is not a
+  bypass for any of this app's existing safety rules (a locked sent/paid
+  invoice, a client with recorded quotes/invoices/licenses, a converted
+  quote) — every one of those still applies unconditionally to every role,
+  `super_admin` included. That was an explicit design question, answered
+  "None — keep every rule as-is, even for me": broadening what *any* role
+  can override would have been a much bigger, riskier change than the
+  account-control feature actually asked for, and every one of those
+  guards exists to prevent a specific, already-reasoned-through kind of
+  data corruption (an invoice diverging from what was actually sent, an
+  orphaned foreign key, a quote's numbers disagreeing with the invoice it
+  already produced) that doesn't become safer just because a more trusted
+  role clicked the button.
+- `routes/users.js`'s `assertSuperAdminForAdminTier(req, res, ...roles)` is
+  the enforcement point — called with every role value a request touches
+  (the incoming `role` on `POST /`; both `existing.role` and `nextRole` on
+  `PUT /:id`, so it catches promoting a `staff` account into an admin tier
+  *and* editing an already-admin-tier account; just `existing.role` on
+  `POST /:id/reset-password` and `DELETE /:id`) and 403s with "Only a
+  super admin can manage admin accounts" the instant any of them is
+  admin-tier and the caller isn't `super_admin` — checked via
+  `roles.some(isAdminRole)`, so a request naming even one admin-tier role
+  among several is blocked. This deliberately sits **on top of** the
+  route's existing `requirePermission('users', 'manage')` gate rather than
+  replacing it — a plain admin still needs (and, per this app's
+  single-business model, already has) full `users` access to manage staff
+  accounts; this second check narrows what that access can reach, the same
+  layering `requireAdmin` already uses elsewhere (independent of, not a
+  replacement for, the per-module grant system). Like `requireAdmin`, no
+  staff `user_permissions` grant can ever unlock it — it reads
+  `req.user.role` directly.
+- **CLI bootstrap**: `scripts/create-user.js` (`npm run create-user`)
+  gained a `--role` flag (`admin` | `super_admin`, default `admin` —
+  unchanged from before this feature, so every existing invocation with no
+  `--role` behaves exactly as it always did) since nobody can promote
+  anyone into `super_admin` from inside the app until at least one
+  `super_admin` account already exists — the classic bootstrap problem,
+  solved the same way this script has always solved "how does the very
+  first account get created at all": shell access to run it is already a
+  higher trust level than anything the in-app permission system could
+  restrict. For a **new** account, `--role` picks what gets created,
+  same as it always implicitly did for the (always-admin) default. For an
+  **existing** account, passing `--role` with a value that differs from
+  the account's current role takes a distinct, separate path — it updates
+  *only* `role`, touches no password, and returns immediately, before the
+  script's usual "reset this account's password?" prompt ever gets a
+  chance to ask anything (email is resolved before name for this reason
+  too — a pure role change needs an email to find the account and nothing
+  else, so it shouldn't have to prompt for a name it will never use). This
+  is how a business owner would promote their own existing account to
+  `super_admin` the first time this feature ships: `node
+  scripts/create-user.js --email you@yourbusiness.com --role super_admin`
+  against the real production database (never done by an AI agent working
+  in a sandboxed environment with no production DB access — this is
+  explicitly a step for whoever actually operates the server).
+- **Frontend**: `frontend/src/context/AuthContext.jsx` exposes `isAdmin`
+  (`isAdminRole(user?.role)` — true for either admin tier) and
+  `isSuperAdmin` (`user?.role === 'super_admin'`) alongside the existing
+  `can()`, so every component that used to write `user.role === 'admin'`
+  reads one of these instead rather than re-deriving the rule — swept
+  across `Sidebar.jsx` (the Email Center nav link's `adminOnly` filter),
+  `EmailCenter.jsx` (its own admin-only page guard), and
+  `pages/business/Import.jsx` (the `DangerZone` gate) after `isAdminRole`
+  was introduced, so none of those three regressed to "admin-tier-blind"
+  once a `super_admin` existed. `frontend/src/lib/roles.js` holds the
+  frontend's own `isAdminRole()` (mirroring the backend's) and
+  `roleLabel(role)` — `'Administrator'` | `'Staff'` | `'Super Admin'` —
+  used everywhere a role is *displayed* (`DashboardRail.jsx`'s profile
+  card, `MyAccount.jsx`'s account-type line, `Users.jsx`'s role column)
+  so a raw `super_admin` value never renders as the literal, underscored
+  `"Super_admin"` the way a bare `capitalize` CSS class on `u.role` would.
+- `pages/Users.jsx`'s Role `<select>` only renders the `Admin`/`Super
+  Admin` `<option>`s when the viewer is `isSuperAdmin` — a plain admin
+  sees only `Staff`, since selecting either other option would just 403 on
+  submit (same "never show a control that would just error" convention
+  this app already follows everywhere else — `Licenses.jsx`'s Renew/Remind
+  guards, `QuoteDetail.jsx`'s locked-status buttons). The per-row Edit/
+  Reset password/Delete `IconActionButton`s are similarly gated —
+  `canManage && (isSuperAdmin || !isAdminRole(u.role))` — so a plain
+  admin viewing the list sees a staff row's usual three actions but an
+  admin-tier row's action cell renders empty rather than a set of buttons
+  that would each just 403. The page's own intro copy states the rule
+  directly ("only a super admin can create, edit, or remove another admin
+  or super admin account") rather than leaving it to be inferred from
+  missing buttons.
+- **The Finance preset**: a "Finance" button next to the "Module
+  permissions" heading, shown only while `form.role === 'staff'` (an
+  admin-tier account has no permissions grid to preset — it bypasses
+  `user_permissions` entirely). `FINANCE_MODULES` is `['invoices',
+  'expenses', 'financials']` — deliberately not a fourth stored role, a
+  new `MODULES` entry, or a `users.role` value: it's a one-click way to
+  zero every module then grant `{can_view: true, can_manage: true}` on
+  just those three, using the exact same `setPermissionsState`/
+  `togglePermission` state the checkbox grid already manages, so every box
+  it sets is exactly as freely re-toggleable afterward as if an admin had
+  clicked each one by hand — there is no separate "Finance mode" the
+  account is locked into. Deliberately just these three modules, not
+  every module that touches money in some way: `expenses` already covers
+  capital contributions and owner draws (`routes/capitalContributions.js`/
+  `routes/ownerDraws.js` both reuse the `expenses` permission rather than
+  declaring their own, see "Business module" above), and `reports.js`
+  reuses `financials` for the same reason — so `invoices` + `expenses` +
+  `financials` together already reach every dedicated money-movement
+  screen and PDF report in the app, without also handing out `clients`/
+  `quotes`/`products`/`licenses`/etc., which a finance-focused hire
+  typically has no reason to edit. `quotes` is deliberately excluded even
+  though it precedes an invoice — a quote has no money changing hands yet,
+  so it reads as sales/CRM territory rather than finance.
 
 ### Client portal (`backend/src/`, `frontend/src/`)
 

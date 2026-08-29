@@ -10,7 +10,8 @@ const router = Router();
 // the billing/CRM data the rest of this app's permission system (per-module
 // user_permissions grants) governs, so it bypasses that system entirely
 // rather than adding a new gatable module. No staff, however permissioned,
-// can see or submit one — only an account with role: 'admin'.
+// can see or submit one — only an admin-tier account ('admin' or
+// 'super_admin', see requireAdmin/isAdminRole).
 router.use(requireAuth);
 router.use(requireAdmin);
 

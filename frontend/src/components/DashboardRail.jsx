@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { roleLabel } from '../lib/roles';
 
 // The right-hand rail from the combined dashboard direction — a profile
 // card, a short list of shortcuts, and a compact "needs attention" feed
@@ -33,7 +34,7 @@ export default function DashboardRail({ user, shortcuts, attentionItems }) {
         )}
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-ink dark:text-white">{user?.name}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{user?.role === 'admin' ? 'Administrator' : 'Staff'}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{roleLabel(user?.role)}</p>
         </div>
       </Link>
 

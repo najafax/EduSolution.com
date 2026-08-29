@@ -10,8 +10,18 @@ import IconActionButton from '../components/IconActionButton';
 import { PlusIcon, PencilIcon, KeyIcon, TrashIcon } from '../components/icons';
 import { useConfirm } from '../lib/useConfirm';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
+import { isAdminRole, roleLabel } from '../lib/roles';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', active: true };
+
+// The money-related modules a "Finance" staff member needs — invoicing,
+// expenses (which already covers capital contributions/owner draws, see
+// CLAUDE.md's "Roles and permissions"), and financials/reports (reused by
+// routes/reports.js for the same reason). This is a quick-select preset for
+// the permissions grid below, not a stored role — a Finance account is a
+// plain 'staff' row whose grants happen to start here; every checkbox stays
+// freely adjustable afterward.
+const FINANCE_MODULES = ['invoices', 'expenses', 'financials'];
 
 function moduleLabel(module) {
   return module.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -24,7 +34,7 @@ function emptyPermissions(modules) {
 }
 
 export default function Users() {
-  const { user: currentUser, token, can } = useAuth();
+  const { user: currentUser, token, can, isSuperAdmin } = useAuth();
   const canView = can('users', 'view');
   const canManage = can('users', 'manage');
 
@@ -93,6 +103,19 @@ export default function Users() {
     }
   }
 
+  // Zeroes every module then grants view+manage on just FINANCE_MODULES —
+  // a starting point for a Finance staff account, not a locked-in preset;
+  // every box in the grid below stays individually editable afterward.
+  function applyFinancePreset() {
+    setPermissionsState(() => {
+      const next = emptyPermissions(modules);
+      for (const m of FINANCE_MODULES) {
+        if (m in next) next[m] = { can_view: true, can_manage: true };
+      }
+      return next;
+    });
+  }
+
   function togglePermission(module, level) {
     setPermissionsState((prev) => {
       const entry = prev[module] || { can_view: false, can_manage: false };
@@ -115,7 +138,7 @@ export default function Users() {
         email: form.email,
         role: form.role,
         active: form.active,
-        permissions: form.role === 'admin' ? undefined : permissions,
+        permissions: isAdminRole(form.role) ? undefined : permissions,
       };
       if (editingId) {
         await api.users.update(editingId, payload, token);
@@ -181,7 +204,7 @@ export default function Users() {
       </div>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         Everyone with an account can see and edit shared business data unless restricted below. Admins always have
-        full access.
+        full access; only a super admin can create, edit, or remove another admin or super admin account.
       </p>
 
       <div className="mt-4 sm:max-w-sm">
@@ -236,7 +259,11 @@ export default function Users() {
                 className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               >
                 <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
+                {/* Only a super admin can hand out admin-tier roles — see
+                    assertSuperAdminForAdminTier in routes/users.js, which
+                    403s a plain admin's attempt at either option below. */}
+                {isSuperAdmin && <option value="admin">Admin</option>}
+                {isSuperAdmin && <option value="super_admin">Super Admin</option>}
               </select>
             </label>
             {editingId && editingId !== currentUser.id && (
@@ -254,7 +281,17 @@ export default function Users() {
 
           {form.role === 'staff' && (
             <div className="mt-4">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Module permissions</h3>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Module permissions</h3>
+                <button
+                  type="button"
+                  onClick={applyFinancePreset}
+                  className="rounded-md border border-lagoon-200 bg-lagoon-50 px-2.5 py-1 text-xs font-medium text-lagoon-700 hover:bg-lagoon-100 dark:border-lagoon-800 dark:bg-lagoon-950 dark:text-lagoon-300 dark:hover:bg-lagoon-900"
+                  title="Grant view + manage on Invoices, Expenses, and Financials only; clear everything else"
+                >
+                  Finance
+                </button>
+              </div>
               <div className="mt-1.5 max-h-56 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
                 <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                   <thead>
@@ -381,7 +418,7 @@ export default function Users() {
                         {u.id === currentUser.id && <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">(you)</span>}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{u.email}</td>
-                      <td className="whitespace-nowrap px-4 py-3 capitalize text-slate-600 dark:text-slate-400">{u.role}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{roleLabel(u.role)}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -395,18 +432,24 @@ export default function Users() {
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
-                          <div className="flex justify-end gap-1.5">
-                            <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(u)} title="Edit" label="Edit user" />
-                            <IconActionButton
-                              icon={KeyIcon}
-                              tone="slate"
-                              onClick={() => setResetTargetId(u.id)}
-                              title="Reset password"
-                            />
-                            {u.id !== currentUser.id && (
-                              <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(u)} title="Delete" label="Delete user" />
-                            )}
-                          </div>
+                          {/* An admin-tier row is only actionable by a super
+                              admin — see assertSuperAdminForAdminTier in
+                              routes/users.js, which 403s a plain admin's
+                              attempt at any of these. */}
+                          {(isSuperAdmin || !isAdminRole(u.role)) && (
+                            <div className="flex justify-end gap-1.5">
+                              <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(u)} title="Edit" label="Edit user" />
+                              <IconActionButton
+                                icon={KeyIcon}
+                                tone="slate"
+                                onClick={() => setResetTargetId(u.id)}
+                                title="Reset password"
+                              />
+                              {u.id !== currentUser.id && (
+                                <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(u)} title="Delete" label="Delete user" />
+                              )}
+                            </div>
+                          )}
                         </td>
                       )}
                     </tr>
@@ -443,9 +486,9 @@ export default function Users() {
                 >
                   <div className="flex justify-between">
                     <dt className="text-slate-500 dark:text-slate-400">Role</dt>
-                    <dd className="capitalize text-slate-900 dark:text-white">{u.role}</dd>
+                    <dd className="text-slate-900 dark:text-white">{roleLabel(u.role)}</dd>
                   </div>
-                  {canManage && (
+                  {canManage && (isSuperAdmin || !isAdminRole(u.role)) && (
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(u)} title="Edit" label="Edit user" />
                       <IconActionButton icon={KeyIcon} tone="slate" onClick={() => setResetTargetId(u.id)} title="Reset password" />

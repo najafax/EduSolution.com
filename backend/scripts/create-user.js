@@ -5,6 +5,12 @@ const db = require('../src/db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
+// This script only ever creates/promotes into the two admin-tier roles —
+// staff accounts need granular per-module permissions, which only make
+// sense to set up through the in-app Users page, not this CLI. 'admin'
+// stays the default so every existing invocation (with no --role) behaves
+// exactly as before.
+const ROLES = ['admin', 'super_admin'];
 
 function parseArgs(argv) {
   const args = {};
@@ -84,14 +90,37 @@ async function main() {
     return;
   }
 
-  const name = args.name || (await ask('Full name: '));
-  if (!name) throw new Error('Name is required');
+  let role = 'admin';
+  if (args.role) {
+    role = String(args.role).trim().toLowerCase();
+    if (!ROLES.includes(role)) throw new Error(`--role must be one of: ${ROLES.join(', ')}`);
+  }
 
+  // Email is resolved before name — a pure role change (below) only needs
+  // an email to find the target account, and shouldn't have to prompt for
+  // a name it will never use.
   const emailInput = args.email || (await ask('Email: '));
   const email = String(emailInput).trim().toLowerCase();
   if (!EMAIL_RE.test(email)) throw new Error(`"${email}" is not a valid email address`);
 
-  const existing = db.prepare('SELECT id, name FROM users WHERE email = ?').get(email);
+  const existing = db.prepare('SELECT id, name, role FROM users WHERE email = ?').get(email);
+
+  // A role change for an existing account is handled as its own, separate
+  // action — it never touches the password (or the name), and exits before
+  // the password-reset prompt below even gets a chance to ask anything.
+  // This is the bootstrap path for the very first super_admin: nobody else
+  // can promote anyone into that tier from inside the app yet (see
+  // routes/users.js's assertSuperAdminForAdminTier), so it has to be
+  // possible from here, with only shell access as the trust bar.
+  if (existing && args.role && role !== existing.role) {
+    db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, existing.id);
+    console.log(`\nRole changed for ${existing.name} <${email}> (user #${existing.id}): ${existing.role} -> ${role}.`);
+    return;
+  }
+
+  const name = args.name || (await ask('Full name: '));
+  if (!name) throw new Error('Name is required');
+
   if (existing && !args.password) {
     const answer = await ask(`An account already exists for ${email} (${existing.name}). Reset its password? [y/N] `);
     if (answer.toLowerCase() !== 'y') {
@@ -122,13 +151,14 @@ async function main() {
   } else {
     // Shell access to run this script is already a higher trust level than
     // anything the in-app permission system could restrict, so CLI-created
-    // accounts are always admin — this is the bootstrap/recovery path.
-    // Day-to-day staff accounts with granular permissions are created by an
-    // admin from the app's Users page instead.
+    // accounts are always admin-tier (admin by default, or super_admin via
+    // --role) — this is the bootstrap/recovery path. Day-to-day staff
+    // accounts with granular permissions are created by an admin from the
+    // app's Users page instead.
     const result = db
-      .prepare(`INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'admin')`)
-      .run(name.trim(), email, passwordHash);
-    console.log(`\nCreated admin user ${name.trim()} <${email}> (user #${result.lastInsertRowid}).`);
+      .prepare(`INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)`)
+      .run(name.trim(), email, passwordHash, role);
+    console.log(`\nCreated ${role} user ${name.trim()} <${email}> (user #${result.lastInsertRowid}).`);
   }
 
   console.log('They can now sign in at the app\'s /login page.');
