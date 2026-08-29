@@ -194,7 +194,11 @@ function Field({ label, children }) {
     </label>
   );
 }
-const inputClass = 'mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white';
+// h-11 (a fixed height), not min-h-11 (a floor) — a native iOS/WebKit
+// date or time control can otherwise render its own internal chrome
+// taller than a plain text input's natural height, so the two field
+// types drift apart even though both share this exact class.
+const inputClass = 'mt-1 h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white';
 
 // Same shape as pages/business/Settings.jsx's own ImageField (PNG/JPEG,
 // 400KB cap, read as a data URI via FileReader) — a small, deliberate
