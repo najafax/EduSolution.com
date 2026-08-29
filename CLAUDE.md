@@ -2695,6 +2695,104 @@ logged in on" list. Built together since the first three all touch
   swallow the badge along with it, caught visually in testing before this
   shipped.
 
+### MOD Report public submission link (`backend/src/`, `frontend/src/`)
+
+A shareable, no-login URL a super admin can generate so a MOD report can be
+*submitted* — e.g. from a shared tablet at reception — without needing a
+staff account. Deliberately the mirror image of `routes/public.js`'s own
+quote/invoice links: those are read(+respond) links to one already-existing
+document; this is a write-only link to *create* a new `mod_reports` row,
+with no way to read any report back, past or present — MOD Report is the
+one feature in this app locked down tighter than anything else (see
+"Restricted admins..." above — not even a plain `admin` can see it), so a
+public link exposing that same sensitive operational detail (guest names,
+security/CCTV notes, staff housing, issue photos) was never on the table;
+only the ability to add to it was.
+
+- **Shared validation, not duplicated**: `SECTIONS`/`VILLA_ITEMS` (the
+  checklist's own fixed shape) and the sanitize/validate helpers
+  (`sanitizeIssues`/`sanitizeVillas`/`sanitizeGuests`/`validate`/`tally`/
+  `reportTally`) used to live only in `routes/modReports.js`; both now live
+  in `lib/modReportShared.js`, required by both that file and
+  `routes/public.js`. This is deliberate, not just tidying — it's what
+  guarantees the unauthenticated public submission path can never validate
+  or sanitize a submission more loosely than the authenticated one does,
+  since there's only one copy of that logic for either caller to drift
+  from.
+- **The link identifies the form, not a report**: unlike quotes/invoices
+  (a `public_token` column per row), there's no report yet when this link
+  is generated, so it's a single `submission_token` on the existing
+  single-row `mod_report_settings` table (`ALTER TABLE`-guarded — that
+  table already carries its one real row from whenever MOD Report first
+  shipped, same lesson `licenses.url` learned the hard way, see
+  `db/index.js` above) — one link per business, not one per report. No
+  `UNIQUE` constraint the way `public_token` has (SQLite's `ALTER TABLE
+  ADD COLUMN` can't add one anyway) — moot on a single-row table, since
+  there's nothing else it could collide with.
+- `routes/modReports.js`'s `POST /settings/regenerate-token`
+  (`crypto.randomBytes(16).toString('hex')`, same scheme quotes/invoices
+  use for `public_token`) is simultaneously "generate the first link" and
+  "rotate it if it's leaked" — regenerating always works whether a token
+  already exists or not, one action either way. `DELETE /settings/token`
+  is the other half of the lifecycle — clears it back to `NULL`, turning
+  public submission off entirely (the old link 404s) without generating a
+  replacement, for a business that wants to pause the feature rather than
+  rotate it. Both `requireSuperAdmin`-gated like every other route in this
+  file, and both log a structured `activity_log` entry.
+- `routes/public.js` gains `GET /mod-reports/:token/meta` (validates the
+  token against `mod_report_settings.submission_token`, 404s on a mismatch
+  or a `NULL` token — i.e. the feature not yet enabled/since disabled —
+  returns `{ sections, villaItems, businessName, logoImage }`, the same
+  checklist structure `routes/modReports.js`'s own authenticated `GET
+  /meta` serves, plus the branding needed to show *which* business's form
+  this is) and `POST /mod-reports/:token` (same token check, then the
+  identical validate → sanitize → insert sequence the authenticated `POST
+  /` uses, just with `submitted_by_user_id: NULL` — there's no logged-in
+  staff user behind a public submission — and `submitted_by_name` set to
+  the MOD's own name, `mod_name`, which is exactly what that column
+  already means on an authenticated submission too). Response is a bare
+  `{ ok: true }` — a public submitter has no further access to the record
+  they just created (no `GET` route exists to read it back by token), so
+  there's nothing to return beyond confirmation it saved.
+  `middleware/rateLimit.js`'s new `modReportSubmitLimiter` (30/hour) guards
+  the `POST` only — unlike the read-only quote/invoice links, this one
+  writes a new row on every accepted request, so a leaked or guessed link
+  could otherwise flood the table with junk submissions; `GET .../meta` is
+  unlimited, matching every other public-token `GET` in this app (the
+  128-bit token itself is what actually blocks brute-forcing, the same
+  trust level quotes/invoices already rely on with zero rate limiting).
+- **Frontend reuses the real create form, not a copy of it**:
+  `pages/business/MODReport.jsx` exports its own `ChecklistForm` (purely
+  presentational — no `api.*` calls or auth dependency, which is exactly
+  what makes this safe to reuse) and `newDraft`, both now imported by the
+  new `pages/PublicMODReport.jsx`. This means the authenticated "New
+  checklist" tab and the public submission page can never drift apart in
+  shape — every field, every villa/guest-interaction/issue row, comes from
+  the same component either way. `PublicMODReport.jsx` (route
+  `/mod/:token`, public — outside `ProtectedRoute`, never touching
+  `AuthContext`/`localStorage`, same as `PublicQuote.jsx`/`PublicInvoice.jsx`)
+  fetches `GET /public/mod-reports/:token/meta` on mount, renders
+  `ChecklistForm` with `editingId` always `null` (a public link only ever
+  creates), and on submit calls `POST /public/mod-reports/:token` — success
+  swaps the form for a "Checklist submitted" confirmation with a "Submit
+  another checklist" button, matching the shared-kiosk use case (several
+  submissions across one shift from the same open tab) rather than
+  dead-ending after one. `Navbar.jsx`'s `isPublicDocLink` check (hides the
+  "Log in" button on `/q/`/`/i/` for the same reason) now also covers
+  `/mod/` — whoever's filling this out from a shared link has no staff
+  account either.
+- **Settings tab, `PublicLinkCard`**: a new card on `MODReport.jsx`'s
+  existing "Settings" tab, right below the branding form — shows the
+  current link (built from `window.location.origin`, same "trust the
+  browser's own origin over the backend's `CLIENT_ORIGIN`" convention
+  `QuoteDetail.jsx`'s/`InvoiceDetail.jsx`'s own "Copy public link" buttons
+  already establish) with Copy/Regenerate/Remove actions when a token
+  exists, or a single "Generate public link" button when one doesn't.
+  Regenerate and Remove both go through the page's existing shared
+  `useConfirm()` dialog — regenerating immediately invalidates the old
+  link, so that's worth a pause the same way any other "this breaks what
+  was there before" action in this app already is.
+
 ### Client portal (`backend/src/`, `frontend/src/`)
 
 A self-serve login for clients, separate from staff auth entirely — a

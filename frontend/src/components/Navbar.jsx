@@ -52,7 +52,10 @@ export default function Navbar() {
   // this shared Navbar — but they're meant for an external client with no
   // account, so the "Log in" button there is just noise (or worse, an
   // invitation to poke at staff-only auth) rather than a useful action.
-  const isPublicDocLink = location.pathname.startsWith('/q/') || location.pathname.startsWith('/i/');
+  // PublicMODReport.jsx (/mod/:token) is the same kind of page for the same
+  // reason — whoever's filling out a MOD checklist from a shared link has
+  // no staff account either.
+  const isPublicDocLink = location.pathname.startsWith('/q/') || location.pathname.startsWith('/i/') || location.pathname.startsWith('/mod/');
 
   const initials = (user?.name || user?.email || '?')
     .trim()

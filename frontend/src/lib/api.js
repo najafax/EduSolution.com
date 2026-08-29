@@ -286,6 +286,8 @@ export const api = {
     openPdf: (id, token) => openPdf(`/mod-reports/${id}/pdf`, token),
     getSettings: (token) => request('/mod-reports/settings', { token }),
     updateSettings: (payload, token) => request('/mod-reports/settings', { method: 'PUT', body: payload, token }),
+    regeneratePublicLink: (token) => request('/mod-reports/settings/regenerate-token', { method: 'POST', token }),
+    removePublicLink: (token) => request('/mod-reports/settings/token', { method: 'DELETE', token }),
   },
 
   users: {
@@ -307,6 +309,10 @@ export const api = {
     getInvoice: (publicToken) => request(`/public/invoices/${publicToken}`),
     openQuotePdf: (publicToken) => openPdf(`/public/quotes/${publicToken}/pdf`),
     openInvoicePdf: (publicToken) => openPdf(`/public/invoices/${publicToken}/pdf`),
+    // The MOD report submission link — write-only, no per-report identity
+    // to read back (see routes/public.js's own note).
+    modReportMeta: (publicToken) => request(`/public/mod-reports/${publicToken}/meta`),
+    submitModReport: (publicToken, payload) => request(`/public/mod-reports/${publicToken}`, { method: 'POST', body: payload }),
   },
 
   // The client portal — a client's own login (see routes/clientPortal.js),

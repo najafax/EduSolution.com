@@ -26,6 +26,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const PublicQuote = lazy(() => import('./pages/PublicQuote'));
 const PublicInvoice = lazy(() => import('./pages/PublicInvoice'));
+const PublicMODReport = lazy(() => import('./pages/PublicMODReport'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Clients = lazy(() => import('./pages/business/Clients'));
 const Products = lazy(() => import('./pages/business/Products'));
@@ -135,6 +136,7 @@ export default function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/q/:token" element={<PublicQuote />} />
                 <Route path="/i/:token" element={<PublicInvoice />} />
+                <Route path="/mod/:token" element={<PublicMODReport />} />
                 <Route path="/portal/*" element={<PortalApp />} />
                 <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
 

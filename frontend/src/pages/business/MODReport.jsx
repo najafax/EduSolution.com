@@ -5,7 +5,7 @@ import { todayStr, timeAgo } from '../../lib/date';
 import { useConfirm } from '../../lib/useConfirm';
 import IconActionButton from '../../components/IconActionButton';
 import Pagination from '../../components/Pagination';
-import { DownloadIcon, PencilIcon, TrashIcon, PlusIcon, CheckCircleIcon } from '../../components/icons';
+import { DownloadIcon, PencilIcon, TrashIcon, PlusIcon, CheckCircleIcon, LinkIcon, RefreshIcon, XIcon } from '../../components/icons';
 
 function nowStr() {
   const d = new Date();
@@ -59,7 +59,11 @@ function compressImage(file, maxDim = 1000, quality = 0.62) {
   });
 }
 
-function newDraft(sections) {
+// Exported (along with ChecklistForm below) so pages/PublicMODReport.jsx
+// can reuse the exact same create-flow shape for the unauthenticated
+// public submission link — see routes/public.js's own note on why that
+// link is write-only, with no read-back of past reports.
+export function newDraft(sections) {
   const sectionAnswers = {};
   (sections || []).forEach((s) => { sectionAnswers[s.key] = emptyItemMap(s.items.length); });
   return {
@@ -300,7 +304,92 @@ function ModSettingsForm({ settings, setSettings, onSubmit, submitting, error, s
   );
 }
 
-function ChecklistForm({ meta, draft, setDraft, editingId, onSubmit, onCancelEdit, submitting, error }) {
+// Manages the one shareable "submit a MOD report without logging in" link
+// (see routes/public.js's own POST /mod-reports/:token) — Generate/
+// Regenerate/Remove are handled by the parent (Regenerate/Remove go
+// through the page's shared useConfirm() dialog, so they live where that
+// lives), this component just renders the current state and a self-
+// contained "Copy" action, same as this app's other "Copy public link"
+// buttons (QuoteDetail.jsx/InvoiceDetail.jsx) build their own copy from
+// window.location.origin rather than trusting the backend's CLIENT_ORIGIN
+// to match what's actually being served.
+function PublicLinkCard({ submissionToken, onRegenerate, onRemove, busy, error, notice }) {
+  const [copied, setCopied] = useState(false);
+  const url = submissionToken ? `${window.location.origin}/mod/${submissionToken}` : '';
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 flex max-w-lg flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Public submission link</h3>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+          Share this link with whoever needs to submit a MOD report without logging in — a shared tablet at reception, for example. Anyone with the link can submit a new checklist; it doesn't let them view past reports or anything else in the app.
+        </p>
+      </div>
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {notice && <p className="text-sm text-emerald-600 dark:text-emerald-400">{notice}</p>}
+
+      {submissionToken ? (
+        <>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={url}
+              onFocus={(e) => e.target.select()}
+              className="min-h-11 w-full flex-1 rounded-md border border-slate-300 bg-slate-50 px-3 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            />
+            <IconActionButton icon={LinkIcon} tone="lagoon" title={copied ? 'Copied!' : 'Copy link'} label="Copy public link" onClick={handleCopy} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy === 'regenerate'}
+              onClick={onRegenerate}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <RefreshIcon className={`h-4 w-4 ${busy === 'regenerate' ? 'animate-spin' : ''}`} />
+              {busy === 'regenerate' ? 'Regenerating…' : 'Regenerate'}
+            </button>
+            <button
+              type="button"
+              disabled={busy === 'remove'}
+              onClick={onRemove}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+            >
+              <XIcon className="h-4 w-4" />
+              {busy === 'remove' ? 'Removing…' : 'Remove link'}
+            </button>
+          </div>
+        </>
+      ) : (
+        <button
+          type="button"
+          disabled={busy === 'regenerate'}
+          onClick={onRegenerate}
+          className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-md bg-lagoon-600 px-5 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+        >
+          <LinkIcon className="h-4 w-4" />
+          {busy === 'regenerate' ? 'Generating…' : 'Generate public link'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Purely presentational — no api.* calls or auth dependency of its own,
+// which is exactly what lets pages/PublicMODReport.jsx reuse it unchanged
+// (editingId always null there, since a public link only ever creates).
+export function ChecklistForm({ meta, draft, setDraft, editingId, onSubmit, onCancelEdit, submitting, error }) {
   const overall = { answered: 0, total: 0 };
   meta.sections.forEach((s) => {
     const t = tally(draft.sections[s.key], s.items.length);
@@ -752,6 +841,10 @@ export default function MODReport() {
   const [modSettingsSuccess, setModSettingsSuccess] = useState(false);
   const [modSettingsSubmitting, setModSettingsSubmitting] = useState(false);
 
+  const [publicLinkBusy, setPublicLinkBusy] = useState('');
+  const [publicLinkError, setPublicLinkError] = useState('');
+  const [publicLinkNotice, setPublicLinkNotice] = useState('');
+
   useEffect(() => {
     if (!isSuperAdmin) return;
     api.modReports
@@ -892,6 +985,57 @@ export default function MODReport() {
     }
   }
 
+  async function handleRegeneratePublicLink() {
+    const hadExisting = Boolean(modSettings?.submission_token);
+    if (
+      hadExisting &&
+      !(await confirm({
+        title: 'Regenerate the public link?',
+        message: 'The current link stops working the moment this one is created — anyone still using it will need the new link.',
+        confirmLabel: 'Regenerate',
+        danger: false,
+      }))
+    ) {
+      return;
+    }
+    setPublicLinkBusy('regenerate');
+    setPublicLinkError('');
+    setPublicLinkNotice('');
+    try {
+      const res = await api.modReports.regeneratePublicLink(token);
+      setModSettings(res.settings);
+      setPublicLinkNotice(hadExisting ? 'Link regenerated — the old one no longer works.' : 'Public link generated.');
+    } catch (err) {
+      setPublicLinkError(err.message);
+    } finally {
+      setPublicLinkBusy('');
+    }
+  }
+
+  async function handleRemovePublicLink() {
+    if (
+      !(await confirm({
+        title: 'Remove the public link?',
+        message: 'The current link stops working immediately. You can generate a new one anytime.',
+        confirmLabel: 'Remove',
+      }))
+    ) {
+      return;
+    }
+    setPublicLinkBusy('remove');
+    setPublicLinkError('');
+    setPublicLinkNotice('');
+    try {
+      const res = await api.modReports.removePublicLink(token);
+      setModSettings(res.settings);
+      setPublicLinkNotice('Public link removed.');
+    } catch (err) {
+      setPublicLinkError(err.message);
+    } finally {
+      setPublicLinkBusy('');
+    }
+  }
+
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Manager on Duty Checklist</h1>
@@ -982,15 +1126,25 @@ export default function MODReport() {
 
         {tab === 'settings' && (
           modSettings ? (
-            <ModSettingsForm
-              settings={modSettings}
-              setSettings={setModSettings}
-              onSubmit={handleSaveModSettings}
-              submitting={modSettingsSubmitting}
-              error={modSettingsError}
-              setError={setModSettingsError}
-              success={modSettingsSuccess}
-            />
+            <>
+              <ModSettingsForm
+                settings={modSettings}
+                setSettings={setModSettings}
+                onSubmit={handleSaveModSettings}
+                submitting={modSettingsSubmitting}
+                error={modSettingsError}
+                setError={setModSettingsError}
+                success={modSettingsSuccess}
+              />
+              <PublicLinkCard
+                submissionToken={modSettings.submission_token}
+                onRegenerate={handleRegeneratePublicLink}
+                onRemove={handleRemovePublicLink}
+                busy={publicLinkBusy}
+                error={publicLinkError}
+                notice={publicLinkNotice}
+              />
+            </>
           ) : (
             <p className="text-sm text-slate-500 dark:text-slate-400">{modSettingsError || 'Loading…'}</p>
           )

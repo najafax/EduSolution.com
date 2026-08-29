@@ -870,6 +870,24 @@ if (!invoiceColumns.has('po_number')) {
   db.exec(`ALTER TABLE invoices ADD COLUMN po_number TEXT NOT NULL DEFAULT '';`);
 }
 
+// submission_token — the one shareable "submit a MOD report without
+// logging in" public link this business gets (see routes/modReports.js's
+// POST /settings/regenerate-token and routes/public.js's own POST
+// /mod-reports/:token). NULL until a super admin actually generates one,
+// so a business that's never used this feature has no dormant link
+// sitting around. No UNIQUE constraint the way quotes'/invoices' own
+// public_token columns have — mod_report_settings is a single row locked
+// to id=1, so there's nothing else it could ever collide with (and SQLite's
+// ALTER TABLE ADD COLUMN can't add a UNIQUE constraint anyway). Same
+// ALTER TABLE treatment as every other post-launch column in this file —
+// this table already carries its one real row (the app has been running
+// against it since the MOD Report feature first shipped), seeded via the
+// `INSERT OR IGNORE ... VALUES (1)` call further below.
+const modReportSettingsColumns = new Set(db.prepare('PRAGMA table_info(mod_report_settings)').all().map((c) => c.name));
+if (!modReportSettingsColumns.has('submission_token')) {
+  db.exec(`ALTER TABLE mod_report_settings ADD COLUMN submission_token TEXT;`);
+}
+
 db.pragma('foreign_keys = ON');
 
 // Bound params rather than string-interpolated into the exec() block above,
