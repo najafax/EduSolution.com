@@ -1414,6 +1414,32 @@ deliberately untouched by either, always returning every row.
   `recentPayments` are each scoped by their own natural date column
   (`expense_date`/`contribution_date`/`draw_date`/`payments.paid_at`)
   the same way `routes/reports.js`'s own per-report queries are.
+  **`netProfit` is cash-basis** (`cashRevenue - totalExpenses`, where
+  `cashRevenue` is `SUM(payments.amount)` by `paid_at` in range) —
+  deliberately **not** `totalPaid - totalExpenses` the way it reads for the
+  unfiltered/all-time case, even though the two are the same grand total
+  when unfiltered (every dollar in `amount_paid` traces back to exactly
+  one `payments` row, and neither sum is date-restricted then). They
+  diverge the moment a real period filter is applied: an invoice issued
+  last year but paid this year contributes to this year's cash revenue
+  but not to this year's accrual `totalPaid` (its `issue_date` falls
+  outside the range) — an earlier version of this filter used `totalPaid`
+  for `netProfit` too, which silently missed that payment while
+  `routes/reports.js`'s own `GET /profit-loss/pdf` (cash-basis since it
+  was first built) counted it, so the same "Net profit" figure disagreed
+  between the Financials page and its own PDF report for the identical
+  date range — the bug that prompted this fix. `cashRevenue` is also
+  returned on the response so `Financials.jsx`'s own margin % divides by
+  the same figure `netProfit` was actually computed from, rather than the
+  accrual `totalPaid`, which wouldn't reconcile with it. `totalPaid`
+  itself (and everything derived from it — `totalOutstanding`,
+  `overdueAmount`, the Collection Rate meter) stays accrual, matching the
+  Sales Report PDF's own convention — this is a deliberate, permanent
+  split, not a bug to unify later: "how much of what was billed this
+  period is still owed" is inherently an accrual question, while "how
+  much did the business actually profit this period" is inherently a
+  cash one, and this app's own pre-existing P&L report had already
+  settled on cash for the latter before this filter existed.
   `clientCount` and `quoteCounts` are never scoped by the filter — a live
   headcount and an all-time quote-status breakdown aren't really
   period-scoped concepts. **`bankBalance` is the one figure a period

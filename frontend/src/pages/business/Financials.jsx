@@ -99,7 +99,11 @@ export default function Financials() {
   const symbol = settings?.currency_symbol || '$';
   const collectedPct = summary.totalInvoiced > 0 ? (summary.totalPaid / summary.totalInvoiced) * 100 : 0;
   const outstandingPct = summary.totalInvoiced > 0 ? (summary.totalOutstanding / summary.totalInvoiced) * 100 : 0;
-  const marginPct = summary.totalPaid > 0 ? (summary.netProfit / summary.totalPaid) * 100 : null;
+  // Divides by cashRevenue, not totalPaid — netProfit is itself computed
+  // cash-basis (payments received in the period, see routes/financials.js's
+  // own note), so the margin has to divide by that same revenue figure
+  // rather than totalPaid's accrual one, or the two wouldn't reconcile.
+  const marginPct = summary.cashRevenue > 0 ? (summary.netProfit / summary.cashRevenue) * 100 : null;
   const isProfitable = summary.netProfit >= 0;
   const isPositiveBalance = summary.bankBalance >= 0;
 

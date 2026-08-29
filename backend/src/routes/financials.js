@@ -72,12 +72,30 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
 
   const expenseDateFilter = filtered ? ' AND expense_date BETWEEN ? AND ?' : '';
   const totalExpenses = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE 1=1${expenseDateFilter}`).get(...dateArgs).total;
+  // Net profit is cash-basis — payments actually RECEIVED in the period,
+  // minus expenses RECORDED in the period — deliberately NOT totalPaid
+  // above, which is accrual (each filtered-by-issue_date invoice's own
+  // running amount_paid). The two sums are identical in the unfiltered/
+  // all-time case (every dollar in amount_paid traces back to exactly one
+  // payment row, and neither sum is date-restricted then), which is why
+  // this drifted apart unnoticed until a real period filter existed: an
+  // invoice issued last year but paid this year contributes to this
+  // year's cash revenue (payments.paid_at) but not to this year's accrual
+  // totalPaid (its issue_date falls outside the range) — netProfit here
+  // used to read totalPaid, so it silently missed that payment while
+  // routes/reports.js's own GET /profit-loss/pdf (which has always been
+  // cash-basis) counted it, producing two different "Net profit" figures
+  // for what a user reasonably expects to be the same number over the
+  // same range. cashRevenue mirrors that PDF's own `revenueTotal` query
+  // exactly, so the two now always agree.
+  const paymentDateFilterForRevenue = filtered ? ' AND paid_at BETWEEN ? AND ?' : '';
+  const cashRevenue = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE 1=1${paymentDateFilterForRevenue}`).get(...dateArgs).total;
   // Deliberately excluded from netProfit: a capital contribution is an
   // owner/partner putting personal money into the business, not the
   // business earning it — folding it in would make "net profit" claim the
   // business was more profitable than it actually was. It still belongs in
   // bankBalance below, since that cash really did land in the account.
-  const netProfit = Math.round((totalPaid - totalExpenses) * 100) / 100;
+  const netProfit = Math.round((cashRevenue - totalExpenses) * 100) / 100;
 
   const contributionDateFilter = filtered ? ' AND contribution_date BETWEEN ? AND ?' : '';
   const totalCapitalContributions = db
@@ -167,6 +185,12 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
     clientCount,
     totalExpenses: Math.round(totalExpenses * 100) / 100,
     netProfit,
+    // The cash-basis revenue netProfit above is actually derived from
+    // (see the comment there) — returned so the frontend's own margin %
+    // divides by the same figure netProfit was computed from, rather than
+    // the accrual totalPaid above, which would produce a margin that
+    // doesn't reconcile with netProfit for a filtered period.
+    cashRevenue: Math.round(cashRevenue * 100) / 100,
     totalCapitalContributions: Math.round(totalCapitalContributions * 100) / 100,
     totalOwnerDraws: Math.round(totalOwnerDraws * 100) / 100,
     totalOwnerReturns: Math.round(totalOwnerReturns * 100) / 100,
