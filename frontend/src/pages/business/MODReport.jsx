@@ -182,7 +182,13 @@ function ChecklistSection({ title, items, answers, onItemChange, onMarkAllYes, d
 
 function Field({ label, children }) {
   return (
-    <label className="block">
+    // min-w-0 overrides a grid item's default min-width: auto, which
+    // otherwise lets a native date/time input's own intrinsic minimum
+    // width (the calendar/clock control) push its whole grid cell wider
+    // than the column actually allows, overflowing the card on a narrow
+    // phone instead of the input just shrinking to fit like every other
+    // field's w-full does.
+    <label className="block min-w-0">
       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
       {children}
     </label>
@@ -345,7 +351,7 @@ function ChecklistForm({ meta, draft, setDraft, editingId, onSubmit, onCancelEdi
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3">
           <Field label="MOD Name">
             <input type="text" required value={draft.mod_name} onChange={(e) => setDraft((d) => ({ ...d, mod_name: e.target.value }))} placeholder="Your name" className={inputClass} />
           </Field>
