@@ -54,6 +54,7 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(isEditing);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -74,7 +75,13 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
   useEffect(() => {
     api.clients.list(token).then(({ clients }) => setClients(clients));
     api.products.list(token).then(({ products }) => setProducts(products)).catch(() => {});
-    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {});
+    // .finally flips settingsLoaded whether the fetch succeeds or fails —
+    // the loading gate below waits on this too, so LineItemsEditor's
+    // currency symbol (and its Subtotal line, which renders even with zero
+    // items) never flashes the '$' fallback before the business's real
+    // symbol arrives a moment later (see Dashboard.jsx's own note on this
+    // race for the full story).
+    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {}).finally(() => setSettingsLoaded(true));
   }, [token]);
 
   useEffect(() => {
@@ -192,13 +199,13 @@ export default function QuoteForm({ embedded = false, idOverride, onSuccess, onC
     }
   }
 
-  if (loading) {
-    const loadingEl = <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>;
-    return embedded ? loadingEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{loadingEl}</div>;
-  }
   if (!canManage) {
     const deniedEl = <p className="text-sm text-slate-500 dark:text-slate-400">You don't have permission to view this page.</p>;
     return embedded ? deniedEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{deniedEl}</div>;
+  }
+  if (loading || !settingsLoaded) {
+    const loadingEl = <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>;
+    return embedded ? loadingEl : <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{loadingEl}</div>;
   }
   if (locked) {
     const lockedEl = (

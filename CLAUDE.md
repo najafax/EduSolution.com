@@ -4600,6 +4600,33 @@ keeps its existing layout.
   All five were verified the same throttled-Playwright way, with real
   test records in place so each page's money-bearing cells were actually
   exercised, not just an empty state.
+  **Re-audited app-wide** after the Dashboard greeting turned up a related
+  instance of the same race on a non-currency value (see that fix's own
+  note further down this section) — grepping every `api.settings` call
+  site found `QuoteForm.jsx`/`InvoiceForm.jsx` as the two the original
+  sweep missed: both fetch settings in the same `useEffect` as
+  clients/products, pass `currencySymbol={settings?.currency_symbol}`
+  (no `|| '$'` fallback of their own) straight to
+  `components/LineItemsEditor.jsx`, which *does* default that prop to
+  `'$'` — so a brand-new quote/invoice's Line items section, and
+  specifically its Subtotal line (which renders even with zero items,
+  reading "Subtotal: $0.00"), could paint with the wrong symbol before
+  settings resolved. Fixed with the identical `settingsLoaded` +
+  `.finally()` pattern, widening each form's existing `if (loading)`
+  gate to `if (loading || !settingsLoaded)` — but with the `!canManage`
+  permission check moved *ahead* of that gate (it used to come after),
+  since `canManage` is synchronous (from `AuthContext`, no fetch) and
+  making a staff member without `quotes`/`invoices:manage` wait on a
+  settings round-trip just to see "You don't have permission" would have
+  been a real, avoidable regression introduced by widening the gate.
+  Verified the same throttled-Playwright way: no `$` anywhere in the DOM
+  while settings is still in flight (the whole line-items area simply
+  isn't rendered yet), then adding a line item once settled shows the
+  correct symbol immediately, never a swap. A full re-grep of every
+  `api.settings` call site in the app (15 total) confirms this closed
+  every remaining gap — everything else was already fixed by the earlier
+  sweep, is a settings editor itself (`Settings.jsx`, not a race), or
+  reads through `PortalAuthContext` (already confirmed safe above).
   **The client portal and the public document-link pages were
   investigated and found to already be safe, needing no fix**:
   `PublicQuote.jsx`/`PublicInvoice.jsx` read `settings` from the *same*
