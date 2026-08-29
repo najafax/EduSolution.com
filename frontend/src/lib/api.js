@@ -81,6 +81,10 @@ export const api = {
   updatePreferences: (payload, token) => request('/auth/preferences', { method: 'PUT', body: payload, token }),
   updateAvatar: (image, token) => request('/auth/avatar', { method: 'PUT', body: { image }, token }),
   removeAvatar: (token) => request('/auth/avatar', { method: 'DELETE', token }),
+  sessions: {
+    list: (token) => request('/auth/sessions', { token }),
+    revoke: (id, token) => request(`/auth/sessions/${id}`, { method: 'DELETE', token }),
+  },
 
   settings: {
     get: (token) => request('/settings', { token }),

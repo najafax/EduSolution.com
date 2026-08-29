@@ -105,6 +105,14 @@ export function AuthProvider({ children }) {
   // tier itself, not just "some kind of admin."
   const isAdmin = isAdminRole(user?.role);
   const isSuperAdmin = user?.role === 'super_admin';
+  // Mirrors the backend's isUnrestrictedAdmin() (lib/permissions.js) — an
+  // admin-tier account that a super admin has flagged `restricted` no
+  // longer bypasses the per-module system, so requireAdmin-gated features
+  // with no module of their own (Import.jsx's DangerZone) need this rather
+  // than the plain role-based `isAdmin` to decide whether to even show the
+  // button, same "never show a control that would just 403" convention as
+  // everywhere else in this app.
+  const isUnrestrictedAdmin = isSuperAdmin || (isAdmin && !user?.restricted);
 
   return (
     <AuthContext.Provider
@@ -121,6 +129,7 @@ export function AuthProvider({ children }) {
         can,
         isAdmin,
         isSuperAdmin,
+        isUnrestrictedAdmin,
       }}
     >
       {children}

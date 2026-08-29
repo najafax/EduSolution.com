@@ -7,6 +7,7 @@ const { requireAuth } = require('../middleware/auth');
 const { loginLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rateLimit');
 const { sendMail } = require('../lib/mailer');
 const { effectivePermissions } = require('../lib/permissions');
+const { createSession } = require('../lib/sessions');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -22,10 +23,16 @@ const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
 
 const router = Router();
 
-function signToken(user) {
-  return jwt.sign({ id: user.id, email: user.email, name: user.name }, process.env.JWT_SECRET, {
-    expiresIn: '7d',
-  });
+// `jti` ties this token to a `sessions` row (see lib/sessions.js) so it can
+// later be listed/revoked from MyAccount.jsx without touching the
+// password. Optional: `change-password` below re-signs a fresh token for
+// an already-active session and passes its *existing* jti back in (the
+// session itself hasn't changed, only the signature/iat has), rather than
+// minting a whole new session row for what's really the same device.
+function signToken(user, jti) {
+  const payload = { id: user.id, email: user.email, name: user.name };
+  if (jti) payload.jti = jti;
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
 // The idle-logout timeout applies to every logged-in user regardless of
@@ -45,10 +52,12 @@ function publicUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    restricted: Boolean(user.restricted),
     notifyOverdue: Boolean(user.notify_overdue),
     notifyQuoteResponses: Boolean(user.notify_quote_responses),
     notifyMonthlyReport: Boolean(user.notify_monthly_report),
     notifyPaymentProofs: Boolean(user.notify_payment_proofs),
+    notifyAdminChanges: Boolean(user.notify_admin_changes),
     avatarImage: user.avatar_image || '',
     createdAt: user.created_at,
   };
@@ -81,7 +90,8 @@ router.post('/login', loginLimiter, async (req, res) => {
     return res.status(401).json({ error: 'This account has been deactivated' });
   }
 
-  const token = signToken(user);
+  const jti = createSession(user.id, req);
+  const token = signToken(user, jti);
   res.json({
     token,
     user: publicUser(user),
@@ -227,36 +237,85 @@ router.post('/change-password', requireAuth, async (req, res) => {
   // Bumping password_changed_at invalidates every token issued before now,
   // including the one this request just authenticated with — issue a fresh
   // one so the caller's own session doesn't get logged out by its own
-  // password change.
-  res.json({ message: 'Password updated.', token: signToken(user) });
+  // password change. Carries the *same* jti forward (req.sessionJti, set
+  // by requireAuth — absent for a pre-session-tracking token, in which case
+  // this naturally starts tracking a session for it going forward instead
+  // of leaving it untracked forever) rather than minting a new sessions
+  // row — this is still the same device/session, just a refreshed
+  // signature, so it should keep reading as one entry in MyAccount.jsx's
+  // list, not spawn a duplicate.
+  const jti = req.sessionJti || createSession(user.id, req);
+  res.json({ message: 'Password updated.', token: signToken(user, jti) });
 });
 
-// Four personal preferences: opt in to a daily digest email when the
+// Five personal preferences: opt in to a daily digest email when the
 // overdue-reminder job actually sends reminders (see lib/scheduler.js),
 // opt in to a notification whenever a client accepts a quote (see
 // lib/quoteAcceptedNotify.js), opt in to the automated monthly P&L
-// summary email (see lib/scheduler.js's `runMonthlyReport()`), and opt in
-// to a notification whenever a client uploads a payment proof (see
-// lib/paymentProofNotify.js). All four fields are optional in the body so
+// summary email (see lib/scheduler.js's `runMonthlyReport()`), opt in to a
+// notification whenever a client uploads a payment proof (see
+// lib/paymentProofNotify.js), and opt in to a notification whenever a new
+// admin-tier account is created or an existing one is promoted (see
+// lib/adminChangeNotify.js — only ever meaningful for a super_admin
+// account, but stored/accepted the same as the other four rather than a
+// role-specific special case). All five fields are optional in the body so
 // a caller updating one doesn't have to also resend the others' current
 // values — `?? existing` keeps whichever wasn't sent unchanged, rather
 // than silently resetting it to false.
 router.put('/preferences', requireAuth, (req, res) => {
   const existing = db
-    .prepare('SELECT notify_overdue, notify_quote_responses, notify_monthly_report, notify_payment_proofs FROM users WHERE id = ?')
+    .prepare(
+      `SELECT notify_overdue, notify_quote_responses, notify_monthly_report, notify_payment_proofs,
+              notify_admin_changes FROM users WHERE id = ?`,
+    )
     .get(req.user.id);
-  const { notifyOverdue, notifyQuoteResponses, notifyMonthlyReport, notifyPaymentProofs } = req.body || {};
+  const { notifyOverdue, notifyQuoteResponses, notifyMonthlyReport, notifyPaymentProofs, notifyAdminChanges } =
+    req.body || {};
   db.prepare(
-    'UPDATE users SET notify_overdue = ?, notify_quote_responses = ?, notify_monthly_report = ?, notify_payment_proofs = ? WHERE id = ?',
+    `UPDATE users SET notify_overdue = ?, notify_quote_responses = ?, notify_monthly_report = ?,
+       notify_payment_proofs = ?, notify_admin_changes = ? WHERE id = ?`,
   ).run(
     (notifyOverdue ?? existing.notify_overdue) ? 1 : 0,
     (notifyQuoteResponses ?? existing.notify_quote_responses) ? 1 : 0,
     (notifyMonthlyReport ?? existing.notify_monthly_report) ? 1 : 0,
     (notifyPaymentProofs ?? existing.notify_payment_proofs) ? 1 : 0,
+    (notifyAdminChanges ?? existing.notify_admin_changes) ? 1 : 0,
     req.user.id,
   );
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   res.json({ user: publicUser(user) });
+});
+
+// Session/device visibility (MyAccount.jsx) — see lib/sessions.js and
+// db/index.js's `sessions` table. Every account manages only its own
+// sessions; there's no admin-facing "see someone else's active devices"
+// view here (that's a meaningfully bigger surveillance feature nobody
+// asked for — this is purely the self-service "did I leave myself logged
+// in on a lost laptop" list every account already gets for itself).
+router.get('/sessions', requireAuth, (req, res) => {
+  const rows = db
+    .prepare('SELECT * FROM sessions WHERE user_id = ? AND revoked_at IS NULL ORDER BY last_seen_at DESC')
+    .all(req.user.id);
+  res.json({
+    sessions: rows.map((s) => ({
+      id: s.id,
+      userAgent: s.user_agent,
+      ipAddress: s.ip_address,
+      createdAt: s.created_at,
+      lastSeenAt: s.last_seen_at,
+      isCurrent: Boolean(req.sessionJti) && s.jti === req.sessionJti,
+    })),
+  });
+});
+
+router.delete('/sessions/:id', requireAuth, (req, res) => {
+  const session = db.prepare('SELECT * FROM sessions WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  if (req.sessionJti && session.jti === req.sessionJti) {
+    return res.status(400).json({ error: "You can't revoke your current session — log out instead" });
+  }
+  db.prepare("UPDATE sessions SET revoked_at = datetime('now') WHERE id = ?").run(session.id);
+  res.status(204).end();
 });
 
 module.exports = router;

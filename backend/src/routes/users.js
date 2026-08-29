@@ -4,6 +4,7 @@ const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { MODULES, isAdminRole, getPermissions, setPermissions } = require('../lib/permissions');
 const { logActivity } = require('../lib/activity');
+const { notifyOfAdminTierChange } = require('../lib/adminChangeNotify');
 
 const router = Router();
 router.use(requireAuth);
@@ -37,9 +38,25 @@ function publicUser(user) {
     email: user.email,
     role: user.role,
     active: Boolean(user.active),
+    restricted: Boolean(user.restricted),
     notify_overdue: Boolean(user.notify_overdue),
     created_at: user.created_at,
   };
+}
+
+// `restricted` only ever means anything for a plain `admin` account (see
+// lib/permissions.js's isUnrestrictedAdmin) — storing it as anything but 0
+// for `staff` (already permission-gated, nothing to toggle) or
+// `super_admin` (must always stay unrestricted, the one tier that can
+// never be locked out of managing admin accounts) would be silently
+// meaningless data at best, or a confusing "why doesn't this checkbox do
+// anything" at worst. Sanitized here rather than trusted from the request
+// body, independent of whatever `assertSuperAdminForAdminTier` above
+// already guards — a plain admin editing a staff row could otherwise send
+// `restricted: true` in the body with no effect anyway, but this keeps the
+// stored value honest regardless.
+function sanitizeRestricted(role, restricted) {
+  return role === 'admin' ? Boolean(restricted) : false;
 }
 
 // Counts both admin-tier roles together — a business with zero plain
@@ -98,7 +115,7 @@ router.get('/:id', view, (req, res) => {
 });
 
 router.post('/', manage, async (req, res) => {
-  const { name, email: emailInput, password, role = 'staff', permissions } = req.body || {};
+  const { name, email: emailInput, password, role = 'staff', permissions, restricted } = req.body || {};
 
   if (!name || !emailInput || !password) {
     return res.status(400).json({ error: 'name, email and password are required' });
@@ -116,13 +133,35 @@ router.post('/', manage, async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
   const result = db
-    .prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
-    .run(name.trim(), email, passwordHash, role);
+    .prepare('INSERT INTO users (name, email, password_hash, role, restricted) VALUES (?, ?, ?, ?, ?)')
+    .run(name.trim(), email, passwordHash, role, sanitizeRestricted(role, restricted) ? 1 : 0);
 
   if (permissions) setPermissions(result.lastInsertRowid, permissions);
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
   logActivity({ userName: req.user.name, action: 'created', entityType: 'user', entityId: user.id, entityLabel: `${user.name} (${role})` });
+  // Distinct, separately-searchable audit entry whenever the newly created
+  // account starts out admin-tier — the generic 'created' entry above
+  // already covers every account, but "a brand-new admin/super_admin
+  // account just appeared" is worth its own line in the activity feed
+  // (same "structured change tracking on top of the generic entry"
+  // convention routes/licenses.js's PUT /:id already established for its
+  // own cancelled/reactivated/billing-cycle transitions). Also fires the
+  // opt-in super_admin alert email, fire-and-forget, and never for the
+  // account's own creator (see notifyOfAdminTierChange's own recipient
+  // filter).
+  if (isAdminRole(role)) {
+    logActivity({
+      userName: req.user.name,
+      action: 'created admin-tier account',
+      entityType: 'user',
+      entityId: user.id,
+      entityLabel: `${user.name} (${role})`,
+    });
+    notifyOfAdminTierChange({ user, actorId: req.user.id, actorName: req.user.name, wasNew: true }).catch((err) =>
+      console.error('[admin-change] notify failed:', err.message),
+    );
+  }
   res.status(201).json({ user: publicUser(user), permissions: getPermissions(user.id) });
 });
 
@@ -130,7 +169,7 @@ router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'User not found' });
 
-  const { name, email: emailInput, role, active, permissions } = req.body || {};
+  const { name, email: emailInput, role, active, permissions, restricted } = req.body || {};
   if (!name || !emailInput) return res.status(400).json({ error: 'name and email are required' });
   const email = String(emailInput).trim().toLowerCase();
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Invalid email address' });
@@ -138,6 +177,7 @@ router.put('/:id', manage, (req, res) => {
   const nextRole = ROLES.includes(role) ? role : existing.role;
   if (!ROLES.includes(nextRole)) return res.status(400).json({ error: `role must be one of: ${ROLES.join(', ')}` });
   const nextActive = active === false ? 0 : 1;
+  const nextRestricted = sanitizeRestricted(nextRole, restricted ?? existing.restricted);
   if (!assertSuperAdminForAdminTier(req, res, existing.role, nextRole)) return;
 
   const emailTaken = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email, existing.id);
@@ -159,13 +199,65 @@ router.put('/:id', manage, (req, res) => {
   }
 
   db.prepare(
-    `UPDATE users SET name = ?, email = ?, role = ?, active = ? WHERE id = ?`,
-  ).run(name.trim(), email, nextRole, nextActive, existing.id);
+    `UPDATE users SET name = ?, email = ?, role = ?, active = ?, restricted = ? WHERE id = ?`,
+  ).run(name.trim(), email, nextRole, nextActive, nextRestricted ? 1 : 0, existing.id);
 
   if (permissions) setPermissions(existing.id, permissions);
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(existing.id);
   logActivity({ userName: req.user.name, action: 'updated', entityType: 'user', entityId: user.id, entityLabel: user.name });
+
+  // Structured admin-tier change tracking, on top of the generic 'updated'
+  // entry above — same convention routes/licenses.js's PUT /:id already
+  // established for its own cancelled/reactivated/billing-cycle
+  // transitions, applied here to the two admin-tier-specific things worth
+  // a distinct, separately-searchable line: a role move into/out of/within
+  // the admin tier, and a restriction toggle (see lib/permissions.js's
+  // isUnrestrictedAdmin). Only a *newly* admin-tier account (promoted from
+  // staff) fires the opt-in super_admin alert email — a role move between
+  // the two admin tiers, or a restriction toggle, isn't "a new admin-tier
+  // account appeared," so it stays a log entry only.
+  const becameAdminTier = !isAdminRole(existing.role) && isAdminRole(nextRole);
+  const leftAdminTier = isAdminRole(existing.role) && !isAdminRole(nextRole);
+  const changedAdminTier = isAdminRole(existing.role) && isAdminRole(nextRole) && existing.role !== nextRole;
+  if (becameAdminTier) {
+    logActivity({
+      userName: req.user.name,
+      action: 'promoted to admin-tier account',
+      entityType: 'user',
+      entityId: user.id,
+      entityLabel: `${user.name} (${nextRole})`,
+    });
+    notifyOfAdminTierChange({ user, actorId: req.user.id, actorName: req.user.name, wasNew: false }).catch((err) =>
+      console.error('[admin-change] notify failed:', err.message),
+    );
+  } else if (leftAdminTier) {
+    logActivity({
+      userName: req.user.name,
+      action: 'demoted from admin-tier account',
+      entityType: 'user',
+      entityId: user.id,
+      entityLabel: `${user.name} (was ${existing.role})`,
+    });
+  } else if (changedAdminTier) {
+    logActivity({
+      userName: req.user.name,
+      action: nextRole === 'super_admin' ? 'promoted to super admin' : 'demoted to admin',
+      entityType: 'user',
+      entityId: user.id,
+      entityLabel: user.name,
+    });
+  }
+  if (nextRole === 'admin' && Boolean(existing.restricted) !== nextRestricted) {
+    logActivity({
+      userName: req.user.name,
+      action: nextRestricted ? 'restricted admin account' : 'removed restriction from admin account',
+      entityType: 'user',
+      entityId: user.id,
+      entityLabel: user.name,
+    });
+  }
+
   res.json({ user: publicUser(user), permissions: getPermissions(user.id) });
 });
 
@@ -185,6 +277,15 @@ router.post('/:id/reset-password', manage, async (req, res) => {
   ).run(passwordHash, existing.id);
 
   logActivity({ userName: req.user.name, action: 'reset password for', entityType: 'user', entityId: existing.id, entityLabel: existing.name });
+  if (isAdminRole(existing.role)) {
+    logActivity({
+      userName: req.user.name,
+      action: 'reset password for admin-tier account',
+      entityType: 'user',
+      entityId: existing.id,
+      entityLabel: `${existing.name} (${existing.role})`,
+    });
+  }
   res.status(204).end();
 });
 
@@ -205,6 +306,15 @@ router.delete('/:id', manage, (req, res) => {
 
   db.prepare('DELETE FROM users WHERE id = ?').run(existing.id);
   logActivity({ userName: req.user.name, action: 'deleted', entityType: 'user', entityId: existing.id, entityLabel: existing.name });
+  if (isAdminRole(existing.role)) {
+    logActivity({
+      userName: req.user.name,
+      action: 'deleted admin-tier account',
+      entityType: 'user',
+      entityId: existing.id,
+      entityLabel: `${existing.name} (${existing.role})`,
+    });
+  }
   res.status(204).end();
 });
 

@@ -2448,6 +2448,146 @@ in the same pass.
   keyed on `canManage`, so a view-only visitor doesn't see instructions
   for actions they can't take.
 
+### Restricted admins, admin-tier audit trail, change alerts, and session visibility (`backend/src/`, `frontend/src/`)
+
+A follow-up batch of four related asks, all extending the super admin/admin
+relationship above rather than the staff-facing permission system: letting
+a super admin restrict a *specific* admin's business-data access the same
+way staff access is already controlled (closing the one part of the
+original "supper admin can... limit access to users like admin and staff"
+request that the initial super-admin feature deliberately left
+out-of-scope, see that section's own "None — keep every rule as-is"
+decision — this is a different question from overriding a business-safety
+rule, and is now addressed on its own), a more visible record of who
+changed what about an admin-tier account, an opt-in email the moment a
+new admin-tier account appears, and a self-service "which devices am I
+logged in on" list. Built together since the first three all touch
+`routes/users.js` in the same handlers.
+
+- **Restricted admins**: `users.restricted` (`ALTER TABLE`-guarded, same
+  pattern as every other post-launch `users` column — see `db/index.js`
+  above) is only ever meaningful for a plain `admin` account —
+  `lib/permissions.js`'s `isUnrestrictedAdmin(user)` is the actual bypass
+  check `hasPermission()`/`effectivePermissions()` now use in place of the
+  broader `isAdminRole()`: `true` for `super_admin` unconditionally (the
+  one tier that can never be locked out of managing admin accounts, so
+  `routes/users.js` refuses to store `restricted` as anything but `0` for
+  it — same refusal for `staff`, which is already permission-gated with
+  nothing to toggle), and for `admin` only when `restricted` is falsy. A
+  restricted admin is gated by real `user_permissions` grants exactly like
+  `staff` — default-deny until a super admin explicitly checks boxes for
+  them on the same Users page grid staff already use — but keeps every
+  other admin-tier *account* protection unchanged: still only a super
+  admin can edit/delete/reset its password/promote it further (still
+  passes `isAdminRole()` for `assertSuperAdminForAdminTier`'s purposes),
+  and it still counts toward `activeAdminCount`'s last-active-admin guard
+  — restricting business-data access and controlling the account itself
+  are deliberately separate questions, matching the original super-admin
+  feature's own "keep every rule as-is" framing applied to this new
+  capability too. `middleware/auth.js`'s `requireAdmin` was updated to
+  the same `isUnrestrictedAdmin()` check (was `isAdminRole()`) — this is
+  what makes the restriction actually reach `routes/dataReset.js`'s Danger
+  Zone too, not just the per-module grants, since that's the one other
+  place in the app an admin-tier account bypasses a whole system rather
+  than going through `requirePermission`. `routes/users.js`'s
+  `sanitizeRestricted(role, restricted)` is what enforces the "only ever
+  `admin`" rule at write time, independent of whatever
+  `assertSuperAdminForAdminTier` already blocks a plain admin from
+  reaching. Frontend: `AuthContext.jsx`'s `isUnrestrictedAdmin` mirrors the
+  backend check (`isSuperAdmin || (isAdmin && !user?.restricted)`) —
+  `Import.jsx`'s `DangerZone` gate reads this instead of the plain
+  `isAdmin` it used before, so a restricted admin never sees a button that
+  would now 403. `pages/Users.jsx`'s edit form gains a "Restrict module
+  access" checkbox, shown only when `isSuperAdmin && form.role ===
+  'admin'` (the Role select already only offers "Admin" to a super admin
+  viewer, so reaching this at all already implies the viewer can act on
+  it) — checking it reveals the *same* permissions grid `form.role ===
+  'staff'` already shows (the condition became `form.role === 'staff' ||
+  (form.role === 'admin' && form.restricted)`), pre-filled from whatever
+  `user_permissions` rows already exist for that account (all-false for
+  an admin who's never been restricted before, since they never needed
+  real rows). A restricted admin's row gets a small amber "Restricted"
+  badge next to its role in both the desktop table and mobile accordion
+  (`u.restricted`), same "only show the exception case" convention this
+  app already follows elsewhere.
+- **Admin-tier audit trail**: on top of the generic `'created'`/
+  `'updated'`/`'deleted'`/`'reset password for'` entries every account
+  mutation already gets, `routes/users.js` now writes a second, distinct
+  `activity_log` entry whenever something *admin-tier-specific* happens —
+  same "structured change tracking layered on the generic entry"
+  convention `routes/licenses.js`'s own cancelled/reactivated/billing-
+  cycle transitions already established. Covers: `'created admin-tier
+  account'` (`POST /` when the new role is `admin`/`super_admin`),
+  `'promoted to admin-tier account'` / `'demoted from admin-tier
+  account'` (`PUT /:id` when role crosses the staff/admin-tier boundary
+  in either direction), `'promoted to super admin'` / `'demoted to
+  admin'` (`PUT /:id` when role moves *between* the two admin tiers —
+  logged, but doesn't fire the alert email below, since no new admin-tier
+  account appeared), `'restricted admin account'` / `'removed restriction
+  from admin account'` (`PUT /:id` when the new capability above is
+  toggled), `'reset password for admin-tier account'` (`POST
+  /:id/reset-password`), and `'deleted admin-tier account'` (`DELETE
+  /:id`) — each carries the role in its `entity_label` so the feed reads
+  specifically (e.g. `Future Admin (admin)`) rather than generically.
+- **Change alert email**: `lib/adminChangeNotify.js`'s
+  `notifyOfAdminTierChange({ user, actorId, actorName, wasNew })` — same
+  shape as `lib/quoteAcceptedNotify.js`'s own staff digest (an internal
+  notification, not a client-facing send, so it deliberately skips
+  `lib/emailTemplates.js`'s editable-template system and `email_log`, same
+  reasoning that file's own top-of-file note documents), called — never
+  awaited, just fired with a `.catch()` — from `routes/users.js`'s `POST
+  /` and `PUT /:id`, only when the account either starts out admin-tier
+  (a brand-new admin/super_admin account) or is freshly promoted into the
+  tier from `staff`. Recipients are every active `super_admin` with the
+  new `notify_admin_changes` preference on, excluding the actor
+  themselves (notifying the person who just made the change would be
+  noise). `notify_admin_changes` (`ALTER TABLE`-guarded on `users`, same
+  pattern as `notify_overdue` etc.) is wired through the existing `PUT
+  /api/auth/preferences` route alongside the other four opt-ins — stored
+  on every account the same way, though only ever meaningful for a
+  `super_admin`, so `MyAccount.jsx`'s Notifications card renders that
+  fifth checkbox only when `isSuperAdmin` (a plain admin/staff would just
+  be toggling something with no effect).
+- **Session/device visibility**: a `sessions` table (brand new, plain
+  `CREATE TABLE IF NOT EXISTS` — see `db/index.js` above), one row per
+  issued staff JWT, lets an account see "which devices am I logged in on"
+  and revoke one without changing its password (which would end *every*
+  session at once via the existing `password_changed_at` check, not just
+  the one that's lost/stolen). `lib/sessions.js`'s `createSession(userId,
+  req)` mints a random `jti`, stores it with the request's `user-agent`/
+  IP, and returns it; `routes/auth.js`'s `signToken(user, jti)` embeds
+  that `jti` in the JWT payload when given one. `POST /login` always
+  creates a fresh session; `POST /change-password` reuses `req.sessionJti`
+  (set by `requireAuth` below) instead of minting a new row, since
+  refreshing a token after a password change is still the same device/
+  session, not a new one — re-signing with the same `jti` keeps it reading
+  as one entry rather than a duplicate. `middleware/auth.js`'s
+  `requireAuth` checks a token's `jti` against `getActiveSession()` on
+  every request (rejecting with "This session has been signed out" if
+  revoked) and touches `last_seen_at` — but **only when a `jti` is present
+  at all**: a token minted before this feature shipped carries no `jti`
+  claim and is deliberately let through unchecked, exactly as it always
+  was, so deploying this never mass-logs-out every already-signed-in
+  session; only a fresh login (or a `change-password` refresh) after the
+  deploy starts a token down the trackable/revocable path. `GET
+  /api/auth/sessions` (self-service only — no admin-facing "see someone
+  else's devices" view, a meaningfully bigger surveillance feature nobody
+  asked for) lists the caller's own non-revoked sessions with an
+  `isCurrent` flag; `DELETE /api/auth/sessions/:id` revokes one, blocked
+  (400) for the caller's own current session — "log out" is what that's
+  for, not this. `pages/MyAccount.jsx` gains an "Active sessions" card
+  (user-agent, relative last-active time via a small local `timeAgoShort`
+  — session activity is usually minutes/hours old, unlike `lib/date.js`'s
+  `timeAgo()`, which is tuned for days/weeks-old dates elsewhere in this
+  app) with a "This device" badge on the current row and a "Sign out"
+  button on every other row, behind the same `useConfirm()` dialog every
+  other destructive action in this app already uses. The user-agent text
+  and the "This device" badge sit in their own flex row (`min-w-0
+  flex-1` text + `shrink-0` badge) rather than one `truncate`d block —
+  a long user-agent string truncating the *whole* line would silently
+  swallow the badge along with it, caught visually in testing before this
+  shipped.
+
 ### Client portal (`backend/src/`, `frontend/src/`)
 
 A self-serve login for clients, separate from staff auth entirely — a

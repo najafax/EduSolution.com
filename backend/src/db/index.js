@@ -494,6 +494,30 @@ db.exec(`
     error TEXT NOT NULL DEFAULT ''
   );
 
+  -- One row per issued staff JWT (see middleware/auth.js's requireAuth,
+  -- which now checks this table on every request, not just the token's own
+  -- signature/expiry). Lets a logged-in user see "which devices/browsers am
+  -- I signed in on" (MyAccount.jsx) and revoke one without changing their
+  -- password (which would log out *every* session, not just the one being
+  -- lost/stolen). jti is a random id embedded in the JWT payload at
+  -- login/register time -- the row this token maps to; a token whose jti
+  -- has no matching row, or whose row has revoked_at set, is rejected the
+  -- same as an expired one. user_agent is read straight from the request
+  -- header at login (free-text, not parsed into a device/browser name --
+  -- good enough for a person to recognize "that's my phone" from).
+  -- Brand-new table, no production data yet, so a plain CREATE TABLE IF
+  -- NOT EXISTS is enough.
+  CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    jti TEXT NOT NULL UNIQUE,
+    user_agent TEXT NOT NULL DEFAULT '',
+    ip_address TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+    revoked_at TEXT
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_requests_client ON quote_requests(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_request_items_request ON quote_request_items(quote_request_id);
@@ -509,6 +533,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_licenses_client ON licenses(client_id);
   CREATE INDEX IF NOT EXISTS idx_licenses_expiry ON licenses(expiry_date);
   CREATE INDEX IF NOT EXISTS idx_payment_proofs_invoice ON payment_proofs(invoice_id);
+  CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+  CREATE INDEX IF NOT EXISTS idx_sessions_jti ON sessions(jti);
 
   -- Added once the query patterns above (list routes' ORDER BY, the
   -- scheduler's WHERE clauses, routes/reports.js's date-range SUMs) were
@@ -799,6 +825,36 @@ if (!quoteColumns.has('client_viewed_at')) {
 }
 if (!invoiceColumns.has('client_viewed_at')) {
   db.exec(`ALTER TABLE invoices ADD COLUMN client_viewed_at TEXT;`);
+}
+
+// `restricted` on `users` — lets a super_admin subject a specific plain
+// `admin` account to the same per-module `user_permissions` grants a
+// `staff` account already has, instead of that account automatically
+// bypassing the whole permission system the way every admin-tier account
+// does by default (see lib/permissions.js's isUnrestrictedAdmin()). Only
+// ever meaningful for role = 'admin' — a `staff` account is already
+// permission-gated with nothing to toggle, and a `super_admin` can never
+// be restricted (routes/users.js refuses to store it as anything but 0 for
+// either of those roles), so this stays a plain unconstrained INTEGER
+// rather than needing a CHECK tied to role. Defaults to 0 (unrestricted —
+// today's behavior, unchanged) for every existing and newly created admin;
+// only a super_admin flipping it via the Users page ever sets it to 1.
+if (!userColumns.has('restricted')) {
+  db.exec(`ALTER TABLE users ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0;`);
+}
+
+// `notify_admin_changes` — the opt-in preference (MyAccount.jsx, mirroring
+// `notify_overdue`/`notify_quote_responses`/etc.) for the staff digest sent
+// when a new admin-tier account is created or an existing account is
+// promoted into one (see lib/adminChangeNotify.js and routes/users.js's
+// `POST /`/`PUT /:id`) — only ever meaningful for a `super_admin` account
+// (a plain admin can't reach the Users page actions that would trigger
+// this at all, see assertSuperAdminForAdminTier), but stored as a plain
+// column on every user the same as the other notify_* preferences rather
+// than a super_admin-only special case, so `PUT /api/auth/preferences`
+// doesn't need role-specific logic to accept it.
+if (!userColumns.has('notify_admin_changes')) {
+  db.exec(`ALTER TABLE users ADD COLUMN notify_admin_changes INTEGER NOT NULL DEFAULT 0;`);
 }
 
 // po_number — an optional client-supplied purchase order reference,

@@ -35,11 +35,33 @@ function isAdminRole(role) {
   return role === 'admin' || role === 'super_admin';
 }
 
-// Staff default-deny: a module with no row is { can_view: false, can_manage:
-// false }, never falls back to "allowed". Neither admin tier ever consults
-// this table — hasPermission() short-circuits to true for them — so
-// there's nothing to keep in sync when a new module is added; only staff
-// grants need seeding.
+// isAdminRole() answers "is this account admin-tier" (used for account-
+// management purposes — who a super_admin can/can't touch, who counts
+// toward the last-active-admin guard — see routes/users.js). This answers
+// the narrower, separate question hasPermission()/effectivePermissions()
+// actually care about: does this specific account currently bypass the
+// per-module grant system. `super_admin` always does — the tier super_admin
+// exists precisely to be un-restrictable, so a super_admin's own account
+// can never be flagged `restricted` (routes/users.js refuses to store it).
+// A plain `admin` bypasses by default too, UNLESS a super_admin has
+// explicitly flagged that specific account `restricted` (see "Super admin
+// and the Finance permission preset" in CLAUDE.md) — once restricted, an
+// admin is gated by real `user_permissions` grants exactly like `staff`,
+// though it keeps its admin-tier *account* protections (still only a
+// super_admin can edit/delete/reset it, still counts toward
+// activeAdminCount) unchanged, since restricting business-data access is a
+// completely separate question from who controls the account itself.
+function isUnrestrictedAdmin(user) {
+  if (!user) return false;
+  if (user.role === 'super_admin') return true;
+  return user.role === 'admin' && !user.restricted;
+}
+
+// Default-deny: a module with no row is { can_view: false, can_manage:
+// false }, never falls back to "allowed". An unrestricted admin-tier
+// account never consults this table — hasPermission() short-circuits to
+// true for them — so there's nothing to keep in sync when a new module is
+// added; only staff (and any restricted admin) grants need seeding.
 function getPermissions(userId) {
   const rows = db.prepare('SELECT module, can_view, can_manage FROM user_permissions WHERE user_id = ?').all(userId);
   const map = {};
@@ -56,7 +78,7 @@ function getPermissions(userId) {
 // can edit clients can obviously also see them), but not the reverse.
 function hasPermission(user, module, level = 'view') {
   if (!user) return false;
-  if (isAdminRole(user.role)) return true;
+  if (isUnrestrictedAdmin(user)) return true;
   const entry = getPermissions(user.id)[module];
   if (!entry) return false;
   return level === 'manage' ? entry.can_manage : entry.can_view || entry.can_manage;
@@ -87,12 +109,13 @@ function setPermissions(userId, permissionsMap) {
 }
 
 // What the frontend actually wants: a single resolved map it can read
-// directly without re-implementing the "admin bypasses everything" rule
-// itself. Both admin tiers get every module at { can_view: true, can_manage:
-// true }; staff get their real grants from getPermissions().
+// directly without re-implementing the "an unrestricted admin bypasses
+// everything" rule itself. An unrestricted admin-tier account gets every
+// module at { can_view: true, can_manage: true }; staff and any restricted
+// admin get their real grants from getPermissions().
 function effectivePermissions(user) {
   if (!user) return {};
-  if (isAdminRole(user.role)) {
+  if (isUnrestrictedAdmin(user)) {
     const map = {};
     for (const m of MODULES) map[m] = { can_view: true, can_manage: true };
     return map;
@@ -100,4 +123,12 @@ function effectivePermissions(user) {
   return getPermissions(user.id);
 }
 
-module.exports = { MODULES, isAdminRole, getPermissions, hasPermission, setPermissions, effectivePermissions };
+module.exports = {
+  MODULES,
+  isAdminRole,
+  isUnrestrictedAdmin,
+  getPermissions,
+  hasPermission,
+  setPermissions,
+  effectivePermissions,
+};

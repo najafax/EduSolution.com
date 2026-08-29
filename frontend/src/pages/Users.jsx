@@ -12,7 +12,7 @@ import { useConfirm } from '../lib/useConfirm';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { isAdminRole, roleLabel } from '../lib/roles';
 
-const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', active: true };
+const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', active: true, restricted: false };
 
 // The money-related modules a "Finance" staff member needs — invoicing,
 // expenses (which already covers capital contributions/owner draws, see
@@ -94,7 +94,14 @@ export default function Users() {
     setError('');
     try {
       const { user: full, permissions: perms } = await api.users.get(user.id, token);
-      setForm({ name: full.name, email: full.email, password: '', role: full.role, active: full.active });
+      setForm({
+        name: full.name,
+        email: full.email,
+        password: '',
+        role: full.role,
+        active: full.active,
+        restricted: full.restricted,
+      });
       setPermissionsState(perms);
       setEditingId(full.id);
       setShowForm(true);
@@ -133,12 +140,14 @@ export default function Users() {
     setError('');
     setSubmitting(true);
     try {
+      const gridShown = form.role === 'staff' || (form.role === 'admin' && form.restricted);
       const payload = {
         name: form.name,
         email: form.email,
         role: form.role,
         active: form.active,
-        permissions: isAdminRole(form.role) ? undefined : permissions,
+        restricted: form.role === 'admin' ? form.restricted : undefined,
+        permissions: gridShown ? permissions : undefined,
       };
       if (editingId) {
         await api.users.update(editingId, payload, token);
@@ -203,8 +212,9 @@ export default function Users() {
         )}
       </div>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        Everyone with an account can see and edit shared business data unless restricted below. Admins always have
-        full access; only a super admin can create, edit, or remove another admin or super admin account.
+        Everyone with an account can see and edit shared business data unless restricted below. Admins have full
+        access by default — a super admin can restrict a specific admin's access too, the same way staff access is
+        controlled — and only a super admin can create, edit, or remove another admin or super admin account.
       </p>
 
       <div className="mt-4 sm:max-w-sm">
@@ -277,9 +287,27 @@ export default function Users() {
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Active</span>
               </label>
             )}
+            {/* Only meaningful for a plain admin — staff is already
+                permission-gated with nothing to toggle, and a super admin
+                must always stay unrestricted (see lib/permissions.js's
+                isUnrestrictedAdmin). Reachable only by a super admin viewer
+                since the Role select above only offers "Admin" to one. */}
+            {isSuperAdmin && form.role === 'admin' && (
+              <label className="col-span-2 flex min-h-11 items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.restricted}
+                  onChange={(e) => setForm((f) => ({ ...f, restricted: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Restrict module access — this admin only sees what's granted below, like a staff account
+                </span>
+              </label>
+            )}
           </div>
 
-          {form.role === 'staff' && (
+          {(form.role === 'staff' || (form.role === 'admin' && form.restricted)) && (
             <div className="mt-4">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Module permissions</h3>
@@ -418,7 +446,14 @@ export default function Users() {
                         {u.id === currentUser.id && <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">(you)</span>}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{u.email}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{roleLabel(u.role)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">
+                        {roleLabel(u.role)}
+                        {u.restricted && (
+                          <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-400">
+                            Restricted
+                          </span>
+                        )}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -486,7 +521,14 @@ export default function Users() {
                 >
                   <div className="flex justify-between">
                     <dt className="text-slate-500 dark:text-slate-400">Role</dt>
-                    <dd className="text-slate-900 dark:text-white">{roleLabel(u.role)}</dd>
+                    <dd className="text-slate-900 dark:text-white">
+                      {roleLabel(u.role)}
+                      {u.restricted && (
+                        <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-400">
+                          Restricted
+                        </span>
+                      )}
+                    </dd>
                   </div>
                   {canManage && (isSuperAdmin || !isAdminRole(u.role)) && (
                     <div className="flex flex-wrap gap-1.5 pt-1">

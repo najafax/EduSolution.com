@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const db = require('../db');
-const { hasPermission, isAdminRole } = require('../lib/permissions');
+const { hasPermission, isUnrestrictedAdmin } = require('../lib/permissions');
+const { getActiveSession, touchSession } = require('../lib/sessions');
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -32,7 +33,9 @@ function requireAuth(req, res, next) {
   // deactivation, and profile edits all need to take effect on the very
   // next request, not after the token's 7-day expiry.
   const user = db
-    .prepare('SELECT id, name, email, role, active, notify_overdue, password_changed_at FROM users WHERE id = ?')
+    .prepare(
+      'SELECT id, name, email, role, active, restricted, notify_overdue, password_changed_at FROM users WHERE id = ?',
+    )
     .get(payload.id);
   if (!user) {
     return res.status(401).json({ error: 'Invalid or expired token' });
@@ -51,6 +54,24 @@ function requireAuth(req, res, next) {
     if (iatStr < user.password_changed_at) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
+  }
+
+  // Session/device revocation (see lib/sessions.js, db/index.js's
+  // `sessions` table, and MyAccount.jsx's "active sessions" list). Only a
+  // token carrying a `jti` is session-tracked at all — a token minted
+  // before this feature shipped has no `jti` claim and is intentionally
+  // let through unchecked here, exactly as it always was, so deploying this
+  // never mass-logs-out everyone already signed in; only tokens issued
+  // *after* the deploy (a fresh login, or the refresh `change-password`
+  // hands back) are ever revocable. A `jti` present but with no matching
+  // active row means the session was revoked from MyAccount.jsx elsewhere.
+  if (payload.jti) {
+    const session = getActiveSession(payload.jti);
+    if (!session) {
+      return res.status(401).json({ error: 'This session has been signed out' });
+    }
+    touchSession(payload.jti);
+    req.sessionJti = payload.jti;
   }
 
   req.user = user;
@@ -75,10 +96,15 @@ function requirePermission(module, level = 'view') {
 // staff grant should ever unlock — e.g. bulk-deleting all business data —
 // unlike every other gated route in this app, which a staff member can be
 // granted access to via user_permissions. Passes for either admin tier
-// (isAdminRole) since super_admin is a strict superset of admin. Must run
-// after requireAuth.
+// (isUnrestrictedAdmin) since super_admin is a strict superset of admin —
+// with one exception: a plain admin a super_admin has flagged `restricted`
+// (see lib/permissions.js's isUnrestrictedAdmin) fails this too, the same
+// as it now fails requirePermission()'s modules, so a super_admin's
+// restriction actually reaches every admin-tier-only feature in the app
+// (routes/dataReset.js, the one remaining requireAdmin caller), not just
+// the per-module ones. Must run after requireAuth.
 function requireAdmin(req, res, next) {
-  if (!isAdminRole(req.user.role)) {
+  if (!isUnrestrictedAdmin(req.user)) {
     return res.status(403).json({ error: 'Only an admin can do this' });
   }
   next();
