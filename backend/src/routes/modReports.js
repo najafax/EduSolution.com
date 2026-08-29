@@ -1,19 +1,19 @@
 const { Router } = require('express');
 const db = require('../db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { renderModReportPdf } = require('../lib/modReportPdf');
 
 const router = Router();
-// Admin-only, same requireAdmin pattern as routes/dataReset.js/
-// routes/emailCenter.js — this is a resort operations report, unrelated to
-// the billing/CRM data the rest of this app's permission system (per-module
+// Super-admin-only, same requireSuperAdmin pattern documented in
+// middleware/auth.js — this is a resort operations report, unrelated to the
+// billing/CRM data the rest of this app's permission system (per-module
 // user_permissions grants) governs, so it bypasses that system entirely
-// rather than adding a new gatable module. No staff, however permissioned,
-// can see or submit one — only an admin-tier account ('admin' or
-// 'super_admin', see requireAdmin/isAdminRole).
+// rather than adding a new gatable module. Deliberately narrower than
+// routes/dataReset.js's own requireAdmin: no staff, however permissioned,
+// and no plain 'admin' either, can see or submit one — only 'super_admin'.
 router.use(requireAuth);
-router.use(requireAdmin);
+router.use(requireSuperAdmin);
 
 // The checklist's own shape — which sections exist, and what each item
 // says — is fixed and code-defined, not something an admin configures in

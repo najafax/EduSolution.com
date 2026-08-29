@@ -19,6 +19,7 @@ const MODULES = [
   'users',
   'import',
   'campaigns',
+  'email_center',
 ];
 
 // Both admin tiers bypass the per-module grant system entirely — super_admin

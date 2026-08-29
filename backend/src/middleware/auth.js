@@ -84,4 +84,21 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, requirePermission, requireAdmin };
+// Stricter still than requireAdmin: only the super_admin tier passes, not a
+// plain admin. Reserved for a feature that's deliberately narrower than the
+// rest of this app's admin-tier bypass rather than a bug — e.g.
+// routes/modReports.js, which used to be requireAdmin like everything else
+// here but was intentionally tightened to super_admin only. Like
+// requireAdmin, this bypasses the per-module user_permissions grant system
+// entirely (reads req.user.role directly) — no staff grant can ever unlock
+// it, and unlike requirePermission()'s modules, a plain admin can't be
+// handed access to this one via the Users page either. Must run after
+// requireAuth.
+function requireSuperAdmin(req, res, next) {
+  if (req.user.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Only a super admin can do this' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requirePermission, requireAdmin, requireSuperAdmin };

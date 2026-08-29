@@ -70,7 +70,7 @@ const LINK_ICONS = {
 // sidebar keeps working exactly as it did — only the below-`xl:` styling
 // branches on `mobileOpen`.
 export default function Sidebar({ mobileOpen = false, onMobileClose }) {
-  const { user, logout, can, isAdmin } = useAuth();
+  const { user, logout, can, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -96,7 +96,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
   if (!user) return null;
 
   const visibleLinks = BUSINESS_LINKS.filter(
-    (link) => (!link.module || can(link.module, 'view')) && (!link.adminOnly || isAdmin),
+    (link) => (!link.module || can(link.module, 'view')) && (!link.superAdminOnly || isSuperAdmin),
   );
 
   function isActive(to) {

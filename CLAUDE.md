@@ -2097,14 +2097,15 @@ Status/derived-field conventions worth knowing before touching this code:
   unlock it (unlike every other module in this app, which a staff member
   can be granted access to), and passes for either admin tier since
   `super_admin` is a strict superset of `admin`. Reserved for actions with
-  no per-row undo (`routes/dataReset.js`) or, as of the Email Center, for
-  a feature that's simply admin-only *for now* by deliberate scope
-  decision rather than a no-undo action — `routes/emailCenter.js` reuses
-  the same middleware rather than adding a new gatable module to
-  `lib/permissions.js`'s `MODULES`, since opening it to staff later (if
-  that turns out to be wanted) is a one-line change to
-  `requirePermission('email_center', ...)` plus a `MODULES` entry, not a
-  reason to add that plumbing speculatively now.
+  no per-row undo (`routes/dataReset.js`) — a feature that's simply
+  admin-tier-only by deliberate scope decision rather than a no-undo
+  action can still move off `requireAdmin` later if that turns out to be
+  wanted (as `routes/emailCenter.js` eventually did, see "Super admin and
+  the Finance permission preset" below), so reaching for it isn't a
+  one-way door. `requireSuperAdmin` is a third, still stricter sibling —
+  same shape, but checks `role === 'super_admin'` specifically rather than
+  `isAdminRole()`, so a plain `admin` fails it too; `routes/modReports.js`
+  is its one caller.
 - `routes/dataReset.js` (mounted at `/api/data-reset`, `requireAuth` +
   `requireAdmin`, its own `router.use()` chain independent of the
   `requirePermission`/module system entirely) — `POST /` bulk-deletes
@@ -2158,9 +2159,11 @@ Status/derived-field conventions worth knowing before touching this code:
   count in its label) before `api.dataReset.run(confirm, categories,
   token)` is ever called.
 - `routes/emailCenter.js` (mounted at `/api/email-center`, `requireAuth` +
-  `requireAdmin` via its own `router.use()` chain — same pattern as
-  `routes/dataReset.js` above, admin-only for now rather than gated by a
-  new `MODULES` entry) — the Email Center's API: `GET /templates` (calls
+  `requirePermission('email_center', 'view'|'manage')` per route — see
+  "Super admin and the Finance permission preset" below for why this
+  moved off the `requireAdmin` pattern `routes/dataReset.js` still uses,
+  once `email_center` became a real `MODULES` entry) — the Email Center's
+  API: `GET /templates` (calls
   `lib/emailTemplates.js`'s `getAllTemplates()`), `PUT /templates/:type`
   (400s if `subject`/`message` is missing/blank, or if `:type` isn't one of
   the 4 known types — `setTemplate()` throws on an unrecognized type, caught
@@ -2317,11 +2320,15 @@ same reasoning applied to this feature's third question.
   `isSuperAdmin` (`user?.role === 'super_admin'`) alongside the existing
   `can()`, so every component that used to write `user.role === 'admin'`
   reads one of these instead rather than re-deriving the rule — swept
-  across `Sidebar.jsx` (the Email Center nav link's `adminOnly` filter),
-  `EmailCenter.jsx` (its own admin-only page guard), and
-  `pages/business/Import.jsx` (the `DangerZone` gate) after `isAdminRole`
-  was introduced, so none of those three regressed to "admin-tier-blind"
-  once a `super_admin` existed. `frontend/src/lib/roles.js` holds the
+  across `pages/business/Import.jsx` (the `DangerZone` gate) after
+  `isAdminRole` was introduced, so it didn't regress to "admin-tier-blind"
+  once a `super_admin` existed. `Sidebar.jsx`'s own admin-tier-style link
+  filter and `EmailCenter.jsx`'s own page guard were both swept the same
+  way at the time, but have since moved off `isAdmin` entirely as this
+  section's own later notes describe — `Sidebar.jsx`'s filter now checks
+  `isSuperAdmin` (MOD Report's `superAdminOnly`, the one remaining
+  role-based link gate), and `EmailCenter.jsx` reads `can('email_center',
+  ...)` like any other module. `frontend/src/lib/roles.js` holds the
   frontend's own `isAdminRole()` (mirroring the backend's) and
   `roleLabel(role)` — `'Administrator'` | `'Staff'` | `'Super Admin'` —
   used everywhere a role is *displayed* (`DashboardRail.jsx`'s profile
@@ -2365,6 +2372,81 @@ same reasoning applied to this feature's third question.
   typically has no reason to edit. `quotes` is deliberately excluded even
   though it precedes an invoice — a quote has no money changing hands yet,
   so it reads as sales/CRM territory rather than finance.
+
+**Two follow-up changes, made once `super_admin` existed**: tightening MOD
+Report down to super-admin-exclusive (previously any admin-tier account
+could reach it, the same as every other `requireAdmin`-gated feature), and
+opening Email Center up to the granular permission system for the first
+time (previously admin-tier-only with no way to grant it to staff at all —
+see that route's own original note, which explicitly left this as "a
+deliberate future call, not an oversight"). These land in opposite
+directions — one *narrower* than the app's existing admin-tier bypass, one
+*added* to the module-grant system that bypass has always sat on top of —
+which is worth stating plainly since both touch admin-tier-only features
+in the same pass.
+
+- **MOD Report → super-admin-exclusive**: `middleware/auth.js` gained
+  `requireSuperAdmin`, a still-stricter sibling of `requireAdmin` — same
+  shape (bypasses `user_permissions` entirely, reads `req.user.role`
+  directly, no staff grant can ever unlock it), but checks
+  `role === 'super_admin'` specifically rather than `isAdminRole()`, so a
+  plain `admin` account fails it too. `routes/modReports.js`'s
+  `router.use(requireAdmin)` became `router.use(requireSuperAdmin)` — the
+  only change the route needed, since every handler in that file already
+  just reads `req.user` for attribution (`submitted_by_name`, etc.) and
+  never branched on role itself. This makes MOD Report the one feature in
+  the app that a plain `admin` cannot reach at all, by design — it was
+  never business data the per-module grant system was built to gate (a
+  resort operations checklist, unrelated to billing/CRM), so tightening it
+  further didn't call for a new `MODULES` entry, just a stricter version of
+  the same bypass-based gate it already used. `frontend/src/components/
+  Navbar.jsx`'s `BUSINESS_LINKS` entry for `/mod-reports` swapped
+  `adminOnly: true` for `superAdminOnly: true` (the last remaining use of
+  `adminOnly` was Email Center, below, so the flag itself was renamed
+  rather than left as a dead alternative alongside the new one) —
+  `components/Sidebar.jsx`'s link filter reads
+  `!link.superAdminOnly || isSuperAdmin` now, not `isAdmin`.
+  `pages/business/MODReport.jsx`'s three effects and its own
+  "You don't have permission" render guard all check `isSuperAdmin` from
+  `useAuth()` (previously a literal `user?.role !== 'admin'` comparison —
+  worth noting this was actually a pre-existing bug once `super_admin` was
+  introduced: a literal `!== 'admin'` check reads `true`, i.e. "blocked,"
+  for `role: 'super_admin'` too, so between the two features shipping a
+  super admin had briefly and unintentionally lost access to this page
+  entirely, the opposite of every other admin-tier check in the app. Fixed
+  as part of this same change, not a separate patch, since the fix and the
+  new intended behavior are the same line).
+- **Email Center → a real, grantable module**: `email_center` joins
+  `lib/permissions.js`'s `MODULES` list — `routes/emailCenter.js`'s
+  `router.use(requireAdmin)` became per-route `requirePermission
+  ('email_center', 'view'|'manage')` (`view` on `GET /templates`/`GET
+  /log`, `manage` on `PUT /templates/:type`/`POST /templates/:type/
+  reset`), the exact move that route's own original comment already
+  flagged as a "one-line change... not a reason to add that plumbing
+  speculatively now" — this is that later, deliberate call. **Both admin
+  tiers keep exactly the access they already had** — `hasPermission()`'s
+  admin-tier bypass applies to every module including this new one, so an
+  `admin`/`super_admin` account's own access to Email Center is unchanged
+  by this — the actual effect is additive: a `staff` account can now be
+  individually granted `email_center` view/manage via the Users page's
+  permissions grid, which was previously impossible no matter what. The
+  frontend mirrors this exactly: `Navbar.jsx`'s `/email-center` entry
+  dropped `adminOnly`/`module: null` for a plain `module: 'email_center'`,
+  so it's now filtered by `can('email_center', 'view')` the same as every
+  other business link — no special-casing left. `pages/EmailCenter.jsx`
+  reads `canView`/`canManage` from `can('email_center', 'view'|'manage')`
+  instead of the old blanket `isAdmin` — `canView` gates the page the same
+  way every other business page's `if (!can(module, 'view')) return
+  <...not authorized...>` guard does, and `canManage` is new: a
+  view-only-granted staff member now sees every template's current
+  subject/message (read-only inputs, muted `bg-slate-50` styling — same
+  convention `EmailPreviewModal.jsx`'s own read-only `To` field already
+  uses) and the sent log, but the Save/Reset button row is hidden
+  entirely per template card, same "never show a control that would just
+  403" convention as everywhere else in this app. The page's own intro
+  copy dropped "Admin-only for now" (no longer true) for two variants
+  keyed on `canManage`, so a view-only visitor doesn't see instructions
+  for actions they can't take.
 
 ### Client portal (`backend/src/`, `frontend/src/`)
 
@@ -3704,12 +3786,15 @@ frontend stops holding/sending it.
   return <...not authorized...>`) for the case of someone reaching the
   route directly by URL rather than through a nav link — same pattern
   `Dashboard.jsx` already used for its financials-gated view before this
-  feature existed. `pages/EmailCenter.jsx` (route `/email-center`) is the
-  same guard pattern but checks `user?.role === 'admin'` directly instead
-  of `can(module, 'view')` — same convention as `Import.jsx`'s
-  `DangerZone` below, since this is admin-only for now rather than gated by
-  a permission module (see `routes/emailCenter.js` above). It has two
-  sections: **Templates**, a `TemplateCard` per editable type (the 4 from
+  feature existed. `pages/EmailCenter.jsx` (route `/email-center`) uses the
+  same `can(module, 'view')` guard pattern as everything else — it used to
+  check `user?.role === 'admin'` directly instead, back when this page was
+  admin-only with no gatable module of its own, but see "Super admin and
+  the Finance permission preset" above for why that changed once
+  `email_center` became a real `MODULES` entry. `canManage` (`can
+  ('email_center', 'manage')`) additionally gates every template's Save/
+  Reset controls — a view-only grant shows the current subject/message
+  read-only. It has two sections: **Templates**, a `TemplateCard` per editable type (the 4 from
   `api.emailCenter.templates()`) with editable Subject/Message fields,
   a `{{placeholder}}` reference line built from each template's
   `placeholders` array, a "Customized" badge and "Reset to default" button
@@ -3979,8 +4064,9 @@ frontend stops holding/sending it.
   generated client-side as static strings and downloaded via a blob URL,
   the same throwaway-`<a>` pattern as `downloadFile()` in `lib/api.js`.
   The same page also renders `DangerZone` (see `routes/dataReset.js`
-  above) at the bottom, but only when `user.role === 'admin'` — checked
-  directly against the role, not `can('import', 'manage')` like the rest
+  above) at the bottom, but only when `isAdmin` — checked
+  directly against the role (either admin tier, see `useAuth()`'s
+  `isAdminRole`-backed check), not `can('import', 'manage')` like the rest
   of this page, since a staff member could be granted that permission
   without being trusted with a bulk, unrecoverable delete. Its per-type
   `ResultsTable` (row/status/item/message) was pulled out into
@@ -4352,12 +4438,16 @@ frontend stops holding/sending it.
   is filtered through `can(link.module, 'view')` so a restricted user never
   sees a nav link leading to a page that would just reject them — same
   UX-only caveat as the business-page button gating above, not a security
-  boundary on its own. The Email Center's entry additionally carries
-  `adminOnly: true` (`module: null`, since it isn't gated by the permission
-  system at all) — `visibleLinks`'s filter checks
-  `(!link.adminOnly || user?.role === 'admin')` alongside the existing
-  module check, mirroring `routes/emailCenter.js`'s `requireAdmin` rather
-  than a `can()` check, same UX-only caveat. "My account" is appended after
+  boundary on its own. This filtering itself now lives in
+  `components/Sidebar.jsx`, not `Navbar.jsx` (see "Sidebar navigation
+  (desktop)" below — `Navbar.jsx` still *defines and exports*
+  `BUSINESS_LINKS`, but no longer filters it itself). MOD Report's entry
+  additionally carries `superAdminOnly: true` (`module: null`, since it
+  isn't gated by the permission system at all) — the filter checks
+  `(!link.superAdminOnly || isSuperAdmin)` alongside the existing module
+  check, mirroring `routes/modReports.js`'s `requireSuperAdmin` rather
+  than a `can()` check, same UX-only caveat (see "Super admin and the
+  Finance permission preset" above). "My account" is appended after
   the filtered links, unconditionally visible to any logged-in user (admin
   or staff) since it's never permission-gated.
 - `pages/Dashboard.jsx` — the page's outer container is a bare `px-4 py-10
@@ -4916,10 +5006,12 @@ persistent desktop sidebar either way.
   persistent desktop sidebar and the mobile drawer (both render the same
   `GlobalSearch` call, so both needed it, and both got it from this one
   change).
-- The nav list reuses `Navbar.jsx`'s own exported `BUSINESS_LINKS` array
-  and the identical `can()`/`adminOnly` filtering logic — one source of
-  truth for "which links exist and who can see them," shared by both
-  components rather than duplicated. `LINK_ICONS` maps each link's `to`
+- The nav list reuses `Navbar.jsx`'s own exported `BUSINESS_LINKS` array —
+  one source of truth for "which links exist," with the `can()`/
+  `superAdminOnly` filtering logic itself living here in `Sidebar.jsx`
+  (see "Mobile/tablet drawer mode" below for why `Navbar.jsx` dropped its
+  own copy of this filtering entirely rather than keeping two to drift out
+  of sync). `LINK_ICONS` maps each link's `to`
   path to one of `components/icons.jsx`'s icons; a few modules
   deliberately reuse an icon that already carries a close-enough meaning
   elsewhere in the app rather than inventing a new glyph per link —

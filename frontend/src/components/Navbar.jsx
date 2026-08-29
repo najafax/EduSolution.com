@@ -11,10 +11,14 @@ import { SearchIcon, XIcon, MenuIcon } from './icons';
 // permissions (Dashboard). Everything else is filtered by that module's
 // view permission so a restricted user never sees a link leading to a 403
 // — enforcement itself still happens server-side; this is just UX.
-// `adminOnly: true` (Email Center) is a stricter, separate check against
+// `superAdminOnly: true` (MOD report) is a stricter, separate check against
 // the account's actual role rather than a module grant — mirrors the
-// backend's requireAdmin (routes/emailCenter.js), which no staff permission
-// can unlock.
+// backend's requireSuperAdmin (routes/modReports.js), which no staff
+// permission, and no plain 'admin' role either, can unlock; deliberately
+// the one link in this list with no `module` and no way for any admin to
+// grant it to anyone else, the same way routes/dataReset.js's Danger Zone
+// (embedded in the Import page, not its own nav link) stays outside the
+// per-module grant system entirely.
 export const BUSINESS_LINKS = [
   { to: '/dashboard', label: 'Dashboard', module: null },
   { to: '/clients', label: 'Clients', module: 'clients' },
@@ -32,8 +36,8 @@ export const BUSINESS_LINKS = [
   { to: '/reports', label: 'Reports', module: 'financials' },
   { to: '/activity', label: 'Activity', module: 'activity' },
   { to: '/users', label: 'Users', module: 'users' },
-  { to: '/email-center', label: 'Email center', module: null, adminOnly: true },
-  { to: '/mod-reports', label: 'MOD report', module: null, adminOnly: true },
+  { to: '/email-center', label: 'Email center', module: 'email_center' },
+  { to: '/mod-reports', label: 'MOD report', module: null, superAdminOnly: true },
   { to: '/settings', label: 'Settings', module: 'settings' },
 ];
 

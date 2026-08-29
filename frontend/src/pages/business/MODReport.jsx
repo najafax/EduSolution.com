@@ -710,7 +710,7 @@ function ReportDetail({ report, meta, onBack, onEdit, onDownload, onDelete, down
 }
 
 export default function MODReport() {
-  const { user, token } = useAuth();
+  const { token, isSuperAdmin } = useAuth();
   const { confirm, confirmDialog } = useConfirm();
 
   const [tab, setTab] = useState('new');
@@ -736,7 +736,7 @@ export default function MODReport() {
   const [modSettingsSubmitting, setModSettingsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user?.role !== 'admin') return;
+    if (!isSuperAdmin) return;
     api.modReports
       .meta(token)
       .then((res) => {
@@ -745,7 +745,7 @@ export default function MODReport() {
       })
       .catch((err) => setMetaError(err.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, user]);
+  }, [token, isSuperAdmin]);
 
   function loadReports() {
     api.modReports
@@ -758,10 +758,10 @@ export default function MODReport() {
   }
 
   useEffect(() => {
-    if (user?.role !== 'admin' || tab !== 'log') return;
+    if (!isSuperAdmin || tab !== 'log') return;
     loadReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, user, tab, page]);
+  }, [token, isSuperAdmin, tab, page]);
 
   useEffect(() => {
     if (!openReportId) { setOpenReport(null); return; }
@@ -773,16 +773,16 @@ export default function MODReport() {
   }, [openReportId]);
 
   useEffect(() => {
-    if (user?.role !== 'admin' || tab !== 'settings') return;
+    if (!isSuperAdmin || tab !== 'settings') return;
     setModSettingsSuccess(false);
     api.modReports
       .getSettings(token)
       .then((res) => setModSettings(res.settings))
       .catch((err) => setModSettingsError(err.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, user, tab]);
+  }, [token, isSuperAdmin, tab]);
 
-  if (user?.role !== 'admin') {
+  if (!isSuperAdmin) {
     return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">You don't have permission to view this page.</div>;
   }
 
@@ -879,7 +879,7 @@ export default function MODReport() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Manager on Duty Checklist</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        Shift handover checklist for resort operations. Admin-only.
+        Shift handover checklist for resort operations. Super admin only.
       </p>
 
       <div className="mt-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">

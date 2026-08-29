@@ -1,16 +1,12 @@
 const { Router } = require('express');
 const db = require('../db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requirePermission } = require('../middleware/auth');
 const { getAllTemplates, setTemplate, resetTemplate } = require('../lib/emailTemplates');
 
 const router = Router();
-// Admin-only for now (see CLAUDE.md) — same requireAdmin pattern as
-// routes/dataReset.js, bypassing the per-module user_permissions grant
-// system entirely rather than adding a new gatable module. Could move to
-// requirePermission('email_center', ...) later if this needs to open up to
-// staff, but that's a deliberate future call, not an oversight.
 router.use(requireAuth);
-router.use(requireAdmin);
+const view = requirePermission('email_center', 'view');
+const manage = requirePermission('email_center', 'manage');
 
 // Human label for the log entry types that have no editable template — the
 // automated overdue-reminder digest and the automated license-expiry alert
@@ -35,11 +31,11 @@ const TYPE_LABELS = {
   campaign: 'Promotional campaign',
 };
 
-router.get('/templates', (req, res) => {
+router.get('/templates', view, (req, res) => {
   res.json({ templates: getAllTemplates() });
 });
 
-router.put('/templates/:type', (req, res) => {
+router.put('/templates/:type', manage, (req, res) => {
   const { subject, message } = req.body || {};
   if (!subject || !subject.trim() || !message || !message.trim()) {
     return res.status(400).json({ error: 'subject and message are required' });
@@ -52,7 +48,7 @@ router.put('/templates/:type', (req, res) => {
   res.json({ templates: getAllTemplates() });
 });
 
-router.post('/templates/:type/reset', (req, res) => {
+router.post('/templates/:type/reset', manage, (req, res) => {
   try {
     resetTemplate(req.params.type);
   } catch (err) {
@@ -66,7 +62,7 @@ const PAGE_SIZE = 30;
 // Sent log — mirrors routes/activity.js's pagination pattern exactly
 // (always paginated, not opt-in like the business list routes' `?page=`
 // convention) since this is a chronological audit feed, not a pickable list.
-router.get('/log', (req, res) => {
+router.get('/log', view, (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const offset = (page - 1) * PAGE_SIZE;
   const { total } = db.prepare('SELECT COUNT(*) AS total FROM email_log').get();
