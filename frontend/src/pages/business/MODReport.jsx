@@ -194,11 +194,18 @@ function Field({ label, children }) {
     </label>
   );
 }
-// h-11 (a fixed height), not min-h-11 (a floor) — a native iOS/WebKit
-// date or time control can otherwise render its own internal chrome
-// taller than a plain text input's natural height, so the two field
-// types drift apart even though both share this exact class.
 const inputClass = 'mt-1 h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white';
+// A native date/time control's own compound widget (spinner segments,
+// calendar/clock icon) is drawn by the OS/browser, not by us — on some
+// mobile browsers that internal rendering ignores an explicit CSS
+// height/width entirely and forces its own larger box instead, which is
+// what actually caused these two fields to grow taller AND wider than
+// their siblings despite sharing the identical h-11/w-full classes.
+// appearance-none tells the browser to stop drawing that native widget
+// frame and let our own border/height/width own the box completely —
+// tapping the field still opens the OS date/time picker either way, this
+// only changes how the closed field itself is drawn.
+const dateTimeInputClass = `${inputClass} appearance-none [-webkit-appearance:none]`;
 
 // Same shape as pages/business/Settings.jsx's own ImageField (PNG/JPEG,
 // 400KB cap, read as a data URI via FileReader) — a small, deliberate
@@ -360,10 +367,10 @@ function ChecklistForm({ meta, draft, setDraft, editingId, onSubmit, onCancelEdi
             <input type="text" required value={draft.mod_name} onChange={(e) => setDraft((d) => ({ ...d, mod_name: e.target.value }))} placeholder="Your name" className={inputClass} />
           </Field>
           <Field label="Date">
-            <input type="date" required value={draft.report_date} onChange={(e) => setDraft((d) => ({ ...d, report_date: e.target.value }))} className={inputClass} />
+            <input type="date" required value={draft.report_date} onChange={(e) => setDraft((d) => ({ ...d, report_date: e.target.value }))} className={dateTimeInputClass} />
           </Field>
           <Field label="Time started">
-            <input type="time" value={draft.time_started} onChange={(e) => setDraft((d) => ({ ...d, time_started: e.target.value }))} className={inputClass} />
+            <input type="time" value={draft.time_started} onChange={(e) => setDraft((d) => ({ ...d, time_started: e.target.value }))} className={dateTimeInputClass} />
           </Field>
           <Field label="Weather">
             <input type="text" value={draft.weather} onChange={(e) => setDraft((d) => ({ ...d, weather: e.target.value }))} placeholder="e.g. mostly cloudy" className={inputClass} />
