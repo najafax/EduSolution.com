@@ -139,7 +139,7 @@ function ItemRow({ label, itemState, onChange }) {
         placeholder="Comment (optional)"
         value={comment}
         onChange={(e) => onChange({ value, comment: e.target.value })}
-        className="min-h-9 w-full flex-1 basis-full rounded-md border border-transparent bg-slate-50 px-2.5 py-1.5 text-sm focus:border-lagoon-500 focus:bg-white focus:outline-none dark:bg-slate-800 dark:text-white dark:focus:bg-slate-900"
+        className="min-h-9 w-full flex-1 basis-full rounded-md border border-transparent bg-slate-50 px-2.5 py-1.5 text-base focus:border-lagoon-500 focus:bg-white focus:outline-none dark:bg-slate-800 dark:text-white dark:focus:bg-slate-900"
       />
     </div>
   );
@@ -428,7 +428,7 @@ function ChecklistForm({ meta, draft, setDraft, editingId, onSubmit, onCancelEdi
                   placeholder="Villa number, e.g. V21"
                   value={v.villaNumber}
                   onChange={(e) => setDraft((d) => ({ ...d, villas: d.villas.map((vv, i) => (i === vIdx ? { ...vv, villaNumber: e.target.value } : vv)) }))}
-                  className="min-h-9 w-56 max-w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm font-semibold focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                  className="min-h-9 w-56 max-w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-base font-semibold focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
                 />
                 {draft.villas.length > 1 && (
                   <button
@@ -466,14 +466,14 @@ function ChecklistForm({ meta, draft, setDraft, editingId, onSubmit, onCancelEdi
               placeholder="Villa & guest name(s)"
               value={g.villaGuest}
               onChange={(e) => setDraft((d) => ({ ...d, guestInteractions: d.guestInteractions.map((gg, gi) => (gi === i ? { ...gg, villaGuest: e.target.value } : gg)) }))}
-              className="min-h-9 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              className="min-h-9 rounded-md border border-slate-300 px-2.5 py-1.5 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
             />
             <input
               type="text"
               placeholder="Comment"
               value={g.comment}
               onChange={(e) => setDraft((d) => ({ ...d, guestInteractions: d.guestInteractions.map((gg, gi) => (gi === i ? { ...gg, comment: e.target.value } : gg)) }))}
-              className="min-h-9 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              className="min-h-9 rounded-md border border-slate-300 px-2.5 py-1.5 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
             />
             <button
               type="button"
@@ -537,7 +537,7 @@ function ChecklistForm({ meta, draft, setDraft, editingId, onSubmit, onCancelEdi
                 placeholder="Describe the issue"
                 value={iss.caption}
                 onChange={(e) => setDraft((d) => ({ ...d, issues: d.issues.map((ii, ix) => (ix === i ? { ...ii, caption: e.target.value } : ii)) }))}
-                className="rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                className="rounded-md border border-slate-300 px-2.5 py-1.5 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
               />
               <button
                 type="button"
