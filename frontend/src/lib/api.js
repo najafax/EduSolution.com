@@ -240,7 +240,10 @@ export const api = {
   },
 
   financials: {
-    summary: (token) => request('/financials/summary', { token }),
+    // `from`/`to` are both optional — omit both (Dashboard.jsx's own call)
+    // for the unfiltered, all-time summary; Financials.jsx's period-filter
+    // tabs pass both once a period other than "All time" is selected.
+    summary: (token, { from, to } = {}) => request(`/financials/summary${qs({ from, to })}`, { token }),
   },
 
   import: {

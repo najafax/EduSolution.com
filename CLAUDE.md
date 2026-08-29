@@ -1387,6 +1387,50 @@ deliberately untouched by either, always returning every row.
   (and later `ownerDraws`) brought the count up, an even grid reads more
   like a real balance-sheet-style overview than one card visually shouting
   over the rest.
+  **Period filter on `Financials.jsx`**: `GET /summary` accepts optional
+  `?from=&to=` (`YYYY-MM-DD`) — omitted, it's the exact unfiltered/all-time
+  query this endpoint has always run (what `Dashboard.jsx`'s own call still
+  gets, unconditionally; malformed or partial input falls back to
+  unfiltered too, rather than 400ing, since this isn't a hand-typed form).
+  `Financials.jsx` renders a `StatusFilterChips` row (This year/Last year/
+  This month/Last month/All time, defaulting to **This year**) right under
+  the page intro, computing each option's exact `{from, to}` fresh on every
+  call (not memoized) the same way `Reports.jsx`'s own quick-pick presets
+  do, so "This year"/"This month" stay relative to today rather than to
+  whenever the page first loaded; switching tabs doesn't reset `summary` to
+  `null` first, so the numbers swap directly instead of flashing back to
+  the page's "Loading…" state. When a range is present, `totalInvoiced`/
+  `totalPaid`/`totalOutstanding`/`overdueCount`/`overdueAmount`/
+  `invoiceCounts` are all scoped to invoices by `issue_date` (accrual,
+  same convention `routes/reports.js`'s own sales/tax reports use) —
+  `invoiceCounts` is its own query rather than derived from the same
+  `invoices` array the totals use, since that array is `status != 'void'`
+  (voided invoices stay excluded from every financial total, as always)
+  while the status *breakdown* chart still needs to count void as one of
+  its own slices (see `StatusBreakdownChart`'s own `void` entry) — deriving
+  it from the totals array would have silently dropped every voided
+  invoice from the chart, including in the unfiltered case. `totalExpenses`/
+  `totalCapitalContributions`/`totalOwnerDraws`/`totalOwnerReturns`/
+  `recentPayments` are each scoped by their own natural date column
+  (`expense_date`/`contribution_date`/`draw_date`/`payments.paid_at`)
+  the same way `routes/reports.js`'s own per-report queries are.
+  `clientCount` and `quoteCounts` are never scoped by the filter — a live
+  headcount and an all-time quote-status breakdown aren't really
+  period-scoped concepts. **`bankBalance` is the one figure a period
+  filter doesn't narrow — it moves *when* the running balance is measured
+  instead**: `bankBalanceAsOf` (also returned) is the filtered range's own
+  `to` date, or today for the unfiltered case (identical to what this
+  always meant before period filtering existed) — the balance itself is
+  the cumulative running total through that one cutoff date, mirroring
+  `routes/reports.js`'s own `GET /bank-balance/pdf` closing-balance math
+  exactly, just collapsed to one "as of" cutoff instead of that route's
+  separate opening/closing split. `Financials.jsx`'s own Bank balance
+  `KpiCard` sub text reads "As of {date}" whenever that date isn't today,
+  falling back to its original static explanation otherwise. `monthlyTrend`
+  (the "Revenue, last 6 months" chart) is deliberately **not** scoped to
+  the period filter either — that widget's own title already sets a fixed,
+  independent framing (always the 6 months trailing from today), so it
+  keeps showing that regardless of which filter tab is selected.
 - `routes/reports.js` (mounted at `/api/reports`) — five downloadable PDF
   reports, each `GET /<type>/pdf?from=&to=` (`YYYY-MM-DD`, both required;
   400s if either is missing/malformed or `from` is after `to`). Gated on

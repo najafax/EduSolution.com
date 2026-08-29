@@ -7,25 +7,76 @@ import KpiCard from '../../components/KpiCard';
 import MeterBar from '../../components/MeterBar';
 import RevenueTrendChart from '../../components/RevenueTrendChart';
 import StatusBreakdownChart from '../../components/StatusBreakdownChart';
+import StatusFilterChips from '../../components/StatusFilterChips';
 import { InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, ExpenseIcon, TrendUpIcon, TrendDownIcon, BankIcon, UsersIcon } from '../../components/icons';
 import { money } from '../../lib/money';
+import { todayStr, startOfMonthStr } from '../../lib/date';
 import MobileListAccordion from '../../components/MobileListAccordion';
+
+// Every card/chart/list on this page is scoped to whichever period is
+// selected here (see routes/financials.js's own `from`/`to` handling) —
+// 'all_time' is the one option that sends no range at all, matching this
+// endpoint's original, pre-filter behavior exactly (and what Dashboard.jsx's
+// own call to the same endpoint still gets, unconditionally).
+const PERIOD_OPTIONS = [
+  { value: 'this_year', label: 'This year' },
+  { value: 'last_year', label: 'Last year' },
+  { value: 'this_month', label: 'This month' },
+  { value: 'last_month', label: 'Last month' },
+  { value: 'all_time', label: 'All time' },
+];
+
+// Computed fresh from `period` on every call (not memoized) so "This
+// year"/"This month" stay relative to today rather than to whenever the
+// page first loaded — same reasoning Reports.jsx's own PRESETS documents
+// for its identical "This month"/"Last month" math, reused here rather
+// than duplicated logic drifting apart from it.
+function periodRange(period) {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const fmt = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  switch (period) {
+    case 'this_year':
+      return { from: `${y}-01-01`, to: todayStr() };
+    case 'last_year':
+      return { from: `${y - 1}-01-01`, to: `${y - 1}-12-31` };
+    case 'this_month':
+      return { from: startOfMonthStr(), to: todayStr() };
+    case 'last_month':
+      return { from: fmt(new Date(y, m - 1, 1)), to: fmt(new Date(y, m, 0)) };
+    case 'all_time':
+    default:
+      return { from: null, to: null };
+  }
+}
 
 export default function Financials() {
   const { token } = useAuth();
+  const [period, setPeriod] = useState('this_year');
   const [summary, setSummary] = useState(null);
   const [settings, setSettings] = useState(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.financials.summary(token).then(setSummary).catch((err) => setError(err.message));
+    // No `setSummary(null)` here on a period change — the previous
+    // period's figures stay on screen until the new ones arrive, so
+    // switching tabs swaps the numbers directly instead of flashing back
+    // to the page's "Loading…" state (same "only show the loading state on
+    // the very first load" convention lib/useDebouncedValue.js documents
+    // for every other page's own search/filter refetches).
+    api.financials.summary(token, periodRange(period)).then(setSummary).catch((err) => setError(err.message));
+  }, [token, period]);
+
+  useEffect(() => {
     // .finally flips settingsLoaded whether the fetch succeeds or fails
     // (e.g. a staff user without settings:view) — the loading gate below
     // waits on this too, so every money figure on this page paints with
     // the real currency symbol on first render instead of flashing '$'
     // for a frame while settings is still in flight (see Dashboard.jsx's
-    // own note on this same race for the full story).
+    // own note on this same race for the full story). Independent of the
+    // period effect above — settings never change with the filter.
     api.settings
       .get(token)
       .then(({ settings }) => setSettings(settings))
@@ -119,7 +170,15 @@ export default function Financials() {
       key: 'bankBalance',
       label: 'Bank balance',
       value: money(symbol, summary.bankBalance),
-      sub: 'Starting balance + net profit + contributions − owner draws',
+      // Bank balance is a running total, not a period sum — a period
+      // filter moves *when* it's measured (see routes/financials.js's own
+      // note) rather than narrowing it, so its sub text says so whenever
+      // that "as of" date isn't just today (the this-year/all-time case,
+      // where it reads the same as it always has).
+      sub:
+        summary.bankBalanceAsOf && summary.bankBalanceAsOf !== todayStr()
+          ? `As of ${summary.bankBalanceAsOf}`
+          : 'Starting balance + net profit + contributions − owner draws',
       icon: <BankIcon />,
       tone: isPositiveBalance ? 'positive' : 'negative',
     },
@@ -129,6 +188,10 @@ export default function Financials() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Financials</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">A live view of what's owed, what's been paid, and where you stand.</p>
+
+      <div className="mt-4">
+        <StatusFilterChips options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
+      </div>
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
