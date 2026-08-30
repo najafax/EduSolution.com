@@ -126,9 +126,17 @@ export default function Navbar() {
           </>
         ) : (
           <>
-            <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
-              EduSolution<span className="text-lagoon-600">.com</span>
-            </Link>
+            {/* Hidden on the public quote/invoice/MOD-report links — a
+                client following one of those has no reason to see (or
+                click into) the app's own branding, same reasoning the
+                "Log in" button below is already hidden there. */}
+            {isPublicDocLink ? (
+              <span />
+            ) : (
+              <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
+                EduSolution<span className="text-lagoon-600">.com</span>
+              </Link>
+            )}
             <div className="flex items-center gap-2 sm:gap-4">
               <ThemeToggle />
               {!isPublicDocLink && (
