@@ -21,7 +21,11 @@
 //    (description, particulars, remarks, narration, purpose, details,
 //    memo, note, or "for") and takes the rest of that line — a short
 //    phrase rather than a single code, capped at MAX_DESCRIPTION_LENGTH so
-//    a long narration line doesn't blow out the Reference field.
+//    a long narration line doesn't blow out the Reference field. Unlike a
+//    reference number, a description is often too long to fit on the same
+//    printed line as its own label — see findDescription() below, which
+//    walks into the next line or two when the label's own line is blank
+//    rather than giving up the moment that one line has nothing on it.
 // 3. Neither label found at all — falls back to the longest alphanumeric
 //    token in the whole text that's at least MIN_FALLBACK_LENGTH
 //    characters and contains at least one digit (so a stray English word
@@ -77,6 +81,18 @@ function isRealValue(candidate) {
   return Boolean(candidate) && /[A-Za-z0-9]/.test(candidate) && !LABEL_STOPWORDS.has(candidate.toLowerCase()) && !DATE_LIKE_RE.test(candidate);
 }
 
+// A line that itself opens with a known label — a reference/description
+// keyword, or one of the plain LABEL_STOPWORDS field names (Date, Amount,
+// Status, ...) — is never treated as free-text continuation of the
+// *previous* label's value; see findDescription() below for the one place
+// that matters. Built from the same word lists used above rather than a
+// separately hand-maintained one, so a keyword added to either can't be
+// forgotten here.
+const LABEL_LINE_RE = new RegExp(
+  `^(?:ref(?:erence)?|txn|transaction|trans|confirmation|receipt|description|particulars?|remarks?|narration|purpose|details?|memo|note|for|${[...LABEL_STOPWORDS].join('|')})\\b`,
+  'i',
+);
+
 // Runs `keywordRe` against `text` one line at a time, returning the first
 // line's captured group that survives isRealValue() — never a value from a
 // different line than the label that introduced it.
@@ -85,6 +101,36 @@ function matchPerLine(text, keywordRe) {
     const match = line.match(keywordRe);
     const value = match?.[1]?.trim();
     if (isRealValue(value)) return value;
+  }
+  return null;
+}
+
+// A description is often too long to fit on the same printed line as its
+// own label, so the label's line is blank ("Description:" with nothing
+// after it) and the actual text sits on the line(s) below — unlike a
+// reference number, which is short enough that a real slip essentially
+// always prints it inline. matchPerLine() alone can't recover this case by
+// design (see that function's own note on why staying within one line is
+// deliberate for the reference tier), so this walks forward from a
+// label-only line into the next couple of lines looking for the first one
+// that reads as real content rather than another field's own label —
+// bounded to 2 lines ahead (not unlimited) so a genuinely label-less slip
+// doesn't have some unrelated line further down mistaken for it.
+function findDescription(text) {
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(DESCRIPTION_KEYWORD_RE);
+    if (!match) continue;
+
+    const inline = match[1]?.trim();
+    if (isRealValue(inline)) return inline;
+
+    for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+      const next = lines[j].trim();
+      if (!next) continue; // a stray blank OCR line — keep looking
+      if (LABEL_LINE_RE.test(next)) break; // the very next real line is another field, not a continuation
+      return isRealValue(next) ? next : null;
+    }
   }
   return null;
 }
@@ -99,7 +145,7 @@ export function extractReference(rawText) {
   const reference = matchPerLine(rawText, REFERENCE_KEYWORD_RE);
   if (reference) return { value: reference, source: 'reference' };
 
-  const description = matchPerLine(rawText, DESCRIPTION_KEYWORD_RE);
+  const description = findDescription(rawText);
   if (description) return { value: description.slice(0, MAX_DESCRIPTION_LENGTH), source: 'description' };
 
   const candidates = rawText.match(/[A-Za-z0-9][A-Za-z0-9/-]{5,}/g) || [];

@@ -3699,6 +3699,28 @@ staff *reach* and *fill in* that same existing endpoint.
   shared by all three tiers (label matching and the tier-3 candidate
   filter alike) rather than duplicated, so a value that shouldn't count
   is rejected the same way everywhere it could turn up.
+  **A follow-up ask once the two fixes above shipped: the description
+  tier still missed real descriptions that print on the line *below*
+  their own label** — a longer description often doesn't fit on the same
+  printed line as "Description:"/"Particulars:" itself, so that line is
+  blank the same way a blank *reference* field is, but unlike a
+  reference (a short code that essentially always fits inline) the real
+  text is sitting one or two lines down. The per-line confinement that
+  fixed the reference bug above is deliberately still in force for the
+  reference tier — a reference is short enough to always be safe to
+  require inline — but `findDescription()` is a dedicated second pass
+  just for the description tier: on a label line with nothing usable
+  after it, it walks forward up to 2 lines (skipping a stray blank OCR
+  line) looking for the first real line of text, stopping without
+  returning anything if that next real line is itself another field's
+  own label rather than a continuation. `LABEL_LINE_RE` (which powers
+  that "is this actually another field" check) is built from the exact
+  same reference/description keyword lists plus `LABEL_STOPWORDS`,
+  rather than a separately hand-maintained list, so a line starting with
+  any already-known label word (`Date`, `Amount`, `Bank`, etc. — not just
+  the reference/description keywords) is correctly recognized as "not a
+  continuation," closing the same class of gap `isRealValue()` closes for
+  values.
   **This deliberately does not self-host tesseract.js's worker/WASM
   core/language-data files** (unlike this app's own fonts — see "Mobile
   design system"'s note on why those *are* self-hosted) — those files run
