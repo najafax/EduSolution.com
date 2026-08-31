@@ -32,6 +32,14 @@ export function startOfMonthStr() {
   return `${year}-${month}-01`;
 }
 
+// January 1st of the current local-calendar year — Dashboard.jsx's own
+// "from" date (paired with todayStr() as "to") for scoping its financial
+// figures to the current year, the same YYYY-01-01 shape Financials.jsx's
+// own "This year" preset already computes inline.
+export function startOfYearStr() {
+  return `${new Date().getFullYear()}-01-01`;
+}
+
 // A short relative-time string ("just now", "5 minutes ago", "3 days ago")
 // for a SQLite `datetime('now')` timestamp (a space-separated
 // "YYYY-MM-DD HH:MM:SS" UTC string, not ISO 8601) — used by

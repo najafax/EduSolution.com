@@ -452,68 +452,126 @@ deliberately untouched by either, always returning every row.
   order is what a PO number is *for*), and the `GET /export.csv`/
   `GET /export.xlsx` invoice export.
   **Quotes only, the mirror of invoices' own locked-status guard below**:
-  `PUT /:id` and `DELETE /:id` on `quotes.js` both reject with 409 once
-  `converted_invoice_id` is set — "This quote has already been converted to
-  an invoice and can no longer be edited"/"...cannot be deleted". Before
-  this, both were silently allowed: editing a converted quote had no effect
-  on the invoice it had already produced (the two documents share nothing
-  live, `POST /:id/convert-to-invoice` only ever *copies* the quote's
-  client/items/totals once at conversion time), so an edit here just
-  quietly diverged from the real, already-sent-or-paid invoice with nothing
-  telling staff that had happened; deleting one was worse — `invoices.
-  quote_id INTEGER REFERENCES quotes(id)` carries no `ON DELETE` clause of
-  its own (unlike `quote_items`' `ON DELETE CASCADE`), so with
-  `foreign_keys` actually enforced (see `db/index.js` above) that delete
-  would have 500'd on a raw `SQLITE_CONSTRAINT_FOREIGNKEY` the moment a
-  conversion existed, the exact kind of surfaced-as-a-crash-instead-of-a-
-  clean-409 case this app's own deletes are supposed to guard against
-  everywhere else. `QuoteForm.jsx` mirrors `InvoiceForm.jsx`'s own
-  `lockedStatus` pattern (a `locked` flag set after fetching the quote
-  being edited, short-circuiting to a "can no longer be edited" message +
-  "View quote" link instead of the form) so navigating straight to
-  `/quotes/:id/edit` by URL is blocked the same way, not just the button
-  that would normally lead there. `QuoteDetail.jsx`'s Edit/Delete header
-  buttons and `Quotes.jsx`'s row-action Edit/Delete `IconActionButton`s are
-  both gated on `!quote.converted_invoice_id` (same "never show a button
-  that would just error" convention every other locked-state gate in this
-  app already follows — `InvoiceDetail.jsx`'s own `isLocked`/`canVoid`
-  checks, `Licenses.jsx`'s Renew/Remind guards); every other action
-  (Download PDF, Copy public link, Email to client, Duplicate) stays
+  `PUT /:id` on `quotes.js` rejects with 409 once `converted_invoice_id` is
+  set — "This quote has already been converted to an invoice and can no
+  longer be edited". Before this, edits were silently allowed: a converted
+  quote had no effect on the invoice it had already produced (the two
+  documents share nothing live, `POST /:id/convert-to-invoice` only ever
+  *copies* the quote's client/items/totals once at conversion time), so an
+  edit here just quietly diverged from the real, already-sent-or-paid
+  invoice with nothing telling staff that had happened. `QuoteForm.jsx`
+  mirrors `InvoiceForm.jsx`'s own `lockedStatus` pattern (a `locked` flag
+  set after fetching the quote being edited, short-circuiting to a "can no
+  longer be edited" message + "View quote" link instead of the form) so
+  navigating straight to `/quotes/:id/edit` by URL is blocked the same way,
+  not just the button that would normally lead there. `QuoteDetail.jsx`'s
+  Edit header button and `Quotes.jsx`'s row-action Edit `IconActionButton`
+  are both gated on `!quote.converted_invoice_id` (same "never show a
+  button that would just error" convention every other locked-state gate
+  in this app already follows — `InvoiceDetail.jsx`'s own `isLocked`/
+  `canVoid` checks, `Licenses.jsx`'s Renew/Remind guards); every other
+  action (Download PDF, Copy public link, Email to client, Duplicate) stays
   available, since none of those mutate the quote itself. `QuoteDetail.jsx`'s
-  existing "Converted to invoice" notice now reads "...and can no longer be
-  edited or deleted" so the reason the buttons are gone is stated
-  explicitly, not left for staff to infer from their absence.
+  "Converted to invoice" notice reads "...and can no longer be edited or
+  voided" so the reason the buttons are gone is stated explicitly, not left
+  for staff to infer from their absence.
   **Invoices only** (not quotes): `PUT /:id` rejects with 409 once
   `status` is `sent` or `paid` — "This invoice has already been sent or
   paid and can no longer be edited." A `void` invoice stays editable (it's
   still a correctable mistake, not a delivered/settled document), and
   `draft` is always editable. This only blocks the edit route itself —
   `/duplicate` (which creates a fresh draft copy) and recording a payment
-  are unaffected, and deletion is still governed separately by the
-  existing "has recorded payments" guard below. **Invoices only**, also:
-  `POST /:id/void` is the actual way an invoice becomes `void` — a
-  dedicated action route rather than a `status` value on the generic
-  `PUT /:id` above, because that route already 409s once `status` is
-  `sent`/`paid`, but voiding is precisely the escape hatch a *sent*
-  invoice needs (cancel a mistake, e.g. a client backed out) — it has to
-  work exactly where `PUT` refuses to. (`PUT /:id` still technically
-  accepts `status: 'void'` in its body too, but since it's blocked for
-  `sent`/`paid` invoices and the frontend never sends a `status` field at
-  all, that path is effectively dead — `POST /:id/void` is the only route
-  that matters in practice.) Blocked with 409 if the invoice is already
-  `void`, already `paid` (voiding real money needs a refund process, not a
-  status flip), or has *any* recorded payment at all — mirrors the
-  DELETE guard's "has recorded payments" check, so a partially-paid sent
-  invoice can't have its payments silently orphaned by voiding it.
-  Voiding also has ripple effects on the other invoice actions, all
-  enforced server-side: `POST /:id/send` and `POST /:id/remind` both 409
-  on a `void` invoice (there's no reason to email or nag a client about a
-  cancelled invoice), and `POST /:id/payments` already rejected `void`
-  the same as `draft` before this feature existed. A voided invoice is
-  excluded from `routes/financials.js`'s summary and the sales/tax PDF
+  are unaffected. **Invoices only**, also: `POST /:id/void` is the actual
+  way an invoice becomes `void` — a dedicated action route rather than a
+  `status` value on the generic `PUT /:id` above, because that route
+  already 409s once `status` is `sent`/`paid`, but voiding is precisely the
+  escape hatch a *sent* invoice needs (cancel a mistake, e.g. a client
+  backed out) — it has to work exactly where `PUT` refuses to. (`PUT /:id`
+  still technically accepts `status: 'void'` in its body too, but since
+  it's blocked for `sent`/`paid` invoices and the frontend never sends a
+  `status` field at all, that path is effectively dead — `POST /:id/void`
+  is the only route that matters in practice.) Blocked with 409 if the
+  invoice is already `void`, already `paid` (voiding real money needs a
+  refund process, not a status flip), or has *any* recorded payment at all
+  — a partially-paid sent invoice can't have its payments silently orphaned
+  by voiding it. Voiding also has ripple effects on the other invoice
+  actions, all enforced server-side: `POST /:id/send` and `POST /:id/remind`
+  both 409 on a `void` invoice (there's no reason to email or nag a client
+  about a cancelled invoice), and `POST /:id/payments` already rejected
+  `void` the same as `draft` before this feature existed. A voided invoice
+  is excluded from `routes/financials.js`'s summary and the sales/tax PDF
   reports in `routes/reports.js` (both filter `status != 'void'`), the
   same way those already excluded nothing else — void is the only status
   either of them filters out.
+- **Neither quotes nor invoices can be deleted, in any circumstance —
+  voiding, with a required reason, is the only way to cancel either.** Both
+  routers used to carry a `DELETE /:id` (guarded — a quote blocked once
+  converted, an invoice blocked once it had any recorded payment), but
+  both were removed outright rather than left as a "cancel this by mistake"
+  escape hatch: a quote/invoice is a real business record, and this app
+  now never lets one simply disappear. This lost no real capability — the
+  old `DELETE` guards already only ever let a *zero-payment* invoice
+  through (any recorded payment, partial or full, blocked it), and quote
+  deletion was already blocked once converted — exactly the same set of
+  documents `POST /:id/void` already covers, so removing `DELETE` doesn't
+  strand anything that used to be deletable and now isn't reachable any
+  other way. Both `POST /:id/void` routes (quotes' own mirrors invoices'
+  — see above) now require a non-blank `reason` in the body (400
+  otherwise: "A reason is required to void a quote/an invoice"), stored in
+  a new `void_reason` column (`quotes`/`invoices`, `db/index.js`,
+  `ALTER TABLE`-guarded — both tables have carried real documents since
+  the app's first deploy) rather than only living in a one-line
+  `activity_log` entry — `logActivity()`'s own `entityLabel` for a void
+  is `` `${number} — ${reason}` `` too, so the reason is genuinely
+  double-recorded, not just on the row. Voiding a quote is blocked (409)
+  once it's already `void`, or once `converted_invoice_id` is set — the
+  real transaction has already moved to a live invoice by then, so voiding
+  the quote itself would be meaningless; that's the same terminal state
+  `PUT /:id` above already locks against, just extended to the new action.
+  A voided quote's `total` is excluded from `GET /quotes/analytics`'s
+  `amountQuoted`/`totals.totalQuoted` (both now `filter(q => q.status !==
+  'void')` before summing) the same way a void invoice is already excluded
+  from `amountInvoiced` — a voided quote never became real business, so it
+  shouldn't inflate either figure; `byStatus`'s status-count map gained a
+  `void: 0` default alongside the original five so a business with no
+  voided quotes yet still reports a real zero, not `undefined`. `quotes.js`'s
+  `PUT /:id` `validStatuses` also grew a `void` entry (mirroring invoices'
+  own list) purely for consistency — the frontend never sends `status` on
+  a quote `PUT` either, so this is the same effectively-dead path invoices'
+  own copy already documents.
+  `components/VoidReasonModal.jsx` is the one shared popup behind every
+  void action on either document — a `Modal` wrapping a required textarea
+  + Cancel/red "Void" footer, modeled directly on `InvoiceDetail.jsx`'s
+  own pre-existing "Reject this payment proof" modal (same shape, a plain
+  `confirm()` can't collect free text) — four callers
+  (`Quotes.jsx`/`QuoteDetail.jsx`/`Invoices.jsx`/`InvoiceDetail.jsx`) is
+  well past this app's own "three real duplicates" bar for promoting a
+  pattern into a shared component. The submit button stays disabled until
+  the reason is non-blank, and a failed `onVoid()` call keeps the modal
+  open with the server's error shown inline rather than closing on
+  failure. `Quotes.jsx`/`Invoices.jsx`'s own list-row `TrashIcon` "Delete"
+  `IconActionButton` was replaced with an `XIcon` "Void" one (red tone,
+  same as the icon `InvoiceDetail.jsx`'s own header Void button already
+  used), gated the same way each detail page's own Void button already
+  is — `!quote.converted_invoice_id && quote.status !== 'void'` for
+  quotes, `(status === 'draft' || status === 'sent') && amount_paid === 0`
+  for invoices (a small `canVoid()` helper on each list page, mirroring
+  `InvoiceDetail.jsx`'s own) — clicking it opens `VoidReasonModal` for
+  that specific row rather than navigating anywhere first.
+  `InvoiceDetail.jsx`'s/`QuoteDetail.jsx`'s existing "voided" notice
+  (`"This invoice has been voided and is excluded from financial totals
+  and reports."` / the quote equivalent) now also renders `` Reason:
+  {void_reason} `` right after it, only when the column is actually set —
+  the common case for any document voided before this feature shipped has
+  a blank `void_reason`, so nothing extra renders for those.
+  `lib/api.js`'s `quotes`/`invoices` objects both lost their `remove()`
+  entry entirely (there is no `DELETE /:id` left to call) — `void()` on
+  both now takes `(id, reason, token)` instead of `(id, token)`.
+  `routes/dataReset.js`'s Danger Zone is unaffected by any of this: it
+  deletes by raw `DELETE FROM <table>` SQL directly against the tables in
+  a transaction, never through these routers' own endpoints, so removing
+  `DELETE /:id` here doesn't touch that separate, already
+  super-admin-gated, type-`DELETE`-to-confirm bulk-reset tool at all.
 - **Invoice/quote analytics**: `GET /invoices/analytics` and
   `GET /quotes/analytics` (both `view`-gated, each registered before its own
   `GET /:id` for the same "don't let `:id` swallow a literal path" reason
@@ -3489,6 +3547,119 @@ touches is its own row.
   rendering already lives on — so the notification and the detail it's
   pointing at are never two different views of the same fact.
 
+### Easier payment recording + payment slip scan (`frontend/src/`)
+
+Two related staff-side improvements to recording an invoice payment, built
+together since both touch the same form: reaching "Record payment" no
+longer requires opening a specific invoice's own detail page first, and
+the form itself can optionally read a photographed/uploaded bank slip and
+pre-fill the Reference field from whatever transaction number it prints.
+Purely a frontend change — `POST /api/invoices/:id/payments` itself
+(`routes/invoices.js`) is completely unchanged; this is all about how
+staff *reach* and *fill in* that same existing endpoint.
+
+- **`components/RecordPaymentModal.jsx`** is the one "Record payment" form
+  now, pulled out of `InvoiceDetail.jsx`'s own previously-inline
+  `<form>` (which lived inside its "Payments" `Accordion`, collapsed by
+  default on mobile — one more tap before the button was even visible)
+  into a standalone `Modal`-based component with no change to the fields
+  themselves (Amount/Method/Date/Reference — `notes` stays in the
+  submitted payload but, as before this change, has no input of its own).
+  Takes `{ open, onClose, invoice, token, onRecorded }` — owns its own
+  submit/busy/error state and calls `api.invoices.recordPayment` itself,
+  so both callers below just need to react to `onRecorded(result)`
+  (refresh their own data) rather than re-implementing the submit flow.
+  Opening it re-syncs Amount to the invoice's current `balance_due` every
+  time (mirrors the old inline form's own `togglePaymentForm()` behavior
+  exactly — paying off the full remaining balance is the common case, the
+  field stays freely editable for a partial payment).
+- **List-row quick action**: `Invoices.jsx` gained a `BanknoteIcon`
+  (`icons.jsx` — a rounded banknote, distinct from `BankIcon`'s
+  running-balance meaning) "Record payment" `IconActionButton` (tone
+  `emerald`) in `rowActions()`, opening `RecordPaymentModal` for that row
+  directly from the list — no navigation to the invoice's own detail page
+  needed at all, closing the actual gap in "make it easier to access":
+  before this, recording *any* payment meant finding the right invoice in
+  the list, clicking into its detail page, then finding and expanding the
+  Payments section. `InvoiceDetail.jsx`'s own existing "Record payment"
+  button (in the Payments `Accordion`'s header action) now opens the same
+  modal instead of the old inline form — same trigger, same place, just a
+  popup instead of an in-page expansion.
+- **A real pre-existing gating bug, caught and fixed by this change**:
+  both the list-row action and the detail page's button used to be gated
+  on `invoice.status !== 'void' && invoice.balance_due > 0` — which is
+  *not* actually the full set of invoices `POST /:id/payments` accepts.
+  That route also 400s with `"cannot record a payment against a draft
+  invoice"` for a `draft` invoice (only `sent` invoices with a balance are
+  ever actually payable), so a draft invoice — which always has
+  `balance_due > 0` the moment it's created — showed a "Record payment"
+  button that would just error on click, the exact "never show a button
+  that would just error" violation this app otherwise guards against
+  everywhere. Both gates are now `invoice.status === 'sent' &&
+  invoice.balance_due > 0`, matching the backend's own guard exactly;
+  caught during this feature's own Playwright verification (a draft test
+  invoice's payment attempt 400'd, which is what led to checking the
+  gate itself rather than assuming the pre-existing condition was
+  already correct).
+- **Payment slip scan**: `components/ScanPaymentSlip.jsx`, mounted at the
+  top of `RecordPaymentModal.jsx`'s form, is an optional "Scan payment
+  slip (optional)" file input (`accept="image/*" capture="environment"`,
+  so a phone offers its camera directly) that runs client-side OCR via
+  `tesseract.js` (a new frontend dependency) on the chosen image and, if
+  it finds something that looks like a reference/transaction number,
+  pre-fills the Reference field with it. `tesseract.js` itself is loaded
+  via a dynamic `import()`, not a static one — this is a rarely-clicked,
+  optional action, not something every page load (or even every payment
+  recorded) should pay the ~19KB for, the same "route-level
+  code-splitting" reasoning this app already applies to whole pages (see
+  "Route-level code-splitting" below). `lib/extractReference.js`'s
+  `extractReference(rawText)` is the actual pick-a-reference heuristic,
+  deliberately factored out as a small, pure, dependency-free function
+  (no OCR, no DOM, no network) so it's the one part of this feature
+  that's unit-testable in isolation: it first looks for a line containing
+  a common bank-slip label (`ref`/`reference`/`txn`/`transaction`/
+  `confirmation`/`receipt no`) and takes the token right after it; with
+  no keyword match at all, it falls back to the longest alphanumeric
+  token in the whole text that's at least 6 characters *and* contains a
+  digit (so a stray letterhead word like "TRANSFER" can never win over a
+  real reference just for being long). Either way this is always a guess,
+  never authoritative — `ScanPaymentSlip.jsx`'s own success notice reads
+  `` Detected "{reference}" — please double-check it against the slip
+  before saving. `` rather than treating it as settled, and the Reference
+  field stays a normal, freely-editable text input regardless of whether
+  a scan was ever attempted or what it found.
+  **This deliberately does not self-host tesseract.js's worker/WASM
+  core/language-data files** (unlike this app's own fonts — see "Mobile
+  design system"'s note on why those *are* self-hosted) — those files run
+  well into single-digit megabytes, multiple orders of magnitude past
+  what a font pair costs, and bundling them would mean every visitor's
+  PWA install precache grows by that much for a feature most staff will
+  use rarely if ever; `tesseract.js` instead fetches them from its own
+  default CDN (`cdn.jsdelivr.net`) the first time OCR actually runs, and
+  caches them in the browser afterward. The real, known trade-off: this
+  makes the *scan* step (not the rest of the form, not the rest of the
+  app) depend on that CDN being reachable from wherever staff are — on a
+  heavily locked-down network (a corporate firewall blocking unrecognized
+  domains outright, the same class of problem this business has already
+  hit once with `api.edusolutionsmaldives.com` itself) the scan can fail
+  outright. That failure is always caught and shown as a plain "Couldn't
+  scan this image — please enter the reference manually." notice
+  (`ScanPaymentSlip.jsx`'s own try/catch around the whole recognize call)
+  — verified directly in this sandboxed dev environment, whose own
+  outbound network policy blocks arbitrary CDN domains the exact same
+  way: attempting a scan here reliably fails at the `importScripts()`
+  step and surfaces that exact message, with the rest of the form (Amount/
+  Method/Date/Reference, and a normal submit) staying fully usable
+  afterward — real, if accidental, end-to-end proof the degradation path
+  works, even though the successful-recognition path itself could only be
+  verified against `extractReference()`'s own unit-style checks (real
+  bank-slip-shaped sample text, not a real photographed slip) rather than
+  a live OCR run, since this sandbox's own network couldn't reach the CDN
+  either. If this ever becomes a real recurring problem for actual staff
+  (not just this dev sandbox), self-hosting a smaller subset (just the
+  LSTM-only WASM core, skipping the SIMD variant) is the next thing to
+  try before giving up on the feature entirely.
+
 ### Quote requests (`backend/src/`, `frontend/src/`)
 
 A client's ask for a quote, submitted from the portal, reviewed by staff,
@@ -4918,6 +5089,61 @@ frontend stops holding/sending it.
   collapse away. `RingKpiCard`/`DashboardRail`/`StatusDonutChart` are used
   only on `Dashboard.jsx` — no other page needed this treatment yet, so
   none of the three were generalized further than that one caller needs.
+- **Dashboard scoped to the current year, plus a "This year at a glance"
+  overview**: the ring KPI cards (Bank balance/Paid/Outstanding/Overdue)
+  used to read `api.financials.summary(token)` with no range — an
+  all-time total that only ever grows, the same figure whether it's
+  January or December and never resetting a business's sense of "how's
+  this year going." `Dashboard.jsx` now calls
+  `api.financials.summary(token, { from: YEAR_FROM, to: YEAR_TO })`,
+  `YEAR_FROM`/`YEAR_TO` being `startOfYearStr()` (a new `lib/date.js`
+  helper, the January-1st sibling of that file's own `startOfMonthStr()`)
+  through `todayStr()` — the exact same range shape
+  `pages/business/Financials.jsx`'s own "This year" `StatusFilterChips`
+  tab already sends to this identical endpoint, so Dashboard now shows
+  the same year-scoped figures Financials' own default tab does, not a
+  separate all-time view of the same numbers. `bankBalance`/`clientCount`/
+  `monthlyTrend` are unaffected either way — see `routes/financials.js`'s
+  own note on which fields a period filter does and doesn't scope; the
+  practical effect here is `totalPaid`/`totalOutstanding`/`overdueAmount`/
+  `overdueCount`/`invoiceCounts` all becoming "this year" figures instead
+  of all-time ones (verified with a quote/invoice deliberately dated the
+  prior year: its amounts never leak into any of the Dashboard's own
+  figures). The "Needs attention" panel is deliberately **not** scoped by
+  this — it still queries every currently-overdue invoice regardless of
+  which year it was issued (unchanged), since an old overdue invoice is
+  exactly the kind of thing that still needs to surface even if it drops
+  out of "this year's" headline Overdue figure — the same accrual-vs-
+  operational split `Financials.jsx`'s own period filter already commits
+  to for its identical `overdueAmount` field.
+  **"This year at a glance"**, a new `Accordion` between "Invoices by
+  status" and "Needs attention," is the "full analytics of everything"
+  half of this change — six `KpiCard`s (Quotes issued/Quotes accepted/
+  Invoices issued/Collected/New licenses/Expenses), each linking straight
+  to that module's own full analytics page. Deliberately **not** a fifth
+  backend endpoint — every figure comes from the *current year's own row*
+  in the `byYear` array each of `GET /quotes/analytics`,
+  `GET /invoices/analytics`, `GET /licenses/analytics`, and
+  `GET /expenses/analytics` already returns (`currentYearRow()`, a small
+  helper that finds the row matching `CURRENT_YEAR` or falls back to an
+  all-zero stand-in for a business with no data yet this year) — that
+  data already existed for each module's own analytics page, this just
+  reads the one row that matters here instead of standing up a new
+  aggregation route. Four independent, permission-gated, best-effort
+  fetches (`can('quotes'|'invoices'|'licenses'|'expenses', 'view')`,
+  mirroring the "Needs attention" fetches' own reasoning just above —
+  a user could hold any subset of these four grants, and one failing
+  shouldn't block the rest of the dashboard or the financials-gated
+  content above it). The whole section (and each individual card within
+  it) is gated independently of `financials:view` — a staff member with,
+  say, only `quotes:view` still sees a Quotes card even without financials
+  access, though in practice this section currently only renders at all
+  when the surrounding `canViewFinancials` branch does too, since the
+  entire main-column layout (ring KPIs, charts, this section, Needs
+  attention, Recent payments) is nested inside that same top-level gate —
+  a staff member with none of the four `view` grants used here, and no
+  `financials:view` either, still falls back to the bare shortcuts-only
+  view the page has always shown in that case.
 - `pages/Dashboard.jsx` and `pages/business/Financials.jsx` charts
   (`components/RevenueTrendChart.jsx`, `components/StatusBreakdownChart.jsx`)
   are hand-rolled SVG/CSS, no charting library. Status colors there are
@@ -5604,7 +5830,7 @@ proved out, rather than staying a one-off.
   needed a "reset password" glyph), `InvoiceDetail.jsx`'s Payments
   table (Download/Email per receipt row, both tone `lagoon`), and
   `Quotes.jsx`/`Invoices.jsx` (Edit/Download PDF/Email to client/
-  Duplicate/Delete — see "Quote/invoice row actions" below).
+  Duplicate/Void — see "Quote/invoice row actions" below).
 - **Quote/invoice row actions**: `Quotes.jsx` and `Invoices.jsx` originally
   had no per-row actions at all — a list row was just data, and every
   action (Edit, Download, Email, Duplicate, Delete) only existed on the
@@ -5616,9 +5842,12 @@ proved out, rather than staying a one-off.
   pt-1`), so mobile and desktop can never drift, per the shared-helper
   convention described above. The action set is deliberately narrower than
   the detail page's own button row: Edit/Download PDF/Email to client/
-  Duplicate/Delete only — actions that need more than a single click or a
-  simple confirm (Send reminder, Void, Convert to invoice, Record payment)
-  stay detail-page-only, reachable by tapping into the row. Edit
+  Duplicate/Void only — actions that need more than a single click or a
+  simple confirm (Send reminder, Convert to invoice, Record payment) stay
+  detail-page-only, reachable by tapping into the row (Void is the one
+  exception — a single click opens `VoidReasonModal`, see "Neither quotes
+  nor invoices can be deleted..." above, so it earns a row-level shortcut
+  the others don't). Edit
   (`PencilIcon`, tone `slate`) navigates via `onClick={() =>
   navigate(...)}` rather than a `<Link>`, since `IconActionButton` has no
   link variant — same reasoning `Licenses.jsx`'s own edit action (which
@@ -5637,31 +5866,24 @@ proved out, rather than staying a one-off.
   success, navigates straight to the new draft's own detail page — not a
   list refresh — the same behavior `QuoteDetail.jsx`/`InvoiceDetail.jsx`'s
   own Duplicate already has, since a fresh duplicate is something to review
-  next, not just another row in the list. Delete (`TrashIcon`, tone `red`)
-  reuses the plain `confirm({title: 'Delete this quote/invoice?'})` guard
-  and reloads the list on success. Edit and Email to client are both
-  additionally gated to match the detail page's own rules:
+  next, not just another row in the list. Void (`XIcon`, tone `red`) opens
+  `VoidReasonModal` for that row rather than acting immediately — see
+  "Neither quotes nor invoices can be deleted..." above for the shared
+  component and each list's own `canVoid()` gate. Edit and Email to client
+  are both additionally gated to match the detail page's own rules:
   `Invoices.jsx`'s Edit only shows when `!isLocked` (`status` isn't
   `sent`/`paid`, computed inline per row — mirrors `InvoiceForm.jsx`'s own
   guard) and Email to client is hidden once `status === 'void'` (mirrors
   `InvoiceDetail.jsx`'s own `invoice.status !== 'void'` gate); `Quotes.jsx`
   has neither restriction, matching `QuoteDetail.jsx`, which locks nothing.
-  `Invoices.jsx`'s Duplicate and Delete are additionally hidden once
-  `status === 'paid'` (both here and on `InvoiceDetail.jsx`'s own button
-  row) — a paid invoice is a settled, real-money record: `DELETE /:id`
-  already 409s once an invoice has any recorded payment (see
-  `routes/invoices.js` above, and every `paid` invoice has at least one by
-  definition), so hiding Delete here is the same "never show a button that
-  would just error" convention this app already applies everywhere else,
-  not a new restriction. Duplicate has no equivalent backend guard — the
-  API still allows duplicating a paid invoice into a fresh draft — but
-  cluttering a finished invoice's actions with one more thing to second-
-  guess wasn't worth it once Delete was already being hidden for the same
-  status, so it's a UI-only scope decision paired with it rather than a
-  safety fix of its own. Void is unaffected by this — it's already
-  `canVoid`-gated to `draft`/`sent` invoices with `amount_paid === 0`,
-  which a `paid` invoice never satisfies, so it was already implicitly
-  hidden here.
+  `Invoices.jsx`'s Duplicate is additionally hidden once `status === 'paid'`
+  (both here and on `InvoiceDetail.jsx`'s own button row) — cluttering a
+  finished invoice's actions with one more thing to second-guess wasn't
+  worth it, so it's a UI-only scope decision, not a safety fix (the API
+  still allows duplicating a paid invoice into a fresh draft). Void is
+  unaffected by this — it's already `canVoid`-gated to `draft`/`sent`
+  invoices with `amount_paid === 0`, which a `paid` invoice never
+  satisfies, so it was already implicitly hidden here.
   A shared `busy: { id, action }` state (same shape as `Licenses.jsx`'s
   own) tracks which row and which specific action is in flight, so
   Duplicate/Delete on the same row each show their own correct

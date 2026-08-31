@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { useDashboardShortcuts } from '../lib/useDashboardShortcuts';
+import { startOfYearStr, todayStr } from '../lib/date';
 import RevenueTrendChart from '../components/RevenueTrendChart';
 import StatusDonutChart from '../components/StatusDonutChart';
 import RingKpiCard from '../components/RingKpiCard';
+import KpiCard from '../components/KpiCard';
 import DashboardRail from '../components/DashboardRail';
 import Accordion from '../components/Accordion';
 import Modal from '../components/Modal';
@@ -25,6 +27,28 @@ import {
   SettingsIcon,
 } from '../components/icons';
 import { money } from '../lib/money';
+
+// This year's YYYY-01-01..today range, computed once per module load rather
+// than per render — every consumer below (the financials summary fetch, the
+// "this year" label, the byYear lookups) needs the identical bounds, so
+// this is the one place that pins them.
+const YEAR_FROM = startOfYearStr();
+const YEAR_TO = todayStr();
+const CURRENT_YEAR = new Date().getFullYear();
+
+// Pulls out the current year's row from an analytics endpoint's own
+// `byYear` array (see routes/quotes.js's/routes/invoices.js's/
+// routes/licenses.js's/routes/expenses.js's own GET /analytics — every one
+// of the four already reports a year-over-year breakdown with gap years
+// included at zero) rather than adding a fifth backend endpoint just to
+// ask "what happened this year" — that data already exists, this just
+// reads the one row out of it that matters here. Falls back to an all-zero
+// stand-in row if the year has no data yet (a business's very first year
+// using a module, or a module nobody's touched yet this year) so every
+// caller can read fields off the result unconditionally.
+function currentYearRow(byYear) {
+  return (byYear || []).find((row) => row.year === CURRENT_YEAR) || { year: CURRENT_YEAR };
+}
 
 function greeting() {
   const hour = new Date().getHours();
@@ -66,15 +90,30 @@ export default function Dashboard() {
   const [customizing, setCustomizing] = useState(false);
   const [overdueInvoices, setOverdueInvoices] = useState([]);
   const [expiringLicenses, setExpiringLicenses] = useState([]);
+  const [quoteAnalytics, setQuoteAnalytics] = useState(null);
+  const [invoiceAnalytics, setInvoiceAnalytics] = useState(null);
+  const [licenseAnalytics, setLicenseAnalytics] = useState(null);
+  const [expenseAnalytics, setExpenseAnalytics] = useState(null);
 
   const canViewFinancials = can('financials', 'view');
+  const canViewQuotes = can('quotes', 'view');
   const canViewInvoices = can('invoices', 'view');
   const canViewLicenses = can('licenses', 'view');
+  const canViewExpenses = can('expenses', 'view');
   const canSeeAttentionPanel = canViewFinancials && (canViewInvoices || canViewLicenses);
+  const canSeeYearOverview = canViewQuotes || canViewInvoices || canViewLicenses || canViewExpenses;
 
   useEffect(() => {
     if (canViewFinancials) {
-      api.financials.summary(token).then(setSummary).catch((err) => setError(err.message));
+      // Scoped to the current calendar year (see YEAR_FROM/YEAR_TO above) —
+      // the same `?from=&to=` range Financials.jsx's own "This year" tab
+      // already sends to this identical endpoint, so Dashboard now shows
+      // the same year-scoped figures rather than an all-time total that
+      // only grows and never resets a business's sense of "how's this year
+      // going." bankBalance/clientCount/monthlyTrend are unaffected either
+      // way — see routes/financials.js's own note on which fields a period
+      // filter does and doesn't scope.
+      api.financials.summary(token, { from: YEAR_FROM, to: YEAR_TO }).then(setSummary).catch((err) => setError(err.message));
     }
     // `.finally` flips settingsLoaded whether the fetch succeeds or fails
     // (e.g. a staff user without settings:view) — the render below waits on
@@ -118,6 +157,33 @@ export default function Dashboard() {
       })
       .catch(() => {});
   }, [token, canSeeAttentionPanel, canViewLicenses]);
+
+  // "This year at a glance" — reuses each module's own existing
+  // GET /:module/analytics endpoint (already year-over-year, see
+  // currentYearRow() above) rather than a new backend endpoint. Four
+  // independent, permission-gated, best-effort fetches (same reasoning as
+  // the "Needs attention" ones above — a user could hold any subset of
+  // these four view grants, and a failure here shouldn't block the rest of
+  // the dashboard).
+  useEffect(() => {
+    if (!canViewQuotes) return;
+    api.quotes.analytics(token).then(setQuoteAnalytics).catch(() => {});
+  }, [token, canViewQuotes]);
+
+  useEffect(() => {
+    if (!canViewInvoices) return;
+    api.invoices.analytics(token).then(setInvoiceAnalytics).catch(() => {});
+  }, [token, canViewInvoices]);
+
+  useEffect(() => {
+    if (!canViewLicenses) return;
+    api.licenses.analytics(token).then(setLicenseAnalytics).catch(() => {});
+  }, [token, canViewLicenses]);
+
+  useEffect(() => {
+    if (!canViewExpenses) return;
+    api.expenses.analytics(token).then(setExpenseAnalytics).catch(() => {});
+  }, [token, canViewExpenses]);
 
   const symbol = settings?.currency_symbol || '$';
   const permittedShortcuts = SHORTCUTS.filter((s) => can(s.module, 'view'));
@@ -186,6 +252,90 @@ export default function Dashboard() {
             </p>
           )}
         </div>
+      </div>
+    );
+  }
+
+  // "This year at a glance" — six KpiCards drawing on each module's own
+  // existing analytics endpoint (see currentYearRow() above), one per
+  // module the viewer actually holds a `view` grant for. Deliberately not
+  // every field each analytics endpoint returns — Paid/Outstanding/Overdue
+  // already have their own ring cards above, so this section covers what
+  // those don't: how much activity happened this year, not just the money
+  // balance right now. Each card links straight to that module's own full
+  // analytics page (the real "everything" this section is a preview of).
+  function yearOverviewSection() {
+    const q = quoteAnalytics && currentYearRow(quoteAnalytics.byYear);
+    const inv = invoiceAnalytics && currentYearRow(invoiceAnalytics.byYear);
+    const lic = licenseAnalytics && currentYearRow(licenseAnalytics.byYear);
+    const exp = expenseAnalytics && currentYearRow(expenseAnalytics.byYear);
+    const decided = q ? (q.accepted || 0) + (q.declined || 0) : 0;
+
+    return (
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        {canViewQuotes && q && (
+          <Link to="/quotes/analytics" className="block">
+            <KpiCard
+              icon={<QuoteIcon width={17} height={17} />}
+              label="Quotes issued"
+              value={q.created || 0}
+              sub={`${money(symbol, q.amountQuoted || 0)} quoted`}
+            />
+          </Link>
+        )}
+        {canViewQuotes && q && (
+          <Link to="/quotes/analytics" className="block">
+            <KpiCard
+              tone="positive"
+              icon={<CheckCircleIcon width={17} height={17} />}
+              label="Quotes accepted"
+              value={q.accepted || 0}
+              sub={decided > 0 ? `of ${decided} decided` : 'None decided yet'}
+            />
+          </Link>
+        )}
+        {canViewInvoices && inv && (
+          <Link to="/invoices/analytics" className="block">
+            <KpiCard
+              icon={<InvoiceIcon width={17} height={17} />}
+              label="Invoices issued"
+              value={inv.issued || 0}
+              sub={`${money(symbol, inv.amountInvoiced || 0)} invoiced`}
+            />
+          </Link>
+        )}
+        {canViewInvoices && inv && (
+          <Link to="/invoices/analytics" className="block">
+            <KpiCard
+              tone="positive"
+              icon={<CheckCircleIcon width={17} height={17} />}
+              label="Collected"
+              value={money(symbol, inv.amountCollected || 0)}
+              sub={`${inv.paymentsReceived || 0} payment${inv.paymentsReceived === 1 ? '' : 's'}`}
+            />
+          </Link>
+        )}
+        {canViewLicenses && lic && (
+          <Link to="/licenses/analytics" className="block">
+            <KpiCard
+              icon={<LicenseIcon width={17} height={17} />}
+              label="New licenses"
+              value={lic.newLicenses || 0}
+              sub={`${lic.renewals || 0} renewed`}
+            />
+          </Link>
+        )}
+        {canViewExpenses && exp && (
+          <Link to="/expenses/analytics" className="block">
+            <KpiCard
+              tone="warning"
+              icon={<ExpenseIcon width={17} height={17} />}
+              label="Expenses"
+              value={money(symbol, exp.total || 0)}
+              sub={`${exp.count || 0} recorded`}
+            />
+          </Link>
+        )}
       </div>
     );
   }
@@ -317,6 +467,12 @@ export default function Dashboard() {
                 <StatusDonutChart counts={summary.invoiceCounts} />
               </Accordion>
             </div>
+
+            {canSeeYearOverview && (
+              <div className="mt-6">
+                <Accordion title={`This year at a glance (${CURRENT_YEAR})`}>{yearOverviewSection()}</Accordion>
+              </div>
+            )}
 
             {/* Needs attention — full-detail Accordion below `xl:` (no rail
                 at that width), the same data condensed into DashboardRail's
