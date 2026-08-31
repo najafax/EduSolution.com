@@ -3603,8 +3603,14 @@ staff *reach* and *fill in* that same existing endpoint.
   already correct).
 - **Payment slip scan**: `components/ScanPaymentSlip.jsx`, mounted at the
   top of `RecordPaymentModal.jsx`'s form, is an optional "Scan payment
-  slip (optional)" file input (`accept="image/*" capture="environment"`,
-  so a phone offers its camera directly) that runs client-side OCR via
+  slip (optional)" file input (`accept="image/*"` — deliberately **no**
+  `capture` attribute; that forces mobile browsers straight into the
+  camera, skipping the OS picker's own gallery/files option entirely, so
+  a staff member trying to attach a slip they'd already photographed
+  earlier — or received as a screenshot/forward — had no way to do that
+  at all. This shipped with `capture="environment"` originally and was
+  corrected once reported: "opens the camera, but no option to select
+  photo of slip") that runs client-side OCR via
   `tesseract.js` (a new frontend dependency) on the chosen image and, if
   it finds something that looks like a reference/transaction number,
   pre-fills the Reference field with it. `tesseract.js` itself is loaded

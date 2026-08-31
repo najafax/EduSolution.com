@@ -71,10 +71,14 @@ export default function ScanPaymentSlip({ onDetected, disabled }) {
       <label className="flex min-h-11 w-fit cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
         <ScanIcon width={16} height={16} />
         {scanning ? 'Scanning slip…' : 'Scan payment slip (optional)'}
+        {/* Deliberately no `capture` attribute — that forces mobile
+            browsers straight into the camera, skipping the OS picker's
+            own "choose from gallery/files" option, which is exactly how a
+            staff member re-scanning a slip they already photographed
+            earlier (or received as a screenshot) would want to attach it. */}
         <input
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={handleFile}
           disabled={scanning || disabled}
           className="hidden"
