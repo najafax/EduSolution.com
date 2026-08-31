@@ -4645,13 +4645,24 @@ frontend stops holding/sending it.
   between the desktop table's action cell and each mobile
   `MobileListAccordion` card's expanded body, since both need the exact
   same conditional Renew/Cancel/Reactivate/Remind/History/Edit/Delete
-  buttons and duplicating them would drift. Renew and Remind buttons are
-  conditioned on the row's raw `status` (`active`/`cancelled`), not the
-  computed `display_status` — a lapsed-but-not-cancelled license
-  (`display_status: 'expired'`) still shows both, mirroring
-  `routes/licenses.js`'s own guards exactly (Renew is blocked only by
-  `cancelled`, not by having already expired — that's the whole point of a
-  renew button). **Cancel**/**Reactivate** (`status === 'active'` /
+  buttons and duplicating them would drift. Remind is conditioned on the
+  row's raw `status` (`active`/`cancelled`), not the computed
+  `display_status` — a lapsed-but-not-cancelled license (`display_status:
+  'expired'`) still shows it, mirroring `routes/licenses.js`'s own guard
+  exactly (blocked only by `cancelled`, not by having already expired).
+  **Renew is narrower**: on top of the same raw-`status === 'active'` gate,
+  it also requires `display_status !== 'active'` — so it only appears once
+  a license is actually due (`expiring_soon` or already `expired`), not for
+  a license that's comfortably active with plenty of time left, and it
+  disappears again immediately after a successful renewal pushes the new
+  expiry back out past the 30-day warning window. This is a UI-only scope
+  decision, not a backend safety fix — `routes/licenses.js`'s
+  `POST /:id/renew` is unchanged and still accepts a renewal on any
+  non-`cancelled` license regardless of `display_status`, same "narrow the
+  button, not the API" call `Invoices.jsx`'s own Duplicate-hidden-once-
+  `paid` gate makes — this just stops staff from casually re-extending a
+  license that isn't due yet and over-paying/over-crediting it by mistake.
+  **Cancel**/**Reactivate** (`status === 'active'` /
   `status === 'cancelled'` respectively) are one-click, confirm-then-act
   actions — the same `useConfirm()` pattern every other lifecycle action in
   the app uses — that PUT the full record back with only `status` flipped;

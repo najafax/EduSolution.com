@@ -333,7 +333,7 @@ export default function Licenses() {
     // meant to be casually cancelled or nagged about again.
     return (
       <>
-        {l.status === 'active' && (
+        {l.status === 'active' && l.display_status !== 'active' && (
           <IconActionButton
             icon={RefreshIcon}
             tone="lagoon"
