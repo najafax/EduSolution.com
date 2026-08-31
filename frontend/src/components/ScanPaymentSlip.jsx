@@ -28,11 +28,14 @@ import { ScanIcon } from './icons';
 // how confident that tier actually is, not a single generic "detected X"
 // line for all three: a labeled reference reads very differently from a
 // blind guess, and saying so is what tells staff how hard to double-check
-// it before saving.
+// it before saving. `description` is tried first (see that file's own
+// top-of-file note on why — a slip's "Reference"/"Transaction ID" is often
+// just the bank's own opaque internal code, while its Description carries
+// the actual client/invoice detail), so its wording no longer frames itself
+// as a fallback for a missing reference.
 const SCAN_NOTICES = {
+  description: (value) => `Detected "${value}" from the slip's description — please double-check it against the slip before saving.`,
   reference: (value) => `Detected "${value}" — please double-check it against the slip before saving.`,
-  description: (value) =>
-    `No reference number found on this slip — filled in "${value}" from its description instead. Please check it before saving.`,
   fallback: (value) =>
     `Couldn't find a labeled reference or description on this slip — filled in "${value}" as a best guess. Please check it carefully before saving.`,
 };

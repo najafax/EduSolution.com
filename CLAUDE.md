@@ -3622,29 +3622,35 @@ staff *reach* and *fill in* that same existing endpoint.
   `extractReference(rawText)` is the actual pick-a-heuristic, deliberately
   factored out as a small, pure, dependency-free function (no OCR, no DOM,
   no network) so it's the one part of this feature that's unit-testable
-  in isolation, returning `{ value, source }` (`source` is `'reference'` |
-  `'description'` | `'fallback'`) or `null` when nothing usable was found
+  in isolation, returning `{ value, source }` (`source` is `'description'` |
+  `'reference'` | `'fallback'`) or `null` when nothing usable was found
   at all. Three tiers, tried in order:
-  1. A line containing a common bank-slip *reference* label (`ref`/
-     `reference`/`txn`/`transaction`/`trans`/`confirmation`/`receipt`,
-     each optionally followed by `no`/`no.`/`number`/`#` — e.g. "Reference
-     No:", "Transaction No.", "Receipt No.", "Confirmation#" are all real
-     slip label shapes this needs to recognize as *one* label, not a
-     keyword plus a mangled value) — the token right after the label is
-     taken as the reference.
-  2. No reference label at all — real staff feedback on this feature
+  1. A line containing a common bank-slip *description*-style label
+     (`description`/`particulars`/`remarks`/`narration`/`purpose`/
+     `details`/`memo`/`note`/`for`) — takes that line's own trailing text
+     plus every further real line directly below it (see `findDescription()`
+     own note further down for why this collects the *whole* block, not
+     just the first line), joined with a space. Tried **first**, ahead of a
+     labeled reference number — see "Description preferred over a labeled
+     reference number" below for why.
+  2. No usable description found — real staff feedback on this feature
      (some slips scanned fine but the field stayed blank) turned out to
      mean exactly what it sounds like: plenty of real slips genuinely
-     don't print a reference number, only a *description* of what the
-     payment was for. Falls back to a description-style label instead
-     (`description`/`particulars`/`remarks`/`narration`/`purpose`/
-     `details`/`memo`/`note`/`for`) and takes the rest of that line — a
-     short phrase, not a single code, capped at 60 characters so a long
-     narration doesn't blow out the Reference field.
+     don't print a description either, only a labeled *reference* number.
+     Falls back to a bank-slip reference label instead (`ref`/`reference`/
+     `txn`/`transaction`/`trans`/`confirmation`/`receipt`, each optionally
+     followed by `no`/`no.`/`number`/`#` — e.g. "Reference No:",
+     "Transaction No.", "Receipt No.", "Confirmation#" are all real slip
+     label shapes this needs to recognize as *one* label, not a keyword
+     plus a mangled value) and takes the token right after it.
   3. Neither label found — falls back to the longest alphanumeric token
      in the whole text that's at least 6 characters *and* contains a
      digit (so a stray letterhead word like "TRANSFER" can never win over
      a real reference just for being long).
+  A description tier's own joined result is capped at 160 characters (up
+  from an original 60, sized with real headroom for a multi-line join —
+  see "Collecting the whole description block" below) so a long narration
+  still can't blow out the Reference field indefinitely.
   **Fixing tier 1 to recognize a `no`/`number`/`#` suffix as part of the
   label (not the value) was itself a real bug fix, not just cleanup** —
   the original regex only special-cased this for two of its six keywords
@@ -3738,6 +3744,43 @@ staff *reach* and *fill in* that same existing endpoint.
   rather than erroring or falling back. Both character classes now also
   allow `\` (`[A-Za-z0-9/\\-]`), closing the same gap either tier could
   hit.
+  **Description preferred over a labeled reference number**: a shared
+  real slip (Bank of Maldives, a "Transfer successful" screen) made a
+  business-level gap obvious rather than a parsing bug — its "Reference"
+  field and its "Transaction ID" field were the exact same opaque bank-
+  generated code (`FT262422B3J4\MV1`), meaningless for reconciling the
+  payment against an invoice, while its "Description" field carried the
+  client name and invoice codes staff actually needed
+  (`R. ATOLL SCHOOL BLAZ1IQ8FLR1N5H69 GS18/BML/2026/08`). Since tier 1 used
+  to be the reference label, a slip shaped like this always had its
+  Reference field win, and the description — the actually useful text —
+  was never even reached. Reordered on explicit confirmation (asked via
+  `AskUserQuestion`, since this is a real business call about which field
+  actually matters for reconciliation, not something to guess at again
+  after already misreading this feature's requirements twice): description
+  is now tried first whenever it has real content, falling back to a
+  labeled reference only when there's no usable description at all — the
+  reverse of the original priority. `ScanPaymentSlip.jsx`'s own
+  `SCAN_NOTICES.description` wording was updated to match (no longer
+  phrased as "no reference found, here's the description instead," since
+  description winning is now the expected common case, not a fallback).
+  **Collecting the whole description block, not just its first line**:
+  `findDescription()` used to `return` the instant it found *one* real
+  line — the label's own inline trailing text if present, else the first
+  real line below it — which is exactly why the Bank of Maldives slip
+  above only ever surfaced "R. ATOLL SCHOOL" and silently dropped
+  "BLAZ1IQ8FLR1N5H69"/"GS18/BML/2026/08", the rest of the same circled
+  block. It now collects every real content line starting from the label
+  (inline text, if any, plus each following real line) up to
+  `MAX_DESCRIPTION_LINES` (5), stopping the moment a line reads as another
+  field's own label (`LABEL_LINE_RE`) or a blank line follows real content
+  already collected, and joins the whole set with a single space — so a
+  multi-line description block comes back as one complete value instead of
+  its first fragment. `MAX_DESCRIPTION_LENGTH` was raised from 60 to 160 to
+  give a joined multi-line result real headroom (the Bank of Maldives
+  block alone is already 50 characters) without removing the cap
+  entirely — a truly runaway OCR read still gets truncated rather than
+  filling the Reference field with garbage.
   **This deliberately does not self-host tesseract.js's worker/WASM
   core/language-data files** (unlike this app's own fonts — see "Mobile
   design system"'s note on why those *are* self-hosted) — those files run
