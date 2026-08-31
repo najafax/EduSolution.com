@@ -15,9 +15,8 @@ import EmailPreviewModal from '../../components/EmailPreviewModal';
 import IconActionButton from '../../components/IconActionButton';
 import VoidReasonModal from '../../components/VoidReasonModal';
 import RecordPaymentModal from '../../components/RecordPaymentModal';
-import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, DuplicateIcon, XIcon, BanknoteIcon } from '../../components/icons';
+import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, XIcon, BanknoteIcon } from '../../components/icons';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
-import { useConfirm } from '../../lib/useConfirm';
 import InvoiceForm from './InvoiceForm';
 
 const STATUS_OPTIONS = [
@@ -52,13 +51,11 @@ export default function Invoices() {
   const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
-  const [busy, setBusy] = useState(null); // { id, action } — tracks which row/action is in flight
   const [emailModal, setEmailModal] = useState(null); // id of the invoice whose email preview is open, or null
   const [voidTarget, setVoidTarget] = useState(null); // the invoice being voided, or null
   const [voidError, setVoidError] = useState('');
   const [paymentTarget, setPaymentTarget] = useState(null); // the invoice being paid, or null
   const [paymentNotice, setPaymentNotice] = useState('');
-  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     // Only show the loading skeleton on the very first load — once there's
@@ -89,27 +86,6 @@ export default function Invoices() {
       await api.invoices.openPdf(id, token);
     } catch (err) {
       setError(err.message);
-    }
-  }
-
-  async function handleDuplicate(invoice) {
-    if (
-      !(await confirm({
-        title: 'Duplicate this invoice?',
-        message: 'Creates a new draft copy with a fresh number and due date. You can edit it before sending.',
-        confirmLabel: 'Duplicate',
-        danger: false,
-      }))
-    )
-      return;
-    setError('');
-    setBusy({ id: invoice.id, action: 'duplicate' });
-    try {
-      const { invoice: created } = await api.invoices.duplicate(invoice.id, token);
-      navigate(`/invoices/${created.id}`);
-    } catch (err) {
-      setError(err.message);
-      setBusy(null);
     }
   }
 
@@ -144,8 +120,6 @@ export default function Invoices() {
   }
 
   function rowActions(invoice) {
-    const rowBusy = busy?.id === invoice.id;
-    const isBusy = (action) => rowBusy && busy.action === action;
     const isLocked = invoice.status === 'sent' || invoice.status === 'paid';
     return (
       <>
@@ -183,23 +157,11 @@ export default function Invoices() {
             label="Email invoice to client"
           />
         )}
-        {canManage && invoice.status !== 'paid' && (
-          <IconActionButton
-            icon={DuplicateIcon}
-            tone="slate"
-            onClick={() => handleDuplicate(invoice)}
-            disabled={rowBusy}
-            spinning={isBusy('duplicate')}
-            title={isBusy('duplicate') ? 'Duplicating…' : 'Duplicate'}
-            label="Duplicate invoice"
-          />
-        )}
         {canManage && canVoid(invoice) && (
           <IconActionButton
             icon={XIcon}
             tone="red"
             onClick={() => { setVoidError(''); setVoidTarget(invoice); }}
-            disabled={rowBusy}
             title="Void"
             label="Void invoice"
           />
@@ -410,8 +372,6 @@ export default function Invoices() {
         token={token}
         onRecorded={handlePaymentRecorded}
       />
-
-      {confirmDialog}
     </div>
   );
 }

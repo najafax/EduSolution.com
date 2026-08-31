@@ -7,8 +7,7 @@ import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import VoidReasonModal from '../../components/VoidReasonModal';
-import { PencilIcon, DownloadIcon, SendIcon, InvoiceIcon, DuplicateIcon, XIcon, LinkIcon } from '../../components/icons';
-import { useConfirm } from '../../lib/useConfirm';
+import { PencilIcon, DownloadIcon, SendIcon, InvoiceIcon, XIcon, LinkIcon } from '../../components/icons';
 
 export default function QuoteDetail() {
   const { token, can } = useAuth();
@@ -29,7 +28,6 @@ export default function QuoteDetail() {
   const [showSendPreview, setShowSendPreview] = useState(false);
   const [voidModalOpen, setVoidModalOpen] = useState(false);
   const [voidError, setVoidError] = useState('');
-  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     api.quotes
@@ -88,27 +86,6 @@ export default function QuoteDetail() {
     }
   }
 
-  async function handleDuplicate() {
-    if (
-      !(await confirm({
-        title: 'Duplicate this quote?',
-        message: 'Creates a new draft copy with a fresh number and issue date. You can edit it before sending.',
-        confirmLabel: 'Duplicate',
-        danger: false,
-      }))
-    )
-      return;
-    setError('');
-    setBusy(true);
-    try {
-      const { quote } = await api.quotes.duplicate(id, token);
-      navigate(`/quotes/${quote.id}`);
-    } catch (err) {
-      setError(err.message);
-      setBusy(false);
-    }
-  }
-
   async function handleConvert(e) {
     e.preventDefault();
     setError('');
@@ -162,12 +139,6 @@ export default function QuoteDetail() {
             <button onClick={() => setShowConvert((v) => !v)} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
               <InvoiceIcon width={16} height={16} />
               Convert to invoice
-            </button>
-          )}
-          {canManage && (
-            <button onClick={handleDuplicate} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
-              <DuplicateIcon width={16} height={16} />
-              Duplicate
             </button>
           )}
           {canManage && !quote.converted_invoice_id && quote.status !== 'void' && (
@@ -347,8 +318,6 @@ export default function QuoteDetail() {
         title="Void this quote?"
         error={voidError}
       />
-
-      {confirmDialog}
     </div>
   );
 }

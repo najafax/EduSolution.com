@@ -463,48 +463,6 @@ router.post('/:id/send', manage, async (req, res) => {
   res.json(getQuoteWithItems(req.params.id));
 });
 
-router.post('/:id/duplicate', manage, (req, res) => {
-  const data = getQuoteWithItems(req.params.id);
-  if (!data) return res.status(404).json({ error: 'Quote not found' });
-
-  const number = nextQuoteNumber();
-  const publicToken = crypto.randomBytes(16).toString('hex');
-  const issueDate = new Date().toISOString().slice(0, 10);
-
-  const result = db
-    .prepare(
-      `INSERT INTO quotes (number, client_id, status, issue_date, expiry_date, notes, discount_type, discount_value,
-         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name)
-       VALUES (?, ?, 'draft', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      number,
-      data.quote.client_id,
-      issueDate,
-      data.quote.notes,
-      data.quote.discount_type,
-      data.quote.discount_value,
-      data.quote.subtotal,
-      data.quote.discount_amount,
-      data.quote.tax_rate,
-      data.quote.tax_amount,
-      data.quote.total,
-      publicToken,
-      req.user.name,
-    );
-
-  const insertItem = db.prepare(
-    'INSERT INTO quote_items (quote_id, description, quantity, unit_price, amount, sort_order, product_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  );
-  for (const item of data.items) {
-    insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order, item.product_id ?? null);
-  }
-
-  logActivity({ userName: req.user.name, action: 'duplicated', entityType: 'quote', entityId: result.lastInsertRowid, entityLabel: `${number} (from ${data.quote.number})` });
-
-  res.status(201).json(getQuoteWithItems(result.lastInsertRowid));
-});
-
 // Requires manage on both — this creates a real invoice, not just a quote update.
 router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'manage'), (req, res) => {
   const data = getQuoteWithItems(req.params.id);

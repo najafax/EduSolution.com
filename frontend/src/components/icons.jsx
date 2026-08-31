@@ -282,17 +282,6 @@ export function SendIcon(props) {
   );
 }
 
-// Two overlapping documents — "duplicate" (QuoteDetail.jsx/
-// InvoiceDetail.jsx's Duplicate buttons).
-export function DuplicateIcon(props) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M7.5 3.5h7A1.5 1.5 0 0 1 16 5v7a1.5 1.5 0 0 1-1.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <rect x="4" y="7" width="9" height="10" rx="1.5" />
-    </svg>
-  );
-}
-
 // A downward arrow into a tray — "export/download" (Licenses.jsx's Export
 // CSV/Excel buttons).
 export function DownloadIcon(props) {

@@ -129,7 +129,6 @@ export const api = {
       request(`/quotes/${id}/send`, { method: 'POST', body: { ...payload, client_origin: window.location.origin }, token }),
     convertToInvoice: (id, payload, token) =>
       request(`/quotes/${id}/convert-to-invoice`, { method: 'POST', body: payload, token }),
-    duplicate: (id, token) => request(`/quotes/${id}/duplicate`, { method: 'POST', token }),
     openPdf: (id, token) => openPdf(`/quotes/${id}/pdf`, token),
     exportCsv: (token) => downloadFile('/quotes/export.csv', token, 'quotes.csv'),
     exportXlsx: (token) => downloadFile('/quotes/export.xlsx', token, 'quotes.xlsx'),
@@ -158,7 +157,6 @@ export const api = {
       request(`/invoices/${id}/send`, { method: 'POST', body: { ...payload, client_origin: window.location.origin }, token }),
     remindPreview: (id, token) => request(`/invoices/${id}/remind-preview`, { token }),
     remind: (id, payload, token) => request(`/invoices/${id}/remind`, { method: 'POST', body: payload, token }),
-    duplicate: (id, token) => request(`/invoices/${id}/duplicate`, { method: 'POST', token }),
     void: (id, reason, token) => request(`/invoices/${id}/void`, { method: 'POST', body: { reason }, token }),
     recordPayment: (id, payload, token) =>
       request(`/invoices/${id}/payments`, { method: 'POST', body: payload, token }),

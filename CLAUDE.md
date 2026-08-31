@@ -378,10 +378,16 @@ deliberately untouched by either, always returning every row.
   only-show-the-exception-case convention as `Clients.jsx`'s own
   `PortalBadge` (nothing rendered for the common, unopted-in case).
 - `routes/quotes.js`, `routes/invoices.js` — CRUD plus PDF download
-  (`GET /:id/pdf`), email send (`POST /:id/send`), `POST /:id/duplicate`
-  (copies client/items/discount/tax/notes into a new `draft` with a fresh
-  number, `public_token`, and today's date — invoice duplicate also resets
-  `due_date` to +14 days), and `GET /export.csv`/`GET /export.xlsx`. `GET /` supports
+  (`GET /:id/pdf`), email send (`POST /:id/send`), and `GET /export.csv`/
+  `GET /export.xlsx`. **There is no duplicate action** — both routers used
+  to carry a `POST /:id/duplicate` (copying client/items/discount/tax/notes
+  into a new `draft` with a fresh number/`public_token`/today's date), but
+  it was removed outright at explicit request, along with its
+  `DuplicateIcon`/button on `QuoteDetail.jsx`/`InvoiceDetail.jsx` and the
+  row-level Duplicate action on `Quotes.jsx`/`Invoices.jsx` (see "Quote/
+  invoice row actions" below) and `lib/api.js`'s `quotes.duplicate`/
+  `invoices.duplicate` calls — none of it left behind as unreachable dead
+  code. `GET /` supports
   `?status=`, plus `?q=` (matching document number, joined client name, and
   status — the same fields the frontend used to filter client-side before
   this route grew server-side search) and `?page=` (see "Pagination
@@ -414,7 +420,7 @@ deliberately untouched by either, always returning every row.
   a new invoice and stamps `quotes.converted_invoice_id`. Both accept
   `discount_type` (`percentage|fixed`) and `discount_value` on create/update,
   computed via `lib/totals.js`. Every mutation (create/update/delete/send/
-  duplicate/convert/payment) calls `lib/activity.js`'s `logActivity()`.
+  convert/payment) calls `lib/activity.js`'s `logActivity()`.
   **PO number**: `invoices.po_number` (`db/index.js`, `ALTER TABLE`-guarded
   — `invoices` has carried real documents since the app's first deploy,
   same lesson `licenses.url` learned the hard way) is an optional,
@@ -470,7 +476,7 @@ deliberately untouched by either, always returning every row.
   button that would just error" convention every other locked-state gate
   in this app already follows — `InvoiceDetail.jsx`'s own `isLocked`/
   `canVoid` checks, `Licenses.jsx`'s Renew/Remind guards); every other
-  action (Download PDF, Copy public link, Email to client, Duplicate) stays
+  action (Download PDF, Copy public link, Email to client) stays
   available, since none of those mutate the quote itself. `QuoteDetail.jsx`'s
   "Converted to invoice" notice reads "...and can no longer be edited or
   voided" so the reason the buttons are gone is stated explicitly, not left
@@ -480,8 +486,7 @@ deliberately untouched by either, always returning every row.
   paid and can no longer be edited." A `void` invoice stays editable (it's
   still a correctable mistake, not a delivered/settled document), and
   `draft` is always editable. This only blocks the edit route itself —
-  `/duplicate` (which creates a fresh draft copy) and recording a payment
-  are unaffected. **Invoices only**, also: `POST /:id/void` is the actual
+  recording a payment is unaffected. **Invoices only**, also: `POST /:id/void` is the actual
   way an invoice becomes `void` — a dedicated action route rather than a
   `status` value on the generic `PUT /:id` above, because that route
   already 409s once `status` is `sent`/`paid`, but voiding is precisely the
@@ -1296,7 +1301,7 @@ deliberately untouched by either, always returning every row.
 - `routes/public.js` — mounted at `/api/public`, the one route file **not**
   behind `requireAuth`. Looks quotes/invoices up by their `public_token`
   (a random 16-byte hex column generated on every quote/invoice create,
-  duplicate, convert-to-invoice, and recurring-invoice generation) rather
+  convert-to-invoice, and recurring-invoice generation) rather
   than by id, so a client with the link can view/download a document
   without an account. `GET /quotes/:token` and `GET /invoices/:token`
   return the document + client + business settings — the settings row is
@@ -1738,7 +1743,7 @@ deliberately untouched by either, always returning every row.
   logged, not itself a client-facing send.
 - `lib/activity.js` — `logActivity({ userName, action, entityType,
   entityId, entityLabel })` inserts one row into `activity_log`. Called
-  from every create/update/delete/send/duplicate/convert/payment/respond
+  from every create/update/delete/send/convert/payment/respond
   across clients, quotes, invoices, expenses, and recurring invoices —
   when adding a new mutation, call this too rather than letting it go
   unlogged.
@@ -2225,8 +2230,8 @@ Status/derived-field conventions worth knowing before touching this code:
   clean 409 message every other delete guard in this app gives), and an
   invoice with any recorded payments can't be deleted.
 - `public_token` (random 16-byte hex, unique) exists on every quote and
-  invoice row and is regenerated on duplicate/convert/recurring-generation
-  — never reused across documents, and never exposed anywhere except the
+  invoice row and is regenerated on convert/recurring-generation — never
+  reused across documents, and never exposed anywhere except the
   document it belongs to.
 
 ### Roles and permissions (`backend/src/`)
@@ -4497,7 +4502,7 @@ frontend stops holding/sending it.
 - `pages/business/` — the client/quote/invoice/payment/settings/financials/
   expenses/recurring-invoices/activity pages (see "Business module" below).
   Every page in this directory reads `can(module, 'manage')` from
-  `useAuth()` and conditionally renders its New/Edit/Delete/Send/Duplicate/
+  `useAuth()` and conditionally renders its New/Edit/Delete/Send/
   Record-payment/etc. buttons and table-action columns on it — a view-only
   user still sees the list/detail data (gated separately by `can(module,
   'view')`, enforced by `ProtectedRoute` + the page load itself 403ing) but
@@ -4658,10 +4663,9 @@ frontend stops holding/sending it.
   expiry back out past the 30-day warning window. This is a UI-only scope
   decision, not a backend safety fix — `routes/licenses.js`'s
   `POST /:id/renew` is unchanged and still accepts a renewal on any
-  non-`cancelled` license regardless of `display_status`, same "narrow the
-  button, not the API" call `Invoices.jsx`'s own Duplicate-hidden-once-
-  `paid` gate makes — this just stops staff from casually re-extending a
-  license that isn't due yet and over-paying/over-crediting it by mistake.
+  non-`cancelled` license regardless of `display_status` — this just stops
+  staff from casually re-extending a license that isn't due yet and
+  over-paying/over-crediting it by mistake.
   **Cancel**/**Reactivate** (`status === 'active'` /
   `status === 'cancelled'` respectively) are one-click, confirm-then-act
   actions — the same `useConfirm()` pattern every other lifecycle action in
@@ -4732,7 +4736,7 @@ frontend stops holding/sending it.
   `PencilIcon`, `TrashIcon`, `DownloadIcon`, `PlusIcon` (kept separate from
   `FloatingActionButton.jsx`'s own private inline `PlusIcon` rather than
   consolidating the two, since that refactor wasn't otherwise in scope),
-  `SendIcon`, and `DuplicateIcon` — see "Icon action buttons" below for the
+  and `SendIcon` — see "Icon action buttons" below for the
   full list and where each is used.
   `ActivityLog.jsx` is a simple paginated read-only list. `Import.jsx` (linked from `Settings.jsx`, not a top-level
   Navbar item — it's a rare-use admin tool) reads a chosen CSV file
@@ -5077,8 +5081,7 @@ frontend stops holding/sending it.
   `QuoteDetail.jsx`, `InvoiceDetail.jsx`'s delete *and* void actions, and
   `Import.jsx`'s `DangerZone`) — plus every other one-click action across
   the app that fires a mutation immediately with no intervening form/modal
-  step of its own (`Licenses.jsx`'s Cancel/Reactivate/Renew, and the
-  Duplicate button on both `QuoteDetail.jsx` and `InvoiceDetail.jsx`) —
+  step of its own (`Licenses.jsx`'s Cancel/Reactivate/Renew) —
   now goes through the same
   `const { confirm, confirmDialog } = useConfirm()` — `confirm({ title,
   message, confirmLabel, cancelLabel, danger })` returns a Promise the same
@@ -5093,8 +5096,8 @@ frontend stops holding/sending it.
   `lagoon` for the Confirm button, matching the red styling every Delete
   button/`DangerZone` already used; a caller whose action isn't actually
   destructive passes `danger: false` for the `lagoon` treatment instead
-  (`Licenses.jsx`'s Reactivate/Renew, both Duplicate buttons — undoing a
-  reactivation, a renewal, or a duplicate is trivial, unlike Delete/Void/
+  (`Licenses.jsx`'s Reactivate/Renew — undoing a
+  reactivation or a renewal is trivial, unlike Delete/Void/
   Cancel, so these don't need the red "this is dangerous" framing even
   though they still deserve the same are-you-sure pause against a
   mis-click). Deliberately **not** wrapped in an extra `confirm()`, despite
@@ -6010,7 +6013,7 @@ then rolled out to every other page with the same shape once the pattern
 proved out, rather than staying a one-off.
 
 - `components/IconActionButton.jsx` — the shared building block for
-  **row-level** actions (Edit/Delete/Renew/Duplicate/etc.): a compact
+  **row-level** actions (Edit/Delete/Renew/etc.): a compact
   `h-9 w-9` icon-only button, `rounded-md` with a visible border and a
   tone-tinted hover fill, so it reads as a real button rather than bare
   colored text even at that size. Takes `{ icon, tone, title, label,
@@ -6038,10 +6041,10 @@ proved out, rather than staying a one-off.
   needed a "reset password" glyph), `InvoiceDetail.jsx`'s Payments
   table (Download/Email per receipt row, both tone `lagoon`), and
   `Quotes.jsx`/`Invoices.jsx` (Edit/Download PDF/Email to client/
-  Duplicate/Void — see "Quote/invoice row actions" below).
+  Void — see "Quote/invoice row actions" below).
 - **Quote/invoice row actions**: `Quotes.jsx` and `Invoices.jsx` originally
   had no per-row actions at all — a list row was just data, and every
-  action (Edit, Download, Email, Duplicate, Delete) only existed on the
+  action (Edit, Download, Email, Delete) only existed on the
   document's own detail page (see the bulk-select-removal note above).
   Both list pages now carry a `rowActions(item)` helper, the exact same
   shape as `Licenses.jsx`'s own — rendered once in the desktop table's
@@ -6050,7 +6053,7 @@ proved out, rather than staying a one-off.
   pt-1`), so mobile and desktop can never drift, per the shared-helper
   convention described above. The action set is deliberately narrower than
   the detail page's own button row: Edit/Download PDF/Email to client/
-  Duplicate/Void only — actions that need more than a single click or a
+  Void only — actions that need more than a single click or a
   simple confirm (Send reminder, Convert to invoice, Record payment) stay
   detail-page-only, reachable by tapping into the row (Void is the one
   exception — a single click opens `VoidReasonModal`, see "Neither quotes
@@ -6068,13 +6071,7 @@ proved out, rather than staying a one-off.
   `emailModal` (the target row's id, or `null`) rather than a `{type,
   paymentId}` object like `InvoiceDetail.jsx`'s — these two list pages only
   ever trigger the one `send` email type, never `remind`/`receipt`, so a
-  bare id is enough. Duplicate (`DuplicateIcon`, tone `slate`) reuses the
-  same `confirm({..., danger: false})` guard the detail-page Duplicate
-  buttons already have (see `useConfirm`/`ConfirmDialog` above) and, on
-  success, navigates straight to the new draft's own detail page — not a
-  list refresh — the same behavior `QuoteDetail.jsx`/`InvoiceDetail.jsx`'s
-  own Duplicate already has, since a fresh duplicate is something to review
-  next, not just another row in the list. Void (`XIcon`, tone `red`) opens
+  bare id is enough. Void (`XIcon`, tone `red`) opens
   `VoidReasonModal` for that row rather than acting immediately — see
   "Neither quotes nor invoices can be deleted..." above for the shared
   component and each list's own `canVoid()` gate. Edit and Email to client
@@ -6084,25 +6081,22 @@ proved out, rather than staying a one-off.
   guard) and Email to client is hidden once `status === 'void'` (mirrors
   `InvoiceDetail.jsx`'s own `invoice.status !== 'void'` gate); `Quotes.jsx`
   has neither restriction, matching `QuoteDetail.jsx`, which locks nothing.
-  `Invoices.jsx`'s Duplicate is additionally hidden once `status === 'paid'`
-  (both here and on `InvoiceDetail.jsx`'s own button row) — cluttering a
-  finished invoice's actions with one more thing to second-guess wasn't
-  worth it, so it's a UI-only scope decision, not a safety fix (the API
-  still allows duplicating a paid invoice into a fresh draft). Void is
-  unaffected by this — it's already `canVoid`-gated to `draft`/`sent`
-  invoices with `amount_paid === 0`, which a `paid` invoice never
-  satisfies, so it was already implicitly hidden here.
-  A shared `busy: { id, action }` state (same shape as `Licenses.jsx`'s
-  own) tracks which row and which specific action is in flight, so
-  Duplicate/Delete on the same row each show their own correct
-  spinning/disabled state independent of each other; Download and Email
-  aren't tracked this way since one opens a new tab and the other opens a
-  modal, neither with a meaningful "busy" row state to show. Both pages'
-  `TableSkeleton` `cols` arrays gained a trailing entry for the new action
-  column.
+  Both pages'
+  `TableSkeleton` `cols` arrays gained a trailing entry for the action
+  column. **There's no per-row busy/spinning state here** — the original
+  version of this feature tracked a shared `busy: { id, action }` state
+  (mirroring `Licenses.jsx`'s own) so a Duplicate action's in-flight row
+  could show a spinner, but Duplicate was later removed outright (see
+  "Neither quotes nor invoices can be deleted..." above) and nothing else
+  on this row-actions set needed it — Download opens a new tab and Email
+  opens a modal, neither with a meaningful "busy" row state to show, and
+  Void's own busy/error state lives inside `VoidReasonModal` itself — so
+  the whole `busy`/`setBusy`/`isBusy` mechanism (and the `useConfirm()` hook
+  that only ever gated the Duplicate confirmation) was deleted along with
+  it rather than left behind as dead state.
 - **Header** action buttons (Analytics, Export CSV, Export Excel, New X)
   and **detail-page** action buttons (Edit, Download PDF, Email to
-  client, Send reminder, Duplicate, Convert to invoice, Void, Delete,
+  client, Send reminder, Convert to invoice, Void, Delete,
   Record payment) are a different shape — prominent, multi-word, already
   visually button-styled (bordered or filled) before this convention
   existed — so these keep their text and just gain a **leading icon**
@@ -6158,9 +6152,8 @@ proved out, rather than staying a one-off.
   `PlusIcon` (New X/Record payment — kept separate from
   `FloatingActionButton.jsx`'s own private inline `PlusIcon`, since
   consolidating the two wasn't otherwise in scope), `KeyIcon` (Reset
-  password), `SendIcon` (Email to client/receipt — a paper plane,
-  distinct from `BellIcon`'s reminder-nudge meaning), and `DuplicateIcon`
-  (two overlapping documents, for Duplicate).
+  password), and `SendIcon` (Email to client/receipt — a paper plane,
+  distinct from `BellIcon`'s reminder-nudge meaning).
 
 ### Responsive / PWA
 

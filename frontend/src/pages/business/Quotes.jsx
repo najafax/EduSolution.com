@@ -14,9 +14,8 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import IconActionButton from '../../components/IconActionButton';
 import VoidReasonModal from '../../components/VoidReasonModal';
-import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, DuplicateIcon, XIcon } from '../../components/icons';
+import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, XIcon } from '../../components/icons';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
-import { useConfirm } from '../../lib/useConfirm';
 import QuoteForm from './QuoteForm';
 
 const STATUS_OPTIONS = [
@@ -54,11 +53,9 @@ export default function Quotes() {
   const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
-  const [busy, setBusy] = useState(null); // { id, action } — tracks which row/action is in flight
   const [emailModal, setEmailModal] = useState(null); // id of the quote whose email preview is open, or null
   const [voidTarget, setVoidTarget] = useState(null); // the quote being voided, or null
   const [voidError, setVoidError] = useState('');
-  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     // Only show the loading skeleton on the very first load — once there's
@@ -92,27 +89,6 @@ export default function Quotes() {
     }
   }
 
-  async function handleDuplicate(quote) {
-    if (
-      !(await confirm({
-        title: 'Duplicate this quote?',
-        message: 'Creates a new draft copy with a fresh number and issue date. You can edit it before sending.',
-        confirmLabel: 'Duplicate',
-        danger: false,
-      }))
-    )
-      return;
-    setError('');
-    setBusy({ id: quote.id, action: 'duplicate' });
-    try {
-      const { quote: created } = await api.quotes.duplicate(quote.id, token);
-      navigate(`/quotes/${created.id}`);
-    } catch (err) {
-      setError(err.message);
-      setBusy(null);
-    }
-  }
-
   // Mirrors the backend's POST /:id/void 409 guard (routes/quotes.js) —
   // never show a button that would just error. A converted quote's real
   // transaction has already moved to a live invoice, so voiding it is
@@ -134,8 +110,6 @@ export default function Quotes() {
   }
 
   function rowActions(quote) {
-    const rowBusy = busy?.id === quote.id;
-    const isBusy = (action) => rowBusy && busy.action === action;
     return (
       <>
         {canManage && !quote.converted_invoice_id && (
@@ -163,23 +137,11 @@ export default function Quotes() {
             label="Email quote to client"
           />
         )}
-        {canManage && (
-          <IconActionButton
-            icon={DuplicateIcon}
-            tone="slate"
-            onClick={() => handleDuplicate(quote)}
-            disabled={rowBusy}
-            spinning={isBusy('duplicate')}
-            title={isBusy('duplicate') ? 'Duplicating…' : 'Duplicate'}
-            label="Duplicate quote"
-          />
-        )}
         {canManage && canVoid(quote) && (
           <IconActionButton
             icon={XIcon}
             tone="red"
             onClick={() => { setVoidError(''); setVoidTarget(quote); }}
-            disabled={rowBusy}
             title="Void"
             label="Void quote"
           />
@@ -375,8 +337,6 @@ export default function Quotes() {
         title={voidTarget ? `Void ${voidTarget.number}?` : 'Void this quote?'}
         error={voidError}
       />
-
-      {confirmDialog}
     </div>
   );
 }

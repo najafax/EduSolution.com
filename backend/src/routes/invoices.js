@@ -534,50 +534,6 @@ router.post('/:id/remind', manage, async (req, res) => {
   res.json(getInvoiceWithItems(req.params.id));
 });
 
-router.post('/:id/duplicate', manage, (req, res) => {
-  const data = getInvoiceWithItems(req.params.id);
-  if (!data) return res.status(404).json({ error: 'Invoice not found' });
-
-  const number = nextInvoiceNumber();
-  const publicToken = crypto.randomBytes(16).toString('hex');
-  const issueDate = new Date().toISOString().slice(0, 10);
-  const dueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-  const result = db
-    .prepare(
-      `INSERT INTO invoices (number, client_id, status, issue_date, due_date, notes, discount_type, discount_value,
-         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name)
-       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      number,
-      data.invoice.client_id,
-      issueDate,
-      dueDate,
-      data.invoice.notes,
-      data.invoice.discount_type,
-      data.invoice.discount_value,
-      data.invoice.subtotal,
-      data.invoice.discount_amount,
-      data.invoice.tax_rate,
-      data.invoice.tax_amount,
-      data.invoice.total,
-      publicToken,
-      req.user.name,
-    );
-
-  const insertItem = db.prepare(
-    'INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order, product_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  );
-  for (const item of data.items) {
-    insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order, item.product_id ?? null);
-  }
-
-  logActivity({ userName: req.user.name, action: 'duplicated', entityType: 'invoice', entityId: result.lastInsertRowid, entityLabel: `${number} (from ${data.invoice.number})` });
-
-  res.status(201).json(getInvoiceWithItems(result.lastInsertRowid));
-});
-
 router.post('/:id/payments', manage, (req, res) => {
   const data = getInvoiceWithItems(req.params.id);
   if (!data) return res.status(404).json({ error: 'Invoice not found' });

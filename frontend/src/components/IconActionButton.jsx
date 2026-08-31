@@ -1,5 +1,5 @@
 // A compact icon-only button for row-level and detail-page actions
-// (Edit/Delete/Renew/Duplicate/etc.) — visible border + a tone-tinted
+// (Edit/Delete/Renew/etc.) — visible border + a tone-tinted
 // hover fill so it reads as a real button, not bare colored text, while
 // staying small enough that a row with several actions doesn't turn into
 // a wall of pill buttons. `title` doubles as the tooltip and the

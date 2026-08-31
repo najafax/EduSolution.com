@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { timeAgo } from '../../lib/date';
@@ -11,21 +11,19 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import VoidReasonModal from '../../components/VoidReasonModal';
 import RecordPaymentModal from '../../components/RecordPaymentModal';
-import { PencilIcon, DownloadIcon, SendIcon, BellIcon, DuplicateIcon, XIcon, TrashIcon, PlusIcon, LinkIcon, CheckCircleIcon } from '../../components/icons';
+import { PencilIcon, DownloadIcon, SendIcon, BellIcon, XIcon, TrashIcon, PlusIcon, LinkIcon, CheckCircleIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 export default function InvoiceDetail() {
   const { token, can } = useAuth();
   const canManage = can('invoices', 'manage');
   const { id } = useParams();
-  const navigate = useNavigate();
 
   const [data, setData] = useState(null);
   const [settings, setSettings] = useState(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   // { type: 'send' } | { type: 'remind' } | { type: 'receipt', paymentId } | null —
   // one EmailPreviewModal instance shared by all three send-email triggers
@@ -84,27 +82,6 @@ export default function InvoiceDetail() {
       setNotice('Public link copied to clipboard.');
     } catch {
       setError('Could not copy the link — your browser may be blocking clipboard access.');
-    }
-  }
-
-  async function handleDuplicate() {
-    if (
-      !(await confirm({
-        title: 'Duplicate this invoice?',
-        message: 'Creates a new draft copy with a fresh number and due date. You can edit it before sending.',
-        confirmLabel: 'Duplicate',
-        danger: false,
-      }))
-    )
-      return;
-    setError('');
-    setBusy(true);
-    try {
-      const { invoice } = await api.invoices.duplicate(id, token);
-      navigate(`/invoices/${invoice.id}`);
-    } catch (err) {
-      setError(err.message);
-      setBusy(false);
     }
   }
 
@@ -232,25 +209,19 @@ export default function InvoiceDetail() {
             Copy public link
           </button>
           {canManage && invoice.status !== 'void' && (
-            <button onClick={() => setEmailModal({ type: 'send' })} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
+            <button onClick={() => setEmailModal({ type: 'send' })} className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
               <SendIcon width={16} height={16} />
               Email to client
             </button>
           )}
           {canManage && invoice.status !== 'void' && invoice.balance_due > 0 && (
-            <button onClick={() => setEmailModal({ type: 'remind' })} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950">
+            <button onClick={() => setEmailModal({ type: 'remind' })} className="flex min-h-11 items-center gap-1.5 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950">
               <BellIcon width={16} height={16} />
               Send reminder
             </button>
           )}
-          {canManage && invoice.status !== 'paid' && (
-            <button onClick={handleDuplicate} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
-              <DuplicateIcon width={16} height={16} />
-              Duplicate
-            </button>
-          )}
           {canManage && canVoid && (
-            <button onClick={() => { setVoidError(''); setVoidModalOpen(true); }} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
+            <button onClick={() => { setVoidError(''); setVoidModalOpen(true); }} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
               <XIcon width={16} height={16} />
               Void
             </button>
