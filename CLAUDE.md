@@ -5322,6 +5322,50 @@ keeps its existing layout.
   prop for this) is unchanged — it's still the faster one-tap route to
   search from the header itself, alongside the drawer's own `GlobalSearch`
   instance. `xl:flex` desktop `Sidebar` nav is unaffected either way.
+- **Left-edge swipe opens the drawer instead of triggering the phone's own
+  "swipe back" gesture**: `lib/useEdgeSwipeOpen.js`, a small hook attached
+  in `Navbar.jsx` right alongside the hamburger button above (`enabled:
+  Boolean(user) && !menuOpen`, `onOpen: () => setMenuOpen(true)` — the
+  exact same state the hamburger itself toggles, so a swipe and a tap open
+  the identical drawer). Phones ship a system/browser gesture for "swipe
+  in from the left edge to go back," which has nothing to do with this
+  app's own navigation — someone meaning to open the nav drawer instead
+  got bounced to whatever page they were on before, reading as the app
+  misbehaving rather than "the browser went back." The hook attaches
+  `document`-level `touchstart`/`touchmove`/`touchend` listeners (not JSX
+  `onTouch*` props, since the gesture needs to be caught regardless of
+  which element on the page the touch actually starts on): a touch
+  starting within 24px of the left edge is tracked, `preventDefault()`'d
+  on the touchmove the moment it reads as a rightward horizontal swipe
+  (claiming the gesture before the browser's own handling of it can kick
+  in), and once net horizontal movement crosses 60px, `onOpen()` fires and
+  tracking stops. A touch that turns out to be more vertical than
+  horizontal (an ordinary scroll that happens to start near the edge)
+  cancels tracking without ever calling `preventDefault()`, so scrolling
+  from near the edge is untouched. Gated off once the drawer is already
+  open (the backdrop/panel handle their own touches from there — see
+  `Sidebar.jsx`'s `mobileOpen` mode above) and above the `xl:` breakpoint
+  (`Sidebar` is a persistent, always-open panel there, not a drawer — see
+  "Sidebar navigation (desktop)" — so there's nothing for an edge swipe to
+  open), and only for a logged-in user at all (no drawer exists on the
+  public quote/invoice/MOD-report links, `/login`, etc., so those pages
+  keep the browser's native back-swipe untouched, which is the correct
+  behavior there). **This is a best-effort override, not a guarantee** —
+  Chrome for Android generally respects `preventDefault()` here, but iOS
+  Safari's edge-swipe-back is a system-level UIKit gesture recognizer that
+  page JavaScript cannot always suppress, particularly in standalone/
+  installed-PWA mode; there is no combination of web APIs that reliably
+  wins against it on every platform, and the hook's own top-of-file
+  comment says so directly rather than overclaiming. `index.css`'s `body`
+  rule also gained `overscroll-behavior-x: none` — a free, low-risk second
+  layer that helps the same gesture in some browsers/versions, on an app
+  that has no horizontal-scroll content to lose by disabling horizontal
+  overscroll navigation. Verified with synthetic touch-event dispatch
+  (Playwright's touch emulation has no built-in swipe helper, so this
+  constructs and dispatches real `TouchEvent`s at specific coordinates):
+  an edge-starting rightward swipe past the threshold opens the drawer;
+  a short swipe under the threshold, a swipe not starting at the edge, and
+  a vertical swipe starting at the edge all correctly leave it closed.
 - `components/Footer.jsx` — a small global closing bar (small
   `/logo-symbol.png` mark + "EduSolution.com" wordmark on one side, a
   dynamic `© {new Date().getFullYear()} Edu Solutions Pvt Ltd. All rights

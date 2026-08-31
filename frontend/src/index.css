@@ -74,6 +74,13 @@
 body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  /* Helps some browsers/versions suppress the left-edge "swipe to go
+     back" gesture components/Navbar.jsx's own useEdgeSwipeOpen already
+     overrides via touch handlers — not a complete fix on its own (see
+     that hook's note on why this can only ever be best-effort), but a
+     free extra layer with no downside for a vertically-scrolling app
+     like this one. */
+  overscroll-behavior-x: none;
 }
 
 /* Navbar's desktop link strip (components/Navbar.jsx): on narrow desktop

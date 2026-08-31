@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
 import Sidebar from './Sidebar';
 import ThemeToggle from './ThemeToggle';
 import NotificationCenter from './NotificationCenter';
+import { useEdgeSwipeOpen } from '../lib/useEdgeSwipeOpen';
 import { SearchIcon, XIcon, MenuIcon } from './icons';
 
 // `module: null` means always visible to any logged-in user regardless of
@@ -56,6 +57,17 @@ export default function Navbar() {
   // reason — whoever's filling out a MOD checklist from a shared link has
   // no staff account either.
   const isPublicDocLink = location.pathname.startsWith('/q/') || location.pathname.startsWith('/i/') || location.pathname.startsWith('/mod/');
+
+  // Swiping in from the left edge of the screen opens the nav drawer
+  // instead of triggering the phone's own "swipe back" navigation gesture
+  // — see useEdgeSwipeOpen's own note for why this can only ever be a
+  // best-effort override, not a guaranteed one. Disabled once the drawer
+  // is already open (nothing left to open, and the drawer's own backdrop
+  // handles touches on it from here) and for anyone not logged in (no
+  // drawer to open — the public quote/invoice/MOD-report links, Login,
+  // etc. should still go "back" the normal way).
+  const openMenu = useCallback(() => setMenuOpen(true), []);
+  useEdgeSwipeOpen({ enabled: Boolean(user) && !menuOpen, onOpen: openMenu });
 
   const initials = (user?.name || user?.email || '?')
     .trim()
