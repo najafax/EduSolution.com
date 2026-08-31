@@ -434,3 +434,29 @@ export function ClipboardCheckIcon(props) {
     </svg>
   );
 }
+
+// A camera body with a viewfinder ring — "scan this" (ScanPaymentSlip.jsx's
+// scan-a-payment-slip button), distinct from every document-shaped icon in
+// this file since scanning is a camera/photo action, not a document one.
+export function ScanIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 7V5.5A1.5 1.5 0 0 1 5.5 4H7M13 4h1.5A1.5 1.5 0 0 1 16 5.5V7M16 13v1.5a1.5 1.5 0 0 1-1.5 1.5H13M7 16H5.5A1.5 1.5 0 0 1 4 14.5V13" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="10" cy="10" r="3" />
+    </svg>
+  );
+}
+
+// A rounded banknote/bill — "record a payment" (Invoices.jsx's list-row
+// quick action), distinct from BankIcon (the running account-balance
+// figure on Dashboard/Financials) — this is a single transaction, not a
+// balance.
+export function BanknoteIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="5.5" width="15" height="9" rx="1.5" />
+      <circle cx="10" cy="10" r="2" />
+      <path d="M5 8v0M15 12v0" strokeLinecap="round" />
+    </svg>
+  );
+}
