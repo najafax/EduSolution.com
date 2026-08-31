@@ -80,7 +80,9 @@ export default function MyAccount() {
 
   const [sessions, setSessions] = useState(null);
   const [sessionsError, setSessionsError] = useState('');
+  const [sessionsNotice, setSessionsNotice] = useState('');
   const [revokingId, setRevokingId] = useState(null);
+  const [revokingOthers, setRevokingOthers] = useState(false);
 
   function loadSessions() {
     api.sessions
@@ -188,6 +190,7 @@ export default function MyAccount() {
     )
       return;
     setSessionsError('');
+    setSessionsNotice('');
     setRevokingId(session.id);
     try {
       await api.sessions.revoke(session.id, token);
@@ -196,6 +199,31 @@ export default function MyAccount() {
       setSessionsError(err.message);
     } finally {
       setRevokingId(null);
+    }
+  }
+
+  const otherSessionsCount = sessions ? sessions.filter((s) => !s.isCurrent).length : 0;
+
+  async function handleRevokeOthers() {
+    if (
+      !(await confirm({
+        title: 'Sign out all other devices?',
+        message: `Ends every other session signed in as you (${otherSessionsCount} device${otherSessionsCount === 1 ? '' : 's'}). Each will need to log in again. This device stays signed in.`,
+        confirmLabel: 'Sign out all others',
+      }))
+    )
+      return;
+    setSessionsError('');
+    setSessionsNotice('');
+    setRevokingOthers(true);
+    try {
+      const { revoked } = await api.sessions.revokeOthers(token);
+      setSessionsNotice(`Signed out ${revoked} other device${revoked === 1 ? '' : 's'}.`);
+      loadSessions();
+    } catch (err) {
+      setSessionsError(err.message);
+    } finally {
+      setRevokingOthers(false);
     }
   }
 
@@ -393,11 +421,24 @@ export default function MyAccount() {
       </form>
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Active sessions</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Active sessions</h2>
+          {otherSessionsCount > 0 && (
+            <button
+              type="button"
+              disabled={revokingOthers}
+              onClick={handleRevokeOthers}
+              className="min-h-11 shrink-0 rounded-md border border-red-200 px-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+            >
+              {revokingOthers ? 'Signing out others…' : 'Sign out all other devices'}
+            </button>
+          )}
+        </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Every device currently signed in as you. Sign out a device you don't recognize or left logged in
           somewhere.
         </p>
+        {sessionsNotice && <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{sessionsNotice}</p>}
         {sessionsError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{sessionsError}</p>}
         {!sessions && !sessionsError ? (
           <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading…</p>

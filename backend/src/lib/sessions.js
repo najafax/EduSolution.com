@@ -30,4 +30,22 @@ function getActiveSession(jti) {
   return db.prepare('SELECT * FROM sessions WHERE jti = ? AND revoked_at IS NULL').get(jti);
 }
 
-module.exports = { createSession, touchSession, getActiveSession };
+// "Sign out everywhere else" — revokes every one of this user's other
+// active sessions in one call, leaving the current one (if there is one —
+// see below) untouched. `currentJti` is `req.sessionJti`, which is only
+// set when the *current* request's own token carries a `jti` at all (a
+// token minted before this feature shipped has none — see requireAuth's
+// own note on why that's let through unchecked); when it's falsy there's
+// no current-session row to exclude, so every one of this user's tracked
+// sessions is fair game. Returns the number of rows actually revoked, so
+// the caller can report "signed out N other devices" back to the user.
+function revokeOtherSessions(userId, currentJti) {
+  const result = currentJti
+    ? db
+        .prepare("UPDATE sessions SET revoked_at = datetime('now') WHERE user_id = ? AND revoked_at IS NULL AND jti != ?")
+        .run(userId, currentJti)
+    : db.prepare("UPDATE sessions SET revoked_at = datetime('now') WHERE user_id = ? AND revoked_at IS NULL").run(userId);
+  return result.changes;
+}
+
+module.exports = { createSession, touchSession, getActiveSession, revokeOtherSessions };

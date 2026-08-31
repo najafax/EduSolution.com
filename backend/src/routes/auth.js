@@ -7,7 +7,7 @@ const { requireAuth } = require('../middleware/auth');
 const { loginLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rateLimit');
 const { sendMail } = require('../lib/mailer');
 const { effectivePermissions } = require('../lib/permissions');
-const { createSession } = require('../lib/sessions');
+const { createSession, revokeOtherSessions } = require('../lib/sessions');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -316,6 +316,17 @@ router.delete('/sessions/:id', requireAuth, (req, res) => {
   }
   db.prepare("UPDATE sessions SET revoked_at = datetime('now') WHERE id = ?").run(session.id);
   res.status(204).end();
+});
+
+// "Sign out everywhere else" — a bulk sibling of the single-session DELETE
+// above, for the common real case (a lost/stolen device, or just cleaning
+// up after using a lot of shared machines) where revoking one row at a
+// time is tedious. Distinct path shape from `/sessions/:id` (no trailing
+// segment), so there's no literal-vs-`:id` ordering concern the way
+// `GET /summary` elsewhere in this app has to register ahead of `GET /:id`.
+router.delete('/sessions', requireAuth, (req, res) => {
+  const revoked = revokeOtherSessions(req.user.id, req.sessionJti);
+  res.json({ revoked });
 });
 
 module.exports = router;

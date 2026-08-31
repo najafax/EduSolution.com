@@ -84,6 +84,7 @@ export const api = {
   sessions: {
     list: (token) => request('/auth/sessions', { token }),
     revoke: (id, token) => request(`/auth/sessions/${id}`, { method: 'DELETE', token }),
+    revokeOthers: (token) => request('/auth/sessions', { method: 'DELETE', token }),
   },
 
   settings: {

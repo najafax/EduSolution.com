@@ -2757,6 +2757,30 @@ logged in on" list. Built together since the first three all touch
   a long user-agent string truncating the *whole* line would silently
   swallow the badge along with it, caught visually in testing before this
   shipped.
+  **Sign out everywhere else**: `DELETE /api/auth/sessions` (no `:id` —
+  a distinct path shape from the single-session route above, not a
+  literal-vs-`:id` collision) is the bulk sibling — `lib/sessions.js`'s
+  `revokeOtherSessions(userId, currentJti)` revokes every one of the
+  caller's other non-revoked sessions in one `UPDATE`, leaving the current
+  one (matched by `req.sessionJti`) untouched, and returns how many rows it
+  actually revoked so the response can say so. When the *current* request's
+  own token carries no `jti` at all (a pre-this-feature token — see
+  `requireAuth`'s own note above on why that's let through unchecked),
+  there's no current-session row to exclude in the first place, so every
+  tracked session for that user is fair game — `revokeOtherSessions` branches
+  on whether `currentJti` is truthy rather than trying to bind `undefined`
+  into the `jti != ?` comparison. `pages/MyAccount.jsx`'s "Active sessions"
+  card header gains a "Sign out all other devices" button, shown only when
+  there's actually more than one session listed (`otherSessionsCount > 0`
+  — same "never show a button that would just be a no-op" convention every
+  other conditional action in this app follows), behind the same
+  `useConfirm()` dialog as the single-session "Sign out" button, with the
+  confirm message naming exactly how many devices it'll end. A successful
+  call sets a small emerald `sessionsNotice` ("Signed out N other
+  device(s).") above the list — the single-session revoke has no
+  equivalent notice since the affected row simply disappears from the list
+  it's already looking at, but a bulk action clearing several rows at once
+  benefits from an explicit confirmation of what just happened.
 
 ### MOD Report public submission link (`backend/src/`, `frontend/src/`)
 
