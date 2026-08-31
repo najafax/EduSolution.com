@@ -3664,6 +3664,41 @@ staff *reach* and *fill in* that same existing endpoint.
   Reference field stays a normal, freely-editable text input regardless
   of whether a scan was ever attempted, which tier produced a value, or
   whether one was found at all.
+  **A second real bug, caught right after the first fix shipped: a blank
+  labeled field was picking up the *next* line's own label as its value**
+  — reported as the scan detecting the literal word "date" as a
+  reference. Both keyword regexes used a bare `\s*` for the flexible
+  spacing around a label's own colon/dash, and `\s` matches a newline —
+  so a slip with an empty `Reference:` field (nothing printed after the
+  colon) let that whitespace-skip reach straight past the line break and
+  capture the *next* line's own label (`Date:`) as if it were the
+  reference's value. Fixed by matching both keyword regexes **one line at
+  a time** (`matchPerLine()`, splitting on `\r?\n` first) instead of
+  against the whole raw text in one pass — restricting the spacing
+  matchers to `[ \t]*` (no `\n`) would have worked too, but per-line
+  matching is the more robust fix: it makes a match spanning two
+  physical lines structurally impossible rather than merely
+  unlikely, and reads as directly as the bug report itself ("the value
+  came from a different line than the label"). Paired with a second,
+  cheap safety net for the rarer same-line case (a label and the next
+  field's label landing on what OCR reads as one line, or a label's
+  colon left dangling with nothing real after it on its own line):
+  `isRealValue()` rejects a captured value that's empty, contains no
+  letter or digit at all (closing the `":"`-as-a-value gap a dangling
+  colon could otherwise produce once the per-line fix stopped it from
+  reaching the next line for something better), matches a small
+  `LABEL_STOPWORDS` set (date/time/amount/status/branch/account/name/
+  total/balance/currency/bank/page/none/no/na — every field label a slip
+  is likely to carry, so a mis-captured label can never be handed back as
+  if it were a real reference or description), or matches `DATE_LIKE_RE`
+  (`12/05/2026`, `2026-05-12`, `5-12-26` shaped strings) — a date is
+  printed on nearly every slip and, being several digits with a couple of
+  separators, is exactly the kind of thing the least-reliable tier-3
+  fallback would otherwise happily mistake for a real reference the
+  moment a real label's own value came up blank. `isRealValue()` is
+  shared by all three tiers (label matching and the tier-3 candidate
+  filter alike) rather than duplicated, so a value that shouldn't count
+  is rejected the same way everywhere it could turn up.
   **This deliberately does not self-host tesseract.js's worker/WASM
   core/language-data files** (unlike this app's own fonts — see "Mobile
   design system"'s note on why those *are* self-hosted) — those files run
