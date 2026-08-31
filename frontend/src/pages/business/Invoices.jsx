@@ -13,7 +13,9 @@ import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import IconActionButton from '../../components/IconActionButton';
-import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, DuplicateIcon, TrashIcon } from '../../components/icons';
+import VoidReasonModal from '../../components/VoidReasonModal';
+import RecordPaymentModal from '../../components/RecordPaymentModal';
+import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, DuplicateIcon, XIcon, BanknoteIcon } from '../../components/icons';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { useConfirm } from '../../lib/useConfirm';
 import InvoiceForm from './InvoiceForm';
@@ -52,6 +54,10 @@ export default function Invoices() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [busy, setBusy] = useState(null); // { id, action } — tracks which row/action is in flight
   const [emailModal, setEmailModal] = useState(null); // id of the invoice whose email preview is open, or null
+  const [voidTarget, setVoidTarget] = useState(null); // the invoice being voided, or null
+  const [voidError, setVoidError] = useState('');
+  const [paymentTarget, setPaymentTarget] = useState(null); // the invoice being paid, or null
+  const [paymentNotice, setPaymentNotice] = useState('');
   const { confirm, confirmDialog } = useConfirm();
 
   function load() {
@@ -107,18 +113,34 @@ export default function Invoices() {
     }
   }
 
-  async function handleDelete(invoice) {
-    if (!(await confirm({ title: 'Delete this invoice?', confirmLabel: 'Delete' }))) return;
-    setError('');
-    setBusy({ id: invoice.id, action: 'delete' });
+  // Mirrors InvoiceDetail.jsx's own canVoid guard (which itself mirrors the
+  // backend's POST /:id/void 409s) — never show a button that would just
+  // error: void is reachable from draft or sent, not once paid, already
+  // void, or partially paid (amount_paid > 0 would silently orphan a
+  // recorded payment on a "this doesn't count" invoice).
+  function canVoid(invoice) {
+    return (invoice.status === 'draft' || invoice.status === 'sent') && invoice.amount_paid === 0;
+  }
+
+  async function handleVoid(reason) {
+    setVoidError('');
     try {
-      await api.invoices.remove(invoice.id, token);
+      await api.invoices.void(voidTarget.id, reason, token);
+      setVoidTarget(null);
       load();
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(null);
+      setVoidError(err.message);
+      throw err;
     }
+  }
+
+  function handlePaymentRecorded(result) {
+    setPaymentTarget(null);
+    const autoRenewed = result.autoRenewedLicenses || [];
+    const notices = ['Payment recorded.'];
+    if (autoRenewed.length > 0) notices.push(`Also renewed: ${autoRenewed.map((l) => l.name).join(', ')}.`);
+    setPaymentNotice(notices.join(' '));
+    load();
   }
 
   function rowActions(invoice) {
@@ -143,6 +165,15 @@ export default function Invoices() {
           title="Download PDF"
           label="Download invoice PDF"
         />
+        {canManage && invoice.status === 'sent' && invoice.balance_due > 0 && (
+          <IconActionButton
+            icon={BanknoteIcon}
+            tone="emerald"
+            onClick={() => { setPaymentNotice(''); setPaymentTarget(invoice); }}
+            title="Record payment"
+            label="Record a payment for this invoice"
+          />
+        )}
         {canManage && invoice.status !== 'void' && (
           <IconActionButton
             icon={SendIcon}
@@ -163,15 +194,14 @@ export default function Invoices() {
             label="Duplicate invoice"
           />
         )}
-        {canManage && invoice.status !== 'paid' && (
+        {canManage && canVoid(invoice) && (
           <IconActionButton
-            icon={TrashIcon}
+            icon={XIcon}
             tone="red"
-            onClick={() => handleDelete(invoice)}
+            onClick={() => { setVoidError(''); setVoidTarget(invoice); }}
             disabled={rowBusy}
-            spinning={isBusy('delete')}
-            title={isBusy('delete') ? 'Deleting…' : 'Delete'}
-            label="Delete invoice"
+            title="Void"
+            label="Void invoice"
           />
         )}
       </>
@@ -242,6 +272,7 @@ export default function Invoices() {
         <StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />
       </div>
 
+      {paymentNotice && <p className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">{paymentNotice}</p>}
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -362,6 +393,22 @@ export default function Invoices() {
           await api.invoices.send(emailModal, { subject, message }, token);
           load();
         }}
+      />
+
+      <VoidReasonModal
+        open={voidTarget !== null}
+        onClose={() => setVoidTarget(null)}
+        onVoid={handleVoid}
+        title={voidTarget ? `Void ${voidTarget.number}?` : 'Void this invoice?'}
+        error={voidError}
+      />
+
+      <RecordPaymentModal
+        open={paymentTarget !== null}
+        onClose={() => setPaymentTarget(null)}
+        invoice={paymentTarget}
+        token={token}
+        onRecorded={handlePaymentRecorded}
       />
 
       {confirmDialog}

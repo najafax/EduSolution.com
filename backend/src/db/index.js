@@ -888,6 +888,25 @@ if (!modReportSettingsColumns.has('submission_token')) {
   db.exec(`ALTER TABLE mod_report_settings ADD COLUMN submission_token TEXT;`);
 }
 
+// void_reason — a plain, required-at-write-time remark captured the moment
+// a quote/invoice is voided (routes/quotes.js's and routes/invoices.js's
+// own POST /:id/void), so "why was this cancelled" survives on the record
+// itself rather than only in a one-line activity_log entry. Voiding is now
+// the *only* way to cancel a quote or invoice — both routers' DELETE /:id
+// was removed outright (see those files' own notes) — so this column is
+// what makes that the safer trade: nothing is ever destroyed, but every
+// cancellation carries a stated reason. Reuses the already-declared
+// quoteColumns/invoiceColumns sets from the created_by_name migration
+// above. Same ALTER TABLE treatment as every other post-launch column on
+// these two tables — both have carried real documents since the app's
+// first deploy.
+if (!quoteColumns.has('void_reason')) {
+  db.exec(`ALTER TABLE quotes ADD COLUMN void_reason TEXT NOT NULL DEFAULT '';`);
+}
+if (!invoiceColumns.has('void_reason')) {
+  db.exec(`ALTER TABLE invoices ADD COLUMN void_reason TEXT NOT NULL DEFAULT '';`);
+}
+
 db.pragma('foreign_keys = ON');
 
 // Bound params rather than string-interpolated into the exec() block above,

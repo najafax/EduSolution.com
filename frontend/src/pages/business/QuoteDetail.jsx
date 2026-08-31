@@ -6,7 +6,8 @@ import { todayPlus, timeAgo } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
-import { PencilIcon, DownloadIcon, SendIcon, InvoiceIcon, DuplicateIcon, TrashIcon, LinkIcon } from '../../components/icons';
+import VoidReasonModal from '../../components/VoidReasonModal';
+import { PencilIcon, DownloadIcon, SendIcon, InvoiceIcon, DuplicateIcon, XIcon, LinkIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 export default function QuoteDetail() {
@@ -26,6 +27,8 @@ export default function QuoteDetail() {
   const [dueDate, setDueDate] = useState(todayPlus(30));
   const [poNumber, setPoNumber] = useState('');
   const [showSendPreview, setShowSendPreview] = useState(false);
+  const [voidModalOpen, setVoidModalOpen] = useState(false);
+  const [voidError, setVoidError] = useState('');
   const { confirm, confirmDialog } = useConfirm();
 
   function load() {
@@ -72,13 +75,16 @@ export default function QuoteDetail() {
     }
   }
 
-  async function handleDelete() {
-    if (!(await confirm({ title: 'Delete this quote?', confirmLabel: 'Delete' }))) return;
+  async function handleVoid(reason) {
+    setVoidError('');
     try {
-      await api.quotes.remove(id, token);
-      navigate('/quotes');
+      await api.quotes.void(id, reason, token);
+      setVoidModalOpen(false);
+      setNotice('Quote voided.');
+      load();
     } catch (err) {
-      setError(err.message);
+      setVoidError(err.message);
+      throw err;
     }
   }
 
@@ -164,10 +170,10 @@ export default function QuoteDetail() {
               Duplicate
             </button>
           )}
-          {canManage && !quote.converted_invoice_id && (
-            <button onClick={handleDelete} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
-              <TrashIcon width={16} height={16} />
-              Delete
+          {canManage && !quote.converted_invoice_id && quote.status !== 'void' && (
+            <button onClick={() => { setVoidError(''); setVoidModalOpen(true); }} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
+              <XIcon width={16} height={16} />
+              Void
             </button>
           )}
         </div>
@@ -179,11 +185,18 @@ export default function QuoteDetail() {
 
       {quote.converted_invoice_id && (
         <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
-          Converted to invoice and can no longer be edited or deleted —{' '}
+          Converted to invoice and can no longer be edited or voided —{' '}
           <Link to={`/invoices/${quote.converted_invoice_id}`} className="text-lagoon-600 hover:text-lagoon-500">
             view invoice
           </Link>
           .
+        </p>
+      )}
+
+      {quote.status === 'void' && (
+        <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          This quote has been voided and is excluded from analytics.
+          {quote.void_reason && <> Reason: {quote.void_reason}</>}
         </p>
       )}
 
@@ -325,6 +338,14 @@ export default function QuoteDetail() {
           setNotice('Quote emailed to client.');
           load();
         }}
+      />
+
+      <VoidReasonModal
+        open={voidModalOpen}
+        onClose={() => setVoidModalOpen(false)}
+        onVoid={handleVoid}
+        title="Void this quote?"
+        error={voidError}
       />
 
       {confirmDialog}

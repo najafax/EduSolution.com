@@ -13,7 +13,8 @@ import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import IconActionButton from '../../components/IconActionButton';
-import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, DuplicateIcon, TrashIcon } from '../../components/icons';
+import VoidReasonModal from '../../components/VoidReasonModal';
+import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, DuplicateIcon, XIcon } from '../../components/icons';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { useConfirm } from '../../lib/useConfirm';
 import QuoteForm from './QuoteForm';
@@ -25,6 +26,7 @@ const STATUS_OPTIONS = [
   { value: 'accepted', label: 'Accepted' },
   { value: 'declined', label: 'Declined' },
   { value: 'expired', label: 'Expired' },
+  { value: 'void', label: 'Void' },
 ];
 
 // Left accent stripe on each mobile card (components/MobileListAccordion.jsx)
@@ -36,6 +38,7 @@ const ACCENT = {
   accepted: 'bg-emerald-500',
   declined: 'bg-red-500',
   expired: 'bg-amber-500',
+  void: 'bg-slate-300 dark:bg-slate-600',
 };
 
 export default function Quotes() {
@@ -53,6 +56,8 @@ export default function Quotes() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [busy, setBusy] = useState(null); // { id, action } — tracks which row/action is in flight
   const [emailModal, setEmailModal] = useState(null); // id of the quote whose email preview is open, or null
+  const [voidTarget, setVoidTarget] = useState(null); // the quote being voided, or null
+  const [voidError, setVoidError] = useState('');
   const { confirm, confirmDialog } = useConfirm();
 
   function load() {
@@ -108,17 +113,23 @@ export default function Quotes() {
     }
   }
 
-  async function handleDelete(quote) {
-    if (!(await confirm({ title: 'Delete this quote?', confirmLabel: 'Delete' }))) return;
-    setError('');
-    setBusy({ id: quote.id, action: 'delete' });
+  // Mirrors the backend's POST /:id/void 409 guard (routes/quotes.js) —
+  // never show a button that would just error. A converted quote's real
+  // transaction has already moved to a live invoice, so voiding it is
+  // meaningless; an already-void quote has nothing left to void.
+  function canVoid(quote) {
+    return !quote.converted_invoice_id && quote.status !== 'void';
+  }
+
+  async function handleVoid(reason) {
+    setVoidError('');
     try {
-      await api.quotes.remove(quote.id, token);
+      await api.quotes.void(voidTarget.id, reason, token);
+      setVoidTarget(null);
       load();
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(null);
+      setVoidError(err.message);
+      throw err;
     }
   }
 
@@ -163,15 +174,14 @@ export default function Quotes() {
             label="Duplicate quote"
           />
         )}
-        {canManage && !quote.converted_invoice_id && (
+        {canManage && canVoid(quote) && (
           <IconActionButton
-            icon={TrashIcon}
+            icon={XIcon}
             tone="red"
-            onClick={() => handleDelete(quote)}
+            onClick={() => { setVoidError(''); setVoidTarget(quote); }}
             disabled={rowBusy}
-            spinning={isBusy('delete')}
-            title={isBusy('delete') ? 'Deleting…' : 'Delete'}
-            label="Delete quote"
+            title="Void"
+            label="Void quote"
           />
         )}
       </>
@@ -356,6 +366,14 @@ export default function Quotes() {
           await api.quotes.send(emailModal, { subject, message }, token);
           load();
         }}
+      />
+
+      <VoidReasonModal
+        open={voidTarget !== null}
+        onClose={() => setVoidTarget(null)}
+        onVoid={handleVoid}
+        title={voidTarget ? `Void ${voidTarget.number}?` : 'Void this quote?'}
+        error={voidError}
       />
 
       {confirmDialog}

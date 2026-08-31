@@ -116,7 +116,10 @@ export const api = {
     get: (id, token) => request(`/quotes/${id}`, { token }),
     create: (payload, token) => request('/quotes', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/quotes/${id}`, { method: 'PUT', body: payload, token }),
-    remove: (id, token) => request(`/quotes/${id}`, { method: 'DELETE', token }),
+    // No remove() — there is no DELETE /:id on this router at all (see
+    // routes/quotes.js). void() below, which requires a reason, is the
+    // only way to cancel a quote now.
+    void: (id, reason, token) => request(`/quotes/${id}/void`, { method: 'POST', body: { reason }, token }),
     // client_origin is window.location.origin (see below) — passed along so
     // the emailed public link matches exactly what "Copy public link"
     // produces, rather than the backend's own CLIENT_ORIGIN env var, which
@@ -146,7 +149,9 @@ export const api = {
     get: (id, token) => request(`/invoices/${id}`, { token }),
     create: (payload, token) => request('/invoices', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/invoices/${id}`, { method: 'PUT', body: payload, token }),
-    remove: (id, token) => request(`/invoices/${id}`, { method: 'DELETE', token }),
+    // No remove() — there is no DELETE /:id on this router at all (see
+    // routes/invoices.js). void() below, which now requires a reason, is
+    // the only way to cancel an invoice.
     // See quotes.sendPreview/send above for why client_origin is passed.
     sendPreview: (id, token) => request(`/invoices/${id}/send-preview${qs({ client_origin: window.location.origin })}`, { token }),
     send: (id, payload, token) =>
@@ -154,7 +159,7 @@ export const api = {
     remindPreview: (id, token) => request(`/invoices/${id}/remind-preview`, { token }),
     remind: (id, payload, token) => request(`/invoices/${id}/remind`, { method: 'POST', body: payload, token }),
     duplicate: (id, token) => request(`/invoices/${id}/duplicate`, { method: 'POST', token }),
-    void: (id, token) => request(`/invoices/${id}/void`, { method: 'POST', token }),
+    void: (id, reason, token) => request(`/invoices/${id}/void`, { method: 'POST', body: { reason }, token }),
     recordPayment: (id, payload, token) =>
       request(`/invoices/${id}/payments`, { method: 'POST', body: payload, token }),
     receiptPreview: (id, paymentId, token) =>

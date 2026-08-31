@@ -2,17 +2,17 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { todayStr, timeAgo } from '../../lib/date';
+import { timeAgo } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import Modal from '../../components/Modal';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
+import VoidReasonModal from '../../components/VoidReasonModal';
+import RecordPaymentModal from '../../components/RecordPaymentModal';
 import { PencilIcon, DownloadIcon, SendIcon, BellIcon, DuplicateIcon, XIcon, TrashIcon, PlusIcon, LinkIcon, CheckCircleIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
-
-const METHODS = ['bank_transfer', 'cash', 'card', 'cheque', 'other'];
 
 export default function InvoiceDetail() {
   const { token, can } = useAuth();
@@ -27,7 +27,6 @@ export default function InvoiceDetail() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
-  const [payment, setPayment] = useState({ amount: '', method: 'bank_transfer', reference: '', notes: '', paid_at: todayStr() });
   // { type: 'send' } | { type: 'remind' } | { type: 'receipt', paymentId } | null —
   // one EmailPreviewModal instance shared by all three send-email triggers
   // on this page, since only one can be open at a time.
@@ -39,6 +38,8 @@ export default function InvoiceDetail() {
   const [rejectingProofId, setRejectingProofId] = useState(null);
   const [rejectNote, setRejectNote] = useState('');
   const [rejecting, setRejecting] = useState(false);
+  const [voidModalOpen, setVoidModalOpen] = useState(false);
+  const [voidError, setVoidError] = useState('');
   const { confirm, confirmDialog } = useConfirm();
 
   function load() {
@@ -86,16 +87,6 @@ export default function InvoiceDetail() {
     }
   }
 
-  async function handleDelete() {
-    if (!(await confirm({ title: 'Delete this invoice?', confirmLabel: 'Delete' }))) return;
-    try {
-      await api.invoices.remove(id, token);
-      navigate('/invoices');
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
   async function handleDuplicate() {
     if (
       !(await confirm({
@@ -117,40 +108,16 @@ export default function InvoiceDetail() {
     }
   }
 
-  // Opening the form pre-fills Amount with the invoice's current balance
-  // due — the common case is paying it off in full, and it's still a
-  // plain editable number for a partial payment. Only set on open (not
-  // close), so toggling the form shut and back open always re-syncs to
-  // the current balance rather than keeping whatever was last typed.
-  function togglePaymentForm() {
-    setShowPayment((v) => {
-      const opening = !v;
-      if (opening) setPayment((p) => ({ ...p, amount: invoice.balance_due.toFixed(2) }));
-      return opening;
-    });
-  }
-
-  async function handleRecordPayment(e) {
-    e.preventDefault();
-    setError('');
-    setBusy(true);
-    try {
-      const result = await api.invoices.recordPayment(id, { ...payment, amount: Number(payment.amount) }, token);
-      setShowPayment(false);
-      setPayment({ amount: '', method: 'bank_transfer', reference: '', notes: '', paid_at: todayStr() });
-      const autoRenewed = result.autoRenewedLicenses || [];
-      const renewedNames = autoRenewed.filter((l) => !l.reactivated).map((l) => l.name);
-      const reactivatedNames = autoRenewed.filter((l) => l.reactivated).map((l) => l.name);
-      const notices = ['Payment recorded.'];
-      if (renewedNames.length > 0) notices.push(`Also renewed: ${renewedNames.join(', ')}.`);
-      if (reactivatedNames.length > 0) notices.push(`Also reactivated and renewed: ${reactivatedNames.join(', ')}.`);
-      setNotice(notices.join(' '));
-      load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+  function handlePaymentRecorded(result) {
+    setShowPayment(false);
+    const autoRenewed = result.autoRenewedLicenses || [];
+    const renewedNames = autoRenewed.filter((l) => !l.reactivated).map((l) => l.name);
+    const reactivatedNames = autoRenewed.filter((l) => l.reactivated).map((l) => l.name);
+    const notices = ['Payment recorded.'];
+    if (renewedNames.length > 0) notices.push(`Also renewed: ${renewedNames.join(', ')}.`);
+    if (reactivatedNames.length > 0) notices.push(`Also reactivated and renewed: ${reactivatedNames.join(', ')}.`);
+    setNotice(notices.join(' '));
+    load();
   }
 
   async function handleDownloadReceipt(paymentId) {
@@ -213,25 +180,16 @@ export default function InvoiceDetail() {
     }
   }
 
-  async function handleVoid() {
-    if (
-      !(await confirm({
-        title: 'Void this invoice?',
-        message: 'It will be excluded from financial totals and can no longer be sent, edited, or paid.',
-        confirmLabel: 'Void',
-      }))
-    )
-      return;
-    setError('');
-    setBusy(true);
+  async function handleVoid(reason) {
+    setVoidError('');
     try {
-      await api.invoices.void(id, token);
+      await api.invoices.void(id, reason, token);
+      setVoidModalOpen(false);
       setNotice('Invoice voided.');
       load();
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
+      setVoidError(err.message);
+      throw err;
     }
   }
 
@@ -292,15 +250,9 @@ export default function InvoiceDetail() {
             </button>
           )}
           {canManage && canVoid && (
-            <button onClick={handleVoid} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <button onClick={() => { setVoidError(''); setVoidModalOpen(true); }} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
               <XIcon width={16} height={16} />
               Void
-            </button>
-          )}
-          {canManage && invoice.status !== 'paid' && (
-            <button onClick={handleDelete} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
-              <TrashIcon width={16} height={16} />
-              Delete
             </button>
           )}
         </div>
@@ -317,6 +269,7 @@ export default function InvoiceDetail() {
       {invoice.status === 'void' && (
         <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
           This invoice has been voided and is excluded from financial totals and reports.
+          {invoice.void_reason && <> Reason: {invoice.void_reason}</>}
         </p>
       )}
       {invoice.last_reminder_sent_at && (
@@ -457,11 +410,15 @@ export default function InvoiceDetail() {
         <Accordion
           title="Payments"
           action={
+            // Mirrors POST /:id/payments' own 400 guard exactly (see
+            // routes/invoices.js) — that route rejects a draft invoice
+            // too, not just void/fully-paid, so 'sent' is the one status
+            // this button is ever actually allowed to act on.
             canManage &&
-            invoice.status !== 'void' &&
+            invoice.status === 'sent' &&
             invoice.balance_due > 0 && (
               <button
-                onClick={togglePaymentForm}
+                onClick={() => setShowPayment(true)}
                 className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500"
               >
                 <PlusIcon width={16} height={16} />
@@ -470,68 +427,6 @@ export default function InvoiceDetail() {
             )
           }
         >
-          {showPayment && (
-            <form onSubmit={handleRecordPayment} className="-mx-6 -mt-4 mb-4 grid gap-4 border-b border-slate-200 px-6 pb-4 sm:grid-cols-2 dark:border-slate-700">
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount</span>
-                <input
-                  type="number"
-                  min="0.01"
-                  max={invoice.balance_due}
-                  step="0.01"
-                  required
-                  value={payment.amount}
-                  onChange={(e) => setPayment((p) => ({ ...p, amount: e.target.value }))}
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Method</span>
-                <select
-                  value={payment.method}
-                  onChange={(e) => setPayment((p) => ({ ...p, method: e.target.value }))}
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                >
-                  {METHODS.map((m) => (
-                    <option key={m} value={m}>
-                      {m.replace('_', ' ')}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Date</span>
-                <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
-                  <input
-                    type="date"
-                    required
-                    value={payment.paid_at}
-                    onChange={(e) => setPayment((p) => ({ ...p, paid_at: e.target.value }))}
-                    className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
-                  />
-                </div>
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Reference</span>
-                <input
-                  type="text"
-                  value={payment.reference}
-                  onChange={(e) => setPayment((p) => ({ ...p, reference: e.target.value }))}
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                />
-              </label>
-              <div className="sm:col-span-2">
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
-                >
-                  {busy ? 'Recording…' : 'Record payment'}
-                </button>
-              </div>
-            </form>
-          )}
-
           {payments.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">No payments recorded yet.</p>
           ) : (
@@ -799,6 +694,22 @@ export default function InvoiceDetail() {
           </div>
         </form>
       </Modal>
+
+      <VoidReasonModal
+        open={voidModalOpen}
+        onClose={() => setVoidModalOpen(false)}
+        onVoid={handleVoid}
+        title="Void this invoice?"
+        error={voidError}
+      />
+
+      <RecordPaymentModal
+        open={showPayment}
+        onClose={() => setShowPayment(false)}
+        invoice={invoice}
+        token={token}
+        onRecorded={handlePaymentRecorded}
+      />
 
       {confirmDialog}
     </div>

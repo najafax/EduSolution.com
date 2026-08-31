@@ -131,9 +131,11 @@ router.get('/export.xlsx', view, async (req, res) => {
 // (registered before GET /:id for the same "don't let :id swallow a literal
 // path" reason that route documents). For every year from the earliest
 // quote's issue_date through the current year (gap years included at zero,
-// never skipped), reports `created`/`amountQuoted` (by issue_date, every
-// status included — a quote has no void-equivalent status to exclude) and
-// `accepted`/`declined` (by COALESCE(client_responded_at, updated_at) — a
+// never skipped), reports `created` (every status, by issue_date — a count
+// of what was created, not what it was worth) and `amountQuoted` (same
+// year, but excluding `void` quotes — a voided quote never became real
+// business, the same reason routes/invoices.js's own `amountInvoiced`
+// excludes a void invoice) and `accepted`/`declined` (by COALESCE(client_responded_at, updated_at) — a
 // client responding via the public link stamps client_responded_at, see
 // routes/public.js's respond route; a status flipped manually by staff via
 // PUT /:id instead has no dedicated response timestamp, so falls back to
@@ -173,7 +175,7 @@ router.get('/analytics', view, (req, res) => {
       byYear.push({
         year,
         created: createdThisYear.length,
-        amountQuoted: round2(createdThisYear.reduce((sum, q) => sum + q.total, 0)),
+        amountQuoted: round2(createdThisYear.filter((q) => q.status !== 'void').reduce((sum, q) => sum + q.total, 0)),
         accepted: quotes.filter((q) => q.status === 'accepted' && yearOf(decidedAt(q)) === year).length,
         declined: quotes.filter((q) => q.status === 'declined' && yearOf(decidedAt(q)) === year).length,
         converted: convertedEvents.filter((e) => yearOf(e.created_at) === year).length,
@@ -183,7 +185,7 @@ router.get('/analytics', view, (req, res) => {
     const byStatus = db
       .prepare('SELECT status, COUNT(*) AS c FROM quotes GROUP BY status')
       .all()
-      .reduce((acc, row) => ({ ...acc, [row.status]: row.c }), { draft: 0, sent: 0, accepted: 0, declined: 0, expired: 0 });
+      .reduce((acc, row) => ({ ...acc, [row.status]: row.c }), { draft: 0, sent: 0, accepted: 0, declined: 0, expired: 0, void: 0 });
 
     const topClients = db
       .prepare(
@@ -205,7 +207,7 @@ router.get('/analytics', view, (req, res) => {
       topClients,
       totals: {
         totalQuotes: quotes.length,
-        totalQuoted: round2(quotes.reduce((sum, q) => sum + q.total, 0)),
+        totalQuoted: round2(quotes.filter((q) => q.status !== 'void').reduce((sum, q) => sum + q.total, 0)),
         totalAccepted,
         totalDeclined,
         totalConverted: convertedEvents.length,
@@ -311,7 +313,7 @@ router.put('/:id', manage, (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 
-  const validStatuses = ['draft', 'sent', 'accepted', 'declined', 'expired'];
+  const validStatuses = ['draft', 'sent', 'accepted', 'declined', 'expired', 'void'];
   const nextStatus = validStatuses.includes(status) ? status : existing.status;
 
   db.prepare(
@@ -341,15 +343,40 @@ router.put('/:id', manage, (req, res) => {
   res.json(getQuoteWithItems(req.params.id));
 });
 
-router.delete('/:id', manage, (req, res) => {
+// There is deliberately no DELETE /:id on this router — mirrors
+// routes/invoices.js's own removal of its DELETE route: a quote is a real
+// business record, and this app never lets one simply disappear. Void
+// (below) is the only way to cancel one now, and it keeps the record (plus
+// a required remark explaining why) rather than destroying it.
+//
+// Cancels a quote without deleting it, the mirror of routes/invoices.js's
+// own POST /:id/void — a voided quote reads as a real, final state (its
+// own StatusBadge color, excluded from routes/quotes.js's own analytics
+// `amountQuoted` the same way a void invoice is excluded from
+// `amountInvoiced`) rather than vanishing. Blocked (409) once the quote's
+// already been converted to an invoice — that's already this router's
+// existing "no longer editable/deletable" terminal state (see PUT /:id
+// above), and voiding a quote whose real transaction has already moved to
+// a live invoice would be meaningless — or if it's already void. Requires
+// a non-blank `reason` in the body (400 otherwise), stored in void_reason
+// (db/index.js) for the same reason invoices' own void now requires one.
+router.post('/:id/void', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM quotes WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Quote not found' });
   if (existing.converted_invoice_id) {
-    return res.status(409).json({ error: 'This quote has already been converted to an invoice and cannot be deleted' });
+    return res.status(409).json({ error: 'This quote has already been converted to an invoice and cannot be voided' });
   }
-  db.prepare('DELETE FROM quotes WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'quote', entityId: existing.id, entityLabel: existing.number });
-  res.status(204).end();
+  if (existing.status === 'void') {
+    return res.status(409).json({ error: 'This quote is already void' });
+  }
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (!reason) {
+    return res.status(400).json({ error: 'A reason is required to void a quote' });
+  }
+
+  db.prepare(`UPDATE quotes SET status = 'void', void_reason = ?, updated_at = datetime('now') WHERE id = ?`).run(reason, req.params.id);
+  logActivity({ userName: req.user.name, action: 'voided', entityType: 'quote', entityId: existing.id, entityLabel: `${existing.number} — ${reason}` });
+  res.json(getQuoteWithItems(req.params.id));
 });
 
 router.get('/:id/pdf', view, async (req, res) => {

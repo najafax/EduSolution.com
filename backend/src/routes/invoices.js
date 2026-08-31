@@ -374,31 +374,30 @@ router.put('/:id', manage, (req, res) => {
   res.json(getInvoiceWithItems(req.params.id));
 });
 
-router.delete('/:id', manage, (req, res) => {
-  const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Invoice not found' });
-
-  const hasPayments = db.prepare('SELECT 1 FROM payments WHERE invoice_id = ? LIMIT 1').get(req.params.id);
-  if (hasPayments) {
-    return res.status(409).json({ error: 'This invoice has recorded payments and cannot be deleted' });
-  }
-
-  db.prepare('DELETE FROM invoices WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'invoice', entityId: existing.id, entityLabel: existing.number });
-  res.status(204).end();
-});
-
+// There is deliberately no DELETE /:id on this router — an invoice is a
+// real financial document, and this app never lets one simply disappear.
+// Void (below) is the only way to cancel one: unlike a delete, it keeps
+// the record (and, now, a required remark explaining why) instead of
+// destroying it. The old DELETE route only ever worked on a zero-payment
+// invoice anyway (it 409'd the moment any payment existed), which is
+// exactly the same set of invoices void already covers — so removing it
+// loses no real capability, only the one true "make this vanish" escape
+// hatch this app no longer wants to offer.
+//
 // Cancels an invoice without deleting it — a void invoice is excluded from
 // financial totals/reports (see routes/financials.js, routes/reports.js)
-// but the record itself stays, unlike DELETE above. Deliberately its own
-// action route rather than a status value on PUT /:id: that route already
-// 409s once status is 'sent'/'paid' (a delivered/settled document can't be
-// edited), but voiding is exactly the escape hatch a sent invoice needs —
-// it has to work precisely where PUT refuses to. Only blocked when the
-// invoice is already void, already paid (voiding paid money needs a real
-// refund process, not a status flip), or has any recorded payments at all
-// (mirrors the DELETE guard above — a partially-paid invoice can't just
-// have its payments silently orphaned by voiding it).
+// but the record itself stays. Deliberately its own action route rather
+// than a status value on PUT /:id: that route already 409s once status is
+// 'sent'/'paid' (a delivered/settled document can't be edited), but
+// voiding is exactly the escape hatch a sent invoice needs — it has to
+// work precisely where PUT refuses to. Requires a non-blank `reason` in
+// the body (400 otherwise) — see void_reason on the invoices table
+// (db/index.js) for why this is mandatory now that voiding is the only
+// cancellation path this app offers. Only blocked when the invoice is
+// already void, already paid (voiding paid money needs a real refund
+// process, not a status flip), or has any recorded payments at all (a
+// partially-paid invoice can't just have its payments silently orphaned
+// by voiding it).
 router.post('/:id/void', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Invoice not found' });
@@ -411,9 +410,13 @@ router.post('/:id/void', manage, (req, res) => {
   if (existing.amount_paid > 0) {
     return res.status(409).json({ error: 'This invoice has recorded payments and cannot be voided' });
   }
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (!reason) {
+    return res.status(400).json({ error: 'A reason is required to void an invoice' });
+  }
 
-  db.prepare(`UPDATE invoices SET status = 'void', updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'voided', entityType: 'invoice', entityId: existing.id, entityLabel: existing.number });
+  db.prepare(`UPDATE invoices SET status = 'void', void_reason = ?, updated_at = datetime('now') WHERE id = ?`).run(reason, req.params.id);
+  logActivity({ userName: req.user.name, action: 'voided', entityType: 'invoice', entityId: existing.id, entityLabel: `${existing.number} — ${reason}` });
   res.json(getInvoiceWithItems(req.params.id));
 });
 
