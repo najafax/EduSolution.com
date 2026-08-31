@@ -3727,6 +3727,17 @@ staff *reach* and *fill in* that same existing endpoint.
   the reference/description keywords) is correctly recognized as "not a
   continuation," closing the same class of gap `isRealValue()` closes for
   values.
+  **A real compound reference number was getting truncated mid-value**:
+  reported as a slip whose printed reference, `FT26242CWFLC\MV1`, only
+  came back as `FT26242CWFLC` — the captured-value character class
+  (`[A-Za-z0-9/-]`, on both the reference-tier regex and the tier-3
+  fallback's own candidate regex) already allowed a forward slash and a
+  hyphen, since a real reference is often a compound, separator-joined
+  code, but never allowed a literal backslash — so the match simply
+  stopped the instant it hit one, silently dropping everything after it
+  rather than erroring or falling back. Both character classes now also
+  allow `\` (`[A-Za-z0-9/\\-]`), closing the same gap either tier could
+  hit.
   **This deliberately does not self-host tesseract.js's worker/WASM
   core/language-data files** (unlike this app's own fonts — see "Mobile
   design system"'s note on why those *are* self-hosted) — those files run

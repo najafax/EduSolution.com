@@ -54,7 +54,14 @@
 // attempt to a single line at a time makes that structurally impossible —
 // there is no newline character inside the string being matched for it to
 // cross.
-const REFERENCE_KEYWORD_RE = /\b(?:ref(?:erence)?|txn|transaction|trans|confirmation|receipt)\b\.?[ \t]*(?:no\.?|number|#)?[ \t]*[:#-]?[ \t]*([A-Za-z0-9][A-Za-z0-9/-]{3,})/i;
+//
+// The captured value's own character class includes a literal backslash
+// alongside the forward slash/hyphen it already allowed — some bank
+// reference numbers are themselves compound, slash- or backslash-separated
+// codes (e.g. `FT26242CWFLC\MV1`, a real one reported back), and without it
+// the match stopped dead at the backslash and only "FT26242CWFLC" got
+// captured, silently dropping the rest of the real reference.
+const REFERENCE_KEYWORD_RE = /\b(?:ref(?:erence)?|txn|transaction|trans|confirmation|receipt)\b\.?[ \t]*(?:no\.?|number|#)?[ \t]*[:#-]?[ \t]*([A-Za-z0-9][A-Za-z0-9/\\-]{3,})/i;
 const DESCRIPTION_KEYWORD_RE = /\b(?:description|particulars?|remarks?|narration|purpose|details?|memo|note|for)\b\.?[ \t]*[:#-]?[ \t]*(.+)/i;
 const MIN_FALLBACK_LENGTH = 6;
 const MAX_DESCRIPTION_LENGTH = 60;
@@ -148,7 +155,7 @@ export function extractReference(rawText) {
   const description = findDescription(rawText);
   if (description) return { value: description.slice(0, MAX_DESCRIPTION_LENGTH), source: 'description' };
 
-  const candidates = rawText.match(/[A-Za-z0-9][A-Za-z0-9/-]{5,}/g) || [];
+  const candidates = rawText.match(/[A-Za-z0-9][A-Za-z0-9/\\-]{5,}/g) || [];
   const withDigits = candidates.filter((c) => /\d/.test(c) && isRealValue(c));
   if (withDigits.length === 0) return null;
 
