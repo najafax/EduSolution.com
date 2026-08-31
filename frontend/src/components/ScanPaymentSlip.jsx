@@ -23,6 +23,20 @@ import { ScanIcon } from './icons';
 // purely a shortcut to fill it in, never a requirement to record a
 // payment, and whatever it detects is always meant to be double-checked
 // against the real slip before saving.
+
+// One notice per lib/extractReference.js `source` tier — worded to match
+// how confident that tier actually is, not a single generic "detected X"
+// line for all three: a labeled reference reads very differently from a
+// blind guess, and saying so is what tells staff how hard to double-check
+// it before saving.
+const SCAN_NOTICES = {
+  reference: (value) => `Detected "${value}" — please double-check it against the slip before saving.`,
+  description: (value) =>
+    `No reference number found on this slip — filled in "${value}" from its description instead. Please check it before saving.`,
+  fallback: (value) =>
+    `Couldn't find a labeled reference or description on this slip — filled in "${value}" as a best guess. Please check it carefully before saving.`,
+};
+
 export default function ScanPaymentSlip({ onDetected, disabled }) {
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState('');
@@ -38,12 +52,12 @@ export default function ScanPaymentSlip({ onDetected, disabled }) {
     try {
       const { default: Tesseract } = await import('tesseract.js');
       const { data } = await Tesseract.recognize(file, 'eng');
-      const reference = extractReference(data.text);
-      if (reference) {
-        onDetected(reference);
-        setScanNotice(`Detected "${reference}" — please double-check it against the slip before saving.`);
+      const detected = extractReference(data.text);
+      if (detected) {
+        onDetected(detected.value);
+        setScanNotice(SCAN_NOTICES[detected.source](detected.value));
       } else {
-        setScanError("Couldn't detect a reference number automatically — please enter it manually.");
+        setScanError("Couldn't detect a reference or description automatically — please enter it manually.");
       }
     } catch {
       setScanError("Couldn't scan this image — please enter the reference manually.");

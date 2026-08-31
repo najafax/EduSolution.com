@@ -3613,21 +3613,57 @@ staff *reach* and *fill in* that same existing endpoint.
   recorded) should pay the ~19KB for, the same "route-level
   code-splitting" reasoning this app already applies to whole pages (see
   "Route-level code-splitting" below). `lib/extractReference.js`'s
-  `extractReference(rawText)` is the actual pick-a-reference heuristic,
-  deliberately factored out as a small, pure, dependency-free function
-  (no OCR, no DOM, no network) so it's the one part of this feature
-  that's unit-testable in isolation: it first looks for a line containing
-  a common bank-slip label (`ref`/`reference`/`txn`/`transaction`/
-  `confirmation`/`receipt no`) and takes the token right after it; with
-  no keyword match at all, it falls back to the longest alphanumeric
-  token in the whole text that's at least 6 characters *and* contains a
-  digit (so a stray letterhead word like "TRANSFER" can never win over a
-  real reference just for being long). Either way this is always a guess,
-  never authoritative — `ScanPaymentSlip.jsx`'s own success notice reads
-  `` Detected "{reference}" — please double-check it against the slip
-  before saving. `` rather than treating it as settled, and the Reference
-  field stays a normal, freely-editable text input regardless of whether
-  a scan was ever attempted or what it found.
+  `extractReference(rawText)` is the actual pick-a-heuristic, deliberately
+  factored out as a small, pure, dependency-free function (no OCR, no DOM,
+  no network) so it's the one part of this feature that's unit-testable
+  in isolation, returning `{ value, source }` (`source` is `'reference'` |
+  `'description'` | `'fallback'`) or `null` when nothing usable was found
+  at all. Three tiers, tried in order:
+  1. A line containing a common bank-slip *reference* label (`ref`/
+     `reference`/`txn`/`transaction`/`trans`/`confirmation`/`receipt`,
+     each optionally followed by `no`/`no.`/`number`/`#` — e.g. "Reference
+     No:", "Transaction No.", "Receipt No.", "Confirmation#" are all real
+     slip label shapes this needs to recognize as *one* label, not a
+     keyword plus a mangled value) — the token right after the label is
+     taken as the reference.
+  2. No reference label at all — real staff feedback on this feature
+     (some slips scanned fine but the field stayed blank) turned out to
+     mean exactly what it sounds like: plenty of real slips genuinely
+     don't print a reference number, only a *description* of what the
+     payment was for. Falls back to a description-style label instead
+     (`description`/`particulars`/`remarks`/`narration`/`purpose`/
+     `details`/`memo`/`note`/`for`) and takes the rest of that line — a
+     short phrase, not a single code, capped at 60 characters so a long
+     narration doesn't blow out the Reference field.
+  3. Neither label found — falls back to the longest alphanumeric token
+     in the whole text that's at least 6 characters *and* contains a
+     digit (so a stray letterhead word like "TRANSFER" can never win over
+     a real reference just for being long).
+  **Fixing tier 1 to recognize a `no`/`number`/`#` suffix as part of the
+  label (not the value) was itself a real bug fix, not just cleanup** —
+  the original regex only special-cased this for two of its six keywords
+  (`trans(?:\s*no)?`, `receipt\s*no`), so a slip labeling its reference
+  "Reference No: 123456" (an extremely common real-world format) silently
+  failed to match: "No" got swallowed into the *value* capture attempt,
+  which then broke on the colon right after it and failed the capture's
+  own minimum-length check, so the match failed entirely and this fell
+  through to the much less reliable tier-3 fallback instead — explaining
+  the original bug report ("reference number is picking from some slips"
+  but not others, with no obvious pattern from a user's perspective).
+  Sharing one optional suffix across every keyword (rather than special-
+  casing it per keyword) closes this gap for all of them at once. Either
+  way this is always a guess, never authoritative —
+  `components/ScanPaymentSlip.jsx`'s own `SCAN_NOTICES` map picks a
+  distinctly-worded success notice per tier (`` Detected "{value}" —
+  please double-check it against the slip before saving. `` for a real
+  labeled reference, down to `` Couldn't find a labeled reference or
+  description on this slip — filled in "{value}" as a best guess. Please
+  check it carefully before saving. `` for the tier-3 guess) so staff
+  know how much to trust what just got filled in, rather than one generic
+  "detected X" line regardless of which tier actually produced it. The
+  Reference field stays a normal, freely-editable text input regardless
+  of whether a scan was ever attempted, which tier produced a value, or
+  whether one was found at all.
   **This deliberately does not self-host tesseract.js's worker/WASM
   core/language-data files** (unlike this app's own fonts — see "Mobile
   design system"'s note on why those *are* self-hosted) — those files run
