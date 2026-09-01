@@ -112,12 +112,8 @@ export default function App() {
             the standard sticky-footer pattern. BottomNav is phone-only
             (sm:hidden) and fixed, so logged-in pages still need the bottom
             padding on phones or the tab bar covers Footer/the page's last
-            content — see BottomNav.jsx. Bumped from pb-16 to pb-24 once
-            BottomNav became a floating "liquid glass" dock with its own
-            bottom margin (rather than a bar flush against the screen edge),
-            so there's still a clean gap above it instead of content
-            crowding right up to the glass. */}
-        <div className={`flex flex-1 flex-col ${user && !isPortalRoute ? 'pb-24 sm:pb-0' : ''}`}>
+            content — see BottomNav.jsx. */}
+        <div className={`flex flex-1 flex-col ${user && !isPortalRoute ? 'pb-16 sm:pb-0' : ''}`}>
           <div className="flex-1">
             {/* Keyed by pathname so a crash on one page doesn't linger once
                 the user navigates elsewhere — remounting clears the
