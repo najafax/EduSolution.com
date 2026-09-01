@@ -1452,9 +1452,8 @@ deliberately untouched by either, always returning every row.
   over the rest.
   **Period filter on `Financials.jsx`**: `GET /summary` accepts optional
   `?from=&to=` (`YYYY-MM-DD`) — omitted, it's the exact unfiltered/all-time
-  query this endpoint has always run (what `Dashboard.jsx`'s own call still
-  gets, unconditionally; malformed or partial input falls back to
-  unfiltered too, rather than 400ing, since this isn't a hand-typed form).
+  query this endpoint has always run; malformed or partial input falls back
+  to unfiltered too, rather than 400ing, since this isn't a hand-typed form.
   `Financials.jsx` renders a `StatusFilterChips` row (This year/Last year/
   This month/Last month/All time, defaulting to **This year**) right under
   the page intro, computing each option's exact `{from, to}` fresh on every
@@ -1520,6 +1519,99 @@ deliberately untouched by either, always returning every row.
   the period filter either — that widget's own title already sets a fixed,
   independent framing (always the 6 months trailing from today), so it
   keeps showing that regardless of which filter tab is selected.
+  **`computeSummary(from, to)`**: the whole `GET /summary` computation
+  above is a plain, exported function (`router.computeSummary =
+  computeSummary`), not inlined into the route handler — `routes/
+  dashboard.js`'s own combined overview endpoint (below) calls it directly,
+  in-process, rather than duplicating this financially-sensitive logic
+  (bank balance, cash-basis net profit, the whole thing) a second time, or
+  making a second HTTP round-trip to itself. The route handler itself is
+  now just `res.json(computeSummary(from, to))`.
+- `routes/dashboard.js` (mounted at `/api/dashboard`) — `GET /overview` is
+  the single combined fetch behind `Dashboard.jsx`, replacing what used to
+  be up to 8 separate requests fired in parallel on every dashboard load
+  (`financials.summary`, `settings.get`, two "needs attention" list
+  fetches, and four per-module `analytics` calls). This matters more than
+  "fewer round-trips" here specifically because `better-sqlite3` is
+  synchronous — every one of those 8 requests blocked Node's single-
+  threaded event loop in turn (including its own `requireAuth` user
+  re-fetch each time), so they never actually ran in parallel on the
+  backend even though the frontend fired them together; one request means
+  one blocking pass through the DB instead of eight. Like `routes/
+  search.js`, there's no blanket `requirePermission` middleware — just
+  `router.use(requireAuth)`, with every section of the response
+  independently gated inline via `hasPermission(req.user, module, 'view')`
+  (imported directly from `lib/permissions.js`, not the `requirePermission`
+  route middleware) — the same pattern `search.js` uses for a route where
+  different callers can hold different subsets of the underlying grants: a
+  staff user missing some of `financials`/`settings`/`invoices`/`licenses`/
+  `quotes`/`expenses`'s own `view` grants gets `null`/`[]` back for just
+  those sections rather than a 403 for the whole request. The whole handler
+  is wrapped in try/catch (same "log and return `{ error }` rather than an
+  unhandled exception" hardening the four `/analytics` routes already have,
+  see "Error boundaries" below) since a single failure here would otherwise
+  take down the entire dashboard rather than one panel of it.
+  Response shape: `financials` (via `computeSummary(yearFrom, today)` — the
+  exact same current-calendar-year range `Financials.jsx`'s own "This year"
+  filter tab already sends to `GET /financials/summary`, so this is that
+  identical figure, not a separate all-time or differently-scoped one),
+  `settings` (just `{ currency_symbol, business_name }`, the only two
+  fields `Dashboard.jsx` ever reads — not the full `business_settings`
+  row `GET /settings` returns), `overdueInvoices`/`expiringLicenses` (each
+  gated on `financials:view` *and* its own module's `view`, mirroring
+  `Dashboard.jsx`'s own prior `canSeeAttentionPanel` reasoning — a user
+  could hold one grant without the other), and `yearOverview.{quotes,
+  invoices, licenses, expenses}` (each independently gated on that
+  module's own `view`). `overdueInvoices`/`expiringLicenses` are expressed
+  directly as SQL (`WHERE status = 'sent' AND due_date < ? AND (total -
+  amount_paid) > 0`, `WHERE status = 'active' AND expiry_date BETWEEN
+  today AND today+30`) mirroring `routes/invoices.js`'s own
+  `withComputed()`'s `is_overdue` definition and `routes/licenses.js`'s own
+  `statusWhere('expiring_soon')` exactly, rather than fetching every `sent`
+  invoice/`active` license and filtering in JS the way `Dashboard.jsx`'s
+  own prior per-request fetches did — only the rows actually needed are
+  ever queried, each capped at 4 (matching `Dashboard.jsx`'s own
+  `NEEDS_ATTENTION_LIMIT`, now enforced server-side instead of by slicing a
+  larger array client-side). `EXPIRY_WARNING_DAYS = 30` is duplicated here
+  as a literal — same acceptable-duplication call this app already makes
+  between `routes/licenses.js` and `lib/scheduler.js` for the identical
+  constant (keep all three in sync). `yearOverview`'s four sections mirror
+  each module's own `GET /:module/analytics` year-over-year semantics
+  (`routes/quotes.js`'s `created`/`amountQuoted`/`accepted`/`declined`,
+  `routes/invoices.js`'s `issued`/`amountInvoiced`/`paymentsReceived`/
+  `amountCollected`, `routes/licenses.js`'s `newLicenses`/`renewals`,
+  `routes/expenses.js`'s `total`/`count`) but computed as direct
+  current-year-only SQL aggregates (`strftime('%Y', col) = ?`) rather than
+  building each module's complete multi-year `byYear` array the way the
+  dedicated analytics pages need to — this endpoint only ever needs this
+  year's own row, so it queries directly for just that instead of
+  re-deriving it from a bigger structure computed for a different page.
+  `strftime('%Y', ...)` (not a `BETWEEN yearFrom AND today` string-range
+  comparison) is deliberate here for the same reason `db/index.js`'s own
+  migration notes call out elsewhere: several of the columns compared
+  (`payments.paid_at`, `license_renewals.renewed_at`,
+  `quotes.client_responded_at`/`updated_at`) carry a full datetime, not
+  just a date, and a datetime-with-time string sorts *after* a same-day
+  date-only upper bound lexicographically — a plain `BETWEEN` would
+  silently exclude today's own rows.
+  `frontend/src/pages/Dashboard.jsx` calls this once (`api.dashboard.
+  overview(token)`) in place of its former 8 separate `useEffect` fetches,
+  setting the same `summary`/`settings`/`overdueInvoices`/
+  `expiringLicenses`/`quoteAnalytics`/`invoiceAnalytics`/
+  `licenseAnalytics`/`expenseAnalytics` state it always has from the one
+  response's sections — `yearOverviewSection()`'s own `currentYearRow()`
+  helper (which used to pick this year's row out of each analytics
+  endpoint's `byYear` array) was removed entirely, since `yearOverview`'s
+  four sections already arrive as just that one row, not an array to pick
+  from. Verified against a real production build (`npm run preview`, not
+  the dev server — see `NotificationsContext.jsx`'s own note on why
+  `StrictMode` makes dev-server request counts unreliable) with a
+  Playwright pass confirming the dashboard fires exactly one
+  `/api/dashboard/overview` request on load (down from the prior 8-request
+  fan-out), every figure matches what the old separate endpoints returned
+  for the same data, and permission-gating behaves identically for a
+  partial-access staff user (each ungranted section comes back `null`/`[]`
+  rather than the whole request 403ing).
 - `routes/reports.js` (mounted at `/api/reports`) — five downloadable PDF
   reports, each `GET /<type>/pdf?from=&to=` (`YYYY-MM-DD`, both required;
   400s if either is missing/malformed or `from` is after `to`). Gated on

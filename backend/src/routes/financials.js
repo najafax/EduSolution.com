@@ -20,16 +20,13 @@ function recentMonths(count) {
   return months;
 }
 
-router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
-  // `from`/`to` are both optional — Dashboard.jsx's own call never sends
-  // them (and always wants the unfiltered, all-time view it's always had),
-  // while Financials.jsx's period-filter tabs (This year/Last year/This
-  // month/Last month/All time) send both once a period other than "All
-  // time" is selected. Malformed or partial input (a bug, not a real user
-  // action — this isn't a hand-typed form) just falls back to unfiltered
-  // rather than 400ing, since nothing here is destructive and failing open
-  // to "show everything" is the safer default for a summary view.
-  const { from, to } = req.query;
+// The whole GET /summary computation, pulled out into a plain function so
+// routes/dashboard.js's combined overview endpoint can call it in-process
+// (a direct function call, not a second HTTP round-trip) rather than
+// duplicating this financially-sensitive logic — bank balance, cash-basis
+// net profit, etc. — a second time. `from`/`to` are both optional exactly
+// as they are on the route below.
+function computeSummary(from, to) {
   const filtered = DATE_RE.test(from || '') && DATE_RE.test(to || '') && from <= to;
   const dateFilter = filtered ? ' AND issue_date BETWEEN ? AND ?' : '';
   const dateArgs = filtered ? [from, to] : [];
@@ -175,7 +172,7 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
     )
     .all(...dateArgs);
 
-  res.json({
+  return {
     totalInvoiced: Math.round(totalInvoiced * 100) / 100,
     totalPaid: Math.round(totalPaid * 100) / 100,
     totalOutstanding,
@@ -200,7 +197,21 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
     invoiceCounts,
     monthlyTrend,
     recentPayments,
-  });
+  };
+}
+
+router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
+  // `from`/`to` are both optional — Dashboard.jsx's own call never sends
+  // them (and always wants the unfiltered, all-time view it's always had),
+  // while Financials.jsx's period-filter tabs (This year/Last year/This
+  // month/Last month/All time) send both once a period other than "All
+  // time" is selected. Malformed or partial input (a bug, not a real user
+  // action — this isn't a hand-typed form) just falls back to unfiltered
+  // rather than 400ing, since nothing here is destructive and failing open
+  // to "show everything" is the safer default for a summary view.
+  const { from, to } = req.query;
+  res.json(computeSummary(from, to));
 });
 
 module.exports = router;
+module.exports.computeSummary = computeSummary;

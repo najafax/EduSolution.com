@@ -244,10 +244,22 @@ export const api = {
   },
 
   financials: {
-    // `from`/`to` are both optional — omit both (Dashboard.jsx's own call)
-    // for the unfiltered, all-time summary; Financials.jsx's period-filter
-    // tabs pass both once a period other than "All time" is selected.
+    // `from`/`to` are both optional — omit both for the unfiltered,
+    // all-time summary; Financials.jsx's period-filter tabs pass both once
+    // a period other than "All time" is selected. Dashboard.jsx no longer
+    // calls this directly — see dashboard.overview below, which returns the
+    // identical current-year-scoped figure as one section of its combined
+    // response.
     summary: (token, { from, to } = {}) => request(`/financials/summary${qs({ from, to })}`, { token }),
+  },
+
+  // The single combined fetch behind Dashboard.jsx — replaces what used to
+  // be up to 8 separate requests (financials summary, settings, two "needs
+  // attention" list fetches, four per-module analytics calls) with one.
+  // See routes/dashboard.js's own top-of-file note for why this is a real
+  // backend cost reduction, not just fewer round-trips.
+  dashboard: {
+    overview: (token) => request('/dashboard/overview', { token }),
   },
 
   import: {

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { useDashboardShortcuts } from '../lib/useDashboardShortcuts';
-import { startOfYearStr, todayStr } from '../lib/date';
 import RevenueTrendChart from '../components/RevenueTrendChart';
 import StatusDonutChart from '../components/StatusDonutChart';
 import RingKpiCard from '../components/RingKpiCard';
@@ -28,27 +27,12 @@ import {
 } from '../components/icons';
 import { money } from '../lib/money';
 
-// This year's YYYY-01-01..today range, computed once per module load rather
-// than per render — every consumer below (the financials summary fetch, the
-// "this year" label, the byYear lookups) needs the identical bounds, so
-// this is the one place that pins them.
-const YEAR_FROM = startOfYearStr();
-const YEAR_TO = todayStr();
+// The current calendar year — used only for the "This year at a glance
+// (2026)" section title below. The actual current-year figures themselves
+// come from GET /api/dashboard/overview's own yearOverview section (see
+// that route for why this no longer needs a byYear array to pick a row
+// out of on the frontend).
 const CURRENT_YEAR = new Date().getFullYear();
-
-// Pulls out the current year's row from an analytics endpoint's own
-// `byYear` array (see routes/quotes.js's/routes/invoices.js's/
-// routes/licenses.js's/routes/expenses.js's own GET /analytics — every one
-// of the four already reports a year-over-year breakdown with gap years
-// included at zero) rather than adding a fifth backend endpoint just to
-// ask "what happened this year" — that data already exists, this just
-// reads the one row out of it that matters here. Falls back to an all-zero
-// stand-in row if the year has no data yet (a business's very first year
-// using a module, or a module nobody's touched yet this year) so every
-// caller can read fields off the result unconditionally.
-function currentYearRow(byYear) {
-  return (byYear || []).find((row) => row.year === CURRENT_YEAR) || { year: CURRENT_YEAR };
-}
 
 function greeting() {
   const hour = new Date().getHours();
@@ -75,12 +59,6 @@ const SHORTCUTS = [
 // modal (see useDashboardShortcuts), this just caps the rail's own list.
 const RAIL_SHORTCUT_LIMIT = 6;
 
-// How many days out a license still counts as "expiring soon" — matches
-// routes/licenses.js's own EXPIRY_WARNING_DAYS; not imported (this is a
-// frontend display concern reading the backend's already-filtered
-// `?status=expiring_soon` result, not re-deriving the threshold itself).
-const NEEDS_ATTENTION_LIMIT = 4;
-
 export default function Dashboard() {
   const { user, token, can } = useAuth();
   const [summary, setSummary] = useState(null);
@@ -103,87 +81,37 @@ export default function Dashboard() {
   const canSeeAttentionPanel = canViewFinancials && (canViewInvoices || canViewLicenses);
   const canSeeYearOverview = canViewQuotes || canViewInvoices || canViewLicenses || canViewExpenses;
 
+  // One combined fetch (GET /api/dashboard/overview) replaces what used to
+  // be up to 8 separate requests fired in parallel on every page load —
+  // financials summary, settings, two "needs attention" list fetches, and
+  // four per-module analytics calls. better-sqlite3 is synchronous, so
+  // those 8 requests never actually ran in parallel on the backend anyway;
+  // this collapses them into one request handled by one blocking pass
+  // through the DB, not just fewer round-trips. Each section of the
+  // response is independently permission-gated server-side (see
+  // routes/dashboard.js), coming back `null`/`[]` for a grant the caller
+  // doesn't hold rather than 403ing the whole request — so a
+  // partial-access staff user still gets exactly the sections they can see.
   useEffect(() => {
-    if (canViewFinancials) {
-      // Scoped to the current calendar year (see YEAR_FROM/YEAR_TO above) —
-      // the same `?from=&to=` range Financials.jsx's own "This year" tab
-      // already sends to this identical endpoint, so Dashboard now shows
-      // the same year-scoped figures rather than an all-time total that
-      // only grows and never resets a business's sense of "how's this year
-      // going." bankBalance/clientCount/monthlyTrend are unaffected either
-      // way — see routes/financials.js's own note on which fields a period
-      // filter does and doesn't scope.
-      api.financials.summary(token, { from: YEAR_FROM, to: YEAR_TO }).then(setSummary).catch((err) => setError(err.message));
-    }
-    // `.finally` flips settingsLoaded whether the fetch succeeds or fails
-    // (e.g. a staff user without settings:view) — the render below waits on
-    // this alongside `summary` so the hero/KPI figures never paint with the
-    // '$' fallback for one frame before snapping to the real currency
-    // symbol once this resolves a moment later (both fetches fire together
-    // but resolve independently, and summary usually wins the race).
-    api.settings
-      .get(token)
-      .then(({ settings }) => setSettings(settings))
-      .catch(() => {})
+    api.dashboard
+      .overview(token)
+      .then((data) => {
+        if (data.financials) setSummary(data.financials);
+        if (data.settings) setSettings(data.settings);
+        setOverdueInvoices(data.overdueInvoices || []);
+        setExpiringLicenses(data.expiringLicenses || []);
+        setQuoteAnalytics(data.yearOverview?.quotes || null);
+        setInvoiceAnalytics(data.yearOverview?.invoices || null);
+        setLicenseAnalytics(data.yearOverview?.licenses || null);
+        setExpenseAnalytics(data.yearOverview?.expenses || null);
+      })
+      .catch((err) => setError(err.message))
+      // Flips whether the fetch succeeds or fails — the render below waits
+      // on this alongside `summary` so the hero/KPI figures never paint
+      // with the '$' fallback symbol for one frame before snapping to the
+      // real currency symbol once this resolves.
       .finally(() => setSettingsLoaded(true));
-  }, [token, canViewFinancials]);
-
-  // "Needs attention" — the invoices already overdue and the licenses about
-  // to lapse, the two things on this page that actually call for action
-  // rather than just reporting a number. Each is its own small, permission-
-  // gated fetch (separate from `financials:view`, which the rest of this
-  // page's data depends on) rather than something financials/summary
-  // returns, since a user could have one of these grants without the
-  // other. Both are best-effort: a failure here shouldn't block the rest
-  // of the dashboard, so errors are swallowed rather than surfaced.
-  useEffect(() => {
-    if (!canSeeAttentionPanel || !canViewInvoices) return;
-    api.invoices
-      .list(token, { status: 'sent' })
-      .then(({ invoices }) => {
-        const overdue = invoices.filter((inv) => inv.is_overdue).sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
-        setOverdueInvoices(overdue.slice(0, NEEDS_ATTENTION_LIMIT));
-      })
-      .catch(() => {});
-  }, [token, canSeeAttentionPanel, canViewInvoices]);
-
-  useEffect(() => {
-    if (!canSeeAttentionPanel || !canViewLicenses) return;
-    api.licenses
-      .list(token, { status: 'expiring_soon' })
-      .then(({ licenses }) => {
-        const sorted = [...licenses].sort((a, b) => (a.expiry_date < b.expiry_date ? -1 : 1));
-        setExpiringLicenses(sorted.slice(0, NEEDS_ATTENTION_LIMIT));
-      })
-      .catch(() => {});
-  }, [token, canSeeAttentionPanel, canViewLicenses]);
-
-  // "This year at a glance" — reuses each module's own existing
-  // GET /:module/analytics endpoint (already year-over-year, see
-  // currentYearRow() above) rather than a new backend endpoint. Four
-  // independent, permission-gated, best-effort fetches (same reasoning as
-  // the "Needs attention" ones above — a user could hold any subset of
-  // these four view grants, and a failure here shouldn't block the rest of
-  // the dashboard).
-  useEffect(() => {
-    if (!canViewQuotes) return;
-    api.quotes.analytics(token).then(setQuoteAnalytics).catch(() => {});
-  }, [token, canViewQuotes]);
-
-  useEffect(() => {
-    if (!canViewInvoices) return;
-    api.invoices.analytics(token).then(setInvoiceAnalytics).catch(() => {});
-  }, [token, canViewInvoices]);
-
-  useEffect(() => {
-    if (!canViewLicenses) return;
-    api.licenses.analytics(token).then(setLicenseAnalytics).catch(() => {});
-  }, [token, canViewLicenses]);
-
-  useEffect(() => {
-    if (!canViewExpenses) return;
-    api.expenses.analytics(token).then(setExpenseAnalytics).catch(() => {});
-  }, [token, canViewExpenses]);
+  }, [token]);
 
   const symbol = settings?.currency_symbol || '$';
   const permittedShortcuts = SHORTCUTS.filter((s) => can(s.module, 'view'));
@@ -265,10 +193,13 @@ export default function Dashboard() {
   // balance right now. Each card links straight to that module's own full
   // analytics page (the real "everything" this section is a preview of).
   function yearOverviewSection() {
-    const q = quoteAnalytics && currentYearRow(quoteAnalytics.byYear);
-    const inv = invoiceAnalytics && currentYearRow(invoiceAnalytics.byYear);
-    const lic = licenseAnalytics && currentYearRow(licenseAnalytics.byYear);
-    const exp = expenseAnalytics && currentYearRow(expenseAnalytics.byYear);
+    // routes/dashboard.js's own overview endpoint already returns just this
+    // year's own figures for each module (see that route's own top-of-file
+    // note) — no `byYear` array to pick a row out of here anymore.
+    const q = quoteAnalytics;
+    const inv = invoiceAnalytics;
+    const lic = licenseAnalytics;
+    const exp = expenseAnalytics;
     const decided = q ? (q.accepted || 0) + (q.declined || 0) : 0;
 
     return (
