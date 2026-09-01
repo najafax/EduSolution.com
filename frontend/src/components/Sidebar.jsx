@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
 import ThemeToggle from './ThemeToggle';
-import NotificationCenter from './NotificationCenter';
 import { BUSINESS_LINKS } from './Navbar';
 import {
   HomeIcon,
@@ -70,12 +69,20 @@ const LINK_ICONS = {
 // rather than the flat link-list dropdown this app used before. The `xl:`
 // classes below are untouched either way, so the persistent desktop
 // sidebar keeps working exactly as it did — only the below-`xl:` styling
-// branches on `mobileOpen`. Search/notifications/account row (see above)
-// stay in the drawer specifically because `TopBar.jsx`, their new home,
-// is itself `xl:`-only — a tablet/phone user has no other route to them,
-// so the drawer keeps carrying the full experience `mobileOpen` already
-// implies (the exact same content it always rendered), only the
-// `mobileOpen: false` persistent case lost anything here.
+// branches on `mobileOpen`. Search/account row (see above) stay in the
+// drawer specifically because `TopBar.jsx`, their new home, is itself
+// `xl:`-only — a tablet/phone user has no other route to them, so the
+// drawer keeps carrying that part of what `mobileOpen` already implied.
+// Two exceptions to "the drawer keeps everything," both removed at
+// follow-up request once each one's reasoning turned out not to hold:
+// the notification bell (`Navbar.jsx`'s own header, with its own bell,
+// stays mounted and visible the whole time the drawer sits open on top of
+// it, so a second one here was pure duplication, not a real gap — see
+// "Notification center" in CLAUDE.md) and search on phone widths
+// specifically (`hidden sm:block` on its wrapper below — `Navbar.jsx` has
+// its own phone-only search toggle, `sm:hidden` there, so a phone visitor
+// already has a route to search without this copy; a tablet visitor still
+// doesn't, so it stays visible from `sm:` up).
 export default function Sidebar({ mobileOpen = false, onMobileClose }) {
   const { user, logout, can, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
@@ -150,16 +157,6 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
             Edu Solutions
           </Link>
           <div className="flex shrink-0 items-center gap-0.5">
-            {/* Notification bell, drawer mode only — see this file's own
-                top-of-file note: the persistent desktop instance no longer
-                carries this at all, it lives in TopBar.jsx now. Same
-                forced-light-icon override reasoning as ThemeToggle's own
-                Sidebar usage below — its default slate styling is tuned for
-                the app's themed page background, not this permanently-dark
-                panel. */}
-            {mobileOpen && (
-              <NotificationCenter align="left" className="!text-lagoon-200 hover:!bg-white/10 hover:!text-white" />
-            )}
             {/* Close button, drawer mode only — the backdrop click and Escape
                 (see the effect above) also close it, but a visible control
                 matters here since there's no other affordance in-panel. */}
@@ -178,8 +175,16 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
 
         {/* Search, drawer mode only — see this file's own top-of-file note:
             the persistent desktop instance no longer carries this at all,
-            it lives in TopBar.jsx now. GlobalSearch's own dark: styling is
-            tuned for the app's themed page background, not this
+            it lives in TopBar.jsx now. Also `hidden sm:block` even within
+            the drawer — a phone-width visitor already has Navbar.jsx's own
+            phone-only search toggle (`sm:hidden` there, the mirror image of
+            this), so this copy would just be a redundant second search box
+            on top of it; a tablet-width visitor has no such toggle (Navbar
+            renders no search UI of its own between `sm:` and `xl:`), so
+            this stays the one and only way for that width band to reach
+            search — removing it there instead would be a real functional
+            gap, not just visual duplication. GlobalSearch's own dark:
+            styling is tuned for the app's themed page background, not this
             permanently-dark bg-lagoon-950 panel — stacked with the app's
             own dark theme it read as barely-visible dark-on-dark. These
             overrides force a light input regardless of app theme, since
@@ -187,7 +192,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
             classes (its `className` prop only reaches the outer wrapper,
             not the nested <input>). */}
         {mobileOpen && (
-          <div className="mb-3 shrink-0 px-1 [&_input]:!border-lagoon-200 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:!shadow-sm [&_input::placeholder]:!text-slate-400">
+          <div className="mb-3 hidden shrink-0 px-1 sm:block [&_input]:!border-lagoon-200 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:!shadow-sm [&_input::placeholder]:!text-slate-400">
             <GlobalSearch className="w-full" onNavigate={handleLinkClick} />
           </div>
         )}

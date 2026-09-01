@@ -6027,15 +6027,26 @@ persistent desktop sidebar either way.
   plain default styling, tuned for exactly this kind of surface. **The
   persistent `Sidebar` instance (`mobileOpen` false/omitted) no longer
   renders any of these four at all** — `Sidebar.jsx`'s own `mobileOpen &&
-  (...)` guards around its `NotificationCenter` call, its `GlobalSearch`
-  block, and its bottom account-row block are what removes them there
-  specifically; the **drawer instance** (`mobileOpen` true, tablet/phone,
-  opened by `Navbar.jsx`'s hamburger) keeps every one of them exactly as
-  before, unabridged — a tablet-width visitor has no `TopBar` of their own
-  to reach these through (`TopBar` is `xl:`-only, same as the persistent
-  `Sidebar` it replaces at that breakpoint), so the drawer stays the one
-  and only way for that width band to reach search/notifications/theme/
-  account, same as it always was for the *full* nav-links list too.
+  (...)` guards around its `GlobalSearch` block and its bottom account-row
+  block are what removes them there specifically; the **drawer instance**
+  (`mobileOpen` true, tablet/phone, opened by `Navbar.jsx`'s hamburger)
+  keeps the account row exactly as before, unabridged, and `GlobalSearch`
+  on tablet widths specifically (`hidden sm:block` on its wrapper — a
+  tablet-width visitor has no `TopBar` of their own to reach it through,
+  `TopBar` being `xl:`-only same as the persistent `Sidebar` it replaces
+  at that breakpoint, so the drawer stays the one and only way for that
+  width band to reach search/theme/account there). **Two exceptions to
+  "the drawer keeps everything," both pulled back out again at follow-up
+  requests**: the bell — `Navbar.jsx`'s own header (with its own bell)
+  stays mounted and visible the whole time the drawer sits open on top of
+  it, so a second bell inside the drawer was pure duplication rather than
+  filling a real gap (see "Notification center" below for the full
+  story) — and search **on phone widths only** — `Navbar.jsx` also has
+  its own phone-only search toggle (`sm:hidden` there), so a phone
+  visitor already has a route to search without the drawer's copy, the
+  same reasoning that removed the bell; a tablet visitor still has no
+  such toggle, so the drawer's search stays visible from `sm:` up, unlike
+  the bell which is gone at every width below `xl:`.
   Verified end-to-end with a real dev-server + Playwright pass, not just
   a code read: a `1440×900` desktop viewport confirmed zero `<input
   type="search">` elements inside `<aside>` (the persistent sidebar) and
@@ -6044,7 +6055,13 @@ persistent desktop sidebar either way.
   place across the route change, and that a `900×800` tablet-width
   viewport's hamburger-opened drawer still renders both a search input
   and an `/account` link inside its own `<aside>`, unaffected by any of
-  this.
+  this. The two follow-up removals (bell entirely, search on phone) were
+  verified the same way in a second pass: a `390×800` phone viewport's
+  opened drawer has no visible search input and zero notification-bell
+  buttons inside its own `<aside>`, while a `900×800` tablet viewport's
+  opened drawer still shows a visible search input and (still) zero bell
+  buttons — confirming the phone/tablet split on search actually holds
+  and that the bell removal reached both width bands.
 
 ### Notification center
 
@@ -6056,10 +6073,11 @@ location (see "Sidebar navigation (desktop)" above, in particular its
 top nav at `xl:` and up (`Sidebar.jsx` itself is nav-links-only there
 now), and `Navbar.jsx`'s `<header>` is the real top nav below that.
 `components/NotificationCenter.jsx` is one shared component mounted in
-both (plus a third instance in `Sidebar.jsx`'s own tablet/phone drawer —
-see "Placement and theming" below), rather than separate
-implementations, the same "one source of truth, filtered by breakpoint"
-approach `BUSINESS_LINKS` already established for the nav links themselves.
+both, rather than separate implementations, the same "one source of
+truth, filtered by breakpoint" approach `BUSINESS_LINKS` already
+established for the nav links themselves — `Sidebar.jsx`'s own tablet/
+phone drawer briefly carried a third instance too, removed again at
+follow-up request (see "Placement and theming" below for why).
 
 - **Deliberately no backend route, no notifications table, no read/unread
   state.** This is a live, computed view built entirely from three existing,
@@ -6144,31 +6162,27 @@ approach `BUSINESS_LINKS` already established for the nav links themselves.
   "Desktop TopBar" under "Sidebar navigation (desktop)" above) renders it
   with its plain default styling — no override needed there, since
   `TopBar` sits on the app's normal themed page background, not a fixed
-  dark panel. `Sidebar.jsx` still renders its own instance too, but now
-  only in the tablet/phone **drawer** (`mobileOpen` true) — in the top
-  wordmark row (next to the drawer-mode-only close button, both wrapped in
-  a shared `flex items-center gap-0.5` container), with the same
-  forced-light `!text-lagoon-200 hover:!bg-white/10 hover:!text-white`
-  override `ThemeToggle`'s own Sidebar usage already needs — the
-  component's default slate-toned button styling is tuned for the app's
-  themed page background, not this permanently-dark `bg-lagoon-950` panel,
-  and a plain override class isn't guaranteed to win the cascade there
-  (see `ThemeToggle`'s own note on why `!important` is needed). The
-  dropdown panel itself is unaffected by that override in either
-  placement — it's a light-surfaced (`bg-white dark:bg-slate-900`)
-  popover regardless of what surface the bell button itself sits on, same
-  as `GlobalSearch`'s own results dropdown. `Navbar.jsx` renders its own
-  third instance between the phone-only search-toggle button and
-  `ThemeToggle`, visible at every width that header itself renders at
-  (phone through tablet) — unlike the hamburger, which is `sm:flex hidden`
-  (phone uses `BottomNav` instead), the bell has no phone-specific
-  replacement, so it stays visible there. Three render sites in total,
-  never more than one mounted for a given viewport width: `Navbar.jsx`
-  (below `xl:`), `Sidebar.jsx`'s drawer instance (also below `xl:`, but
-  only while the drawer is actually open — `Navbar`'s own header instance
-  and this one can technically both be mounted at once while the drawer
-  is open over it, which is fine, they're just two bells showing the same
-  live count), and `TopBar.jsx` (`xl:` and up).
+  dark panel. Below `xl:`, `Navbar.jsx` renders it between the phone-only
+  search-toggle button and `ThemeToggle`, visible at every width that
+  header itself renders at (phone through tablet) — unlike the hamburger,
+  which is `sm:flex hidden` (phone uses `BottomNav` instead), the bell has
+  no phone-specific replacement, so it stays visible there, including
+  while the hamburger drawer is open over it (`Navbar`'s own `<header>`
+  stays mounted behind `Sidebar`'s drawer, not replaced by it). Two render
+  sites in total, never both mounted for the same viewport width:
+  `Navbar.jsx` (below `xl:`) and `TopBar.jsx` (`xl:` and up). **`Sidebar.jsx`
+  itself no longer renders a bell at all, in either its persistent desktop
+  instance or its tablet/phone drawer** — the drawer briefly carried its
+  own second copy in the top wordmark row once `TopBar.jsx` took over the
+  persistent instance's copy (see "Desktop TopBar" above), on the
+  reasoning that the drawer, like the persistent sidebar before it, had no
+  other way to reach the bell — but that reasoning didn't actually apply
+  below `xl:`: `Navbar.jsx`'s own header (and its own bell) stays visible
+  and mounted the entire time the drawer is open on top of it, so a second
+  bell inside the drawer was pure duplication, not filling a real gap the
+  way the drawer's search/account row genuinely do (removed at explicit
+  follow-up request once this was pointed out). Removing it also dropped
+  `Sidebar.jsx`'s now-unused `NotificationCenter` import.
 
 ### Icon action buttons
 
