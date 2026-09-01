@@ -34,18 +34,42 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-around border-t border-slate-200 bg-white/95 backdrop-blur sm:hidden dark:border-slate-800 dark:bg-slate-950/95"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      // A floating "liquid glass" dock rather than the old flush, flat,
+      // near-opaque bar: detached from the screen edges (inset-x-3, a
+      // margin-driven `bottom` instead of `inset-x-0 bottom-0`), heavily
+      // blurred and translucent so the page scrolling underneath stays
+      // faintly visible, rounded into a pill, and edged with a soft
+      // lagoon-tinted glow (shadow-[...]) so it reads as floating above
+      // the content rather than sitting flush against it — the material
+      // this app's own nautical/lagoon branding calls for. `overflow-hidden`
+      // clips the two decorative sheen layers below to the rounded corners.
+      className="fixed inset-x-3 z-30 flex items-stretch justify-around gap-0.5 overflow-hidden rounded-[28px] border border-white/50 bg-white/70 p-1 shadow-[0_10px_30px_-8px_rgba(14,124,134,0.45)] backdrop-blur-2xl sm:hidden dark:border-white/10 dark:bg-slate-900/70 dark:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)]"
+      style={{ bottom: 'calc(0.875rem + env(safe-area-inset-bottom))' }}
     >
+      {/* Glossy top-edge highlight — light catching a curved glass/water
+          surface, the one detail that sells "liquid glass" rather than
+          plain frosted glass. Purely decorative (aria-hidden,
+          pointer-events-none) and static, no shimmer/animation, matching
+          this app's own "avoid excessive motion" convention. */}
+      <div
+        className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent dark:via-white/40"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-white/50 to-transparent dark:from-white/10"
+        aria-hidden="true"
+      />
       {tabs.map(({ to, label, Icon }) => {
         const active = isActive(to);
         return (
           <Link
             key={to}
             to={to}
-            className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10.5px] font-bold ${active ? 'text-lagoon-600 dark:text-lagoon-400' : 'text-slate-500 dark:text-slate-400'}`}
+            className={`relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-[22px] text-[10.5px] font-bold ${active ? 'text-lagoon-700 dark:text-lagoon-300' : 'text-slate-600 dark:text-slate-300'}`}
           >
-            <span className={`flex h-6 w-9 items-center justify-center rounded-lg ${active ? 'bg-lagoon-50 dark:bg-lagoon-950' : ''}`}>
+            <span
+              className={`flex h-6 w-9 items-center justify-center rounded-full transition-colors ${active ? 'bg-white/80 shadow-[0_1px_5px_rgba(14,124,134,0.4)] dark:bg-lagoon-400/20' : ''}`}
+            >
               <Icon width={19} height={19} />
             </span>
             {label}

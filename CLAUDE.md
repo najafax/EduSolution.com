@@ -5444,12 +5444,60 @@ keeps its existing layout.
   width below `xl:` — see "Top-left hamburger, top-right avatar" below), so
   there's exactly one way to reach it rather than two. `App.jsx` renders `<BottomNav />` only when `user` is
   truthy (mirroring `Navbar.jsx`'s own `{user ? ... }` split) and wraps the
-  routed `<Routes>` in a `pb-16 sm:pb-0` div so the fixed bar never covers
-  a page's last content or action buttons; `FloatingActionButton.jsx`'s
-  `bottom` offset was raised to `calc(5.5rem + env(safe-area-inset-bottom))`
-  for the same reason, and got the mockup's gradient (`from-lagoon-600
+  routed `<Routes>` in a `pb-24 sm:pb-0` div (bumped from the original
+  `pb-16` once the bar became a floating dock — see "Liquid glass" below —
+  so there's a clean gap above it, not content crowding right up to the
+  glass) so the fixed bar never covers a page's last content or action
+  buttons; `FloatingActionButton.jsx`'s `bottom` offset was raised
+  accordingly, and got the mockup's gradient (`from-lagoon-600
   to-lagoon-700`) + `rounded-2xl` squircle treatment instead of a flat
-  circle.
+  circle — since restyled again as a glass droplet, see "Liquid glass"
+  below.
+- **Liquid glass**: both `BottomNav.jsx` and `FloatingActionButton.jsx`
+  were restyled from flat/opaque to a translucent "liquid glass" material
+  — a real-world material metaphor that fits this app's own nautical/
+  lagoon branding, asked for directly as a "water effect." `BottomNav.jsx`
+  changed from a flush, edge-to-edge, near-opaque bar (`inset-x-0
+  bottom-0`, `bg-white/95`, plain `backdrop-blur`) to a floating, detached
+  "dock": `inset-x-3` plus a margin-driven `bottom: calc(0.875rem +
+  env(safe-area-inset-bottom))` instead of `bottom-0`, `rounded-[28px]`
+  into a pill rather than a flat-topped bar, heavier `backdrop-blur-2xl`
+  over a more translucent `bg-white/70 dark:bg-slate-900/70`, a soft
+  `border-white/50`/`dark:border-white/10` glass edge, and a lagoon-tinted
+  glow shadow (`shadow-[0_10px_30px_-8px_rgba(14,124,134,0.45)]`) so it
+  reads as floating above the page rather than sitting flush against it.
+  Two thin decorative overlay `<div>`s (`aria-hidden`, `pointer-events-none`,
+  clipped to the rounded corners by the nav's own `overflow-hidden`) add a
+  static glossy top-edge highlight — light catching a curved glass/water
+  surface, the one detail that sells "liquid glass" over plain frosted
+  glass — with no shimmer/animation, matching this app's "avoid excessive
+  motion" convention elsewhere. The active tab's icon chip became a
+  translucent `bg-white/80` glass pill with a soft matching shadow instead
+  of the old flat `bg-lagoon-50` fill.
+  `FloatingActionButton.jsx`'s `BASE_CLASSES` went from a fully opaque
+  `bg-gradient-to-br from-lagoon-600 to-lagoon-700` `rounded-2xl` squircle
+  to a `rounded-full` glass "droplet": the same gradient at 90% opacity
+  (`from-lagoon-500/90 to-lagoon-700/90`) plus `backdrop-blur-md` so the
+  page softly shows through, a light `border-white/40` glass edge, and a
+  lagoon-tinted glow shadow — the same glass material `BottomNav.jsx`'s
+  dock uses, so the two read as one connected surface. A small static
+  `GlossHighlight` (`aria-hidden`, `pointer-events-none`, a blurred
+  `bg-white/60` blob near the top-left corner) is rendered inside both the
+  `<Link>` and `<button>` branches as the droplet's specular highlight —
+  the detail that reads as "glass/water" rather than a plain translucent
+  circle. Both the dock's own bottom margin and the button's default/
+  drag-clamped position moved to match: `DEFAULT_STYLE`'s `bottom` went
+  from `calc(5.5rem + ...)` to `calc(6rem + ...)`, and `BOTTOM_RESERVE`
+  (the drag-clamp estimate of the dock's own footprint + breathing room)
+  from `76` to `96`, both sized to clear the dock's new `0.875rem` margin
+  plus its ~64px height with a clean ~16px gap above it — verified with a
+  real dev server + Playwright pass (phone-width screenshots in both light
+  and dark mode, plus a `boundingBox()` check confirming the FAB's own
+  bottom edge sits above the dock's top edge with no overlap on a real
+  list page). Deliberately no ripple-on-tap or other interaction effect —
+  a design-direction question asked directly, and "liquid glass surface"
+  (a material/visual restyle) was the one picked over a ripple interaction
+  or the two combined.
 - `components/FloatingActionButton.jsx` is draggable, not just fixed
   bottom-right — a user can drag it anywhere on screen and it stays there
   across visits. It renders at its usual `right`/`bottom` CSS position
@@ -5461,10 +5509,10 @@ keeps its existing layout.
   Pointer events (`onPointerDown`/`onPointerMove`/`onPointerUp`, with
   `setPointerCapture` so a drag tracks correctly even off the button's own
   bounds) update that position live and `clamp()` it to stay within
-  `EDGE_MARGIN` (8px) of the screen edges and `BOTTOM_RESERVE` (76px, a
-  fixed estimate of `BottomNav.jsx`'s own height + margin — this component
-  has no ref into that one) above the bottom nav, re-clamping on window
-  resize/orientation change too. A press only counts as a drag once
+  `EDGE_MARGIN` (8px) of the screen edges and `BOTTOM_RESERVE` (96px, a
+  fixed estimate of `BottomNav.jsx`'s own floating-dock footprint + margin
+  — this component has no ref into that one) above the bottom nav,
+  re-clamping on window resize/orientation change too. A press only counts as a drag once
   movement exceeds `DRAG_THRESHOLD` (6px); `justDraggedRef` is what makes
   that distinction stick through to the `click` event that always follows
   a `pointerup` — `handleClick` checks it first and, if a drag just
