@@ -5825,11 +5825,17 @@ persistent desktop sidebar either way.
   `max-w-*` cap — the sidebar itself is the width constraint now), the nav
   list, and a bottom-pinned account row (initials avatar + name, linking
   to `/account`, plus `ThemeToggle` and a logout icon button) — search and
-  account controls live in the sidebar itself rather than a separate top
-  bar repeated on every page (the shape most dense B2B dashboards —
-  Notion, Linear, Vercel — already use for this), which is also what let
-  this ship as a global layout change with no changes needed to any
-  individual page. `ThemeToggle` needed `!`-prefixed override classes
+  account controls originally lived in the sidebar itself rather than a
+  separate top bar repeated on every page (the shape most dense B2B
+  dashboards — Notion, Linear, Vercel — already use for this), which is
+  also what let this ship as a global layout change with no changes
+  needed to any individual page. **This has since changed for the
+  persistent desktop instance specifically** — see "Desktop TopBar" below
+  for why search/notifications/theme/account moved out to their own bar;
+  this paragraph's description of `GlobalSearch`/the account row still
+  describes exactly what the drawer instance (`mobileOpen` true, tablet/
+  phone) renders, just no longer the persistent one. `ThemeToggle` needed
+  `!`-prefixed override classes
   (`!text-lagoon-200 hover:!bg-white/10 hover:!text-white`) to read
   correctly against the dark sidebar — its own default classes
   (`text-slate-500` etc.) are appended-not-replaced by its `className`
@@ -5954,16 +5960,65 @@ persistent desktop sidebar either way.
   above) — leaving `BottomNav.jsx` with just its primary shortcut tabs
   (Settings joined them later, see that section's own note) and exactly
   one way to reach the full nav, not two.
+- **Desktop TopBar**: `components/TopBar.jsx`, a later follow-up shipped
+  at explicit request — the persistent desktop `Sidebar` originally
+  carried search, notifications, theme, and the account/logout cluster
+  itself (see its own top-of-section description above), but was asked to
+  become nav-links-only, with those controls moved to a new header of
+  their own. `TopBar.jsx` is the exact `xl:`-and-up counterpart to
+  `Navbar.jsx`'s mobile/tablet header — `hidden ... xl:flex` (the mirror
+  image of `Navbar`'s own `xl:hidden`), so exactly one of the two ever
+  renders for a given viewport width, same mutual-exclusivity contract
+  `Sidebar`/`Navbar` already had. Mounted in `App.jsx`'s "main column" div
+  (the `min-w-0 flex-1 flex-col` sibling of `Sidebar` — see above),
+  immediately after `Navbar`, rather than as a `Sidebar`-level sibling —
+  it only needs to span the content area next to `Sidebar`, not the full
+  page width the way `Sidebar` itself does. Holds `GlobalSearch`
+  (`max-w-sm`, since this bar has much more width to spare than the old
+  240px sidebar column ever did), then a right-hand cluster of
+  `NotificationCenter`/`ThemeToggle`/an avatar+name link to `/account`/a
+  logout icon button — the exact same four controls `Sidebar`'s own
+  wordmark-row-plus-account-row used to carry, just laid out in one bar
+  instead of split top/bottom. Unlike `Sidebar`'s own instances of these,
+  none of `TopBar`'s need the dark-panel `!important` overrides
+  `Sidebar.jsx`'s own notes describe — `TopBar` sits on the app's normal
+  themed page background (`bg-white/80 backdrop-blur` in light mode,
+  matching `Navbar.jsx`'s own header treatment exactly), so
+  `GlobalSearch`/`NotificationCenter`/`ThemeToggle` all render with their
+  plain default styling, tuned for exactly this kind of surface. **The
+  persistent `Sidebar` instance (`mobileOpen` false/omitted) no longer
+  renders any of these four at all** — `Sidebar.jsx`'s own `mobileOpen &&
+  (...)` guards around its `NotificationCenter` call, its `GlobalSearch`
+  block, and its bottom account-row block are what removes them there
+  specifically; the **drawer instance** (`mobileOpen` true, tablet/phone,
+  opened by `Navbar.jsx`'s hamburger) keeps every one of them exactly as
+  before, unabridged — a tablet-width visitor has no `TopBar` of their own
+  to reach these through (`TopBar` is `xl:`-only, same as the persistent
+  `Sidebar` it replaces at that breakpoint), so the drawer stays the one
+  and only way for that width band to reach search/notifications/theme/
+  account, same as it always was for the *full* nav-links list too.
+  Verified end-to-end with a real dev-server + Playwright pass, not just
+  a code read: a `1440×900` desktop viewport confirmed zero `<input
+  type="search">` elements inside `<aside>` (the persistent sidebar) and
+  exactly one inside `<header>` (`TopBar`), that clicking a sidebar nav
+  link still navigates correctly with `TopBar` staying mounted and in
+  place across the route change, and that a `900×800` tablet-width
+  viewport's hamburger-opened drawer still renders both a search input
+  and an `/account` link inside its own `<aside>`, unaffected by any of
+  this.
 
 ### Notification center
 
 A bell icon in the top nav, global to every logged-in page, surfacing what
 already needs attention — asked for directly as "a notification center on
-the top navbar," which in this app's post-sidebar layout means two
-different literal locations (see "Sidebar navigation (desktop)" above):
-`Sidebar.jsx` *is* the top nav at `xl:` and up, and `Navbar.jsx`'s
-`<header>` is the real top nav below that. `components/NotificationCenter.jsx`
-is one shared component mounted in both, rather than two separate
+the top navbar," which in this app's layout means more than one literal
+location (see "Sidebar navigation (desktop)" above, in particular its
+"Desktop TopBar" note): `components/TopBar.jsx`'s `<header>` is the real
+top nav at `xl:` and up (`Sidebar.jsx` itself is nav-links-only there
+now), and `Navbar.jsx`'s `<header>` is the real top nav below that.
+`components/NotificationCenter.jsx` is one shared component mounted in
+both (plus a third instance in `Sidebar.jsx`'s own tablet/phone drawer —
+see "Placement and theming" below), rather than separate
 implementations, the same "one source of truth, filtered by breakpoint"
 approach `BUSINESS_LINKS` already established for the nav links themselves.
 
@@ -6046,23 +6101,35 @@ approach `BUSINESS_LINKS` already established for the nav links themselves.
   widths) — the header's own width, not the button's position within it,
   is what determines whether that anchor has room, and the header is
   always at least as wide as the dropdown.
-- **Placement and theming**: `Sidebar.jsx` renders it in the top wordmark
-  row (next to the drawer-mode-only close button, both now wrapped in a
-  shared `flex items-center gap-0.5` container), with the same forced-light
-  `!text-lagoon-200 hover:!bg-white/10 hover:!text-white` override
-  `ThemeToggle`'s own Sidebar usage already needs — the component's default
-  slate-toned button styling is tuned for the app's themed page background,
-  not this permanently-dark `bg-lagoon-950` panel, and a plain override
-  class isn't guaranteed to win the cascade there (see `ThemeToggle`'s own
-  note on why `!important` is needed). The dropdown panel itself is
-  unaffected by that override — it's a light-surfaced (`bg-white
-  dark:bg-slate-900`) popover regardless of the sidebar's own fixed dark
-  background, same as `GlobalSearch`'s own results dropdown. `Navbar.jsx`
-  renders it between the phone-only search-toggle button and `ThemeToggle`,
-  visible at every width that header itself renders at (phone through
-  tablet) — unlike the hamburger, which is `sm:flex hidden` (phone uses
-  `BottomNav` instead), the bell has no phone-specific replacement, so it
-  stays visible there.
+- **Placement and theming**: at `xl:` and up, `components/TopBar.jsx` (see
+  "Desktop TopBar" under "Sidebar navigation (desktop)" above) renders it
+  with its plain default styling — no override needed there, since
+  `TopBar` sits on the app's normal themed page background, not a fixed
+  dark panel. `Sidebar.jsx` still renders its own instance too, but now
+  only in the tablet/phone **drawer** (`mobileOpen` true) — in the top
+  wordmark row (next to the drawer-mode-only close button, both wrapped in
+  a shared `flex items-center gap-0.5` container), with the same
+  forced-light `!text-lagoon-200 hover:!bg-white/10 hover:!text-white`
+  override `ThemeToggle`'s own Sidebar usage already needs — the
+  component's default slate-toned button styling is tuned for the app's
+  themed page background, not this permanently-dark `bg-lagoon-950` panel,
+  and a plain override class isn't guaranteed to win the cascade there
+  (see `ThemeToggle`'s own note on why `!important` is needed). The
+  dropdown panel itself is unaffected by that override in either
+  placement — it's a light-surfaced (`bg-white dark:bg-slate-900`)
+  popover regardless of what surface the bell button itself sits on, same
+  as `GlobalSearch`'s own results dropdown. `Navbar.jsx` renders its own
+  third instance between the phone-only search-toggle button and
+  `ThemeToggle`, visible at every width that header itself renders at
+  (phone through tablet) — unlike the hamburger, which is `sm:flex hidden`
+  (phone uses `BottomNav` instead), the bell has no phone-specific
+  replacement, so it stays visible there. Three render sites in total,
+  never more than one mounted for a given viewport width: `Navbar.jsx`
+  (below `xl:`), `Sidebar.jsx`'s drawer instance (also below `xl:`, but
+  only while the drawer is actually open — `Navbar`'s own header instance
+  and this one can technically both be mounted at once while the drawer
+  is open over it, which is fine, they're just two bells showing the same
+  live count), and `TopBar.jsx` (`xl:` and up).
 
 ### Icon action buttons
 

@@ -55,11 +55,13 @@ const LINK_ICONS = {
 
 // The app's persistent desktop navigation (xl: and up) — replaces the old
 // top Navbar's own desktop link row (see Navbar.jsx, which now only
-// renders the phone/tablet header below that breakpoint). Search, the
-// nav list, and account/theme/logout all live in one place here rather
-// than a separate top bar repeated on every page, the same shape most
-// dense B2B dashboards (Notion, Linear, Vercel) already use — it also
-// means no per-page changes were needed to adopt this layout.
+// renders the phone/tablet header below that breakpoint). At this
+// breakpoint the sidebar is nav-links-only (wordmark + link list) —
+// search, notifications, theme, and account/logout moved to
+// `components/TopBar.jsx` (a new xl:-only header sitting alongside the
+// routed content, see that file) at explicit request, so they're only
+// rendered here in the tablet/phone drawer below, not in the persistent
+// `mobileOpen`-false instance.
 //
 // Below `xl:`, this same component doubles as the tablet/phone nav drawer
 // — Navbar.jsx's own hamburger, top-left in the header at every width below
@@ -68,7 +70,12 @@ const LINK_ICONS = {
 // rather than the flat link-list dropdown this app used before. The `xl:`
 // classes below are untouched either way, so the persistent desktop
 // sidebar keeps working exactly as it did — only the below-`xl:` styling
-// branches on `mobileOpen`.
+// branches on `mobileOpen`. Search/notifications/account row (see above)
+// stay in the drawer specifically because `TopBar.jsx`, their new home,
+// is itself `xl:`-only — a tablet/phone user has no other route to them,
+// so the drawer keeps carrying the full experience `mobileOpen` already
+// implies (the exact same content it always rendered), only the
+// `mobileOpen: false` persistent case lost anything here.
 export default function Sidebar({ mobileOpen = false, onMobileClose }) {
   const { user, logout, can, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
@@ -142,11 +149,16 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
             edusolutionsmaldives<span className="text-lagoon-300">.com</span>
           </Link>
           <div className="flex shrink-0 items-center gap-0.5">
-            {/* Same forced-light-icon override reasoning as ThemeToggle's own
+            {/* Notification bell, drawer mode only — see this file's own
+                top-of-file note: the persistent desktop instance no longer
+                carries this at all, it lives in TopBar.jsx now. Same
+                forced-light-icon override reasoning as ThemeToggle's own
                 Sidebar usage below — its default slate styling is tuned for
                 the app's themed page background, not this permanently-dark
                 panel. */}
-            <NotificationCenter align="left" className="!text-lagoon-200 hover:!bg-white/10 hover:!text-white" />
+            {mobileOpen && (
+              <NotificationCenter align="left" className="!text-lagoon-200 hover:!bg-white/10 hover:!text-white" />
+            )}
             {/* Close button, drawer mode only — the backdrop click and Escape
                 (see the effect above) also close it, but a visible control
                 matters here since there's no other affordance in-panel. */}
@@ -163,16 +175,21 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
           </div>
         </div>
 
-        {/* GlobalSearch's own dark: styling is tuned for the app's themed
-            page background, not this permanently-dark bg-lagoon-950 panel —
-            stacked with the app's own dark theme it read as barely-visible
-            dark-on-dark. These overrides force a light input regardless of
-            app theme, since `!important` is needed to beat GlobalSearch's
-            own hardcoded classes (its `className` prop only reaches the
-            outer wrapper, not the nested <input>). */}
-        <div className="mb-3 shrink-0 px-1 [&_input]:!border-lagoon-200 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:!shadow-sm [&_input::placeholder]:!text-slate-400">
-          <GlobalSearch className="w-full" onNavigate={handleLinkClick} />
-        </div>
+        {/* Search, drawer mode only — see this file's own top-of-file note:
+            the persistent desktop instance no longer carries this at all,
+            it lives in TopBar.jsx now. GlobalSearch's own dark: styling is
+            tuned for the app's themed page background, not this
+            permanently-dark bg-lagoon-950 panel — stacked with the app's
+            own dark theme it read as barely-visible dark-on-dark. These
+            overrides force a light input regardless of app theme, since
+            `!important` is needed to beat GlobalSearch's own hardcoded
+            classes (its `className` prop only reaches the outer wrapper,
+            not the nested <input>). */}
+        {mobileOpen && (
+          <div className="mb-3 shrink-0 px-1 [&_input]:!border-lagoon-200 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:!shadow-sm [&_input::placeholder]:!text-slate-400">
+            <GlobalSearch className="w-full" onNavigate={handleLinkClick} />
+          </div>
+        )}
 
         <nav className="nav-links-scroll flex flex-1 flex-col gap-0.5 overflow-y-auto">
           {visibleLinks.map((link) => {
@@ -194,34 +211,39 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
           })}
         </nav>
 
-        <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-1 pt-3">
-          <Link
-            to="/account"
-            onClick={handleLinkClick}
-            className="flex min-w-0 items-center gap-2 rounded-lg py-1 hover:bg-white/5"
-          >
-            {user.avatarImage ? (
-              <img src={user.avatarImage} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
-            ) : (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
-                {initials}
-              </span>
-            )}
-            <span className="min-w-0 truncate text-xs font-medium text-white">{user.name}</span>
-          </Link>
-          <div className="flex shrink-0 items-center gap-0.5">
-            <ThemeToggle className="!min-h-9 !min-w-9 !text-lagoon-200 hover:!bg-white/10 hover:!text-white" />
-            <button
-              type="button"
-              onClick={handleLogout}
-              aria-label="Log out"
-              title="Log out"
-              className="flex h-9 w-9 items-center justify-center rounded-md text-lagoon-200 hover:bg-white/10 hover:text-white"
+        {/* Account row, drawer mode only — see this file's own top-of-file
+            note: the persistent desktop instance no longer carries the
+            avatar/theme/logout cluster at all, it lives in TopBar.jsx now. */}
+        {mobileOpen && (
+          <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-1 pt-3">
+            <Link
+              to="/account"
+              onClick={handleLinkClick}
+              className="flex min-w-0 items-center gap-2 rounded-lg py-1 hover:bg-white/5"
             >
-              <LogoutIcon width={17} height={17} />
-            </button>
+              {user.avatarImage ? (
+                <img src={user.avatarImage} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
+                  {initials}
+                </span>
+              )}
+              <span className="min-w-0 truncate text-xs font-medium text-white">{user.name}</span>
+            </Link>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <ThemeToggle className="!min-h-9 !min-w-9 !text-lagoon-200 hover:!bg-white/10 hover:!text-white" />
+              <button
+                type="button"
+                onClick={handleLogout}
+                aria-label="Log out"
+                title="Log out"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-lagoon-200 hover:bg-white/10 hover:text-white"
+              >
+                <LogoutIcon width={17} height={17} />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </aside>
     </>
   );

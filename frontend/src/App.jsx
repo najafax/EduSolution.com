@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { MotionConfig, motion } from 'motion/react';
 import Navbar from './components/Navbar';
+import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
 import Footer from './components/Footer';
 import BottomNav from './components/BottomNav';
@@ -88,15 +89,21 @@ export default function App() {
     // honor it rather than checking prefers-reduced-motion per component.
     <MotionConfig reducedMotion="user">
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 xl:flex-row">
-      {/* Sidebar (xl: and up) and Navbar (below xl) are mutually exclusive —
-          each hides itself at the other's breakpoint (see Sidebar.jsx/
-          Navbar.jsx), so exactly one of them ever renders. Sidebar sits as
-          a row sibling of the "main column" below rather than inside it,
-          since it spans the full page height, not just the routed
-          content's height. */}
+      {/* Sidebar (xl: and up, nav links only) pairs with TopBar (search/
+          notifications/theme/account, xl: and up); Navbar (below xl,
+          everything in one header) is the mutually-exclusive alternative
+          to that pair — each of Navbar/TopBar hides itself at the other's
+          breakpoint (see Navbar.jsx/TopBar.jsx), so exactly one of them
+          ever renders. Sidebar sits as a row sibling of the "main column"
+          below rather than inside it, since it spans the full page
+          height, not just the routed content's height; TopBar renders
+          inside that main column instead, alongside Navbar, since it only
+          needs to span the content area next to Sidebar, not the page's
+          full width. */}
       {!isPortalRoute && <Sidebar />}
       <div className="flex min-w-0 flex-1 flex-col">
         {!isPortalRoute && <Navbar />}
+        {!isPortalRoute && <TopBar />}
         {!isPortalRoute && <IdleTimeoutMonitor />}
         {!isPortalRoute && <CommandPalette />}
         {/* flex-1 + flex-col here (rather than on the outer div) is what pins
