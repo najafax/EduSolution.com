@@ -6,6 +6,7 @@ services:
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
+    autoDeploy: true
     disk:
       name: edusolution-data
       mountPath: /var/data
@@ -24,6 +25,7 @@ services:
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
+    autoDeploy: true
     envVars:
       - key: VITE_API_URL
         value: https://api.edusolutionsmaldives.com
