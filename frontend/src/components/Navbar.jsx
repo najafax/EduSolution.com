@@ -104,7 +104,7 @@ export default function Navbar() {
                 {menuOpen ? <XIcon width={22} height={22} /> : <MenuIcon width={22} height={22} />}
               </button>
               <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
-                EduSolution<span className="text-lagoon-600">.com</span>
+                edusolutionsmaldives<span className="text-lagoon-600">.com</span>
               </Link>
             </div>
 
@@ -146,7 +146,7 @@ export default function Navbar() {
               <span />
             ) : (
               <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
-                EduSolution<span className="text-lagoon-600">.com</span>
+                edusolutionsmaldives<span className="text-lagoon-600">.com</span>
               </Link>
             )}
             <div className="flex items-center gap-2 sm:gap-4">

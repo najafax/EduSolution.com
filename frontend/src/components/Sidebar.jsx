@@ -139,7 +139,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
       >
         <div className="mb-5 flex shrink-0 items-center justify-between px-2">
           <Link to="/" onClick={handleLinkClick} className="text-base font-semibold text-white">
-            EduSolution<span className="text-lagoon-300">.com</span>
+            edusolutionsmaldives<span className="text-lagoon-300">.com</span>
           </Link>
           <div className="flex shrink-0 items-center gap-0.5">
             {/* Same forced-light-icon override reasoning as ThemeToggle's own

@@ -17,7 +17,7 @@ export default function Footer({ className = '' }) {
         <div className="flex items-center gap-2">
           <img src="/logo-symbol.png" alt="" className="h-5 w-5" />
           <span className="text-sm font-semibold text-slate-900 dark:text-white">
-            EduSolution<span className="text-lagoon-600">.com</span>
+            edusolutionsmaldives<span className="text-lagoon-600">.com</span>
           </span>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400">

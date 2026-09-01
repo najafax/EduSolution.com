@@ -3352,9 +3352,11 @@ rather than eight overlapping diffs.
   client logged into their own dedicated portal domain-space doesn't need
   reminding they're "in the client portal" every time they look at the
   header. `components/Footer.jsx` (shared with the staff app, rendered
-  by `PortalLayout.jsx` too) keeps its own "EduSolution.com" wordmark
-  unchanged — this rebrand was scoped to the header specifically, not a
-  full rename of every mention of the product name across the app.
+  by `PortalLayout.jsx` too) keeps its own "edusolutionsmaldives.com"
+  wordmark (see "App-wide wordmark rename" under "Mobile design system"
+  below for why it now reads that way rather than "EduSolution.com") —
+  this rebrand was scoped to the header specifically, not a full rename of
+  every mention of the product name across the app.
 - **Full width**: every portal content page (`PortalDashboard.jsx`,
   `PortalQuotes.jsx`, `PortalInvoices.jsx`, `PortalLicenses.jsx`,
   `PortalMyAccount.jsx`, and the three detail pages' loading/error/loaded
@@ -5558,7 +5560,9 @@ keeps its existing layout.
   a short swipe under the threshold, a swipe not starting at the edge, and
   a vertical swipe starting at the edge all correctly leave it closed.
 - `components/Footer.jsx` — a small global closing bar (small
-  `/logo-symbol.png` mark + "EduSolution.com" wordmark on one side, a
+  `/logo-symbol.png` mark + "edusolutionsmaldives.com" wordmark on one
+  side (renamed from "EduSolution.com" app-wide — see "App-wide wordmark
+  rename" below), a
   dynamic `© {new Date().getFullYear()} Edu Solutions Pvt Ltd. All rights
   reserved.` — the year computed rather than a literal, so it never goes
   stale — linking `https://www.edusolutionsmaldives.com`, the same domain
@@ -5604,6 +5608,38 @@ keeps its existing layout.
   separately confirmed on `Dashboard` in dark mode, so the dark-mode
   palette (`dark:border-slate-800 dark:bg-slate-900/50`) was checked too,
   not just the light-mode default.
+- **App-wide wordmark rename**: the `EduSolution` + lagoon-colored `.com`
+  wordmark (`EduSolution<span className="text-lagoon-600">.com</span>`,
+  reading "EduSolution.com") was renamed to
+  `edusolutionsmaldives<span className="text-lagoon-600">.com</span>`
+  (reading "edusolutionsmaldives.com") at every render site, at explicit
+  request — `components/Footer.jsx`, `components/Navbar.jsx` (both the
+  logged-in and logged-out header wordmark links), `components/
+  Sidebar.jsx`'s own wordmark (`text-lagoon-300` there, matching its
+  own dark `bg-lagoon-950` panel rather than the lighter `text-lagoon-600`
+  every other instance uses), and `pages/portal/PortalAuthCard.jsx`'s
+  wordmark (shown above the four unauthenticated portal auth pages —
+  login/accept-invite/forgot/reset-password). Also renamed everywhere the
+  same literal string appeared outside a component render — `index.html`'s
+  `<title>` and `<meta name="description">`, and `vite.config.js`'s PWA
+  manifest `name` field (the full app name shown in an install prompt) —
+  since those are exactly the same "EduSolution.com" wording a user would
+  see in a browser tab, a search result, or an install dialog, just not
+  rendered through React. **Deliberately left unchanged**: the PWA
+  manifest's `short_name` and `index.html`'s
+  `apple-mobile-web-app-title`, both plain `'EduSolution'` with no `.com`
+  suffix at all (so not the wording that was actually asked to change,
+  and — being what actually prints under a home-screen icon in very
+  limited space — `edusolutionsmaldives` would be a real regression there
+  regardless); `Login.jsx`'s own "EduSolutions Maldives" trading-name
+  copy (a different, already-correct piece of wording, not this wordmark);
+  and `MODReport.jsx`'s one prose mention of "EduSolution" with no `.com`
+  (an unrelated sentence explaining why the MOD report checklist is
+  printed unbranded, not the wordmark itself). This is a pure text/wording
+  change — no visual styling, layout, or link target moved, since every
+  one of these wordmarks' actual link `href`/`to` already pointed at
+  `https://www.edusolutionsmaldives.com` (or `/`) before this, per that
+  domain's own correction noted just above.
 - `components/KpiCard.jsx` picked up the mockup's card language:
   `rounded-2xl` (was `rounded-lg`), a smaller `rounded-xl` icon chip (was a
   circle), and the value rendered in `font-display font-extrabold
