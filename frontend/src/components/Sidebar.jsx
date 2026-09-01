@@ -145,8 +145,9 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
         style={{ paddingTop: 'calc(1.25rem + env(safe-area-inset-top))' }}
       >
         <div className="mb-5 flex shrink-0 items-center justify-between px-2">
-          <Link to="/" onClick={handleLinkClick} className="text-base font-semibold text-white">
-            edusolutionsmaldives<span className="text-lagoon-300">.com</span>
+          <Link to="/" onClick={handleLinkClick} className="flex items-center gap-1.5 text-base font-semibold text-white">
+            <img src="/logo-symbol.png" alt="" className="h-6 w-6" />
+            Edu Solutions
           </Link>
           <div className="flex shrink-0 items-center gap-0.5">
             {/* Notification bell, drawer mode only — see this file's own

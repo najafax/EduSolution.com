@@ -5640,6 +5640,45 @@ keeps its existing layout.
   one of these wordmarks' actual link `href`/`to` already pointed at
   `https://www.edusolutionsmaldives.com` (or `/`) before this, per that
   domain's own correction noted just above.
+- **Wordmark simplified to "Edu Solutions" with `logo-symbol.png` in
+  front**, at explicit follow-up request — the "edusolutionsmaldives.com"
+  wording above (and its lagoon-colored `.com` span) was short-lived,
+  replaced by plain `Edu Solutions` text preceded by the same
+  `/logo-symbol.png` icon mark `components/Footer.jsx`'s and
+  `pages/portal/PortalAuthCard.jsx`'s wordmarks already carried (a hand-
+  drawn globe-and-pencil mark, full color on a transparent background —
+  no `dark:` filter needed the way `Login.jsx`'s own separate
+  `logo-wordmark.png` needs `dark:brightness-0 dark:invert`, since this
+  one isn't a monochrome mark tuned for a single background). Every
+  render site now follows the identical `<img src="/logo-symbol.png"
+  alt="" className="h-* w-*" /> Edu Solutions` shape: `Footer.jsx`/
+  `PortalAuthCard.jsx` just lost their trailing `.com` span (they already
+  had the logo); `components/Navbar.jsx` (both its logged-in and
+  logged-out wordmark links) and `components/Sidebar.jsx` gained the
+  logo image for the first time, since neither had carried one before —
+  each link's own className grew `flex items-center gap-1.5` to lay the
+  icon and text out horizontally, sized to roughly match each context's
+  existing text size (`h-6 w-6` on `Sidebar.jsx`/mobile `Navbar.jsx`,
+  `sm:h-7 sm:w-7` to match `Navbar.jsx`'s own `sm:text-lg` step-up).
+  `index.html`'s `<title>`/`<meta name="description">`/
+  `apple-mobile-web-app-title` and `vite.config.js`'s manifest
+  `name`/`short_name` were all updated to plain `Edu Solutions` too, for
+  the same "same wording, no logo possible in a non-visual context"
+  reasoning the first rename's own note documents — `short_name`
+  specifically was left alone during the *first* rename precisely because
+  `edusolutionsmaldives` was too long for that cramped a label, but
+  `Edu Solutions` doesn't have that problem, so this pass updated it too
+  rather than leaving it out of step with everything else. Verified with a
+  real dev server + Playwright screenshot pass (desktop sidebar, tablet/
+  phone `Navbar.jsx` header, and the logged-out `Login.jsx` header) rather
+  than just a code read, confirming the icon renders correctly against
+  both the dark `Sidebar` panel and the light `Navbar` header, and that
+  the browser tab title reads "Edu Solutions". Every actual domain link
+  (`href="https://www.edusolutionsmaldives.com"`, and `Login.jsx`'s own
+  "Visit edusolutionsmaldives.com"/"www.edusolutionsmaldives.com" link
+  text) is untouched by either rename — those are genuine references to
+  the real business URL, not the wordmark component, and were never in
+  scope.
 - `components/KpiCard.jsx` picked up the mockup's card language:
   `rounded-2xl` (was `rounded-lg`), a smaller `rounded-xl` icon chip (was a
   circle), and the value rendered in `font-display font-extrabold

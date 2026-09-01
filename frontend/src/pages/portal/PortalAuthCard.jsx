@@ -10,9 +10,7 @@ export default function PortalAuthCard({ title, subtitle, children }) {
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12 sm:px-6">
       <div className="mb-6 flex items-center justify-center gap-2">
         <img src="/logo-symbol.png" alt="" className="h-7 w-7" />
-        <span className="text-lg font-bold text-slate-900 dark:text-white">
-          edusolutionsmaldives<span className="text-lagoon-600">.com</span>
-        </span>
+        <span className="text-lg font-bold text-slate-900 dark:text-white">Edu Solutions</span>
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl sm:p-8 dark:border-slate-700 dark:bg-slate-900">
         <h1 className="text-xl font-bold text-slate-900 dark:text-white">{title}</h1>

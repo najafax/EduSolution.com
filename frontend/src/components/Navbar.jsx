@@ -103,8 +103,9 @@ export default function Navbar() {
               >
                 {menuOpen ? <XIcon width={22} height={22} /> : <MenuIcon width={22} height={22} />}
               </button>
-              <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
-                edusolutionsmaldives<span className="text-lagoon-600">.com</span>
+              <Link to="/" className="flex shrink-0 items-center gap-1.5 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
+                <img src="/logo-symbol.png" alt="" className="h-6 w-6 sm:h-7 sm:w-7" />
+                Edu Solutions
               </Link>
             </div>
 
@@ -145,8 +146,9 @@ export default function Navbar() {
             {isPublicDocLink ? (
               <span />
             ) : (
-              <Link to="/" className="shrink-0 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
-                edusolutionsmaldives<span className="text-lagoon-600">.com</span>
+              <Link to="/" className="flex shrink-0 items-center gap-1.5 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
+                <img src="/logo-symbol.png" alt="" className="h-6 w-6 sm:h-7 sm:w-7" />
+                Edu Solutions
               </Link>
             )}
             <div className="flex items-center gap-2 sm:gap-4">

@@ -18,8 +18,8 @@ export default defineConfig({
         'fonts/sora-800.woff2',
       ],
       manifest: {
-        name: 'edusolutionsmaldives.com',
-        short_name: 'EduSolution',
+        name: 'Edu Solutions',
+        short_name: 'Edu Solutions',
         description: 'Learning, simplified — courses, progress, and resources in one place.',
         start_url: '/',
         // `display` is the required, universally-supported fallback (hides
