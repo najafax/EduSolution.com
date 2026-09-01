@@ -11,6 +11,7 @@ import IdleTimeoutMonitor from './components/IdleTimeoutMonitor';
 import CommandPalette from './components/CommandPalette';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useAuth } from './context/AuthContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 
 // Every routed page is loaded on demand rather than bundled into one
 // eager chunk — Login previously had to wait on the entire app's JS
@@ -102,8 +103,19 @@ export default function App() {
           full width. */}
       {!isPortalRoute && <Sidebar />}
       <div className="flex min-w-0 flex-1 flex-col">
-        {!isPortalRoute && <Navbar />}
-        {!isPortalRoute && <TopBar />}
+        {/* NotificationsProvider wraps Navbar+TopBar specifically (not the
+            whole app) — see NotificationsContext.jsx's own top-of-file
+            note: both headers are always mounted regardless of viewport
+            (CSS breakpoints pick which is visible, not React), and each
+            renders its own <NotificationCenter> bell, so without a shared
+            provider the same three list requests fired twice on every
+            page load. */}
+        {!isPortalRoute && (
+          <NotificationsProvider>
+            <Navbar />
+            <TopBar />
+          </NotificationsProvider>
+        )}
         {!isPortalRoute && <IdleTimeoutMonitor />}
         {!isPortalRoute && <CommandPalette />}
         {/* flex-1 + flex-col here (rather than on the outer div) is what pins

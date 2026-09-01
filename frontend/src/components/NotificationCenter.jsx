@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { api } from '../lib/api';
+import { useNotifications } from '../context/NotificationsContext';
 import { AlertTriangleIcon, LicenseIcon, InboxIcon, BellIcon } from './icons';
 
 // How many items each category shows before "+more" — a display concern
@@ -33,47 +32,22 @@ const LIMIT_PER_TYPE = 5;
 // under a bell positioned toward the header's right side) never runs out
 // of room there.
 export default function NotificationCenter({ className = '', align = 'right' }) {
-  const { token, can } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [overdueInvoices, setOverdueInvoices] = useState([]);
-  const [expiringLicenses, setExpiringLicenses] = useState([]);
-  const [pendingRequests, setPendingRequests] = useState([]);
   const boxRef = useRef(null);
 
-  const canViewInvoices = can('invoices', 'view');
-  const canViewLicenses = can('licenses', 'view');
-  const canViewQuotes = can('quotes', 'view');
+  // Fetched once, shared across every mounted <NotificationCenter> instance
+  // (Navbar.jsx's and TopBar.jsx's headers are both always in the tree —
+  // CSS breakpoints decide which is *visible*, not React — so without this
+  // shared context each instance used to run its own independent fetch;
+  // see NotificationsContext.jsx's own top-of-file note).
+  const { overdueInvoices, expiringLicenses, pendingRequests, refresh, canViewInvoices, canViewLicenses, canViewQuotes } =
+    useNotifications();
 
-  function load() {
-    if (canViewInvoices) {
-      api.invoices
-        .list(token, { status: 'sent' })
-        .then(({ invoices }) =>
-          setOverdueInvoices(invoices.filter((inv) => inv.is_overdue).sort((a, b) => (a.due_date < b.due_date ? -1 : 1))),
-        )
-        .catch(() => {});
-    }
-    if (canViewLicenses) {
-      api.licenses
-        .list(token, { status: 'expiring_soon' })
-        .then(({ licenses }) => setExpiringLicenses([...licenses].sort((a, b) => (a.expiry_date < b.expiry_date ? -1 : 1))))
-        .catch(() => {});
-    }
-    if (canViewQuotes) {
-      api.quoteRequests
-        .list(token, { status: 'pending' })
-        .then(({ requests }) => setPendingRequests(requests))
-        .catch(() => {});
-    }
-  }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(load, [token, canViewInvoices, canViewLicenses, canViewQuotes]);
   // Re-fetch every time the panel is opened, so a tab left open a while
   // doesn't keep showing counts from whenever it last loaded.
   useEffect(() => {
-    if (open) load();
+    if (open) refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

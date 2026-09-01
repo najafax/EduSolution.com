@@ -6079,6 +6079,33 @@ established for the nav links themselves — `Sidebar.jsx`'s own tablet/
 phone drawer briefly carried a third instance too, removed again at
 follow-up request (see "Placement and theming" below for why).
 
+- **One shared fetch, not one per mounted instance**: `Navbar.jsx`'s and
+  `TopBar.jsx`'s headers are *both* always in the React tree at every
+  viewport width — CSS breakpoints (`xl:hidden`/`hidden ... xl:flex`)
+  decide which one is visually shown, not a JS conditional that would
+  unmount the other — so `NotificationCenter` originally ran its own
+  independent `useEffect` fetch per instance, meaning every page load
+  fired the same three list requests (overdue invoices, expiring
+  licenses, pending quote requests) twice, all the time, at every screen
+  width, for no visible benefit (a real perf regression traced back to
+  this component being duplicated the moment `TopBar.jsx` shipped — see
+  "Desktop TopBar" above). Fixed by pulling the fetch out into
+  `context/NotificationsContext.jsx`'s `NotificationsProvider` — mounted
+  once in `App.jsx`, wrapping `Navbar`+`TopBar` together — so there's
+  exactly one fetch per permission grant regardless of how many
+  `<NotificationCenter>` instances are currently rendered.
+  `NotificationCenter.jsx` itself is now a pure consumer
+  (`useNotifications()`), unchanged in every other respect — same
+  `align` prop, same re-fetch-on-open behavior (`refresh()` from the
+  context), same dropdown markup. Verified against a real production
+  build (`npm run preview`, not `npm run dev` — React's `StrictMode`
+  double-invokes effects in development only, which would have made the
+  before/after request counts impossible to read cleanly) with a
+  Playwright pass counting actual network requests on `/dashboard` at a
+  1440px viewport: 2 requests each for invoices/licenses (one from
+  Dashboard's own "Needs attention" panel, one from the shared
+  notification context — down from 3, since the bell's own copy was
+  previously doubled) and 1 for quote requests (down from 2).
 - **Deliberately no backend route, no notifications table, no read/unread
   state.** This is a live, computed view built entirely from three existing,
   already-permission-gated list endpoints — the same "don't build it until
