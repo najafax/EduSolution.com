@@ -83,6 +83,35 @@ body {
   overscroll-behavior-x: none;
 }
 
+/* App.jsx's own page-transition wrapper — a quick fade + slight rise on
+   every route change, keyed by pathname so each navigation remounts (and
+   thus replays) this animation. Plain CSS rather than the `motion`
+   library deliberately: App.jsx is always in the eager initial bundle
+   (never lazy-loaded), so importing `motion/react` there would pull the
+   whole animation library into what has to load before any page can
+   render at all — see App.jsx's own note on this. Matches the timing/
+   easing the `motion`-based version used (`Modal.jsx`/`ConfirmDialog.jsx`
+   still use the real library for their own animations, both lazy). Gated
+   behind `prefers-reduced-motion: no-preference` — the same effect
+   `MotionConfig reducedMotion="user"` gave those two components — so
+   nothing animates for a visitor who's asked the OS to reduce motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .route-fade-in {
+    animation: route-fade-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes route-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Navbar's desktop link strip (components/Navbar.jsx): on narrow desktop
    widths it can still be wider than the space it's given, and scrolls
    internally rather than forcing the page to scroll horizontally. Default

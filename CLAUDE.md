@@ -6534,6 +6534,51 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
   was missing before, so `npm run preview` (the one workflow command that
   actually serves the real production build, the only way to verify
   chunking like this end to end) had no backend connectivity at all.
+- **Keeping the `motion` library out of the eager initial chunk**: the
+  route-splitting work above dropped the initial chunk to ~262KB (81KB
+  gzip) at the time, but it had crept back up to ~401KB (124KB gzip) by
+  the time this was next audited — traced to `App.jsx` itself statically
+  importing `MotionConfig`/`motion` from `motion/react` for its own
+  page-transition wrapper (a route-change fade + slight rise, keyed by
+  `location.pathname`). `App.jsx` is never lazy — it's the one file every
+  route depends on — so a top-level import there behaves exactly like the
+  pre-route-splitting single bundle for that one dependency: the entire
+  `motion`/`framer-motion`/`motion-dom` graph (measured via a temporary
+  `rollup-plugin-visualizer` build — the single biggest contributor to the
+  initial chunk after `react-dom` itself) got welded onto the chunk every
+  page has to download and parse before it can render at all, including
+  `Login`, which uses no animation whatsoever. Fixed by dropping
+  `motion/react` from `App.jsx` entirely — the page-transition wrapper is
+  now a plain `<div key={location.pathname} className="route-fade-in">`,
+  with the identical fade/rise timing and easing reproduced as a CSS
+  `@keyframes` in `index.css`, gated behind `@media (prefers-reduced-
+  motion: no-preference)` (the CSS equivalent of the `reducedMotion="user"`
+  behavior `MotionConfig` used to provide from the app root). `motion`
+  itself isn't gone from the app — `components/Modal.jsx` and
+  `components/ConfirmDialog.jsx` still use it for their own open/close
+  animations, each now wrapping its own local `<MotionConfig
+  reducedMotion="user">` around its `<AnimatePresence>` (previously
+  inherited from `App.jsx`'s single app-root instance) — but since neither
+  is ever statically imported by `App.jsx` itself, only by individual lazy
+  page chunks that need a modal/confirm dialog, the library now stays out
+  of the one chunk every page shares. Verified against a real production
+  build (`npm run preview`, not the dev server) with Playwright: the
+  `/login` page (no modal anywhere on it) now fetches zero `motion`-bearing
+  chunks at all — its real payload dropped from the old single ~124KB gzip
+  entry chunk to ~85KB gzip index chunk + a couple KB of runtime/page
+  chunks — while `/dashboard` (which does render a `Modal` for its
+  "Customize shortcuts" action) still fetches `motion` on load, but now as
+  its own separate, parallel, non-blocking ~41KB gzip chunk rather than
+  bytes baked into the one chunk that has to finish downloading before
+  React can even mount. Confirmed via `dist/index.html` that the `motion`
+  chunk carries no `<link rel="modulepreload">` (so it's genuinely
+  lazy-fetched only once something that needs it actually loads, not
+  preloaded speculatively), and via a live click-through that Modal still
+  opens/animates correctly with the locally-scoped `MotionConfig`. Watch
+  for this regressing again the same way: any future top-level `App.jsx`
+  import (not just `motion`) re-creates the identical problem, since
+  nothing about route-level code-splitting protects the one file that
+  isn't itself lazy.
 - **Stale-chunk recovery after a deploy**: every chunk's filename carries a
   content hash, so a browser tab left open across a deploy is still
   holding the *old* `index.html`'s chunk map. Navigating to a route whose

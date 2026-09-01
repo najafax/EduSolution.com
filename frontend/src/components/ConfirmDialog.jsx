@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 
 // The one confirmation popup every destructive action in the app renders —
 // same centered-card/dimmed-backdrop language as Modal.jsx and
@@ -23,6 +23,14 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, canc
   }, [open, onCancel]);
 
   return (
+    // MotionConfig lives here (not at the app root) so this file's own
+    // static `motion/react` import is the only thing that pulls the
+    // library in — ConfirmDialog.jsx is only ever reached via a lazily-
+    // loaded page chunk, never from App.jsx itself, so the library stays
+    // out of the eager initial bundle entirely (see Modal.jsx's own
+    // identical note, and App.jsx's page-transition, which deliberately
+    // uses plain CSS instead of `motion` for exactly this reason).
+    <MotionConfig reducedMotion="user">
     <AnimatePresence>
       {open && (
         <motion.div
@@ -68,5 +76,6 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, canc
         </motion.div>
       )}
     </AnimatePresence>
+    </MotionConfig>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 
 // Shared popup styling for "New X" (and reused "Edit X") entry forms —
 // same backdrop + centered white card treatment as
@@ -31,6 +31,16 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
   }, [open, onClose]);
 
   return (
+    // MotionConfig lives here (not at the app root) so this file's own
+    // static `motion/react` import is the only thing that pulls the
+    // library in — Modal.jsx is only ever reached via a lazily-loaded
+    // page chunk, never from App.jsx itself, so the library stays out of
+    // the eager initial bundle entirely (see App.jsx's own note on its
+    // page-transition, which deliberately uses plain CSS instead of
+    // `motion` for exactly this reason). `reducedMotion="user"` collapses
+    // this modal's open/close animation to instant when the OS-level
+    // "reduce motion" preference is on.
+    <MotionConfig reducedMotion="user">
     <AnimatePresence>
       {open && (
         <motion.div
@@ -68,5 +78,6 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
         </motion.div>
       )}
     </AnimatePresence>
+    </MotionConfig>
   );
 }

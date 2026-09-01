@@ -1,6 +1,5 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
-import { MotionConfig, motion } from 'motion/react';
 import Navbar from './components/Navbar';
 import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
@@ -83,12 +82,6 @@ export default function App() {
   const isPortalRoute = location.pathname.startsWith('/portal');
 
   return (
-    // reducedMotion="user" makes every motion component in the app (this
-    // page-transition wrapper, Modal/ConfirmDialog's own open/close
-    // animations) automatically collapse to an instant, no-motion state
-    // when the OS-level "reduce motion" preference is on — one place to
-    // honor it rather than checking prefers-reduced-motion per component.
-    <MotionConfig reducedMotion="user">
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 xl:flex-row">
       {/* Sidebar (xl: and up, nav links only) pairs with TopBar (search/
           notifications/theme/account, xl: and up); Navbar (below xl,
@@ -131,18 +124,27 @@ export default function App() {
                 the user navigates elsewhere — remounting clears the
                 boundary's caught-error state along with everything else.
                 The same key also drives the page's own enter transition
-                (a quick fade + slight rise) — no exit animation, since that
-                would need react-router's own location prop threaded through
-                AnimatePresence just to avoid a blank gap between pages,
-                real complexity for a subtle effect nobody would consciously
-                notice missing. */}
+                (a quick fade + slight rise, `.route-fade-in` in index.css)
+                — no exit animation, same reasoning as before: avoiding a
+                blank gap between pages on route change would need real
+                complexity (react-router's own location prop threaded
+                through something like AnimatePresence) for a subtle effect
+                nobody would consciously notice missing. Plain CSS
+                (`@keyframes` gated behind `prefers-reduced-motion:
+                no-preference`) rather than the `motion` library used here
+                deliberately — this div sits in App.jsx's own always-eager
+                render tree, so a `motion/react` import here would pull the
+                whole animation library into the initial bundle that has to
+                load before ANY page (including Login) can render, the
+                exact regression route-level code-splitting was built to
+                avoid. `motion` itself is unaffected — Modal.jsx's and
+                ConfirmDialog.jsx's own open/close animations still use it
+                (each now wraps its own MotionConfig locally, see their own
+                notes), and since neither is ever statically imported by
+                App.jsx, the library stays lazy: only fetched the first
+                time a modal actually opens, not on every page load. */}
             <ErrorBoundary key={location.pathname}>
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            >
+            <div key={location.pathname} className="route-fade-in">
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 {/* Login is also the app's landing page — see pages/Login.jsx's
@@ -195,7 +197,7 @@ export default function App() {
                 <Route path="/account" element={<Protected><MyAccount /></Protected>} />
               </Routes>
               </Suspense>
-            </motion.div>
+            </div>
             </ErrorBoundary>
           </div>
           {/* Hidden on phones while logged in: BottomNav + each page's own
@@ -212,6 +214,5 @@ export default function App() {
       </div>
       {!isPortalRoute && user && <BottomNav />}
     </div>
-    </MotionConfig>
   );
 }
