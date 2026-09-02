@@ -41,7 +41,10 @@ export default function PortalAcceptInvite() {
     setSubmitting(true);
     try {
       await api.portal.acceptInvite({ token, password });
-      navigate('/portal/login', { state: { message: 'Password set. You can now log in.' } });
+      // Lands on the shared "/login" (see pages/Login.jsx), same as
+      // pages/ResetPassword.jsx's own post-reset redirect — that page's
+      // notice banner already reads location.state?.message.
+      navigate('/login', { state: { message: 'Password set. You can now log in.' } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -97,7 +100,7 @@ export default function PortalAcceptInvite() {
             {error === EXPIRED_MESSAGE && (
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                 If you've already set a password with this link before, it's already been used — try{' '}
-                <Link to="/portal/login" className="font-medium text-lagoon-600 hover:text-lagoon-500">
+                <Link to="/login" className="font-medium text-lagoon-600 hover:text-lagoon-500">
                   logging in
                 </Link>{' '}
                 instead, or use{' '}

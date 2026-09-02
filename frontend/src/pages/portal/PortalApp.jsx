@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { PortalAuthProvider } from '../../context/PortalAuthContext';
 import PortalProtectedRoute from '../../components/PortalProtectedRoute';
 import PortalLayout from './PortalLayout';
-import PortalLogin from './PortalLogin';
 import PortalAcceptInvite from './PortalAcceptInvite';
 import PortalForgotPassword from './PortalForgotPassword';
 import PortalResetPassword from './PortalResetPassword';
@@ -33,7 +32,14 @@ export default function PortalApp() {
   return (
     <PortalAuthProvider>
       <Routes>
-        <Route path="login" element={<PortalLogin />} />
+        {/* There's no portal-specific login page anymore — pages/Login.jsx
+            (route "/login") signs in either a staff account or a client
+            portal account from the same form, so PortalProtectedRoute.jsx
+            and every other in-app link/redirect that used to point at
+            "/portal/login" now points straight at "/login" instead. This
+            route only exists to catch a stale bookmark/emailed link still
+            pointing at the old path. */}
+        <Route path="login" element={<Navigate to="/login" replace />} />
         <Route path="accept-invite" element={<PortalAcceptInvite />} />
         <Route path="forgot-password" element={<PortalForgotPassword />} />
         <Route path="reset-password" element={<PortalResetPassword />} />

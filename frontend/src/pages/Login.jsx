@@ -4,6 +4,32 @@ import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { IDLE_LOGOUT_MESSAGE_KEY } from '../components/IdleTimeoutMonitor';
 
+// This one form now signs in either kind of account this app has — a
+// staff user or a client with portal access (see context/PortalAuthContext.jsx)
+// — since they're deliberately separate auth systems (separate tables,
+// separate JWTs, mutually-exclusive localStorage sessions; see that
+// context's own notes) with no shared login table to query once. The
+// portal's own dedicated `/portal/login` page is retired in favor of this
+// one (see PortalApp.jsx), matching what the public marketing site's own
+// header link already assumed: it's always pointed logged-out visitors —
+// staff and clients alike — at this same `/login` (see MarketingLayout.jsx).
+// `PORTAL_TOKEN_KEY` mirrors PortalAuthContext.jsx's own constant — this
+// page isn't rendered inside a `PortalAuthProvider` (that only wraps
+// `/portal/*`, see PortalApp.jsx), so a successful portal login here writes
+// straight to the same localStorage key that provider reads from on mount,
+// rather than going through its `login()` method.
+const PORTAL_TOKEN_KEY = 'edusolution_portal_token';
+// Both `POST /api/auth/login` and `POST /api/portal/login` return this
+// exact string for "no such account" or "wrong password" — never anything
+// more specific, so a nonexistent/mistyped email can't be distinguished
+// from a real one with the wrong password (account enumeration). Used
+// below as the one signal that means "this wasn't a staff account after
+// all, worth trying the portal instead" — any other message (e.g. "This
+// account has been deactivated") means the credentials genuinely matched
+// a real staff account, so there's nothing a portal lookup could usefully
+// add and it's shown immediately instead of trying to log in twice.
+const GENERIC_LOGIN_ERROR = 'Invalid email or password';
+
 function LoginForm() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -32,8 +58,18 @@ function LoginForm() {
       const { token, user, permissions, sessionTimeoutMinutes } = await api.login(form);
       login(token, user, permissions, sessionTimeoutMinutes);
       navigate('/dashboard');
-    } catch (err) {
-      setError(err.message);
+    } catch (staffErr) {
+      if (staffErr.message !== GENERIC_LOGIN_ERROR) {
+        setError(staffErr.message);
+      } else {
+        try {
+          const { token } = await api.portal.login(form);
+          localStorage.setItem(PORTAL_TOKEN_KEY, token);
+          navigate('/portal/dashboard');
+        } catch (portalErr) {
+          setError(portalErr.message);
+        }
+      }
     } finally {
       setSubmitting(false);
     }
@@ -50,7 +86,8 @@ function LoginForm() {
     <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-xl sm:p-9 dark:border-slate-700 dark:bg-slate-900">
       <h2 className="text-xl font-bold text-ink dark:text-white">Log in</h2>
       <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-        Accounts are created by an administrator — contact yours if you need access.
+        Staff and client portal accounts both sign in here — accounts are created by an administrator, so contact
+        yours if you need access.
       </p>
 
       {notice && (

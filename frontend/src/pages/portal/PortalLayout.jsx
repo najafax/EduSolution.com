@@ -84,7 +84,7 @@ export default function PortalLayout({ children }) {
 
   function handleLogout() {
     logout();
-    navigate('/portal/login');
+    navigate('/login');
   }
 
   function isActive(to) {

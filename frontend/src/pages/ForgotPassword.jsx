@@ -13,8 +13,18 @@ export default function ForgotPassword() {
     setError('');
     setSubmitting(true);
     try {
-      const { message } = await api.forgotPassword(email);
-      setMessage(message);
+      // pages/Login.jsx's "Forgot password?" link lands here for both a
+      // staff account and a client portal account — a bare email gives no
+      // way to tell which one it belongs to, so this requests a reset link
+      // from both systems. Both always return the exact same generic
+      // message regardless of whether the email matches anything on that
+      // side (prevents account enumeration), so showing either's response
+      // is safe and never reveals which system, if either, actually has
+      // this email on file.
+      const [staffResult, portalResult] = await Promise.allSettled([api.forgotPassword(email), api.portal.forgotPassword(email)]);
+      const succeeded = staffResult.status === 'fulfilled' ? staffResult.value : portalResult.status === 'fulfilled' ? portalResult.value : null;
+      if (!succeeded) throw staffResult.reason || portalResult.reason;
+      setMessage(succeeded.message);
     } catch (err) {
       setError(err.message);
     } finally {

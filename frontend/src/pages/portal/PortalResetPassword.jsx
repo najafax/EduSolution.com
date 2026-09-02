@@ -23,7 +23,10 @@ export default function PortalResetPassword() {
     setSubmitting(true);
     try {
       await api.portal.resetPassword(token, password);
-      navigate('/portal/login', { state: { message: 'Password updated. You can now log in.' } });
+      // Lands on the shared "/login" (see pages/Login.jsx), same as
+      // pages/ResetPassword.jsx's own post-reset redirect — that page's
+      // notice banner already reads location.state?.message.
+      navigate('/login', { state: { message: 'Password updated. You can now log in.' } });
     } catch (err) {
       setError(err.message);
     } finally {

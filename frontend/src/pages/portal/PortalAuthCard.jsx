@@ -1,10 +1,13 @@
 import { Link } from 'react-router-dom';
 
-// Shared shell for the four unauthenticated portal auth pages (login,
-// accept-invite, forgot/reset password) — a plain centered card, not the
-// full marketing hero pages/Login.jsx uses for staff, since a client
-// landing here came from a direct invite/reset link with one specific task
-// to do, not browsing the app's front door.
+// Shared shell for the three remaining unauthenticated portal auth pages
+// (accept-invite, forgot/reset password) — a plain centered card, not the
+// full marketing hero pages/Login.jsx used to use for staff, since a
+// client landing here came from a direct invite/reset link with one
+// specific task to do, not browsing the app's front door. Login itself no
+// longer has its own portal-specific page (see pages/Login.jsx/PortalApp.jsx) —
+// it signs in either kind of account from the one shared "/login" form,
+// which is exactly where the footer link below sends someone back to.
 export default function PortalAuthCard({ title, subtitle, children }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12 sm:px-6">
@@ -18,8 +21,8 @@ export default function PortalAuthCard({ title, subtitle, children }) {
         {children}
       </div>
       <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-        <Link to="/portal/login" className="font-medium text-lagoon-600 hover:text-lagoon-500">
-          Back to client portal log in
+        <Link to="/login" className="font-medium text-lagoon-600 hover:text-lagoon-500">
+          Back to log in
         </Link>
       </p>
     </div>

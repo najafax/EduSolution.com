@@ -3236,18 +3236,22 @@ accept/decline).
   Licenses — collapsing to a horizontally-scrollable second row below `sm`,
   not a hamburger drawer, since four links never need one), the client's
   name, `ThemeToggle` (reused as-is — it only reads `ThemeContext`, no
-  staff-auth dependency), and a Log out button. The four unauthenticated
-  auth pages (`PortalLogin`/`PortalAcceptInvite`/`PortalForgotPassword`/
-  `PortalResetPassword`) share `pages/portal/PortalAuthCard.jsx`, a plain
-  centered-card shell — deliberately not `pages/Login.jsx`'s full
-  marketing-hero treatment, since a client landing on one of these came
-  from a direct invite/reset link with exactly one task to do, not
-  browsing the app's front door. `PortalLogin.jsx` redirects an
-  already-authenticated visit straight to `/portal/dashboard`, same pattern
-  as `Login.jsx`. `PortalAcceptInvite.jsx`/`PortalResetPassword.jsx` are
+  staff-auth dependency), and a Log out button. The three remaining
+  unauthenticated auth pages (`PortalAcceptInvite`/`PortalForgotPassword`/
+  `PortalResetPassword` — see "One shared login page" below for why there's
+  no `PortalLogin` anymore) share `pages/portal/PortalAuthCard.jsx`, a
+  plain centered-card shell — deliberately not the marketing-site treatment
+  the shared `/login` page's own visitors get elsewhere, since a client
+  landing on one of these came from a direct invite/reset link with exactly
+  one task to do, not browsing the app's front door.
+  `PortalAcceptInvite.jsx`/`PortalResetPassword.jsx` are
   straight mirrors of `ResetPassword.jsx`'s token-from-query-string +
   set-a-new-password shape, wired to `api.portal.acceptInvite`/
-  `api.portal.resetPassword` instead. **`PortalAcceptInvite.jsx`'s error
+  `api.portal.resetPassword` instead, both landing back at the shared
+  `/login` on success with a banner (`navigate('/login', { state: {
+  message: ... } })`) — the same `location.state?.message` fallback
+  `pages/Login.jsx`'s own notice already reads for `ResetPassword.jsx`'s
+  identical pattern. **`PortalAcceptInvite.jsx`'s error
   state adds one thing `ResetPassword.jsx` doesn't need**: the backend
   returns the exact same "This invite link is invalid or has expired"
   message (`routes/clientPortal.js`'s `POST /accept-invite`) whether the
@@ -3256,9 +3260,12 @@ accept/decline).
   token is cleared the moment accept-invite succeeds — has already been
   used once to set a password. That last case reads as a contradiction to
   a client re-clicking their original invite email ("but it said 7 days"),
-  so matching on that exact string adds a second line pointing at
-  `/portal/login` ("already set up? log in") and `/portal/forgot-password`
-  ("or reset it") — `reset-password` sets `password_hash` the same
+  so matching on that exact string adds a second line pointing at the
+  shared `/login` ("already set up? log in") and `/portal/forgot-password`
+  ("or reset it" — this one stays portal-specific, since the context here
+  already pins the email down to a portal account, unlike the shared
+  `/forgot-password` below which has to guess) — `reset-password` sets
+  `password_hash` the same
   unconditional way `accept-invite` does, so it's a working recovery path
   regardless of which of the three cases actually happened, with no need
   for the backend to distinguish them or for a support conversation to
@@ -3291,6 +3298,136 @@ accept/decline).
   unauthenticated ones take no token (same shape as the top-level
   `api.login`/`api.forgotPassword`), everything else takes the portal
   token from `PortalAuthContext`, never `AuthContext`'s own `token`.
+
+### One shared login page for staff and the client portal
+
+`pages/Login.jsx`'s one form (route `/login`) is now how *either* kind of
+account signs in — a staff user or a client with portal access — closing a
+gap the public marketing site's own header had quietly assumed already
+closed: `MarketingLayout.jsx`'s "Login" nav link has always pointed logged-
+out visitors at `/login` regardless of which kind of account they hold
+(labeled plainly "Login," not "Staff login," on exactly this reasoning —
+see "Public marketing website + content manager" above), but until this
+feature `/login` only ever tried a staff login, so a client clicking it
+would just get "Invalid email or password" no matter how correct their
+portal credentials were. Built at explicit request, deliberately choosing
+one shared *form* over merging the two account systems themselves — staff
+(`users`) and client portal (`client_portal_accounts`) stay exactly as
+separate as "Client portal" above documents (separate tables, separate
+JWTs distinguished by a `type: 'client'` claim, mutually-exclusive
+`localStorage` sessions) — this is a frontend orchestration change only,
+with **no backend route, schema, or auth-boundary change at all**: both
+`POST /api/auth/login` and `POST /api/portal/login` are completely
+untouched.
+
+- **The fallback sequence**: `LoginForm`'s `handleSubmit` tries
+  `api.login(form)` (staff) first. If that succeeds, it's a staff sign-in,
+  same as before this feature. If it throws, the *specific* error message
+  decides what happens next — both backends return the exact same literal
+  string, `"Invalid email or password"`, for "no such account" and "wrong
+  password" alike (account-enumeration protection, see `routes/auth.js`/
+  `routes/clientPortal.js` above), and *only* that exact message triggers a
+  second attempt against `api.portal.login(form)`. Any other message (most
+  notably `"This account has been deactivated"`, which `routes/auth.js`'s
+  own login only ever returns *after* the password has already checked
+  out) is shown immediately instead — a specific rejection means the
+  credentials genuinely matched a real staff account, so there's nothing a
+  portal lookup could usefully add, and falling through anyway would risk
+  masking that real "your account is deactivated" answer behind a generic
+  one if the same email also happens to fail on the portal side. If the
+  portal attempt then also fails, whatever *it* returns is shown as the
+  final error — including its own more specific messages (e.g. "This
+  account has not been activated yet...", from `client_portal_accounts`
+  rows with no `password_hash` set yet), since by that point a staff
+  lookup has already come up empty and the portal's own answer is the most
+  useful thing left to tell the visitor.
+- **No `PortalAuthProvider` needed here**: `pages/Login.jsx` renders
+  outside `/portal/*`, so it has no `usePortalAuth()` to call into (see
+  `PortalApp.jsx` above — that provider only wraps the portal's own nested
+  routes). A successful portal login instead writes straight to
+  `localStorage.setItem('edusolution_portal_token', token)` — the same key
+  `context/PortalAuthContext.jsx`'s own `TOKEN_KEY` constant uses,
+  duplicated here as a literal with a comment pointing at the original
+  (same acceptable-duplication precedent `EXPIRY_WARNING_DAYS` already
+  sets between `routes/licenses.js`/`lib/scheduler.js`) — then navigates to
+  `/portal/dashboard`. That route match mounts a *fresh* `PortalApp`/
+  `PortalAuthProvider`, whose own `useState(() => localStorage.getItem(TOKEN_KEY))`
+  initializer picks the just-written token straight back up and runs its
+  normal bootstrap (`GET /portal/me` + `GET /portal/settings`) before
+  rendering anything — functionally identical to a plain page load with an
+  already-stored portal token, just one extra round trip slower than a
+  "real" `PortalAuthContext.login()` call would be, which is an acceptable
+  trade for not restructuring the provider tree just for this one form. A
+  successful *staff* login still goes through `useAuth()`'s own `login()`
+  exactly as before, which itself already clears the portal token key on
+  the way in (see `AuthContext.jsx`'s own note on why) — so switching
+  identities on this shared form in either direction always leaves at most
+  one of the two sessions active in this browser, the same mutual-
+  exclusivity guarantee "Client portal" above already established.
+- **The subtext line** ("Accounts are created by an administrator — contact
+  yours if you need access.") was reworded to name both audiences up front
+  ("Staff and client portal accounts both sign in here — ...") rather than
+  reading as staff-only, though the underlying claim was already true for
+  a portal account too — a client portal account is only ever created by
+  an admin inviting an existing client (`routes/clients.js`'s `POST
+  /:id/portal-invite`, see "Client portal" above), never self-serve.
+- **`/portal/login` is retired**, not left around as a second, now-
+  inconsistent way to sign in — `pages/portal/PortalLogin.jsx` is deleted
+  outright and every in-app link/redirect that used to target it now
+  targets the shared `/login` instead: `PortalProtectedRoute.jsx`'s
+  not-authenticated redirect, `PortalLayout.jsx`'s "Log out" handler,
+  `PortalResetPassword.jsx`'s/`PortalAcceptInvite.jsx`'s post-success
+  redirects (both already carried a `location.state.message` banner —
+  `pages/Login.jsx`'s own notice already falls back to reading that exact
+  state, the same mechanism `ResetPassword.jsx`'s redirect has always used,
+  so no new plumbing was needed for the banner to keep working),
+  `PortalAcceptInvite.jsx`'s inline "already set up? log in" link, and
+  `PortalAuthCard.jsx`'s footer link (reworded from "Back to client portal
+  log in" to plain "Back to log in," since it's the same shared page every
+  other logged-out route already uses that wording for). `PortalApp.jsx`
+  keeps a bare redirect at `login` (`<Navigate to="/login" replace />`)
+  rather than removing the route outright, purely so a stale bookmark or
+  cached link still lands somewhere useful instead of falling through to
+  the catch-all `<Route path="*" element={<Navigate to="dashboard"
+  replace />} />` — which would otherwise round-trip through an
+  unauthenticated `Protected`/`PortalProtectedRoute` redirect before
+  arriving at the same place anyway. `/portal/forgot-password`/
+  `/portal/reset-password`/`/portal/accept-invite` are all unaffected and
+  keep working exactly as before — these are reached from real emailed
+  links (invite/reset emails point straight at
+  `${CLIENT_ORIGIN}/portal/accept-invite?token=...` etc., see
+  `routes/clients.js`/`routes/clientPortal.js` above) or from a context
+  that already knows the email is a portal account, unlike a bare `/login`/
+  `/forgot-password` visit with nothing to disambiguate on yet.
+- **`pages/ForgotPassword.jsx` needed the identical fallback treatment**,
+  for the same reason the login form does: the "Forgot password?" link on
+  the now-shared `/login` page routes here, and a bare email address gives
+  no way to tell up front whether it belongs to a staff account or a
+  portal one. Rather than guessing (or repeating the login form's
+  sequential-with-a-sentinel-message approach, which doesn't apply here
+  since both endpoints *always* return the exact same generic message
+  regardless of a match — see `routes/auth.js`'s/`routes/clientPortal.js`'s
+  own `genericMessage`, `"If an account exists for that email, a password
+  reset link has been sent."`, verbatim on both sides), `handleSubmit` now
+  fires `api.forgotPassword(email)` and `api.portal.forgotPassword(email)`
+  together via `Promise.allSettled` and shows whichever one's message came
+  back (they're identical either way) — safe precisely because neither
+  response ever reveals whether the email actually matched anything on
+  that side, so firing both can never leak which system, if either, this
+  email belongs to. If both somehow reject (a real failure on both sides —
+  a network error, both rate limiters tripped at once), the first
+  rejection's own message is shown instead of a blank error.
+- Verified end-to-end against a real production build (`npm run preview`)
+  with Playwright: a staff login through `/login` still lands on
+  `/dashboard` and a wrong staff password still shows the generic error; a
+  freshly-seeded, activated portal account logs in through the exact same
+  form and lands on `/portal/dashboard` (screenshotted to confirm the real
+  page renders, not a blank one) with a wrong portal password showing the
+  same generic error; visiting `/portal/login` directly redirects to
+  `/login`; logging out of the portal and visiting a protected portal
+  route while unauthenticated both land back on `/login`; and the Forgot
+  Password page still returns its usual generic success message for a
+  portal-only email.
 
 ### Client portal self-service improvements (`backend/src/`, `frontend/src/`)
 
@@ -4725,11 +4862,13 @@ frontend stops holding/sending it.
   link) still continues straight to the dashboard rather than showing a
   form with nothing left to do. Once resolved, the page is just
   `LoginForm` (email/password/forgot-password link/submit, plus the
-  idle-logout and post-reset-password notice banner — all unchanged)
-  centered in a plain `min-h-[70vh] flex items-center justify-center`
-  wrapper on the page's normal background, with no hero, no marketing
-  copy, and no other section — matching the screenshot the request
-  itself was made from exactly.
+  idle-logout and post-reset-password notice banner) centered in a plain
+  `min-h-[70vh] flex items-center justify-center` wrapper on the page's
+  normal background, with no hero, no marketing copy, and no other
+  section — matching the screenshot the request itself was made from
+  exactly. `handleSubmit` itself is no longer staff-only, though — see
+  "One shared login page for staff and the client portal" above for the
+  staff-then-portal fallback sequence this same form now runs.
 - `pages/` — one component per route (`Login`, `ForgotPassword`,
   `ResetPassword`, `Dashboard`, `Users`, `MyAccount`), wired up in
   `App.jsx` via `react-router-dom`. There is no `Signup` page or `/signup`
