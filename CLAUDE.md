@@ -4336,8 +4336,10 @@ it so news, testimonials, services and (eventually) team/gallery entries
 can be published without a code deploy. `/` used to render the same
 `Login` component as `/login` (see that page's own history note on why
 there was no separate landing page); it now renders the real marketing
-homepage instead, and `Login.jsx` itself is unchanged and lives only at
-`/login`.
+homepage instead. `Login.jsx` itself was later stripped down to just the
+sign-in form once this marketing site existed to cover everything else it
+used to carry — see that page's own note below for what was removed and
+why.
 
 - **Six brand-new tables** (`db/index.js`, plain `CREATE TABLE IF NOT
   EXISTS` — no production data yet): `website_posts`, `website_testimonials`,
@@ -4690,73 +4692,44 @@ frontend stops holding/sending it.
   is ever wanted there. The `public` object (`getQuote`, `respondQuote`,
   `getInvoice`, `openQuotePdf`, `openInvoicePdf`) hits `/api/public/...`
   and is the one set of calls that never passes a token.
-- `pages/Login.jsx` (routes `/` **and** `/login`, both public, both render
-  this same component — see `App.jsx`) is the app's front door — there is
-  no separate Landing page. This app has no public signup (see
-  `routes/auth.js` above), so realistically every real visitor here is
-  either signing in or already signed in; a standalone marketing page
-  that isn't where you actually log in was friction, not value. The login
-  form is the hero's primary element rather than a "Log in" button
-  pointing at a separate page, and an already-authenticated visit (the
-  Navbar brand link, a stale bookmark) redirects straight to `/dashboard`
-  instead of showing a login form/marketing page with nothing left to do
-  there — `Login` checks `token`/`loading` from `useAuth()` and renders
-  `<Navigate to="/dashboard" replace />` once resolved, the same
-  loading/token pattern `ProtectedRoute.jsx` uses (mirrored rather than
-  shared, since the redirect target and the "what to show while deciding"
-  differ). The actual form (email/password/forgot-password link/submit,
-  plus the idle-logout and post-reset-password notice banner) is
-  `LoginForm`, a local sub-component rendered inside `HeroLoginCard`
-  (a soft blurred-gradient-circle backdrop) — kept separate from the
-  exported `Login` component so the redirect-when-authenticated check
-  above doesn't have to sit inside (and re-render with) the form's own
-  state.
+- `pages/Login.jsx` (route `/login` only — see `App.jsx`) is now just the
+  sign-in form itself, nothing else. It briefly doubled as the app's own
+  landing page too (rendered at both `/` and `/login`, with a hero/
+  EduPage-partner panel/mission-statement/closing-wordmark stack of
+  marketing sections below the form — see "Public marketing website +
+  content manager" above for why `/` moved off this component onto a real
+  built-out marketing site instead) — once that site existed to cover
+  every one of those jobs on its own dedicated pages (`/`, `/services`,
+  `/tutorials`, `/testimonials`, `/news`, `/about`, `/contact`), carrying
+  the same marketing content here too was pure redundancy, not a second
+  front door worth keeping. At explicit request ("I just need only this
+  login form for login page, nothing else, as now i have operational
+  website"), every one of those sections — the hero copy/headline, the
+  EduPage-partner panel, "Our mission," and the closing wordmark/domain
+  link — was removed outright rather than left unreachable, along with
+  the now-unused `GraduationCapIcon` import and the `HeroLoginCard`
+  wrapper (its decorative blurred-gradient-circle backdrop went with it —
+  a plain, undecorated centered card is what's wanted now that this page
+  has exactly one job). `components/icons.jsx`'s `GraduationCapIcon`
+  itself stays defined, just no longer used here — nothing else in the
+  app referenced it, but deleting an icon a future page might reasonably
+  reach for again wasn't part of this ask.
 
-  The page below the hero is intentionally light: a hero (eyebrow pill,
-  "Welcome to Edu Solutions" headline, business-description paragraph,
-  "Visit edusolutionsmaldives.com" link), then a single EduPage panel, then an
-  "Our mission" section, then the closing wordmark/link section. The
-  hero's two-column grid (stacked on mobile, `lg:grid-cols-2` side by side
-  on desktop) puts the login form *first* in source order — so it's what a
-  phone visitor sees before any marketing copy — and only reorders to
-  copy-left/form-right via `lg:order-1`/`lg:order-2` once there's room for
-  both side by side, on the reasoning that most visitors here just want
-  to sign in, not read about the product first. A `font-display`
-  sub-headline ("From your first quote to the final payment — all handled
-  in one place.") and a row of `CheckCircleIcon` trust bullets (PDF
-  invoicing, client self-serve links, automated reminders, recurring
-  billing, role-based access) both sat under the headline at one point but
-  were cut for a tighter hero — along with the 6-card feature grid
-  (Clients/Quotes/Invoices/Payments & financials/Recurring & reminders/
-  License tracking) and a "How it works" 3-step section that existed here
-  too. All were removed outright rather than kept around unused —
-  `components/icons.jsx`'s `SendIcon` (only ever used by "How it works")
-  was deleted with it.
-
-  The EduPage panel is its own section (`bg-slate-50`, bordered
-  `rounded-2xl` card, centered `max-w-3xl`) rather than folded into
-  anything else: a mention of EduPage (aSc EduPage, `edupage.org`) — a
-  real, separate school-management platform (timetabling, attendance,
-  digital class registers, homework, e-learning), unrelated to the
-  billing tools this app itself provides. Its copy states the actual
-  business relationship directly — **"Edu Solutions Pvt Ltd is an
-  authorized distributor of EduPage products in the Maldives"** — a
-  specific, verified business fact that any future copy pass on this page
-  must keep verbatim rather than softening into vaguer phrasing. Icon is
-  `GraduationCapIcon` (`components/icons.jsx` — added because none of the
-  CRM/billing icons fit "a school platform," and reusing `UsersIcon`/
-  `LicenseIcon` here would borrow an icon that carries a different
-  meaning elsewhere in the app), under a "Technology partner" eyebrow,
-  with a "Learn more about EduPage" link out to `edupage.org`
-  (`target="_blank"`) — the genuine, verifiable product this refers to.
-
-  "Our mission" (eyebrow "About EduSolutions Maldives") sits on a plain
-  (non-`bg-slate-50`) background with its own `border-b`, so it doesn't
-  read as visually identical to the EduPage panel's `bg-slate-50` section
-  right above it. The old Landing page's CTA band ("Ready to get started?
-  Log in") was dropped rather than carried over — it would just be a
-  second, redundant "Log in" pointing at a form already visible at the
-  top of the same page.
+  What's left: `Login` still checks `token`/`loading` from `useAuth()`
+  and renders `<Navigate to="/dashboard" replace />` once resolved — the
+  same loading/token pattern `ProtectedRoute.jsx` uses (mirrored rather
+  than shared, since the redirect target and the "what to show while
+  deciding" differ) — unchanged by this simplification, since it's auth
+  logic, not decorative content; an already-authenticated visit (a stale
+  bookmark, following the marketing site's own "Login"/"Dashboard" nav
+  link) still continues straight to the dashboard rather than showing a
+  form with nothing left to do. Once resolved, the page is just
+  `LoginForm` (email/password/forgot-password link/submit, plus the
+  idle-logout and post-reset-password notice banner — all unchanged)
+  centered in a plain `min-h-[70vh] flex items-center justify-center`
+  wrapper on the page's normal background, with no hero, no marketing
+  copy, and no other section — matching the screenshot the request
+  itself was made from exactly.
 - `pages/` — one component per route (`Login`, `ForgotPassword`,
   `ResetPassword`, `Dashboard`, `Users`, `MyAccount`), wired up in
   `App.jsx` via `react-router-dom`. There is no `Signup` page or `/signup`
@@ -5858,21 +5831,23 @@ keeps its existing layout.
   rename" below), a
   dynamic `© {new Date().getFullYear()} Edu Solutions Pvt Ltd. All rights
   reserved.` — the year computed rather than a literal, so it never goes
-  stale — linking `https://www.edusolutionsmaldives.com`, the same domain
-  `Login.jsx`'s own closing section already links (this app's actual own
-  domain, per `render.yaml` — an earlier version of both links pointed at
-  `edusolutionsmv.com` instead, which turned out to resolve to unrelated
-  infrastructure the business doesn't control or pay for, so both were
-  corrected to point here), on the other; the
+  stale — linking `https://www.edusolutionsmaldives.com` (this app's
+  actual own domain, per `render.yaml` — an earlier version of this link
+  pointed at `edusolutionsmv.com` instead, which turned out to resolve to
+  unrelated infrastructure the business doesn't control or pay for, so it
+  was corrected to point here), on the other; the
   registered company name, not the "EduSolutions Maldives" trading name
-  `Login.jsx`'s own copy uses elsewhere — a footer copyright line is the
-  one place in the app that specifically calls for the legal entity name)
+  used elsewhere in the app (e.g. `MarketingContact.jsx`'s own copy) — a
+  footer copyright line is the one place in the app that specifically
+  calls for the legal entity name)
   mounted once in `App.jsx` alongside `Navbar`/`BottomNav`, so it appears on
   every route rather than being copy-pasted per page. This is deliberately
   slim — one quiet line, not a multi-column marketing footer — since this
-  is an internal business app; `Login.jsx`'s own richer closing section
-  (wordmark image + link) is untouched and stays that page's own content,
-  with the global `Footer` simply rendering right below it there too.
+  is an internal business app; `pages/Login.jsx`'s own closing wordmark/
+  domain-link section, once a near-duplicate of this same footer content
+  sitting right above it, was removed outright once that page was stripped
+  down to just its sign-in form (see that page's own note above) — `Footer`
+  is what covers that job on `/login` now, the same as on every other route.
   `App.jsx`'s root layout is the standard CSS sticky-footer flex pattern to
   make this work on short pages without leaving a dangling gap: the outer
   container is `flex min-h-screen flex-col`, and a `flex flex-1 flex-col`
@@ -5893,8 +5868,8 @@ keeps its existing layout.
   (e.g. an empty Invoices/Clients list) that offset lands directly inside
   `Footer`'s own band, so the FAB visually sat on top of the copyright text
   — confirmed via a Playwright screenshot before this guard existed.
-  Logged-out phone pages (`Login` — which doubles as the app's landing
-  page, see `pages/Login.jsx` above — `/q/:token`, `/i/:token`) have
+  Logged-out phone pages (`Login`, the marketing site's own pages,
+  `/q/:token`, `/i/:token`) have
   neither `BottomNav` nor a FAB, so `Footer` stays visible there, and
   desktop (`sm` and up) is unaffected either way since the FAB is already
   hidden at that breakpoint. Tablet/desktop `Footer` visibility was
@@ -6673,9 +6648,10 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
 - Icon source files live in `frontend/public/` (`favicon.svg`,
   `favicon-32x32.png`, `pwa-192x192.png`, `pwa-512x512.png`,
   `maskable-icon-512x512.png`, `apple-touch-icon.png`) — all derived from
-  `logo-symbol.png` (the real business mark, also used directly on
-  `Login.jsx`; a matching `logo-wordmark.png` exists too but isn't used in
-  any icon, just as page-level branding), composited onto a white background
+  `logo-symbol.png` (the real business mark, also used directly in
+  `components/Navbar.jsx`/`Sidebar.jsx`/`Footer.jsx`'s own wordmarks; a
+  matching `logo-wordmark.png` exists too but isn't used in any icon, just
+  as page-level branding), composited onto a white background
   (matching the manifest's own `background_color`) and centered at a size
   appropriate to each icon's role: ~66% of the canvas for the standard/
   apple-touch icons, ~50% for the maskable icon (so the mark survives being
