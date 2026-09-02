@@ -1148,10 +1148,14 @@ deliberately untouched by either, always returning every row.
   name — this table-based HTML email's own details section, immediately
   below, already names the client explicitly, and a generic salutation
   reads as more appropriate business correspondence than an informal
-  first-name-style greeting here), a details table (client, license, billing cycle, amount, the license's
+  first-name-style greeting here), a details table (client, license, billing cycle, the license's
   own `url` when set — see that column's own note above, this is the
   "future activation-email template" it was captured for — and the new
-  expiry date), and an "Access license" button linking to `url` when
+  expiry date — deliberately no `amount` row, removed at explicit request:
+  a renewal confirmation is proof the license was extended, not a receipt,
+  and this app already has a real receipt (`renderReceiptPdf`, emailed
+  from `POST /invoices/:id/payments`) for whatever invoice/payment
+  actually funded the renewal), and an "Access license" button linking to `url` when
   present. Table-based layout with inline styles throughout, and the
   header's gradient is layered over a solid `background-color` fallback,
   for the widest email-client compatibility. Deliberately **not** routed
@@ -3630,7 +3634,13 @@ rather than eight overlapping diffs.
   Status/Balance due (with a small "of {symbol}{total}" note when a
   partial payment has been made, mirroring the card's own two-line
   balance-then-total treatment in one row instead); `PortalLicenses.jsx`'s
-  carries Name/Billing cycle/Expires/Status/Amount. None of these gained
+  carries Name/Billing cycle/Expires/Status (an `Amount` column originally
+  sat last, dropped at explicit request — a client's own portal license
+  list is meant to answer "what's active, expiring, or expired," not
+  double as a pricing page; the same column, and the matching figure on
+  the mobile card view, were removed together so desktop and mobile stay
+  in sync — `PortalLicenseDetail.jsx`'s own "Amount" detail row is
+  untouched, this only affects the list). None of these gained
   row actions or a mobile-accordion split the way a staff list page would
   — there's nothing to act on from the list itself (every row already just
   links to its own detail page, same as the card version), and a single

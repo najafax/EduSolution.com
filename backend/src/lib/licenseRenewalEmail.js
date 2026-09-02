@@ -33,14 +33,12 @@ function renderLicenseRenewalEmail({ license, client, settings }) {
   const businessName = escapeHtml(settings.business_name || 'Us');
   const clientName = escapeHtml(client.name);
   const licenseName = escapeHtml(license.name);
-  const symbol = settings.currency_symbol || '$';
   const cycleLabel = license.billing_cycle === 'monthly' ? 'Monthly' : 'Yearly';
 
   const rows = [
     detailRow('Client', clientName),
     detailRow('License', licenseName),
     detailRow('Billing cycle', cycleLabel),
-    detailRow('Amount', `${symbol}${Number(license.amount).toFixed(2)}`),
   ];
   if (license.url) {
     const safeUrl = escapeHtml(license.url);

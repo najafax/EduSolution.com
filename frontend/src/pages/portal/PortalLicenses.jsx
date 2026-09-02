@@ -11,11 +11,10 @@ import { LicenseIcon } from '../../components/icons';
 // list itself is still just enough to see what's active/expiring/expired
 // at a glance, the detail page is where the rest lives.
 export default function PortalLicenses() {
-  const { token, settings } = usePortalAuth();
+  const { token } = usePortalAuth();
   const [licenses, setLicenses] = useState(null);
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
-  const symbol = settings?.currency_symbol || '$';
 
   useEffect(() => {
     api.portal.licenses
@@ -61,7 +60,6 @@ export default function PortalLicenses() {
                   <th className="px-4 py-3">Billing cycle</th>
                   <th className="px-4 py-3">Expires</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -78,10 +76,6 @@ export default function PortalLicenses() {
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{license.expiry_date}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <StatusBadge status={license.display_status} />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
-                      {symbol}
-                      {license.amount.toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -103,10 +97,6 @@ export default function PortalLicenses() {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  <span className="font-semibold text-slate-900 dark:text-white">
-                    {symbol}
-                    {license.amount.toFixed(2)}
-                  </span>
                   <StatusBadge status={license.display_status} />
                 </div>
               </Link>
