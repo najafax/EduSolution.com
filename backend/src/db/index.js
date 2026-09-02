@@ -518,6 +518,75 @@ db.exec(`
     revoked_at TEXT
   );
 
+  -- The public marketing website's editable content (see routes/website.js
+  -- and the unauthenticated GET /api/public/site) — five brand-new tables,
+  -- no production data yet, so plain CREATE TABLE IF NOT EXISTS is enough
+  -- for all five (see this file's own top-of-file note on when that's
+  -- correct vs. when a column addition later needs the ALTER TABLE
+  -- treatment instead). status/visible follow this app's existing
+  -- draft-vs-published convention (quotes/invoices' own status column) —
+  -- the public site only ever reads the published/visible rows, exactly
+  -- the same "only show what's actually ready" filtering
+  -- products.visible_in_portal already does for the client portal's own catalog.
+  CREATE TABLE IF NOT EXISTS website_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft',
+    published_at TEXT,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS website_testimonials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    quote TEXT NOT NULL,
+    author_name TEXT NOT NULL DEFAULT '',
+    author_role TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft',
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS website_services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    icon TEXT NOT NULL DEFAULT 'service',
+    visible INTEGER NOT NULL DEFAULT 1,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- photo is a base64 data URI, same inline-image approach
+  -- business_settings' logo/signature/stamp and payment_proofs' file_data
+  -- already use — this app has no separate file storage service, and a
+  -- headshot is small enough to store inline the same way.
+  CREATE TABLE IF NOT EXISTS website_team_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT '',
+    photo TEXT NOT NULL DEFAULT '',
+    visible INTEGER NOT NULL DEFAULT 1,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS website_gallery (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    image TEXT NOT NULL,
+    caption TEXT NOT NULL DEFAULT '',
+    visible INTEGER NOT NULL DEFAULT 1,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_requests_client ON quote_requests(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_request_items_request ON quote_request_items(quote_request_id);
@@ -535,6 +604,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_payment_proofs_invoice ON payment_proofs(invoice_id);
   CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_sessions_jti ON sessions(jti);
+  CREATE INDEX IF NOT EXISTS idx_website_posts_status ON website_posts(status, published_at);
+  CREATE INDEX IF NOT EXISTS idx_website_testimonials_status ON website_testimonials(status);
+  CREATE INDEX IF NOT EXISTS idx_website_services_visible ON website_services(visible);
+  CREATE INDEX IF NOT EXISTS idx_website_team_visible ON website_team_members(visible);
+  CREATE INDEX IF NOT EXISTS idx_website_gallery_visible ON website_gallery(visible);
 
   -- Added once the query patterns above (list routes' ORDER BY, the
   -- scheduler's WHERE clauses, routes/reports.js's date-range SUMs) were

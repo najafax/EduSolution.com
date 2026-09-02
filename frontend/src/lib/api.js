@@ -329,6 +329,46 @@ export const api = {
     // to read back (see routes/public.js's own note).
     modReportMeta: (publicToken) => request(`/public/mod-reports/${publicToken}/meta`),
     submitModReport: (publicToken, payload) => request(`/public/mod-reports/${publicToken}`, { method: 'POST', body: payload }),
+    // The public marketing site's one combined content fetch — posts,
+    // testimonials, services, team and gallery in a single round trip (see
+    // routes/public.js's own GET /site).
+    getSiteContent: () => request('/public/site'),
+  },
+
+  // The staff-side CMS behind the public marketing site (routes/website.js)
+  // — five small resources, each following the plain list/create/update/
+  // remove shape every other simple resource in this app uses.
+  website: {
+    posts: {
+      list: (token) => request('/website/posts', { token }),
+      create: (payload, token) => request('/website/posts', { method: 'POST', body: payload, token }),
+      update: (id, payload, token) => request(`/website/posts/${id}`, { method: 'PUT', body: payload, token }),
+      remove: (id, token) => request(`/website/posts/${id}`, { method: 'DELETE', token }),
+    },
+    testimonials: {
+      list: (token) => request('/website/testimonials', { token }),
+      create: (payload, token) => request('/website/testimonials', { method: 'POST', body: payload, token }),
+      update: (id, payload, token) => request(`/website/testimonials/${id}`, { method: 'PUT', body: payload, token }),
+      remove: (id, token) => request(`/website/testimonials/${id}`, { method: 'DELETE', token }),
+    },
+    services: {
+      list: (token) => request('/website/services', { token }),
+      create: (payload, token) => request('/website/services', { method: 'POST', body: payload, token }),
+      update: (id, payload, token) => request(`/website/services/${id}`, { method: 'PUT', body: payload, token }),
+      remove: (id, token) => request(`/website/services/${id}`, { method: 'DELETE', token }),
+    },
+    team: {
+      list: (token) => request('/website/team', { token }),
+      create: (payload, token) => request('/website/team', { method: 'POST', body: payload, token }),
+      update: (id, payload, token) => request(`/website/team/${id}`, { method: 'PUT', body: payload, token }),
+      remove: (id, token) => request(`/website/team/${id}`, { method: 'DELETE', token }),
+    },
+    gallery: {
+      list: (token) => request('/website/gallery', { token }),
+      create: (payload, token) => request('/website/gallery', { method: 'POST', body: payload, token }),
+      update: (id, payload, token) => request(`/website/gallery/${id}`, { method: 'PUT', body: payload, token }),
+      remove: (id, token) => request(`/website/gallery/${id}`, { method: 'DELETE', token }),
+    },
   },
 
   // The client portal — a client's own login (see routes/clientPortal.js),

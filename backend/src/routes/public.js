@@ -221,4 +221,39 @@ router.post('/mod-reports/:token', modReportSubmitLimiter, (req, res) => {
   res.status(201).json({ ok: true });
 });
 
+// The public marketing site's one combined content fetch — same "one
+// request instead of several separate ones" reasoning routes/dashboard.js's
+// GET /overview already established, just for an unauthenticated visitor
+// instead of a logged-in one. Only ever returns published/visible rows —
+// a draft post or a hidden gallery image staff are still working on is
+// never reachable through this route, the same "only the opted-in subset is
+// ever public" rule products.visible_in_portal already enforces for the
+// client portal's own catalog. No pagination on any of these lists (see
+// routes/website.js's own top-of-file note — a marketing site's content is
+// inherently small) and no rate limiting (a plain, cheap SELECT with no
+// side effects, the same trust level every other public-token GET in this
+// app already runs at with zero rate limiting).
+router.get('/site', (req, res) => {
+  const posts = db
+    .prepare("SELECT id, title, body, category, published_at FROM website_posts WHERE status = 'published' ORDER BY published_at DESC, id DESC")
+    .all();
+  const testimonials = db
+    .prepare(
+      "SELECT id, quote, author_name, author_role, category FROM website_testimonials WHERE status = 'published' ORDER BY display_order ASC, id DESC",
+    )
+    .all();
+  const services = db
+    .prepare('SELECT id, title, description, icon FROM website_services WHERE visible = 1 ORDER BY display_order ASC, id ASC')
+    .all();
+  const team = db
+    .prepare('SELECT id, name, role, photo FROM website_team_members WHERE visible = 1 ORDER BY display_order ASC, id ASC')
+    .all();
+  const gallery = db
+    .prepare('SELECT id, image, caption FROM website_gallery WHERE visible = 1 ORDER BY display_order ASC, id ASC')
+    .all();
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+
+  res.json({ posts, testimonials, services, team, gallery, settings: settings ? publicSettings(settings) : null });
+});
+
 module.exports = router;

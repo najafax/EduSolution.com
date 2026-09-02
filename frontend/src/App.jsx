@@ -58,6 +58,11 @@ const EmailCenter = lazy(() => import('./pages/EmailCenter'));
 const MODReport = lazy(() => import('./pages/business/MODReport'));
 const Campaigns = lazy(() => import('./pages/business/Campaigns'));
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'));
+const Website = lazy(() => import('./pages/business/Website'));
+const Home = lazy(() => import('./pages/marketing/Home'));
+const MarketingServices = lazy(() => import('./pages/marketing/MarketingServices'));
+const MarketingTestimonials = lazy(() => import('./pages/marketing/MarketingTestimonials'));
+const MarketingNews = lazy(() => import('./pages/marketing/MarketingNews'));
 
 // Same loading copy/markup ProtectedRoute already shows while resolving
 // auth, so a lazy chunk still loading (usually a blip, longer on a slow
@@ -80,6 +85,15 @@ export default function App() {
   // staff `user`/`permissions` shape a portal account doesn't have).
   const location = useLocation();
   const isPortalRoute = location.pathname.startsWith('/portal');
+  // The public marketing site (Home + its three sibling pages) is, like the
+  // client portal, its own self-contained visitor-facing surface — it needs
+  // no part of the internal Sidebar/Navbar/TopBar chrome, which lists
+  // business-management modules (Clients, Invoices, Licenses, ...) that
+  // mean nothing to an outside visitor and would be actively confusing to
+  // show here. Fixed set, exact match — these are top-level pages, not a
+  // route subtree the way /portal/* is, so a prefix check isn't right here.
+  const MARKETING_ROUTES = new Set(['/', '/services', '/testimonials', '/news']);
+  const isMarketingRoute = MARKETING_ROUTES.has(location.pathname);
 
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 xl:flex-row">
@@ -94,7 +108,7 @@ export default function App() {
           inside that main column instead, alongside Navbar, since it only
           needs to span the content area next to Sidebar, not the page's
           full width. */}
-      {!isPortalRoute && <Sidebar />}
+      {!isPortalRoute && !isMarketingRoute && <Sidebar />}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* NotificationsProvider wraps Navbar+TopBar specifically (not the
             whole app) — see NotificationsContext.jsx's own top-of-file
@@ -102,15 +116,16 @@ export default function App() {
             (CSS breakpoints pick which is visible, not React), and each
             renders its own <NotificationCenter> bell, so without a shared
             provider the same three list requests fired twice on every
-            page load. */}
-        {!isPortalRoute && (
+            page load. Skipped for the marketing routes the same way as the
+            portal — those pages render their own MarketingLayout header. */}
+        {!isPortalRoute && !isMarketingRoute && (
           <NotificationsProvider>
             <Navbar />
             <TopBar />
           </NotificationsProvider>
         )}
-        {!isPortalRoute && <IdleTimeoutMonitor />}
-        {!isPortalRoute && <CommandPalette />}
+        {!isPortalRoute && !isMarketingRoute && <IdleTimeoutMonitor />}
+        {!isPortalRoute && !isMarketingRoute && <CommandPalette />}
         {/* flex-1 + flex-col here (rather than on the outer div) is what pins
             Footer to the bottom of the viewport on short pages (e.g. Login)
             while letting it flow naturally below content on tall ones —
@@ -118,7 +133,7 @@ export default function App() {
             (sm:hidden) and fixed, so logged-in pages still need the bottom
             padding on phones or the tab bar covers Footer/the page's last
             content — see BottomNav.jsx. */}
-        <div className={`flex flex-1 flex-col ${user && !isPortalRoute ? 'pb-16 sm:pb-0' : ''}`}>
+        <div className={`flex flex-1 flex-col ${user && !isPortalRoute && !isMarketingRoute ? 'pb-16 sm:pb-0' : ''}`}>
           <div className="flex-1">
             {/* Keyed by pathname so a crash on one page doesn't linger once
                 the user navigates elsewhere — remounting clears the
@@ -147,11 +162,15 @@ export default function App() {
             <div key={location.pathname} className="route-fade-in">
             <Suspense fallback={<RouteFallback />}>
               <Routes>
-                {/* Login is also the app's landing page — see pages/Login.jsx's
-                    own comment for why there's no separate Landing component
-                    anymore. Both paths render the same element so a bookmarked
-                    or shared "/login" link keeps working unchanged. */}
-                <Route path="/" element={<Login />} />
+                {/* '/' is the real public marketing site now (pages/marketing/
+                    Home.jsx) — Login itself is unchanged and lives only at
+                    '/login'; see Home.jsx's own note on the redirect that
+                    replaces its old "already signed in" behavior at this
+                    path. */}
+                <Route path="/" element={<Home />} />
+                <Route path="/services" element={<MarketingServices />} />
+                <Route path="/testimonials" element={<MarketingTestimonials />} />
+                <Route path="/news" element={<MarketingNews />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
@@ -193,6 +212,7 @@ export default function App() {
                 <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
                 <Route path="/users" element={<Protected><Users /></Protected>} />
                 <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
+                <Route path="/website-content" element={<Protected><Website /></Protected>} />
                 <Route path="/mod-reports" element={<Protected><MODReport /></Protected>} />
                 <Route path="/account" element={<Protected><MyAccount /></Protected>} />
               </Routes>
@@ -212,7 +232,7 @@ export default function App() {
           {!isPortalRoute && <Footer className={user ? 'hidden sm:block' : ''} />}
         </div>
       </div>
-      {!isPortalRoute && user && <BottomNav />}
+      {!isPortalRoute && !isMarketingRoute && user && <BottomNav />}
     </div>
   );
 }

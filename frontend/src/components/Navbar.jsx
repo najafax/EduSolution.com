@@ -38,6 +38,7 @@ export const BUSINESS_LINKS = [
   { to: '/activity', label: 'Activity', module: 'activity' },
   { to: '/users', label: 'Users', module: 'users' },
   { to: '/email-center', label: 'Email center', module: 'email_center' },
+  { to: '/website-content', label: 'Website content', module: 'website' },
   { to: '/mod-reports', label: 'MOD report', module: null, superAdminOnly: true },
   { to: '/settings', label: 'Settings', module: 'settings' },
 ];

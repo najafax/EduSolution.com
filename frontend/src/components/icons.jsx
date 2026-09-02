@@ -449,3 +449,28 @@ export function BanknoteIcon(props) {
     </svg>
   );
 }
+
+// A globe — the public marketing site / "Website content" nav link
+// (Sidebar.jsx), distinct from every other module icon since this is the
+// one link that manages what the outside world sees, not internal business
+// data.
+export function GlobeIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="10" cy="10" r="7.5" />
+      <path d="M2.5 10h15M10 2.5c2.2 2.1 3.4 4.7 3.4 7.5s-1.2 5.4-3.4 7.5c-2.2-2.1-3.4-4.7-3.4-7.5S7.8 4.6 10 2.5Z" />
+    </svg>
+  );
+}
+
+// A framed photo — the Gallery section of the website content manager.
+export function ImageIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="3.5" width="15" height="13" rx="1.5" />
+      <circle cx="7" cy="8" r="1.4" />
+      <path d="M3.5 14l3.8-3.8a1.2 1.2 0 0 1 1.7 0L12.5 14" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M11 12.5l1.7-1.7a1.2 1.2 0 0 1 1.7 0l2.1 2.1" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

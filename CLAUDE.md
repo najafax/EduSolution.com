@@ -4328,6 +4328,110 @@ that shortcut.
   (a toast, then reloading the campaign history feed), so these two don't
   need their own success-notice plumbing.
 
+### Public marketing website + content manager
+
+A real public marketing site for Edu Solutions itself — `/`, `/services`,
+`/testimonials`, `/news` — with a staff-side "Website content" CMS behind
+it so news, testimonials, services and (eventually) team/gallery entries
+can be published without a code deploy. `/` used to render the same
+`Login` component as `/login` (see that page's own history note on why
+there was no separate landing page); it now renders the real marketing
+homepage instead, and `Login.jsx` itself is unchanged and lives only at
+`/login`.
+
+- **Five brand-new tables** (`db/index.js`, plain `CREATE TABLE IF NOT
+  EXISTS` — no production data yet): `website_posts`, `website_testimonials`,
+  `website_services`, `website_team_members`, `website_gallery`. Each
+  follows this app's existing draft-vs-published convention —
+  `website_posts`/`website_testimonials` have a `status` (`draft` |
+  `published`), `website_services`/`website_team_members`/
+  `website_gallery` have a `visible` boolean — and the public site only
+  ever reads the published/visible rows, the same "only the opted-in
+  subset is public" rule `products.visible_in_portal` already enforces for
+  the client portal's own catalog. `website_team_members.photo`/
+  `website_gallery.image` are base64 data URIs, the same inline-image
+  approach `business_settings`'s logo/signature/stamp and
+  `payment_proofs.file_data` already use — no separate file storage exists
+  in this app. `website` joins `lib/permissions.js`'s `MODULES` list as its
+  own gatable module (an admin/super_admin bypasses it as usual; a staff
+  account needs an explicit grant, same as every other module).
+- `routes/website.js` (mounted at `/api/website`, `requireAuth` +
+  `requirePermission('website', 'view'|'manage')`) is the staff CRUD API
+  for all five resources — plain list/create/update/delete per resource,
+  no pagination or search on any of them (a marketing site's own content
+  is inherently small, the same "don't build it until needed" call
+  `routes/licenses.js`'s own `GET /:id/renewals` already makes for a
+  comparably small list). Every mutation calls `logActivity()`. Team/
+  gallery images are validated the same way `routes/settings.js`'s own
+  logo upload is (`IMAGE_DATA_URI_RE`, 400KB cap) but additionally accept
+  WEBP, since these only ever render in a browser rather than needing to
+  satisfy PDFKit.
+- `routes/public.js` gains `GET /site` — the one, unauthenticated,
+  combined content fetch behind the whole public site (same "one request
+  instead of several" reasoning `routes/dashboard.js`'s own `GET
+  /overview` already established, just for an anonymous visitor). Returns
+  `{ posts, testimonials, services, team, gallery, settings }`, each list
+  already filtered to published/visible and ordered correctly, `settings`
+  passed through the existing `publicSettings()` (strips
+  `starting_balance`/`session_timeout_minutes`, same as every other public
+  route). No rate limiting — a plain read-only `SELECT` with no side
+  effects, the same trust level every other public-token `GET` in this
+  app already runs at with zero rate limiting.
+- `pages/business/Website.jsx` (route `/website-content`, `Navbar.jsx`
+  link gated on the new `website` module, right after Email Center) is the
+  staff CMS — one page, five tabs (switched with the existing
+  `StatusFilterChips` component, reused as a tab strip rather than a
+  status filter) rather than five separate routed pages, since together
+  they're one cohesive "what shows on the website" area, not five
+  independent business records the way Clients/Products/Expenses are.
+  Each tab is its own local section component following the standard
+  list+modal-form shape (`Modal`, `useConfirm`, `IconActionButton`,
+  `MobileListAccordion`, `FloatingActionButton`) — no `SearchInput`/
+  `Pagination` on any of them, matching the backend's own no-pagination
+  call. `StatusBadge` gained a `published` entry (emerald, the same
+  "this is live" meaning `active`/`paid` already carry — `draft` already
+  existed). Gallery is the one tab that renders as an image grid instead
+  of a table/accordion, since a gallery is inherently visual. A service's
+  `icon` is a small fixed enum (`SERVICE_ICON_OPTIONS`, exported from this
+  file) that the public Services page's own `SERVICE_ICONS` map must stay
+  in sync with by key.
+- **The public site itself** (`pages/marketing/`) — `MarketingLayout.jsx`
+  is the shared header (wordmark, four nav links, `ThemeToggle`, a
+  "Staff login" link that becomes "Dashboard" once `useAuth()` reports a
+  token) wrapping `Home.jsx`/`MarketingServices.jsx`/
+  `MarketingTestimonials.jsx`/`MarketingNews.jsx` — deliberately its own
+  header, not the internal app's `Navbar`/`Sidebar`/`TopBar`, which list
+  business-management modules (Clients, Invoices, Licenses, ...) that mean
+  nothing to an outside visitor. The shared, staff-context-free `Footer`
+  component still renders below every one of these pages (unchanged,
+  `App.jsx` mounts it once outside the portal check either way), so only
+  the header needed a marketing-specific version. Built with the app's
+  existing design tokens (lagoon accent, `font-display`/Sora, slate
+  neutrals, full dark-mode support) rather than the one-off palette a
+  design-canvas pitch for this feature used — no new webfont was added,
+  consistent with this app's own self-hosted-fonts-only PWA policy (see
+  "Mobile design system" above). `Home.jsx` replicates the exact
+  "already signed in → `/dashboard`" redirect `Login.jsx` used to apply at
+  `/` itself. Content is a deliberate split: the "Two ways we help"
+  section and the EduPage/Business Suite feature breakdowns on
+  `MarketingServices.jsx` are static, hardcoded copy (real, always-true
+  facts about the two actual product lines, not CMS-editable), while news/
+  testimonials/extra-services sections are genuinely CMS-driven and each
+  conditionally rendered — hidden entirely until there's at least one
+  published/visible row, so a fresh deploy with an empty CMS never shows a
+  pointless empty section header.
+- **`App.jsx` routing**: `/`, `/services`, `/testimonials`, `/news` are a
+  fixed `MARKETING_ROUTES` set (exact match, not a `/marketing/*` prefix —
+  these are top-level pages, not a route subtree the way `/portal/*` is).
+  `isMarketingRoute` skips the internal `Sidebar`/`Navbar`+`TopBar`/
+  `IdleTimeoutMonitor`/`CommandPalette`/`BottomNav` for these exact paths,
+  the same way `isPortalRoute` already does for the client portal — the
+  marketing pages render their own header via `MarketingLayout` instead.
+  `lib/api.js` gained `api.public.getSiteContent()` and a `api.website.*`
+  block (one `{list, create, update, remove}` sub-object per resource).
+  Two new icons in `components/icons.jsx`: `GlobeIcon` (the "Website
+  content" nav link) and `ImageIcon` (the Gallery tab).
+
 ### Idle session timeout
 
 Separate from the JWT's fixed 7-day expiry (see `middleware/auth.js` above),

@@ -24,6 +24,11 @@ const COLORS = {
   // already existed; 'rejected' reuses the same red as 'declined'/'void'
   // above, same "a staff member said no" meaning.
   rejected: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
+  // Website content only (pages/business/Website.jsx) — a post/testimonial
+  // that's live on the public site, the same emerald "this is real and
+  // visible" meaning 'active'/'paid' already carry; 'draft' above already
+  // covers the not-yet-visible state.
+  published: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
 };
 
 export default function StatusBadge({ status }) {
