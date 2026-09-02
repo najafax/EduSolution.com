@@ -37,7 +37,7 @@ export default function Home() {
             Technology for the Maldives
           </span>
           <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white sm:text-5xl">
-            Run your school or business without the paperwork
+            Run your business without the paperwork
           </h1>
           <p className="max-w-lg text-lg leading-relaxed text-slate-600 dark:text-slate-400">
             Edu Solutions pairs EduPage's school management platform with our own Business Suite for quotes, invoicing and

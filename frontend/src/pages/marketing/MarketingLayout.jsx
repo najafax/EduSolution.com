@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../../components/ThemeToggle';
 
 // The shared header for the public marketing site (/, /services,
-// /testimonials, /news, /about) — deliberately separate from the internal app's own
+// /testimonials, /news, /about, /contact) — deliberately separate from the internal app's own
 // Navbar/Sidebar/TopBar, which list business-management modules (Clients,
 // Invoices, Licenses, ...) that mean nothing to an outside visitor. App.jsx
 // skips that whole staff shell for these exact routes, the same way it
@@ -18,6 +18,7 @@ const NAV_LINKS = [
   { to: '/testimonials', label: 'Testimonials' },
   { to: '/news', label: 'News' },
   { to: '/about', label: 'About' },
+  { to: '/contact', label: 'Contact' },
 ];
 
 export default function MarketingLayout({ children }) {
