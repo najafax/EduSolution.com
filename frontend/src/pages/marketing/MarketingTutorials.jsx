@@ -21,7 +21,7 @@ export default function MarketingTutorials() {
         </span>
         <h1 className="font-display mt-5 text-4xl font-extrabold text-slate-900 dark:text-white">Watch &amp; learn</h1>
         <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">
-          Walkthroughs for EduPage and the Business Suite — tap a video to open it.
+          Walkthroughs for EduPage — tap a video to open it.
         </p>
       </div>
 
