@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../../components/ThemeToggle';
 
 // The shared header for the public marketing site (/, /services,
-// /testimonials, /news) — deliberately separate from the internal app's own
+// /testimonials, /news, /about) — deliberately separate from the internal app's own
 // Navbar/Sidebar/TopBar, which list business-management modules (Clients,
 // Invoices, Licenses, ...) that mean nothing to an outside visitor. App.jsx
 // skips that whole staff shell for these exact routes, the same way it
@@ -17,6 +17,7 @@ const NAV_LINKS = [
   { to: '/services', label: 'Services' },
   { to: '/testimonials', label: 'Testimonials' },
   { to: '/news', label: 'News' },
+  { to: '/about', label: 'About' },
 ];
 
 export default function MarketingLayout({ children }) {
@@ -52,7 +53,7 @@ export default function MarketingLayout({ children }) {
               to={token ? '/dashboard' : '/login'}
               className="hidden min-h-9 items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:flex"
             >
-              {token ? 'Dashboard' : 'Staff login'}
+              {token ? 'Dashboard' : 'Login'}
             </Link>
           </div>
         </div>
@@ -74,7 +75,7 @@ export default function MarketingLayout({ children }) {
             </NavLink>
           ))}
           <Link to={token ? '/dashboard' : '/login'} className="shrink-0 font-display text-sm font-semibold text-slate-600 dark:text-slate-400">
-            {token ? 'Dashboard' : 'Staff login'}
+            {token ? 'Dashboard' : 'Login'}
           </Link>
         </div>
       </header>

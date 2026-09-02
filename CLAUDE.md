@@ -4396,10 +4396,13 @@ homepage instead, and `Login.jsx` itself is unchanged and lives only at
   file) that the public Services page's own `SERVICE_ICONS` map must stay
   in sync with by key.
 - **The public site itself** (`pages/marketing/`) — `MarketingLayout.jsx`
-  is the shared header (wordmark, four nav links, `ThemeToggle`, a
-  "Staff login" link that becomes "Dashboard" once `useAuth()` reports a
-  token) wrapping `Home.jsx`/`MarketingServices.jsx`/
-  `MarketingTestimonials.jsx`/`MarketingNews.jsx` — deliberately its own
+  is the shared header (wordmark, five nav links, `ThemeToggle`, a
+  "Login" link that becomes "Dashboard" once `useAuth()` reports a
+  token — labeled plainly "Login" rather than "Staff login," on the
+  reasoning that a client with a portal account is also logging in here,
+  not just staff) wrapping `Home.jsx`/`MarketingServices.jsx`/
+  `MarketingTestimonials.jsx`/`MarketingNews.jsx`/`MarketingAbout.jsx` —
+  deliberately its own
   header, not the internal app's `Navbar`/`Sidebar`/`TopBar`, which list
   business-management modules (Clients, Invoices, Licenses, ...) that mean
   nothing to an outside visitor. The shared, staff-context-free `Footer`
@@ -4419,8 +4422,15 @@ homepage instead, and `Login.jsx` itself is unchanged and lives only at
   testimonials/extra-services sections are genuinely CMS-driven and each
   conditionally rendered — hidden entirely until there's at least one
   published/visible row, so a fresh deploy with an empty CMS never shows a
-  pointless empty section header.
-- **`App.jsx` routing**: `/`, `/services`, `/testimonials`, `/news` are a
+  pointless empty section header. `MarketingAbout.jsx` (`/about`) is the
+  one page built entirely from CMS content (the `team`/`gallery` sections
+  `GET /api/public/site` already returns, with no admin page of their own
+  otherwise using them) — a team grid (photo-or-initials, name, role) and,
+  only once at least one gallery image is visible, a photo grid below it;
+  both sections render their own "coming soon"/absent-entirely fallback
+  rather than an empty grid when the CMS has nothing yet.
+- **`App.jsx` routing**: `/`, `/services`, `/testimonials`, `/news`,
+  `/about` are a
   fixed `MARKETING_ROUTES` set (exact match, not a `/marketing/*` prefix —
   these are top-level pages, not a route subtree the way `/portal/*` is).
   `isMarketingRoute` skips the internal `Sidebar`/`Navbar`+`TopBar`/
