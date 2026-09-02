@@ -474,3 +474,27 @@ export function ImageIcon(props) {
     </svg>
   );
 }
+
+// A camera/clapper-style rectangle with a play triangle inside — the Videos
+// section of the website content manager and the public Tutorials nav link.
+export function VideoIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="4.5" width="15" height="11" rx="1.5" />
+      <path d="M8.3 8l4 2-4 2V8Z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// A filled play triangle in a circle — the click-to-open overlay on a
+// video's thumbnail (components/VideoThumbnail.jsx). Filled rather than
+// outline, unlike every other icon in this file, since it needs to read
+// clearly at a distance sitting on top of a photo.
+export function PlayCircleIcon(props) {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" {...props}>
+      <circle cx="10" cy="10" r="10" fillOpacity="0.55" />
+      <path d="M8 6.3v7.4c0 .6.65.97 1.16.66l6.02-3.7a.77.77 0 0 0 0-1.32L9.16 5.64A.77.77 0 0 0 8 6.3Z" fill="white" />
+    </svg>
+  );
+}

@@ -4,9 +4,9 @@ const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 
 // The staff-side CMS behind the public marketing site (see routes/public.js's
-// GET /site) — five small resources (posts, testimonials, services, team,
-// gallery), all gated on the same 'website' module rather than five separate
-// MODULES entries, since they're all "who can edit the marketing site" at
+// GET /site) — six small resources (posts, testimonials, services, team,
+// gallery, videos), all gated on the same 'website' module rather than six
+// separate MODULES entries, since they're all "who can edit the marketing site" at
 // the identical sensitivity level (same "reuse when the sensitivity level
 // already matches" call routes/reports.js/routes/capitalContributions.js
 // already make elsewhere). None of these lists paginate — a marketing
@@ -35,6 +35,18 @@ function validateImageField(value, label) {
   const decodedBytes = Math.ceil((match[2].length * 3) / 4);
   if (decodedBytes > MAX_IMAGE_BYTES) throw new Error(`${label} must be smaller than 400KB`);
   return value;
+}
+
+// Matches the file id out of every real Google Drive share-link shape
+// (/file/d/<id>/..., ?id=<id>) — this is what routes/public.js's own
+// video read and the admin list both need to build a thumbnail URL
+// (https://drive.google.com/thumbnail?id=<id>) without re-deriving the
+// regex in two places, and what write-time validation below uses to
+// reject a URL that isn't actually a Drive link before it's ever saved.
+const DRIVE_FILE_ID_RE = /(?:\/file\/d\/|[?&]id=)([\w-]{10,})/;
+function extractDriveFileId(url) {
+  const match = DRIVE_FILE_ID_RE.exec(url || '');
+  return match ? match[1] : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -359,6 +371,66 @@ router.delete('/gallery/:id', manage, (req, res) => {
 
   db.prepare('DELETE FROM website_gallery WHERE id = ?').run(req.params.id);
   logActivity({ userName: req.user.name, action: 'deleted website gallery image', entityType: 'website_gallery', entityId: existing.id, entityLabel: existing.caption || `Image #${existing.id}` });
+  res.status(204).end();
+});
+
+// ---------------------------------------------------------------------------
+// Video tutorials (e.g. EduPage walkthroughs) — hosted on Google Drive, not
+// this app; video_url is the Drive share link itself, and the public site
+// derives a thumbnail from it rather than needing a separate uploaded image
+// (see extractDriveFileId above).
+// ---------------------------------------------------------------------------
+
+router.get('/videos', view, (req, res) => {
+  const videos = db.prepare('SELECT * FROM website_videos ORDER BY display_order ASC, id ASC').all();
+  res.json({ videos });
+});
+
+function validateVideo(body) {
+  const { title, video_url } = body || {};
+  if (!title || !title.trim()) return 'title is required';
+  if (!video_url || !video_url.trim()) return 'video_url is required';
+  if (!extractDriveFileId(video_url)) return 'video_url must be a Google Drive share link';
+  return null;
+}
+
+router.post('/videos', manage, (req, res) => {
+  const error = validateVideo(req.body);
+  if (error) return res.status(400).json({ error });
+
+  const { title, description = '', video_url, category = '', visible = true, display_order = 0 } = req.body;
+  const result = db
+    .prepare('INSERT INTO website_videos (title, description, video_url, category, visible, display_order) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(title.trim(), description, video_url.trim(), category, visible ? 1 : 0, Number(display_order) || 0);
+
+  const video = db.prepare('SELECT * FROM website_videos WHERE id = ?').get(result.lastInsertRowid);
+  logActivity({ userName: req.user.name, action: 'added website video', entityType: 'website_video', entityId: video.id, entityLabel: video.title });
+  res.status(201).json({ video });
+});
+
+router.put('/videos/:id', manage, (req, res) => {
+  const existing = db.prepare('SELECT * FROM website_videos WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Video not found' });
+
+  const error = validateVideo(req.body);
+  if (error) return res.status(400).json({ error });
+
+  const { title, description = '', video_url, category = '', visible = true, display_order = 0 } = req.body;
+  db.prepare(
+    `UPDATE website_videos SET title = ?, description = ?, video_url = ?, category = ?, visible = ?, display_order = ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(title.trim(), description, video_url.trim(), category, visible ? 1 : 0, Number(display_order) || 0, req.params.id);
+
+  const video = db.prepare('SELECT * FROM website_videos WHERE id = ?').get(req.params.id);
+  logActivity({ userName: req.user.name, action: 'updated website video', entityType: 'website_video', entityId: video.id, entityLabel: video.title });
+  res.json({ video });
+});
+
+router.delete('/videos/:id', manage, (req, res) => {
+  const existing = db.prepare('SELECT * FROM website_videos WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Video not found' });
+
+  db.prepare('DELETE FROM website_videos WHERE id = ?').run(req.params.id);
+  logActivity({ userName: req.user.name, action: 'deleted website video', entityType: 'website_video', entityId: existing.id, entityLabel: existing.title });
   res.status(204).end();
 });
 

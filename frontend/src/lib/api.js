@@ -336,7 +336,7 @@ export const api = {
   },
 
   // The staff-side CMS behind the public marketing site (routes/website.js)
-  // — five small resources, each following the plain list/create/update/
+  // — six small resources, each following the plain list/create/update/
   // remove shape every other simple resource in this app uses.
   website: {
     posts: {
@@ -368,6 +368,12 @@ export const api = {
       create: (payload, token) => request('/website/gallery', { method: 'POST', body: payload, token }),
       update: (id, payload, token) => request(`/website/gallery/${id}`, { method: 'PUT', body: payload, token }),
       remove: (id, token) => request(`/website/gallery/${id}`, { method: 'DELETE', token }),
+    },
+    videos: {
+      list: (token) => request('/website/videos', { token }),
+      create: (payload, token) => request('/website/videos', { method: 'POST', body: payload, token }),
+      update: (id, payload, token) => request(`/website/videos/${id}`, { method: 'PUT', body: payload, token }),
+      remove: (id, token) => request(`/website/videos/${id}`, { method: 'DELETE', token }),
     },
   },
 

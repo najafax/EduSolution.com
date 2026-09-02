@@ -251,9 +251,12 @@ router.get('/site', (req, res) => {
   const gallery = db
     .prepare('SELECT id, image, caption FROM website_gallery WHERE visible = 1 ORDER BY display_order ASC, id ASC')
     .all();
+  const videos = db
+    .prepare('SELECT id, title, description, video_url, category FROM website_videos WHERE visible = 1 ORDER BY display_order ASC, id ASC')
+    .all();
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
 
-  res.json({ posts, testimonials, services, team, gallery, settings: settings ? publicSettings(settings) : null });
+  res.json({ posts, testimonials, services, team, gallery, videos, settings: settings ? publicSettings(settings) : null });
 });
 
 module.exports = router;

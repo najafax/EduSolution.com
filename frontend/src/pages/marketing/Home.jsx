@@ -3,6 +3,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import MarketingLayout from './MarketingLayout';
+import VideoThumbnail from '../../components/VideoThumbnail';
 import { CheckCircleIcon, GraduationCapIcon, ProductIcon } from '../../components/icons';
 
 // The public marketing site's front page — replaces the old behavior where
@@ -27,6 +28,7 @@ export default function Home() {
 
   const posts = content?.posts?.slice(0, 3) || [];
   const testimonials = content?.testimonials?.slice(0, 2) || [];
+  const videos = content?.videos?.slice(0, 3) || [];
 
   return (
     <MarketingLayout>
@@ -126,6 +128,28 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* TUTORIALS — only once there's something published */}
+      {videos.length > 0 && (
+        <div className="border-y border-slate-200 bg-slate-50 py-16 dark:border-slate-800 dark:bg-slate-900/50">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Watch &amp; learn</h2>
+              <Link to="/tutorials" className="font-display text-sm font-bold text-lagoon-600 hover:text-lagoon-500 dark:text-lagoon-400">
+                View all →
+              </Link>
+            </div>
+            <div className="mt-8 grid gap-5 sm:grid-cols-3">
+              {videos.map((video) => (
+                <div key={video.id}>
+                  <VideoThumbnail video={video} />
+                  <h3 className="font-display mt-2.5 text-base font-bold leading-snug text-slate-900 dark:text-white">{video.title}</h3>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* NEWS — only once there's something published */}
       {posts.length > 0 && (

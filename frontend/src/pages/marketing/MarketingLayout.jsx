@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../../components/ThemeToggle';
 
 // The shared header for the public marketing site (/, /services,
-// /testimonials, /news, /about, /contact) — deliberately separate from the internal app's own
+// /tutorials, /testimonials, /news, /about, /contact) — deliberately separate from the internal app's own
 // Navbar/Sidebar/TopBar, which list business-management modules (Clients,
 // Invoices, Licenses, ...) that mean nothing to an outside visitor. App.jsx
 // skips that whole staff shell for these exact routes, the same way it
@@ -15,6 +15,7 @@ import ThemeToggle from '../../components/ThemeToggle';
 const NAV_LINKS = [
   { to: '/', label: 'Home' },
   { to: '/services', label: 'Services' },
+  { to: '/tutorials', label: 'Tutorials' },
   { to: '/testimonials', label: 'Testimonials' },
   { to: '/news', label: 'News' },
   { to: '/about', label: 'About' },
@@ -59,7 +60,7 @@ export default function MarketingLayout({ children }) {
           </div>
         </div>
         {/* Below sm, the nav row collapses to a scrollable strip rather than a
-            hamburger drawer — four links never need one. */}
+            hamburger drawer — a handful of links never needs one. */}
         <div className="flex gap-5 overflow-x-auto border-t border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:hidden">
           {NAV_LINKS.map((link) => (
             <NavLink

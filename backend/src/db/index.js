@@ -587,6 +587,25 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- video_url is a Google Drive share link (e.g. EduPage tutorial
+  -- recordings) — this app has no video storage of its own, so a video
+  -- lives on Drive and this table just points at it; there's no
+  -- thumbnail column since one is always derivable from the Drive file
+  -- id embedded in video_url (https://drive.google.com/thumbnail?id=...),
+  -- same don't-store-what-you-can-compute approach invoices.js's
+  -- withComputed() takes for is_overdue.
+  CREATE TABLE IF NOT EXISTS website_videos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    video_url TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT '',
+    visible INTEGER NOT NULL DEFAULT 1,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_requests_client ON quote_requests(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_request_items_request ON quote_request_items(quote_request_id);
@@ -609,6 +628,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_website_services_visible ON website_services(visible);
   CREATE INDEX IF NOT EXISTS idx_website_team_visible ON website_team_members(visible);
   CREATE INDEX IF NOT EXISTS idx_website_gallery_visible ON website_gallery(visible);
+  CREATE INDEX IF NOT EXISTS idx_website_videos_visible ON website_videos(visible);
 
   -- Added once the query patterns above (list routes' ORDER BY, the
   -- scheduler's WHERE clauses, routes/reports.js's date-range SUMs) were

@@ -4339,25 +4339,27 @@ there was no separate landing page); it now renders the real marketing
 homepage instead, and `Login.jsx` itself is unchanged and lives only at
 `/login`.
 
-- **Five brand-new tables** (`db/index.js`, plain `CREATE TABLE IF NOT
+- **Six brand-new tables** (`db/index.js`, plain `CREATE TABLE IF NOT
   EXISTS` — no production data yet): `website_posts`, `website_testimonials`,
-  `website_services`, `website_team_members`, `website_gallery`. Each
+  `website_services`, `website_team_members`, `website_gallery`,
+  `website_videos`. Each
   follows this app's existing draft-vs-published convention —
   `website_posts`/`website_testimonials` have a `status` (`draft` |
   `published`), `website_services`/`website_team_members`/
-  `website_gallery` have a `visible` boolean — and the public site only
+  `website_gallery`/`website_videos` have a `visible` boolean — and the public site only
   ever reads the published/visible rows, the same "only the opted-in
   subset is public" rule `products.visible_in_portal` already enforces for
   the client portal's own catalog. `website_team_members.photo`/
   `website_gallery.image` are base64 data URIs, the same inline-image
   approach `business_settings`'s logo/signature/stamp and
   `payment_proofs.file_data` already use — no separate file storage exists
-  in this app. `website` joins `lib/permissions.js`'s `MODULES` list as its
+  in this app; `website_videos` has no equivalent image column at all, see
+  "Video tutorials" below for why. `website` joins `lib/permissions.js`'s `MODULES` list as its
   own gatable module (an admin/super_admin bypasses it as usual; a staff
   account needs an explicit grant, same as every other module).
 - `routes/website.js` (mounted at `/api/website`, `requireAuth` +
   `requirePermission('website', 'view'|'manage')`) is the staff CRUD API
-  for all five resources — plain list/create/update/delete per resource,
+  for all six resources — plain list/create/update/delete per resource,
   no pagination or search on any of them (a marketing site's own content
   is inherently small, the same "don't build it until needed" call
   `routes/licenses.js`'s own `GET /:id/renewals` already makes for a
@@ -4370,7 +4372,7 @@ homepage instead, and `Login.jsx` itself is unchanged and lives only at
   combined content fetch behind the whole public site (same "one request
   instead of several" reasoning `routes/dashboard.js`'s own `GET
   /overview` already established, just for an anonymous visitor). Returns
-  `{ posts, testimonials, services, team, gallery, settings }`, each list
+  `{ posts, testimonials, services, team, gallery, videos, settings }`, each list
   already filtered to published/visible and ordered correctly, `settings`
   passed through the existing `publicSettings()` (strips
   `starting_balance`/`session_timeout_minutes`, same as every other public
@@ -4379,10 +4381,10 @@ homepage instead, and `Login.jsx` itself is unchanged and lives only at
   app already runs at with zero rate limiting.
 - `pages/business/Website.jsx` (route `/website-content`, `Navbar.jsx`
   link gated on the new `website` module, right after Email Center) is the
-  staff CMS — one page, five tabs (switched with the existing
+  staff CMS — one page, six tabs (switched with the existing
   `StatusFilterChips` component, reused as a tab strip rather than a
-  status filter) rather than five separate routed pages, since together
-  they're one cohesive "what shows on the website" area, not five
+  status filter) rather than six separate routed pages, since together
+  they're one cohesive "what shows on the website" area, not six
   independent business records the way Clients/Products/Expenses are.
   Each tab is its own local section component following the standard
   list+modal-form shape (`Modal`, `useConfirm`, `IconActionButton`,
@@ -4395,14 +4397,67 @@ homepage instead, and `Login.jsx` itself is unchanged and lives only at
   `icon` is a small fixed enum (`SERVICE_ICON_OPTIONS`, exported from this
   file) that the public Services page's own `SERVICE_ICONS` map must stay
   in sync with by key.
+- **Video tutorials**: `website_videos` (title/description/`video_url`/
+  category/visible/display_order) is deliberately the one CMS resource
+  with no image column at all — a tutorial recording (e.g. an EduPage
+  walkthrough) lives on Google Drive, not this app, which has no video
+  storage of its own and no realistic way to add any (base64-inline, the
+  approach every other image field here uses, tops out at a few hundred
+  KB — nowhere near video-file scale). `video_url` is the Drive share
+  link itself; `extractDriveFileId(url)` (a small regex matching both
+  `/file/d/<id>/...` and `?id=<id>` share-link shapes, duplicated as
+  `frontend/src/lib/googleDrive.js` for the same acceptable-duplication
+  reason `EXPIRY_WARNING_DAYS` is duplicated between `routes/licenses.js`/
+  `lib/scheduler.js`) is what both `routes/website.js`'s write-time
+  validation (`POST`/`PUT /videos` 400 on anything that isn't recognizably
+  a Drive link) and the frontend's own thumbnail derivation rely on —
+  there's no separate thumbnail column since one is always computable from
+  the file id via Drive's own public thumbnail endpoint
+  (`https://drive.google.com/thumbnail?id=<id>`), the same
+  don't-store-what-you-can-compute approach `invoices.js`'s `withComputed()`
+  takes for `is_overdue`. This shape was deliberately chosen over a real
+  video embed: Google Drive's own embeddable player is a cross-origin
+  iframe with no exposed JS API, so there's no way to auto-play, auto-stop,
+  or otherwise control playback of a Drive-hosted file from this app's own
+  page — a genuine few-second auto-playing preview isn't achievable from a
+  Drive link at all, only a still thumbnail is. `components/
+  VideoThumbnail.jsx` is the shared card behind every video render site
+  (`pages/marketing/MarketingTutorials.jsx`, `pages/marketing/Home.jsx`'s
+  own teaser section, and `pages/business/Website.jsx`'s admin grid) — an
+  `<a target="_blank">` wrapping the derived thumbnail `<img>` (falling
+  back to a plain `VideoIcon` glyph on a load failure, e.g. a file that
+  isn't actually shared "Anyone with the link," via a simple `onError`-set
+  `broken` state) with a filled `PlayCircleIcon` overlay centered on top —
+  clicking anywhere on the card opens the real Drive link in a new tab,
+  where Drive's own player takes over; this is a styled link to a still
+  image, not a video element, by design. `pages/business/Website.jsx`'s
+  Videos tab follows `ServicesSection`'s own shape (a `visible`/
+  `display_order` form, no `status` draft/published split, since a
+  tutorial is either live or not) with the Google Drive link as a plain
+  `type="url"` field and an inline hint that the file needs "Anyone with
+  the link" sharing — the admin list renders each row's `VideoThumbnail`
+  above its title/category so a broken/unshared link is visually obvious
+  before it ever reaches the public site. `pages/marketing/
+  MarketingTutorials.jsx` (route `/tutorials`) is the dedicated public
+  page — a plain video grid, same loading/empty-state shape as
+  `MarketingNews.jsx`; `Home.jsx` also gained a "Watch & learn" teaser
+  section (top 3 videos, "View all →" to `/tutorials`) inserted right
+  before the existing News section, following the identical
+  conditionally-rendered-only-once-there's-content convention every other
+  CMS-driven Home section already uses. Two new icons in
+  `components/icons.jsx`: `VideoIcon` (a clapper-style rectangle with a
+  play triangle — the Videos tab/`/tutorials` nav link) and
+  `PlayCircleIcon` (filled, not outline like every other icon in this
+  file, since it needs to read clearly sitting on top of a photo — the
+  thumbnail overlay itself).
 - **The public site itself** (`pages/marketing/`) — `MarketingLayout.jsx`
-  is the shared header (wordmark, six nav links, `ThemeToggle`, a
+  is the shared header (wordmark, seven nav links, `ThemeToggle`, a
   "Login" link that becomes "Dashboard" once `useAuth()` reports a
   token — labeled plainly "Login" rather than "Staff login," on the
   reasoning that a client with a portal account is also logging in here,
   not just staff) wrapping `Home.jsx`/`MarketingServices.jsx`/
-  `MarketingTestimonials.jsx`/`MarketingNews.jsx`/`MarketingAbout.jsx`/
-  `MarketingContact.jsx` — deliberately its own
+  `MarketingTutorials.jsx`/`MarketingTestimonials.jsx`/`MarketingNews.jsx`/
+  `MarketingAbout.jsx`/`MarketingContact.jsx` — deliberately its own
   header, not the internal app's `Navbar`/`Sidebar`/`TopBar`, which list
   business-management modules (Clients, Invoices, Licenses, ...) that mean
   nothing to an outside visitor. The shared, staff-context-free `Footer`
@@ -4459,7 +4514,7 @@ homepage instead, and `Login.jsx` itself is unchanged and lives only at
   page's anchor rather than redirected to the new routed page, since a
   same-page scroll-to-CTA is still the faster path for a visitor already
   reading the homepage.
-- **`App.jsx` routing**: `/`, `/services`, `/testimonials`, `/news`,
+- **`App.jsx` routing**: `/`, `/services`, `/tutorials`, `/testimonials`, `/news`,
   `/about`, `/contact` are a
   fixed `MARKETING_ROUTES` set (exact match, not a `/marketing/*` prefix —
   these are top-level pages, not a route subtree the way `/portal/*` is).
@@ -4470,7 +4525,9 @@ homepage instead, and `Login.jsx` itself is unchanged and lives only at
   `lib/api.js` gained `api.public.getSiteContent()` and a `api.website.*`
   block (one `{list, create, update, remove}` sub-object per resource).
   Two new icons in `components/icons.jsx`: `GlobeIcon` (the "Website
-  content" nav link) and `ImageIcon` (the Gallery tab).
+  content" nav link) and `ImageIcon` (the Gallery tab). See "Video
+  tutorials" above for `VideoIcon`/`PlayCircleIcon`, its own later
+  addition to this same icon set.
 
 ### Idle session timeout
 

@@ -65,6 +65,7 @@ const MarketingTestimonials = lazy(() => import('./pages/marketing/MarketingTest
 const MarketingNews = lazy(() => import('./pages/marketing/MarketingNews'));
 const MarketingAbout = lazy(() => import('./pages/marketing/MarketingAbout'));
 const MarketingContact = lazy(() => import('./pages/marketing/MarketingContact'));
+const MarketingTutorials = lazy(() => import('./pages/marketing/MarketingTutorials'));
 
 // Same loading copy/markup ProtectedRoute already shows while resolving
 // auth, so a lazy chunk still loading (usually a blip, longer on a slow
@@ -94,7 +95,7 @@ export default function App() {
   // mean nothing to an outside visitor and would be actively confusing to
   // show here. Fixed set, exact match — these are top-level pages, not a
   // route subtree the way /portal/* is, so a prefix check isn't right here.
-  const MARKETING_ROUTES = new Set(['/', '/services', '/testimonials', '/news', '/about', '/contact']);
+  const MARKETING_ROUTES = new Set(['/', '/services', '/tutorials', '/testimonials', '/news', '/about', '/contact']);
   const isMarketingRoute = MARKETING_ROUTES.has(location.pathname);
 
   return (
@@ -171,6 +172,7 @@ export default function App() {
                     path. */}
                 <Route path="/" element={<Home />} />
                 <Route path="/services" element={<MarketingServices />} />
+                <Route path="/tutorials" element={<MarketingTutorials />} />
                 <Route path="/testimonials" element={<MarketingTestimonials />} />
                 <Route path="/news" element={<MarketingNews />} />
                 <Route path="/about" element={<MarketingAbout />} />
