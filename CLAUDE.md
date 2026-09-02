@@ -3364,13 +3364,22 @@ untouched.
   identities on this shared form in either direction always leaves at most
   one of the two sessions active in this browser, the same mutual-
   exclusivity guarantee "Client portal" above already established.
-- **The subtext line** ("Accounts are created by an administrator — contact
-  yours if you need access.") was reworded to name both audiences up front
-  ("Staff and client portal accounts both sign in here — ...") rather than
-  reading as staff-only, though the underlying claim was already true for
-  a portal account too — a client portal account is only ever created by
-  an admin inviting an existing client (`routes/clients.js`'s `POST
-  /:id/portal-invite`, see "Client portal" above), never self-serve.
+- **The subtext line under "Log in" is gone.** It briefly read "Staff and
+  client portal accounts both sign in here — accounts are created by an
+  administrator, so contact yours if you need access." (itself a reword of
+  an even earlier, staff-only-sounding version, "Accounts are created by an
+  administrator — contact yours if you need access.") — removed outright at
+  explicit request ("I just need only this login form... nothing else"),
+  the same instinct that stripped `Login.jsx` down to just the form in the
+  first place (see that page's own top-of-section note). The underlying
+  fact it stated is still true and still fully enforced server-side either
+  way — a client portal account is only ever created by an admin inviting
+  an existing client (`routes/clients.js`'s `POST /:id/portal-invite`, see
+  "Client portal" above), never self-serve, exactly as for a staff
+  account — this was just prose explaining that fact on the page itself,
+  not a behavior change, so removing it changes nothing about who can log
+  in or how. The card now goes straight from the "Log in" heading to the
+  `{notice}` banner (idle-logout/post-reset messages) or the form itself.
 - **`/portal/login` is retired**, not left around as a second, now-
   inconsistent way to sign in — `pages/portal/PortalLogin.jsx` is deleted
   outright and every in-app link/redirect that used to target it now

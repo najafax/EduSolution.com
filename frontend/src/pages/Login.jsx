@@ -85,10 +85,6 @@ function LoginForm() {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-xl sm:p-9 dark:border-slate-700 dark:bg-slate-900">
       <h2 className="text-xl font-bold text-ink dark:text-white">Log in</h2>
-      <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-        Staff and client portal accounts both sign in here — accounts are created by an administrator, so contact
-        yours if you need access.
-      </p>
 
       {notice && (
         <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
