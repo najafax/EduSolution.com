@@ -451,7 +451,7 @@ export default function Licenses() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading || !settingsLoaded ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={['w-32', 'w-28', 'w-16', 'w-24', 'w-20', 'w-20', 'w-32']} />
+            <TableSkeleton rows={5} cols={['w-32', 'w-28', 'w-16', 'w-24', 'w-20', 'w-24', 'w-20', 'w-32']} />
           </div>
         ) : licenses.length === 0 ? (
           <EmptyState
@@ -471,6 +471,7 @@ export default function Licenses() {
                     <th className="px-4 py-3">URL</th>
                     <th className="px-4 py-3">Expiry</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Last payment</th>
                     <th className="px-4 py-3 text-right">Amount</th>
                     {canManage && <th className="px-4 py-3" />}
                   </tr>
@@ -505,6 +506,13 @@ export default function Licenses() {
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{l.expiry_date}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <StatusBadge status={l.display_status} />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">
+                        {l.last_renewed_at ? (
+                          l.last_renewed_at.slice(0, 10)
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-600">—</span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
                         {symbol}
@@ -545,6 +553,10 @@ export default function Licenses() {
                   <div className="flex justify-between">
                     <dt className="text-slate-500 dark:text-slate-400">Expiry</dt>
                     <dd className="text-slate-900 dark:text-white">{l.expiry_date}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500 dark:text-slate-400">Last payment</dt>
+                    <dd className="text-slate-900 dark:text-white">{l.last_renewed_at ? l.last_renewed_at.slice(0, 10) : '—'}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-slate-500 dark:text-slate-400">Amount</dt>

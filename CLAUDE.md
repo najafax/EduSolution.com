@@ -5169,6 +5169,28 @@ frontend stops holding/sending it.
   row (see `routes/licenses.js` above for the exact shape and why it's
   worth showing — a link staff need to actually click, not free-text
   worth hiding behind a tap the way `notes` is).
+  **Last payment column**: the desktop table and mobile accordion also
+  carry a "Last payment" field (positioned right before "Amount," so a
+  payment date and the amount received on it read together) —
+  `last_renewed_at`, sliced to its date portion the same
+  `renewed_at.slice(0, 10)` way the History modal's own entries already
+  are (a full datetime column; every other date shown in this app's UI is
+  date-only), with an em-dash fallback for a license that's never been
+  renewed, matching the "URL" column's own blank-value convention just
+  above. Deliberately **not** a real per-renewal payment record — neither
+  a manual "Renew" click nor an invoice-payment-triggered auto-renewal
+  (see "License auto-renewal on invoice payment" above) ever records what
+  was actually charged; `license_renewals` has no amount column at all
+  (see `db/index.js`), only the expiry-date change — so the existing
+  "Amount" column right next to it (the license's current recurring/
+  renewal amount) is the closest available figure to "amount received,"
+  the same proxy convention `GET /licenses/analytics`'s own
+  `revenueEstimate` already establishes for the identical limitation
+  (valuing at today's price, not a stored historical actual). This needed
+  no backend change at all — `l.last_renewed_at` was already present on
+  every row the list response returns (it already drives the list's own
+  default sort order, and `rowActions()`'s own Cancel/Remind gates already
+  read it), so this is a pure frontend display addition.
   **Row actions as icon buttons**: `rowActions()`'s Renew/Cancel/Reactivate/
   Remind/History/Edit/Delete buttons render as compact icon-only buttons
   (`components/IconActionButton.jsx` — see "Icon action buttons" below)
