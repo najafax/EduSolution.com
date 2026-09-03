@@ -490,7 +490,19 @@ router.post('/:id/renew', manage, (req, res) => {
     return res.status(409).json({ error: 'This license is cancelled and cannot be renewed' });
   }
 
-  const nextExpiry = renewLicense(existing, req.user.name);
+  // Optional — the amount actually received for this renewal. Blank/omitted
+  // leaves licenses.amount untouched (see lib/licenseRenewal.js's own note);
+  // given, it's validated the same way the create/edit form validates
+  // Renewal amount and passed through so the "Amount" column reflects it.
+  let amount;
+  if (req.body.amount !== undefined && req.body.amount !== null && req.body.amount !== '') {
+    amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      return res.status(400).json({ error: 'Amount must be a non-negative number' });
+    }
+  }
+
+  const nextExpiry = renewLicense(existing, req.user.name, amount);
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id));
   logActivity({ userName: req.user.name, action: 'renewed', entityType: 'license', entityId: license.id, entityLabel: `${existing.name} (${existing.client_name}) → ${nextExpiry}` });

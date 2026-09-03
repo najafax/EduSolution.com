@@ -648,7 +648,12 @@ deliberately untouched by either, always returning every row.
   trimmed/lowercased and checked against that client's active-or-cancelled
   licenses' `name` the same way, so a line item literally naming a license
   (e.g. "LMS Pro Annual License") renews that specific license, and an
-  invoice for something unrelated never touches any license at all.
+  invoice for something unrelated never touches any license at all. Each
+  matched license also has its `amount` updated to the matching line
+  item's own `amount` (summed if more than one line item names it) — see
+  "Last payment column"/"Renew now captures the actual amount received"
+  under `Licenses.jsx` below for the full story; this is a real, exact
+  figure for this auto-renewal path, not a proxy.
   Multiple matching line items still only renew a license once each; an
   invoice can auto-renew more than one license if it bills for more than
   one by name. A matched license that's currently `cancelled` is
@@ -5177,20 +5182,68 @@ frontend stops holding/sending it.
   are (a full datetime column; every other date shown in this app's UI is
   date-only), with an em-dash fallback for a license that's never been
   renewed, matching the "URL" column's own blank-value convention just
-  above. Deliberately **not** a real per-renewal payment record — neither
-  a manual "Renew" click nor an invoice-payment-triggered auto-renewal
-  (see "License auto-renewal on invoice payment" above) ever records what
-  was actually charged; `license_renewals` has no amount column at all
-  (see `db/index.js`), only the expiry-date change — so the existing
-  "Amount" column right next to it (the license's current recurring/
-  renewal amount) is the closest available figure to "amount received,"
-  the same proxy convention `GET /licenses/analytics`'s own
-  `revenueEstimate` already establishes for the identical limitation
-  (valuing at today's price, not a stored historical actual). This needed
-  no backend change at all — `l.last_renewed_at` was already present on
-  every row the list response returns (it already drives the list's own
-  default sort order, and `rowActions()`'s own Cancel/Remind gates already
-  read it), so this is a pure frontend display addition.
+  above. At the time this shipped, neither a manual "Renew" click nor an
+  invoice-payment-triggered auto-renewal (see "License auto-renewal on
+  invoice payment" above) ever recorded what was actually charged —
+  `license_renewals` has no amount column at all (see `db/index.js`), only
+  the expiry-date change — so the "Amount" column right next to it (the
+  license's current recurring/renewal amount) was only ever a proxy for
+  "amount received," the same kind of stand-in `GET /licenses/analytics`'s
+  own `revenueEstimate` already uses for the identical limitation. This
+  first pass needed no backend change at all — `l.last_renewed_at` was
+  already present on every row the list response returns (it already
+  drives the list's own default sort order, and `rowActions()`'s own
+  Cancel/Remind gates already read it), so it was a pure frontend display
+  addition. **A follow-up closed most of that proxy gap**: see "Renew now
+  captures the actual amount received" below — once that shipped, "Amount"
+  genuinely means "what was last received" far more often than not, not
+  just an approximation.
+  **Renew now captures the actual amount received**: `lib/licenseRenewal.js`'s
+  `renewLicense(license, renewedByName, amount)` gained an optional third
+  argument — when given as a finite, non-negative number, the same
+  transaction that advances `expiry_date` also writes it to
+  `licenses.amount`, so the "Amount" column (and the "Last payment" column
+  right next to it) reads as "what was actually received at the last
+  renewal," not a figure that's only ever set once at creation and never
+  revisited. Left `undefined` (the default — a caller with nothing real to
+  report), `amount` is untouched, exactly as before this existed. Both
+  callers now pass a real figure whenever one's available: `routes/
+  licenses.js`'s `POST /:id/renew` forwards whatever `amount` the request
+  body carries (validated the same way the create/edit form validates
+  "Renewal amount" — a finite, non-negative number, 400 otherwise; omitted/
+  blank is left alone, same "don't overwrite with nothing" rule the backend
+  function itself follows) — see below for where that comes from on
+  `Licenses.jsx`. `routes/invoices.js`'s auto-renewal (see "License
+  auto-renewal on invoice payment" above) forwards the *exact* amount the
+  matched invoice line item billed — `amountByDescription`, a
+  trimmed/lowercased-description → summed-`amount` map built from the
+  invoice's own `invoice_items` (summing when more than one line item names
+  the same license, so a license split across two lines still gets its real
+  total) — replacing the plain `Set` that check used to be. This is a real
+  figure, not a proxy, for the auto-renewal path specifically: it's exactly
+  what the client was billed and paid for that license, not an estimate.
+  **`Licenses.jsx`'s Renew action is no longer instant-on-click** — clicking
+  the Renew icon now opens a small `Modal` (`renewTarget`/`renewAmount`
+  state, replacing the old `handleRenew()`'s bare `useConfirm()` prompt)
+  pre-filled with the license's current `amount` (the common case: the
+  price hasn't changed) in an editable "Amount received" number field,
+  plus the same one-line "extends by one {billing_cycle} cycle" context the
+  old confirm dialog showed. Submitting calls `api.licenses.renew(id,
+  { amount }, token)` — `lib/api.js`'s `renew()` gained a `payload`
+  parameter for this (was `(id, token)`, now `(id, payload, token)`,
+  matching the `(id, payload, token)` shape every other single-record
+  action call in this file already uses, e.g. `remind()`); leaving the
+  field blank sends `amount: undefined`, which `JSON.stringify` drops from
+  the request body entirely, so the backend never sees it and leaves
+  `licenses.amount` untouched — the same "no real figure to report" case
+  the backend function itself handles. The modal's own client-side check
+  (finite, non-negative) mirrors the backend's validation so a bad value
+  surfaces immediately rather than only as a 400 after a round trip. The
+  Renew icon button itself lost its `spinning`/busy-label wiring, since
+  clicking it now only opens the form — the actual submit's busy state
+  (`renewSubmitting`) lives on the modal's own Renew button instead, the
+  same "form owns its own submit state" shape every other modal-form in
+  this app already follows.
   **Row actions as icon buttons**: `rowActions()`'s Renew/Cancel/Reactivate/
   Remind/History/Edit/Delete buttons render as compact icon-only buttons
   (`components/IconActionButton.jsx` — see "Icon action buttons" below)

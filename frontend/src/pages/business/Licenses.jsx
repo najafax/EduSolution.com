@@ -87,6 +87,10 @@ export default function Licenses() {
   const [submitting, setSubmitting] = useState(false);
   const [busy, setBusy] = useState(null); // { id, action } — tracks which row/action is in flight so buttons show the right busy label
   const [remindTarget, setRemindTarget] = useState(null);
+  const [renewTarget, setRenewTarget] = useState(null);
+  const [renewAmount, setRenewAmount] = useState('');
+  const [renewSubmitting, setRenewSubmitting] = useState(false);
+  const [renewError, setRenewError] = useState('');
   const [renewalConfirmTarget, setRenewalConfirmTarget] = useState(null);
   const [historyTarget, setHistoryTarget] = useState(null);
   const [renewals, setRenewals] = useState(null);
@@ -209,25 +213,42 @@ export default function Licenses() {
     }
   }
 
-  async function handleRenew(l) {
-    if (
-      !(await confirm({
-        title: 'Renew this license?',
-        message: `${l.name} (${l.client_name}) will be extended by one billing cycle.`,
-        confirmLabel: 'Renew',
-        danger: false,
-      }))
-    )
-      return;
-    setError('');
-    setBusy({ id: l.id, action: 'renew' });
+  // Renew opens a small form instead of acting immediately — the amount
+  // typed in there becomes the license's new `amount`, so the "Amount"
+  // column keeps meaning "what was actually received last time" rather
+  // than a figure only ever set once at creation. Pre-filled with the
+  // license's current amount (the common case: the price hasn't changed),
+  // but left blank leaves `amount` untouched — see lib/licenseRenewal.js's
+  // own note on why the backend treats a blank amount as "don't update."
+  function openRenew(l) {
+    setRenewTarget(l);
+    setRenewAmount(l.amount != null ? String(l.amount) : '');
+    setRenewError('');
+  }
+
+  async function submitRenew(e) {
+    e.preventDefault();
+    if (!renewTarget) return;
+    setRenewError('');
+    let amount;
+    if (renewAmount.trim() !== '') {
+      amount = Number(renewAmount);
+      if (!Number.isFinite(amount) || amount < 0) {
+        setRenewError('Amount must be a non-negative number');
+        return;
+      }
+    }
+    setRenewSubmitting(true);
+    setBusy({ id: renewTarget.id, action: 'renew' });
     try {
-      await api.licenses.renew(l.id, token);
+      await api.licenses.renew(renewTarget.id, { amount }, token);
+      setRenewTarget(null);
       load();
       loadSummary();
     } catch (err) {
-      setError(err.message);
+      setRenewError(err.message);
     } finally {
+      setRenewSubmitting(false);
       setBusy(null);
     }
   }
@@ -337,10 +358,9 @@ export default function Licenses() {
           <IconActionButton
             icon={RefreshIcon}
             tone="lagoon"
-            onClick={() => handleRenew(l)}
+            onClick={() => openRenew(l)}
             disabled={rowBusy}
-            spinning={isBusy('renew')}
-            title={isBusy('renew') ? 'Renewing…' : 'Renew'}
+            title="Renew"
             label="Renew license"
           />
         )}
@@ -741,6 +761,45 @@ export default function Licenses() {
           }
         />
       )}
+
+      <Modal open={!!renewTarget} onClose={() => setRenewTarget(null)} title={renewTarget ? `Renew ${renewTarget.name}` : ''}>
+        {renewTarget && (
+          <form onSubmit={submitRenew} className="flex flex-col gap-3">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {renewTarget.client_name} — extends by one {renewTarget.billing_cycle} cycle.
+            </p>
+            {renewError && <p className="text-sm text-red-600 dark:text-red-400">{renewError}</p>}
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount received</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={renewAmount}
+                onChange={(e) => setRenewAmount(e.target.value)}
+                placeholder="Leave blank to keep the current amount"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              />
+            </label>
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={renewSubmitting}
+                className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+              >
+                {renewSubmitting ? 'Renewing…' : 'Renew'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRenewTarget(null)}
+                className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       {renewalConfirmTarget && (
         <HtmlEmailPreviewModal

@@ -32,13 +32,33 @@ function advanceExpiry(dateStr, cycle) {
 // "Send renewal confirmation" button (routes/licenses.js's own POST
 // /:id/renewal-confirm, gated on this column) should reappear so staff can
 // confirm *this* renewal, not read as already-confirmed from the last one.
-function renewLicense(license, renewedByName) {
+//
+// `amount`, when given as a finite, non-negative number, also updates
+// licenses.amount to that figure as part of the same UPDATE — this is what
+// keeps the "Amount" column meaning "the amount actually received at the
+// last renewal" rather than a value that's only ever set once at creation
+// and never touched again. Both callers pass a real figure when one's
+// available: routes/licenses.js's POST /:id/renew forwards whatever amount
+// staff typed into the Renew form, and routes/invoices.js's auto-renewal
+// forwards the matched invoice line item's own `amount` — an exact figure,
+// not a guess, since that's literally what the client was billed and paid
+// for that license. Omitted (undefined), the license's `amount` is left
+// exactly as it was — a renewal recorded with no amount given shouldn't
+// silently reset the figure to something wrong.
+function renewLicense(license, renewedByName, amount) {
   const nextExpiry = advanceExpiry(license.expiry_date, license.billing_cycle);
+  const hasAmount = typeof amount === 'number' && Number.isFinite(amount) && amount >= 0;
 
   db.transaction(() => {
-    db.prepare(
-      `UPDATE licenses SET expiry_date = ?, last_renewed_at = datetime('now'), last_reminder_sent_at = NULL, last_renewal_confirmation_sent_at = NULL, updated_at = datetime('now') WHERE id = ?`,
-    ).run(nextExpiry, license.id);
+    if (hasAmount) {
+      db.prepare(
+        `UPDATE licenses SET expiry_date = ?, amount = ?, last_renewed_at = datetime('now'), last_reminder_sent_at = NULL, last_renewal_confirmation_sent_at = NULL, updated_at = datetime('now') WHERE id = ?`,
+      ).run(nextExpiry, amount, license.id);
+    } else {
+      db.prepare(
+        `UPDATE licenses SET expiry_date = ?, last_renewed_at = datetime('now'), last_reminder_sent_at = NULL, last_renewal_confirmation_sent_at = NULL, updated_at = datetime('now') WHERE id = ?`,
+      ).run(nextExpiry, license.id);
+    }
     db.prepare(
       `INSERT INTO license_renewals (license_id, previous_expiry_date, new_expiry_date, renewed_by_name) VALUES (?, ?, ?, ?)`,
     ).run(license.id, license.expiry_date, nextExpiry, renewedByName);

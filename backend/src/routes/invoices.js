@@ -605,11 +605,24 @@ router.post('/:id/payments', manage, (req, res) => {
   // than in the action string.
   const autoRenewedLicenses = [];
   if (newStatus === 'paid') {
-    const descriptions = new Set(data.items.map((item) => (item.description || '').trim().toLowerCase()).filter(Boolean));
-    if (descriptions.size > 0) {
+    // Keyed by trimmed/lowercased description, same matching key the license
+    // lookup below uses — summed rather than a bare Set now, so a matched
+    // license's `amount` (see lib/licenseRenewal.js) updates to exactly what
+    // this invoice actually billed for it, not left at whatever it was
+    // before. A license named by more than one line item on the same
+    // invoice (unusual, but possible) sums both — the real total paid for
+    // it — rather than only the last one seen.
+    const amountByDescription = new Map();
+    for (const item of data.items) {
+      const key = (item.description || '').trim().toLowerCase();
+      if (!key) continue;
+      amountByDescription.set(key, (amountByDescription.get(key) || 0) + (item.amount || 0));
+    }
+    if (amountByDescription.size > 0) {
       const clientLicenses = db.prepare("SELECT * FROM licenses WHERE client_id = ? AND status IN ('active', 'cancelled')").all(data.invoice.client_id);
       for (const license of clientLicenses) {
-        if (!descriptions.has(license.name.trim().toLowerCase())) continue;
+        const key = license.name.trim().toLowerCase();
+        if (!amountByDescription.has(key)) continue;
         const wasCancelled = license.status === 'cancelled';
         if (wasCancelled) {
           db.prepare(`UPDATE licenses SET status = 'active', updated_at = datetime('now') WHERE id = ?`).run(license.id);
@@ -621,7 +634,7 @@ router.post('/:id/payments', manage, (req, res) => {
             entityLabel: `${license.name} (${data.client.name}) — via invoice payment`,
           });
         }
-        const nextExpiry = renewLicense(license, req.user.name);
+        const nextExpiry = renewLicense(license, req.user.name, amountByDescription.get(key));
         logActivity({
           userName: req.user.name,
           action: 'auto-renewed via invoice payment for',
