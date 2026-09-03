@@ -3639,8 +3639,14 @@ rather than eight overlapping diffs.
   list is meant to answer "what's active, expiring, or expired," not
   double as a pricing page; the same column, and the matching figure on
   the mobile card view, were removed together so desktop and mobile stay
-  in sync — `PortalLicenseDetail.jsx`'s own "Amount" detail row is
-  untouched, this only affects the list). None of these gained
+  in sync). `PortalLicenseDetail.jsx`'s own "Amount" detail row (in its
+  Billing cycle/Started/Expires grid) was left in place at first, on the
+  reasoning that the ask was specifically about "license status," but a
+  follow-up report ("client portal still showing amount") made clear the
+  ask covered the client-facing license view as a whole, not just the
+  list — removed from the detail page's grid too, in the same pass; the
+  page's `symbol`/`settings` read (only ever used for that figure) went
+  with it. None of these gained
   row actions or a mobile-accordion split the way a staff list page would
   — there's nothing to act on from the list itself (every row already just
   links to its own detail page, same as the card version), and a single

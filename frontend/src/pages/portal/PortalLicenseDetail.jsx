@@ -12,10 +12,9 @@ import { ChevronRightIcon } from '../../components/icons';
 // else to route a click before this existed.
 export default function PortalLicenseDetail() {
   const { id } = useParams();
-  const { token, settings } = usePortalAuth();
+  const { token } = usePortalAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const symbol = settings?.currency_symbol || '$';
 
   useEffect(() => {
     api.portal.licenses
@@ -50,11 +49,6 @@ export default function PortalLicenseDetail() {
           <div>
             <p className="font-medium text-slate-500 dark:text-slate-400">Billing cycle</p>
             <p className="text-slate-900 dark:text-white">{license.billing_cycle === 'monthly' ? 'Monthly' : 'Yearly'}</p>
-            <p className="mt-2 font-medium text-slate-500 dark:text-slate-400">Amount</p>
-            <p className="text-slate-900 dark:text-white">
-              {symbol}
-              {license.amount.toFixed(2)}
-            </p>
           </div>
           <div>
             <p className="font-medium text-slate-500 dark:text-slate-400">Started</p>
