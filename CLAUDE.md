@@ -4683,6 +4683,63 @@ why.
   page's anchor rather than redirected to the new routed page, since a
   same-page scroll-to-CTA is still the faster path for a visitor already
   reading the homepage.
+- **Mobile nav: hamburger drawer + edge swipe, matching the internal app's
+  own convention**: `MarketingLayout.jsx`'s header used to collapse, below
+  `sm:`, to a second, horizontally-scrolling row carrying all seven nav
+  links *and* the Login/Dashboard link at the end of it — reported as "I
+  have to scroll horizontally to find the [Login] button," which is
+  exactly what that layout meant: Login sat off-screen at the tail of a
+  `overflow-x-auto shrink-0` strip with no visible affordance that there
+  was more to scroll to. Fixed on two fronts. First, **Login/Dashboard is
+  now always visible in the header itself**, at every width — its classes
+  dropped `hidden`/`sm:flex`, so it's simply `flex` unconditionally,
+  sitting next to `ThemeToggle` in the header's top-right corner exactly
+  like it already did at `sm:` and up; no more scrolling required to find
+  it at all. Second, the horizontally-scrolling secondary row is gone
+  entirely, replaced with the same hamburger-opens-a-drawer pattern the
+  internal staff app already established (see `Navbar.jsx`'s hamburger +
+  `Sidebar.jsx`'s `mobileOpen` drawer mode, and "Sidebar navigation
+  (desktop)" above) — a `MenuIcon` button, top-left next to the wordmark
+  (`sm:hidden`, since the plain horizontal `NAV_LINKS` row already handles
+  `sm:` and up unchanged), opening a local `MobileMenu` component: the same
+  seven links stacked vertically, plus the Login/Dashboard link pinned at
+  the bottom. `MobileMenu` is a new, marketing-site-local component (not a
+  reuse of `Sidebar.jsx` — this header's own top-of-file note is explicit
+  that this site is deliberately independent of the internal app's nav
+  components, which list business modules that mean nothing to an outside
+  visitor) but mirrors `Sidebar.jsx`'s drawer contract exactly: Escape-to-
+  close, `document.body.style.overflow = 'hidden'` while open, and
+  `createPortal(..., document.body)` rather than rendering inline — this
+  header carries `backdrop-blur` too, which per the CSS Filter Effects spec
+  gives `position: fixed` descendants a new containing block, the identical
+  bug `Sidebar.jsx`'s own note describes catching the first time this
+  pattern was built; portaling straight to `document.body` sidesteps it
+  here the same way. **Left-edge swipe** opens the same drawer, reusing
+  `lib/useEdgeSwipeOpen.js` as-is rather than writing a second copy of the
+  gesture-tracking logic — that hook gained one small, backward-compatible
+  change to make this possible: an optional `breakpointPx` parameter
+  (default `1280`, `Navbar.jsx`'s existing call site is unaffected since it
+  never passes one) controlling the width above which the hook stops
+  claiming the gesture. It was hardcoded to Tailwind's `xl` breakpoint
+  because that's where the internal app's own `Sidebar` stops being a
+  drawer and becomes a persistent panel — but this site's drawer disappears
+  at `sm:` (640px) instead, a much narrower cutoff, so `MarketingLayout.jsx`
+  passes `breakpointPx: 640` to get the identical gesture scoped to its own
+  breakpoint rather than the staff app's. Verified with a real dev server
+  and Playwright at a 390×844 mobile viewport: the header's Login button
+  now sits fully within the viewport with zero horizontal page overflow
+  (`document.documentElement.scrollWidth` matches the viewport width
+  exactly); the hamburger opens the drawer with all seven links plus
+  Login visible; Escape and clicking a link both close it (the latter also
+  navigating); a synthetic left-edge swipe (touchstart near x=0, dragged
+  right past the open threshold) opens the drawer the same way the
+  hamburger does; and at a 1280px desktop viewport the hamburger is hidden
+  and the plain horizontal nav row renders instead, matching pre-existing
+  desktop behavior exactly. Also checked in dark mode (forcing
+  `edusolution_theme` to `'dark'` in `localStorage`, since a fresh visitor
+  defaults to light regardless of OS preference — see "Theme (light/dark
+  mode)" above) to confirm the drawer's `dark:` classes render correctly
+  against the dark palette, not just light.
 - **`App.jsx` routing**: `/`, `/services`, `/tutorials`, `/testimonials`, `/news`,
   `/about`, `/contact` are a
   fixed `MARKETING_ROUTES` set (exact match, not a `/marketing/*` prefix —

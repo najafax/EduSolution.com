@@ -15,7 +15,9 @@ const VERTICAL_CANCEL_PX = 10;
 // Matches Tailwind's `xl` breakpoint — Sidebar is a persistent, always-open
 // panel at that width and up (see Sidebar.jsx/App.jsx), so an edge swipe
 // there has no drawer to open and should fall back to whatever the browser
-// would normally do.
+// would normally do. The default for `breakpointPx` below — a caller whose
+// own drawer disappears at a different width (e.g. MarketingLayout.jsx's
+// own drawer, gone at `sm:`) passes its own breakpoint instead.
 const XL_BREAKPOINT_PX = 1280;
 
 // Phones ship a system/browser "swipe from the left edge to go back"
@@ -38,7 +40,7 @@ const XL_BREAKPOINT_PX = 1280;
 // index.css, which helps the same gesture in some browsers/versions but is
 // also not a complete fix on its own — there is no combination of web APIs
 // that reliably wins against it on every platform.
-export function useEdgeSwipeOpen({ enabled, onOpen }) {
+export function useEdgeSwipeOpen({ enabled, onOpen, breakpointPx = XL_BREAKPOINT_PX }) {
   const stateRef = useRef({ tracking: false, startX: 0, startY: 0 });
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export function useEdgeSwipeOpen({ enabled, onOpen }) {
 
     function handleTouchStart(e) {
       const touch = e.touches[0];
-      if (!touch || touch.clientX > EDGE_ZONE_PX || window.innerWidth >= XL_BREAKPOINT_PX) return;
+      if (!touch || touch.clientX > EDGE_ZONE_PX || window.innerWidth >= breakpointPx) return;
       stateRef.current = { tracking: true, startX: touch.clientX, startY: touch.clientY };
     }
 
@@ -93,5 +95,5 @@ export function useEdgeSwipeOpen({ enabled, onOpen }) {
       document.removeEventListener('touchend', handleTouchEnd);
       document.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [enabled, onOpen]);
+  }, [enabled, onOpen, breakpointPx]);
 }
