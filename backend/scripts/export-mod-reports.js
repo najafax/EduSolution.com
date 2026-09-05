@@ -1,9 +1,10 @@
 // One-time migration helper for the MOD Report split-out: dumps this app's
 // existing mod_reports/mod_report_settings rows (still sitting untouched in
 // this app's own sqlite file — see db/index.js's own note on why they were
-// never dropped) to a JSON file, for ../mod-report-backend's own
-// scripts/import-legacy.js to pick up. A no-op (empty export) on a database
-// that never had the feature enabled, or one already migrated.
+// never dropped) to a JSON file, for the najafax/mod-report repo's own
+// mod-report-backend/scripts/import-legacy.js to pick up. A no-op (empty
+// export) on a database that never had the feature enabled, or one already
+// migrated.
 //
 // Usage (from backend/):
 //   npm run export-mod-reports -- /path/to/mod-reports-export.json
@@ -28,4 +29,4 @@ if (tableExists('mod_report_settings')) {
 
 fs.writeFileSync(outFile, JSON.stringify(data, null, 2));
 console.log(`Exported ${data.mod_reports.length} MOD report(s)${data.mod_report_settings ? ' and branding settings' : ''} to ${outFile}.`);
-console.log('Import it into the new app with: cd ../mod-report-backend && node scripts/import-legacy.js ' + outFile);
+console.log('Import it into najafax/mod-report with: cd mod-report-backend && node scripts/import-legacy.js /path/to/' + outFile);
