@@ -74,20 +74,6 @@ const portalAcceptInviteLimiter = rateLimit({
   handler: jsonHandler('Too many attempts. Please request a new invite link.'),
 });
 
-// Guards routes/public.js's own POST /mod-reports/:token — unlike the
-// read-only public quote/invoice views, this one writes a new row on every
-// accepted request, so a leaked link (or someone finding this one by
-// chance) could otherwise flood mod_reports with junk submissions. 30/hour
-// is generous for the real use case (a shared kiosk/tablet submitting a
-// handful of checklists across a shift) while still bounding an abuse
-// flood to something a super admin can clean up by hand.
-const modReportSubmitLimiter = rateLimit({
-  ...base,
-  windowMs: 60 * 60 * 1000,
-  limit: 30,
-  handler: jsonHandler('Too many submissions from this connection. Please try again later.'),
-});
-
 module.exports = {
   loginLimiter,
   forgotPasswordLimiter,
@@ -96,5 +82,4 @@ module.exports = {
   portalForgotPasswordLimiter,
   portalResetPasswordLimiter,
   portalAcceptInviteLimiter,
-  modReportSubmitLimiter,
 };

@@ -27,7 +27,6 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const PublicQuote = lazy(() => import('./pages/PublicQuote'));
 const PublicInvoice = lazy(() => import('./pages/PublicInvoice'));
-const PublicMODReport = lazy(() => import('./pages/PublicMODReport'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Clients = lazy(() => import('./pages/business/Clients'));
 const Products = lazy(() => import('./pages/business/Products'));
@@ -55,7 +54,6 @@ const Import = lazy(() => import('./pages/business/Import'));
 const Users = lazy(() => import('./pages/Users'));
 const MyAccount = lazy(() => import('./pages/MyAccount'));
 const EmailCenter = lazy(() => import('./pages/EmailCenter'));
-const MODReport = lazy(() => import('./pages/business/MODReport'));
 const Campaigns = lazy(() => import('./pages/business/Campaigns'));
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'));
 const Website = lazy(() => import('./pages/business/Website'));
@@ -182,7 +180,6 @@ export default function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/q/:token" element={<PublicQuote />} />
                 <Route path="/i/:token" element={<PublicInvoice />} />
-                <Route path="/mod/:token" element={<PublicMODReport />} />
                 <Route path="/portal/*" element={<PortalApp />} />
                 <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
 
@@ -219,7 +216,6 @@ export default function App() {
                 <Route path="/users" element={<Protected><Users /></Protected>} />
                 <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
                 <Route path="/website-content" element={<Protected><Website /></Protected>} />
-                <Route path="/mod-reports" element={<Protected><MODReport /></Protected>} />
                 <Route path="/account" element={<Protected><MyAccount /></Protected>} />
               </Routes>
               </Suspense>

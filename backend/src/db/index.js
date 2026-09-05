@@ -177,56 +177,14 @@ db.exec(`
     reviewed_at TEXT
   );
 
-  -- Manager on Duty shift-handover checklist — a resort operations report,
-  -- unrelated to (and deliberately not mixed with) the billing/CRM data
-  -- everywhere else in this schema. Admin-only (see routes/modReports.js's
-  -- requireAdmin gate), so unlike every other business-module table there's
-  -- no per-user_permissions grant for it. The checklist's own shape (which
-  -- sections/items exist) is a fixed, code-defined constant
-  -- (routes/modReports.js's SECTIONS/VILLA_ITEMS), not user-configurable —
-  -- so the actual answers are stored as JSON rather than one column per
-  -- item, the same "the schema lives in code, not the database" call the
-  -- rest of this app never needs to make since every other form here has a
-  -- genuinely fixed, small field set. sections_json is a { [sectionKey]:
-  -- { [itemIndex]: { value: 'yes'|'no'|'na'|null, comment } } } object;
-  -- villas_json is a [{ villaNumber, items: { [itemIndex]: {...} } }]
-  -- array; issues_json is a [{ photo, caption }] array with photo as a
-  -- base64 data URI, same inline-
-  -- image storage approach payment_proofs.file_data and business_settings'
-  -- own logo/signature/stamp columns already use — this app has no
-  -- separate file storage service. edited_at is set only once a submitted
-  -- report is corrected after the fact (routes/modReports.js's PUT /:id),
-  -- left NULL for a report that's never been edited.
-  CREATE TABLE IF NOT EXISTS mod_reports (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    mod_name TEXT NOT NULL,
-    report_date TEXT NOT NULL,
-    weather TEXT NOT NULL DEFAULT '',
-    time_started TEXT NOT NULL DEFAULT '',
-    occupancy_percent REAL,
-    sections_json TEXT NOT NULL DEFAULT '{}',
-    villas_json TEXT NOT NULL DEFAULT '[]',
-    guest_interactions_json TEXT NOT NULL DEFAULT '[]',
-    issues_json TEXT NOT NULL DEFAULT '[]',
-    signature TEXT NOT NULL DEFAULT '',
-    submitted_by_user_id INTEGER REFERENCES users(id),
-    submitted_by_name TEXT NOT NULL DEFAULT '',
-    submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
-    edited_at TEXT
-  );
-
-  -- The MOD report module's own branding, entirely separate from
-  -- business_settings above (see lib/modReportPdf.js's own top-of-file
-  -- note on why the checklist PDF deliberately carries none of
-  -- EduSolution's own name/logo/footer) — a single-row table, same
-  -- id-locked-to-1 shape as business_settings, so whichever resort is
-  -- actually running the checklist can brand it as their own without
-  -- that ever touching or being touched by EduSolution's own settings.
-  CREATE TABLE IF NOT EXISTS mod_report_settings (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    business_name TEXT NOT NULL DEFAULT '',
-    logo_image TEXT NOT NULL DEFAULT ''
-  );
+  -- Note: this schema used to also define mod_reports/mod_report_settings
+  -- (the Manager on Duty shift-handover checklist) here. That feature has
+  -- moved to its own standalone app (../mod-report-backend) with its own
+  -- database — see that app's own db/index.js for the current schema.
+  -- Deliberately not dropped here: an existing deployment's sqlite file
+  -- still has these tables with their historical data untouched (nothing
+  -- in this app reads or writes them anymore), available for a one-time
+  -- export via scripts/export-mod-reports.js into the new app.
 
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -655,7 +613,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_capital_contributions_date ON capital_contributions(contribution_date);
   CREATE INDEX IF NOT EXISTS idx_owner_draws_date ON owner_draws(draw_date);
   CREATE INDEX IF NOT EXISTS idx_license_renewals_license ON license_renewals(license_id);
-  CREATE INDEX IF NOT EXISTS idx_mod_reports_submitted_at ON mod_reports(submitted_at);
   CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status);
   CREATE INDEX IF NOT EXISTS idx_activity_entity ON activity_log(entity_type, action);
 `);
@@ -964,24 +921,6 @@ if (!invoiceColumns.has('po_number')) {
   db.exec(`ALTER TABLE invoices ADD COLUMN po_number TEXT NOT NULL DEFAULT '';`);
 }
 
-// submission_token — the one shareable "submit a MOD report without
-// logging in" public link this business gets (see routes/modReports.js's
-// POST /settings/regenerate-token and routes/public.js's own POST
-// /mod-reports/:token). NULL until a super admin actually generates one,
-// so a business that's never used this feature has no dormant link
-// sitting around. No UNIQUE constraint the way quotes'/invoices' own
-// public_token columns have — mod_report_settings is a single row locked
-// to id=1, so there's nothing else it could ever collide with (and SQLite's
-// ALTER TABLE ADD COLUMN can't add a UNIQUE constraint anyway). Same
-// ALTER TABLE treatment as every other post-launch column in this file —
-// this table already carries its one real row (the app has been running
-// against it since the MOD Report feature first shipped), seeded via the
-// `INSERT OR IGNORE ... VALUES (1)` call further below.
-const modReportSettingsColumns = new Set(db.prepare('PRAGMA table_info(mod_report_settings)').all().map((c) => c.name));
-if (!modReportSettingsColumns.has('submission_token')) {
-  db.exec(`ALTER TABLE mod_report_settings ADD COLUMN submission_token TEXT;`);
-}
-
 // void_reason — a plain, required-at-write-time remark captured the moment
 // a quote/invoice is voided (routes/quotes.js's and routes/invoices.js's
 // own POST /:id/void), so "why was this cancelled" survives on the record
@@ -1008,10 +947,5 @@ db.pragma('foreign_keys = ON');
 db.prepare(
   `INSERT OR IGNORE INTO business_settings (id, business_name, address, phone) VALUES (1, ?, ?, ?)`,
 ).run('Edu Solutions Pvt Ltd', "Vinares tower, aboomaa hin'gun", '+960 7921335');
-
-// Left blank by default — deliberately not seeded with EduSolution's own
-// name, unlike business_settings above (see mod_report_settings's own
-// CREATE TABLE comment for why the two are kept apart).
-db.prepare(`INSERT OR IGNORE INTO mod_report_settings (id) VALUES (1)`).run();
 
 module.exports = db;

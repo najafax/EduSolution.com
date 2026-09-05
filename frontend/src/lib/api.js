@@ -292,20 +292,6 @@ export const api = {
     failures: (id, token) => request(`/campaigns/${id}/failures`, { token }),
   },
 
-  modReports: {
-    meta: (token) => request('/mod-reports/meta', { token }),
-    list: (token, page = 1) => request(`/mod-reports?page=${page}`, { token }),
-    get: (id, token) => request(`/mod-reports/${id}`, { token }),
-    create: (payload, token) => request('/mod-reports', { method: 'POST', body: payload, token }),
-    update: (id, payload, token) => request(`/mod-reports/${id}`, { method: 'PUT', body: payload, token }),
-    remove: (id, token) => request(`/mod-reports/${id}`, { method: 'DELETE', token }),
-    openPdf: (id, token) => openPdf(`/mod-reports/${id}/pdf`, token),
-    getSettings: (token) => request('/mod-reports/settings', { token }),
-    updateSettings: (payload, token) => request('/mod-reports/settings', { method: 'PUT', body: payload, token }),
-    regeneratePublicLink: (token) => request('/mod-reports/settings/regenerate-token', { method: 'POST', token }),
-    removePublicLink: (token) => request('/mod-reports/settings/token', { method: 'DELETE', token }),
-  },
-
   users: {
     list: (token, { q, page } = {}) => request(`/users${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/users/${id}`, { token }),
@@ -325,10 +311,6 @@ export const api = {
     getInvoice: (publicToken) => request(`/public/invoices/${publicToken}`),
     openQuotePdf: (publicToken) => openPdf(`/public/quotes/${publicToken}/pdf`),
     openInvoicePdf: (publicToken) => openPdf(`/public/invoices/${publicToken}/pdf`),
-    // The MOD report submission link — write-only, no per-report identity
-    // to read back (see routes/public.js's own note).
-    modReportMeta: (publicToken) => request(`/public/mod-reports/${publicToken}/meta`),
-    submitModReport: (publicToken, payload) => request(`/public/mod-reports/${publicToken}`, { method: 'POST', body: payload }),
     // The public marketing site's one combined content fetch — posts,
     // testimonials, services, team and gallery in a single round trip (see
     // routes/public.js's own GET /site).

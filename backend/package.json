@@ -13,6 +13,7 @@
     "backup:restore": "node scripts/restore.js",
     "fix-license-renewals": "node scripts/fix-license-renewal-dates.js",
     "find-campaign-failures": "node scripts/find-campaign-failures.js",
+    "export-mod-reports": "node scripts/export-mod-reports.js",
     "db": "node scripts/db-query.js",
     "export-images": "node scripts/export-images.js"
   },

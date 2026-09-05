@@ -3,8 +3,6 @@ const db = require('../db');
 const { renderQuotePdf, renderInvoicePdf } = require('../lib/pdf');
 const { logActivity } = require('../lib/activity');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
-const { SECTIONS, VILLA_ITEMS, sanitizeIssues, sanitizeVillas, sanitizeGuests, validate } = require('../lib/modReportShared');
-const { modReportSubmitLimiter } = require('../middleware/rateLimit');
 
 const router = Router();
 
@@ -139,86 +137,6 @@ router.get('/invoices/:token/pdf', async (req, res) => {
     'Content-Disposition': `inline; filename="${data.invoice.number}.pdf"`,
   });
   res.send(buffer);
-});
-
-// MOD report public submission — deliberately the mirror image of the
-// quote/invoice routes above: those are read (+respond) links to one
-// already-existing document; this is a write-only link to *create* a new
-// one, with nothing to read back (a submitter has no reason to browse past
-// reports, which is exactly the sensitive data routes/modReports.js's own
-// requireSuperAdmin gate exists to protect — see that file's own top note).
-// The link identifies the business's checklist form itself, not any one
-// report, so it's a single token on mod_report_settings rather than a
-// public_token per row the way quotes/invoices work. sections/villaItems
-// are the identical shared source of truth routes/modReports.js's own
-// authenticated GET /meta serves — not sensitive on their own (just the
-// checklist's fixed structure), so no separate stripped-down copy is
-// needed here the way publicSettings() strips business_settings above.
-function getModReportSettingsByToken(token) {
-  const settings = db.prepare('SELECT * FROM mod_report_settings WHERE id = 1').get();
-  if (!settings || !settings.submission_token || settings.submission_token !== token) return null;
-  return settings;
-}
-
-router.get('/mod-reports/:token/meta', (req, res) => {
-  const settings = getModReportSettingsByToken(req.params.token);
-  if (!settings) return res.status(404).json({ error: 'This submission link is invalid or has been disabled.' });
-  res.json({
-    sections: SECTIONS,
-    villaItems: VILLA_ITEMS,
-    businessName: settings.business_name,
-    logoImage: settings.logo_image,
-  });
-});
-
-router.post('/mod-reports/:token', modReportSubmitLimiter, (req, res) => {
-  const settings = getModReportSettingsByToken(req.params.token);
-  if (!settings) return res.status(404).json({ error: 'This submission link is invalid or has been disabled.' });
-
-  const error = validate(req.body);
-  if (error) return res.status(400).json({ error });
-
-  const { mod_name, report_date, weather = '', time_started = '', occupancy_percent, sections = {}, signature = '' } = req.body;
-  const villas = sanitizeVillas(req.body.villas);
-  const guestInteractions = sanitizeGuests(req.body.guestInteractions);
-  const issues = sanitizeIssues(req.body.issues);
-  const occupancy = occupancy_percent === '' || occupancy_percent === undefined || occupancy_percent === null ? null : Number(occupancy_percent);
-
-  // No submitted_by_user_id — there's no logged-in staff user behind a
-  // public submission. submitted_by_name is the MOD's own name (mod_name
-  // itself), same as what the field already means on an authenticated
-  // submission, just with no separate account identity to also record.
-  const result = db
-    .prepare(
-      `INSERT INTO mod_reports (mod_name, report_date, weather, time_started, occupancy_percent, sections_json, villas_json, guest_interactions_json, issues_json, signature, submitted_by_user_id, submitted_by_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
-    )
-    .run(
-      mod_name.trim(),
-      report_date,
-      weather,
-      time_started,
-      occupancy,
-      JSON.stringify(sections && typeof sections === 'object' ? sections : {}),
-      JSON.stringify(villas),
-      JSON.stringify(guestInteractions),
-      JSON.stringify(issues),
-      signature,
-      mod_name.trim(),
-    );
-
-  logActivity({
-    userName: mod_name.trim(),
-    action: 'submitted (public link)',
-    entityType: 'mod_report',
-    entityId: result.lastInsertRowid,
-    entityLabel: `MOD checklist — ${mod_name.trim()} (${report_date})`,
-  });
-
-  // Minimal response — a public submitter has no further access to this
-  // record (no GET route by token exists to read it back), so there's
-  // nothing to return beyond confirmation that it saved.
-  res.status(201).json({ ok: true });
 });
 
 // The public marketing site's one combined content fetch — same "one

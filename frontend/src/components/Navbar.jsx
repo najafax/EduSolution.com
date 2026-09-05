@@ -12,14 +12,6 @@ import { SearchIcon, XIcon, MenuIcon } from './icons';
 // permissions (Dashboard). Everything else is filtered by that module's
 // view permission so a restricted user never sees a link leading to a 403
 // — enforcement itself still happens server-side; this is just UX.
-// `superAdminOnly: true` (MOD report) is a stricter, separate check against
-// the account's actual role rather than a module grant — mirrors the
-// backend's requireSuperAdmin (routes/modReports.js), which no staff
-// permission, and no plain 'admin' role either, can unlock; deliberately
-// the one link in this list with no `module` and no way for any admin to
-// grant it to anyone else, the same way routes/dataReset.js's Danger Zone
-// (embedded in the Import page, not its own nav link) stays outside the
-// per-module grant system entirely.
 export const BUSINESS_LINKS = [
   { to: '/dashboard', label: 'Dashboard', module: null },
   { to: '/clients', label: 'Clients', module: 'clients' },
@@ -39,7 +31,6 @@ export const BUSINESS_LINKS = [
   { to: '/users', label: 'Users', module: 'users' },
   { to: '/email-center', label: 'Email center', module: 'email_center' },
   { to: '/website-content', label: 'Website content', module: 'website' },
-  { to: '/mod-reports', label: 'MOD report', module: null, superAdminOnly: true },
   { to: '/settings', label: 'Settings', module: 'settings' },
 ];
 
@@ -54,10 +45,7 @@ export default function Navbar() {
   // this shared Navbar — but they're meant for an external client with no
   // account, so the "Log in" button there is just noise (or worse, an
   // invitation to poke at staff-only auth) rather than a useful action.
-  // PublicMODReport.jsx (/mod/:token) is the same kind of page for the same
-  // reason — whoever's filling out a MOD checklist from a shared link has
-  // no staff account either.
-  const isPublicDocLink = location.pathname.startsWith('/q/') || location.pathname.startsWith('/i/') || location.pathname.startsWith('/mod/');
+  const isPublicDocLink = location.pathname.startsWith('/q/') || location.pathname.startsWith('/i/');
 
   // Swiping in from the left edge of the screen opens the nav drawer
   // instead of triggering the phone's own "swipe back" navigation gesture

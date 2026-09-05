@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { Router } = require('express');
 const db = require('../db');
-const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { renderModReportPdf } = require('../lib/modReportPdf');
 const {
@@ -9,35 +9,18 @@ const {
 } = require('../lib/modReportShared');
 
 const router = Router();
-// Super-admin-only, same requireSuperAdmin pattern documented in
-// middleware/auth.js — this is a resort operations report, unrelated to the
-// billing/CRM data the rest of this app's permission system (per-module
-// user_permissions grants) governs, so it bypasses that system entirely
-// rather than adding a new gatable module. Deliberately narrower than
-// routes/dataReset.js's own requireAdmin: no staff, however permissioned,
-// and no plain 'admin' either, can see or submit one — only 'super_admin'.
+// Every route below just needs a valid login — this standalone app has no
+// role tiers to further gate against (see db/index.js's own note; the main
+// EduSolution app this was split out of gated the equivalent routes to its
+// super_admin role, which has no equivalent here).
 router.use(requireAuth);
-router.use(requireSuperAdmin);
 
-const SECTIONS_BY_KEY = new Map(SECTIONS.map((s) => [s.key, s]));
 const PAGE_SIZE = 20;
 
 router.get('/meta', (req, res) => {
   res.json({ sections: SECTIONS, villaItems: VILLA_ITEMS });
 });
 
-// The MOD report module's own branding — a business name/logo for
-// whichever resort is running the checklist, entirely separate from
-// routes/settings.js's business_settings (see db/index.js's
-// mod_report_settings table and lib/modReportPdf.js's own top-of-file
-// note for why: the generated PDF must never carry EduSolution's own
-// name/logo). Same validateImageField shape routes/settings.js already
-// uses for its own logo/signature/stamp fields — duplicated rather than
-// imported, since it's a few lines tied to a different table and the two
-// are meant to stay independently editable. Registered ahead of GET/PUT
-// /:id below so the literal path "settings" is never swallowed by the
-// :id param, same convention this app's other routers already follow for
-// GET /meta, GET /summary, GET /analytics, etc.
 const IMAGE_DATA_URI_RE = /^data:image\/(png|jpe?g);base64,([A-Za-z0-9+/]+=*)$/;
 const MAX_LOGO_BYTES = 400 * 1024;
 
@@ -70,14 +53,9 @@ router.put('/settings', (req, res) => {
   res.json({ settings });
 });
 
-// The public submission link (see routes/public.js's own POST
-// /mod-reports/:token) — a random 16-byte hex token, same
-// crypto.randomBytes(16).toString('hex') scheme quotes/invoices use for
-// their own public_token, just stored on this single-row settings table
-// instead of per-document, since there's no per-report identity to attach
-// a link to before a report even exists. Regenerating always works,
-// whether a token already exists or not — it's simultaneously "generate
-// the first link" and "rotate it if it's leaked," one action either way.
+// The public submission link — a random 16-byte hex token stored on this
+// single-row settings table (see routes/public.js's own note on why
+// there's no per-report identity to attach a link to before one exists).
 router.post('/settings/regenerate-token', (req, res) => {
   const submissionToken = crypto.randomBytes(16).toString('hex');
   db.prepare('UPDATE mod_report_settings SET submission_token = ? WHERE id = 1').run(submissionToken);
@@ -86,9 +64,6 @@ router.post('/settings/regenerate-token', (req, res) => {
   res.json({ settings });
 });
 
-// The other half of the lifecycle — turns public submission off entirely
-// (the old link 404s from then on) without generating a replacement, for
-// a business that wants to pause the feature rather than rotate it.
 router.delete('/settings/token', (req, res) => {
   db.prepare('UPDATE mod_report_settings SET submission_token = NULL WHERE id = 1').run();
   const settings = db.prepare('SELECT * FROM mod_report_settings WHERE id = 1').get();

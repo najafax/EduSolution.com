@@ -22,7 +22,6 @@ import {
   SendIcon,
   SettingsIcon,
   LogoutIcon,
-  ClipboardCheckIcon,
   GlobeIcon,
 } from './icons';
 
@@ -50,7 +49,6 @@ const LINK_ICONS = {
   '/users': UsersIcon,
   '/email-center': SendIcon,
   '/website-content': GlobeIcon,
-  '/mod-reports': ClipboardCheckIcon,
   '/settings': SettingsIcon,
 };
 
@@ -86,7 +84,7 @@ const LINK_ICONS = {
 // already has a route to search without this copy; a tablet visitor still
 // doesn't, so it stays visible from `sm:` up).
 export default function Sidebar({ mobileOpen = false, onMobileClose }) {
-  const { user, logout, can, isSuperAdmin } = useAuth();
+  const { user, logout, can } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -112,7 +110,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
   if (!user) return null;
 
   const visibleLinks = BUSINESS_LINKS.filter(
-    (link) => (!link.module || can(link.module, 'view')) && (!link.superAdminOnly || isSuperAdmin),
+    (link) => !link.module || can(link.module, 'view'),
   );
 
   function isActive(to) {
