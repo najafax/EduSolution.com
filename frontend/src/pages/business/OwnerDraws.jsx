@@ -17,7 +17,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
-import { BankIcon, TrendDownIcon, TrendUpIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, RefreshIcon } from '../../components/icons';
+import { BankIcon, TrendDownIcon, TrendUpIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, RefreshIcon, HistoryIcon } from '../../components/icons';
 
 // Money an owner/partner takes OUT of the business, with an explicit way to
 // record paying some or all of it back — the mirror of CapitalContributions
@@ -47,6 +47,16 @@ import { BankIcon, TrendDownIcon, TrendUpIcon, DownloadIcon, PlusIcon, PencilIco
 // round trip). The modal stays open after a successful partial payment
 // (`returnDetail` refreshed from the response) so recording several
 // installments against the same draw doesn't mean reopening it each time.
+// The original draw row itself is never modified or deleted once fully
+// repaid — only its computed `returned_amount`/`balance` change — so once
+// `balance` reaches 0 `rowActions()` swaps the same `openReturn(d)` action
+// to a "View history" button (`HistoryIcon`, tone `slate`, in place of the
+// emerald "Record return" one) rather than dropping it entirely: the same
+// modal opens either way, its own `balance > 0.004` check inside already
+// replaces the payment form with "This draw has been fully repaid." once
+// there's nothing left to record, so a fully-repaid draw's return history
+// stays reachable from the list rather than becoming invisible the moment
+// the last payment closes it out.
 const TYPE_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'draw', label: 'Draws' },
@@ -233,14 +243,24 @@ export default function OwnerDraws() {
   function rowActions(d) {
     return (
       <>
-        {d.type === 'draw' && d.balance > 0.004 && canManage && (
-          <IconActionButton
-            icon={RefreshIcon}
-            tone="emerald"
-            onClick={() => openReturn(d)}
-            title="Record return"
-            label="Record a return against this draw"
-          />
+        {d.type === 'draw' && canManage && (
+          d.balance > 0.004 ? (
+            <IconActionButton
+              icon={RefreshIcon}
+              tone="emerald"
+              onClick={() => openReturn(d)}
+              title="Record return"
+              label="Record a return against this draw"
+            />
+          ) : (
+            <IconActionButton
+              icon={HistoryIcon}
+              tone="slate"
+              onClick={() => openReturn(d)}
+              title="View history"
+              label="View this draw's return history"
+            />
+          )
         )}
         {canManage && (
           <>
