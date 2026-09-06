@@ -1771,8 +1771,10 @@ deliberately untouched by either, always returning every row.
   client-facing send action; see "Email preview before sending" above. Now
   admin-editable via the Email Center (`routes/emailCenter.js`/
   `pages/EmailCenter.jsx` below): `DEFAULT_TEMPLATES` holds the built-in
-  text for the 5 editable types (`quote_send`, `invoice_send`,
-  `invoice_remind`, `receipt_send`, `license_remind`) as `{{placeholder}}`
+  text for every editable type (`quote_send`, `invoice_send`,
+  `invoice_remind`, `receipt_send`, `license_remind`, `portal_invite`,
+  `overdue_reminder_soft`, `overdue_reminder_firm`, `overdue_reminder_final`
+  — 9 total) as `{{placeholder}}`
   strings (e.g. `Quote {{quote_number}} from {{business_name}}`); the
   `email_templates` table (one row per `type`, primary-keyed on it — see
   `db/index.js`) holds an optional admin override. `renderTemplate(str,
@@ -1780,43 +1782,52 @@ deliberately untouched by either, always returning every row.
   literal text rather than blanked, so an admin typo is visible/debuggable
   instead of silently vanishing. `buildEmail(type, to, vars)` picks the
   stored override if one exists, else the default, renders both subject and
-  message, and is what the five exported functions
+  message, and is what the exported wrapper functions
   (`quoteSendEmail`/`invoiceSendEmail`/`invoiceRemindEmail`/
-  `receiptSendEmail`/`licenseRemindEmail`) now call internally — their
-  signatures are unchanged, so every existing call site (the preview/send
-  routes in `routes/quotes.js`/`routes/invoices.js`/`routes/licenses.js`)
-  needed no changes at all when this template system was added; adding
-  `licenseRemindEmail` later needed no changes to `getAllTemplates()`/
+  `receiptSendEmail`/`licenseRemindEmail`/`portalInviteEmail`/
+  `overdueReminderEmail`) all call internally — their
+  signatures are unchanged whenever a new type is added, so every existing
+  call site (the preview/send routes in `routes/quotes.js`/
+  `routes/invoices.js`/`routes/licenses.js`) needed no changes at all when
+  this template system was first added; adding a new type since then has
+  needed no changes to `getAllTemplates()`/
   `setTemplate()`/`resetTemplate()` below either, since they all iterate
-  `DEFAULT_TEMPLATES`' own keys generically — a 5th type just needed an
+  `DEFAULT_TEMPLATES`' own keys generically — each new type just needed an
   entry in `DEFAULT_TEMPLATES`/`PLACEHOLDERS`/`TYPE_LABELS` and it's
-  automatically picked up everywhere. `PLACEHOLDERS` documents which
+  automatically picked up everywhere, including `pages/EmailCenter.jsx`'s
+  own frontend, which renders one `TemplateCard` per entry
+  `getAllTemplates()` returns with no hardcoded type list of its own.
+  `PLACEHOLDERS` documents which
   `{{...}}` keys are valid per type (shown as a hint in the Email Center
   UI); `TYPE_LABELS` is the human-readable name per type.
   `getAllTemplates()`/`setTemplate(type, {subject,
   message})`/`resetTemplate(type)` are the admin-management functions
-  `routes/emailCenter.js` calls — `getAllTemplates()` returns all 5 types
+  `routes/emailCenter.js` calls — `getAllTemplates()` returns every type
   with whichever text is currently effective (stored override or default)
   plus `isCustom` (so the frontend only shows "Reset to default" when
   there's actually an override to clear) and the raw
-  `defaultSubject`/`defaultMessage` for reference. This deliberately does
-  **not** cover the automated overdue-reminder digest
-  (`lib/scheduler.js`'s `runOverdueReminders()`) — that email's content
-  stays fully automatic and non-customizable by design (unlike a
-  human-triggered send, nobody reviews it before it goes out), so it never
-  reads from this file; its sends are still recorded to the Email Center's
-  sent log under a distinct `overdue_reminder` type, just not through
-  `buildEmail()`. The automated license-expiry alert
-  (`lib/scheduler.js`'s `runLicenseExpiryAlerts()`) is the **opposite**
-  case, deliberately: it calls `licenseRemindEmail()` — the very same
+  `defaultSubject`/`defaultMessage` for reference.
+  **The automated license-expiry alert and the automated overdue-invoice
+  dunning ladder both reuse this admin-editable system now, for the same
+  reason**: `lib/scheduler.js`'s `runLicenseExpiryAlerts()` calls
+  `licenseRemindEmail()` — the very same
   admin-editable template the manual "Remind" button uses — rather than
-  hardcoding its own text like the overdue-reminder digest does, so an
+  hardcoding its own text, so an
   admin who customizes the license reminder wording gets that wording
-  whether a human clicked "Remind" or the cron job sent it automatically.
-  Its sends are still logged under their own distinct type
-  (`license_expiry_alert`, see `lib/emailLog.js` below) purely so the sent
+  whether a human clicked "Remind" or the cron job sent it automatically,
+  and `runOverdueReminders()` now follows the identical pattern via
+  `overdueReminderEmail()` (see that function's own note further down this
+  file) rather than the hardcoded per-stage HTML it originally shipped
+  with — see "Staged dunning ladder, now admin-editable" under
+  `lib/scheduler.js` below for the full story of that reversal. Both
+  automated jobs' sends are still logged under their own distinct types
+  (`license_expiry_alert`, `overdue_reminder_soft`/`_firm`/`_final` — see
+  `lib/emailLog.js` below) purely so the sent
   log can tell "a human sent this" apart from "the cron job sent this,"
-  the same reason `overdue_reminder` is distinct from `invoice_remind`.
+  the same reason `overdue_reminder`/`overdue_reminder_soft` etc. are
+  distinct from `invoice_remind` (the manual, single-stage "Send reminder"
+  button's own template, still separate and untouched by any of this —
+  see that function's own note above).
 - `lib/emailLog.js` — `logEmail({ type, to, subject, sentByName,
   entityType, entityId, entityLabel })` inserts one row into `email_log`
   (see `db/index.js`), backing the Email Center's sent log
@@ -2193,36 +2204,75 @@ deliberately untouched by either, always returning every row.
     re-nagging for a week). **Dunning ladder**: the email this job sends
     escalates in tone as an invoice ages, rather than repeating the same
     gentle wording indefinitely. `daysOverdue(dueDate)` computes how many
-    whole days past `due_date` today is, and `dunningContent({ invoice,
-    client, settings, balanceDue, overdueDays })` picks one of three fixed
+    whole days past `due_date` today is, and `dunningStage(overdueDays)`
+    picks one of three fixed
     stages from it: `soft` (the default, under `DUNNING_FIRM_DAYS` = 14
     days overdue — a plain "this is due, here it is again" reminder),
     `firm` (14–29 days — "remains unpaid... please arrange payment as soon
     as possible"), and `final` (`DUNNING_FINAL_DAYS` = 30+ days — a
     `FINAL NOTICE:` subject line and "please settle this balance
-    immediately to avoid further action"); each stage has its own
-    subject/HTML body, still with the invoice PDF attached exactly as
-    before. This needed **no new DB state or scheduling change at all** —
+    immediately to avoid further action"), still with the invoice PDF
+    attached exactly as before. This needed **no new DB state or scheduling change at all** —
     the job already runs daily and already suppresses re-sends for 7 days
     via `last_reminder_sent_at`, so the *same* invoice naturally gets
     re-selected roughly every week as it ages, and each time
     `daysOverdue()` is simply recomputed fresh against today — an invoice
     that was `soft` on its first reminder reads as `firm` a couple of
     re-sends later and eventually `final`, with no separate "which rung of
-    the ladder is this invoice on" column to keep in sync. Deliberately
-    **not** wired into `lib/emailTemplates.js`'s admin-editable template
-    system the way `quote_send`/`invoice_send`/`invoice_remind`/
-    `receipt_send`/`license_remind`/`portal_invite` all are — this follows
-    that file's own existing precedent for this exact job (see its
-    top-of-file note): nobody reviews an automated reminder before it goes
-    out the way a human reviews a manual "Send" click via
-    `EmailPreviewModal`, so like the rest of this digest's wording, the
-    three stages' copy is a fixed, hardcoded escalation rather than
-    something an admin can rewrite per stage. `logEmail()`'s
-    `entityLabel` for this job is now `` `${invoice.number} (${stage})` ``
-    (e.g. `INV-2026-0001 (firm)`) rather than just the bare number, so the
-    Email Center's sent log shows which rung of the ladder each historical
-    send actually was. Emails the invoice PDF and updates
+    the ladder is this invoice on" column to keep in sync.
+    **Staged dunning ladder, now admin-editable**: each stage's actual
+    subject/message used to be hardcoded HTML right in this job — the
+    original reasoning being that nobody reviews an automated reminder
+    before it goes out the way a human reviews a manual "Send" click via
+    `EmailPreviewModal`, so unlike `quote_send`/`invoice_send`/
+    `invoice_remind`/`receipt_send`/`license_remind`/`portal_invite` this
+    digest's wording wasn't wired into `lib/emailTemplates.js`'s
+    admin-editable system at all. That reasoning was sound as far as it
+    went — nobody *does* review this send before it fires — but it
+    conflated "no human reviews each individual send" with "the wording
+    can never be reviewed or customized ahead of time," which turned out
+    not to hold once a business owner actually asked for the second: an
+    admin who wants their own tone, or a firmer/softer call to action at
+    the final-notice stage specifically, had no way to change a single
+    word of it short of editing this file directly. Reversed at that
+    request, following the exact precedent `runLicenseExpiryAlerts()`
+    below already set for the identical tension (an unattended cron job
+    reusing a human-reviewable, admin-editable template): each stage is
+    now its own type in `lib/emailTemplates.js`
+    (`overdue_reminder_soft`/`_firm`/`_final`, each with its own
+    `DEFAULT_TEMPLATES`/`PLACEHOLDERS` entry seeded with the exact original
+    wording so an admin who never customizes any of the three sees
+    identical behavior to before), and `overdueReminderEmail({ invoice,
+    client, settings, balanceDue, overdueDays, stage })` picks the right
+    one and renders it — `dunningStage(overdueDays)` (this job's own small
+    helper, just the three-threshold `if`/`else` above with no
+    subject/HTML of its own anymore) is what decides `stage`, and the
+    message comes back as plain text run through `lib/mailer.js`'s
+    `textToHtml()` — the same plain-text-with-blank-line-paragraphs
+    convention every other template in this system already uses, rather
+    than the raw HTML the three stages used to hand-write directly. The
+    one visible casualty of that switch: the final stage's "This is a
+    final notice." used to render `<strong>`-bold, and plain text through
+    `textToHtml()` has no bold — the default wording now states
+    "FINAL NOTICE:" as a literal capitalized prefix instead, which reads
+    as the same emphasis without needing markup, and an admin who wants
+    real bold back would need to accept that trade-off is fixed for this
+    template system, not specific to this one template. `logEmail()`'s
+    `type` for this job is now the specific per-stage template type
+    (`overdue_reminder_soft`/`_firm`/`_final`, replacing the single shared
+    `overdue_reminder` type every send used to log under regardless of
+    stage) — the Email Center's sent log now shows exactly which of the
+    three admin-editable templates produced each historical send, not
+    just a bare type plus the `entityLabel` suffix; `entityLabel` still
+    carries `` `${invoice.number} (${stage})` `` too, so the stage reads
+    in both places.
+    `routes/emailCenter.js`'s own separate `TYPE_LABELS` map (for the sent
+    log's `type_label`, distinct from `lib/emailTemplates.js`'s own map
+    used by the template editor — see that route's own note) kept the old
+    bare `overdue_reminder` entry too, purely so a log row written before
+    this change still renders with a real label instead of falling back to
+    its raw type string — no code path writes that literal type anymore,
+    it's kept for historical rows only. Emails the invoice PDF and updates
     `last_reminder_sent_at`. After the loop, if any reminders actually went
     out, calls `notifyStaffOfReminders(reminded, settings)` — queries
     `users` for `active = 1 AND notify_overdue = 1` and emails each an HTML
@@ -2231,19 +2281,36 @@ deliberately untouched by either, always returning every row.
     stage label (`STAGE_LABELS`: "reminder" / "firm reminder" / "FINAL
     NOTICE") so a staff member scanning the digest can tell at a glance
     which overdue invoices are still early and which are about to (or
-    already did) get the final-notice treatment. This is opt-in per-user
+    already did) get the final-notice treatment — this internal staff
+    digest is unaffected by any of the admin-editable-template change
+    above, and (like `runMonthlyReport()`'s own staff notification) stays
+    outside `lib/emailTemplates.js` entirely, same reasoning that file's
+    own top-of-file note on `notifyStaffOfReminders()`/
+    `notifyStaffOfQuoteAccepted()` already documents. This is opt-in per-user
     (see `PUT /api/auth/preferences` above) and best-effort: each
     recipient send is its own try/catch so one bad address never blocks
     the others, and since it only runs after the SMTP-configured check
     above, it's naturally dormant (never even reached) when SMTP isn't set
-    — no separate gate needed. Verified by creating three test invoices
-    engineered to sit at 3/20/45 days overdue and confirming
-    `dunningContent()` resolved each to `soft`/`firm`/`final` respectively
-    (via a temporary debug log, removed before commit) — real SMTP
-    delivery itself isn't testable in this environment, so the send
-    attempt was exercised against an unreachable `SMTP_HOST` to confirm
-    the full query/render/recipient pipeline runs correctly up to the
-    point of the (expected, harmless) `ECONNREFUSED`.
+    — no separate gate needed. Verified two ways: `overdueReminderEmail()`
+    called directly for all three stages confirmed the rendered
+    subject/message exactly matches the original hardcoded text
+    word-for-word (proving the switch to the template system changed
+    nothing for an admin who never customizes it), a `setTemplate()` →
+    render → `resetTemplate()` round-trip against the real `email_templates`
+    table confirmed a customization actually takes effect and cleanly
+    reverts, and `GET /api/email-center/templates` plus a real
+    Playwright pass against the Email Center page confirmed all three new
+    stages render as ordinary, editable `TemplateCard`s with no frontend
+    changes needed (`pages/EmailCenter.jsx` already iterates
+    `getAllTemplates()`'s response generically, so a new type just appears).
+    A full `runOverdueReminders()` run against an isolated copy of the dev
+    database (never the real one) with a genuinely-overdue test invoice and
+    an unreachable `SMTP_HOST` confirmed the whole pipeline — candidate
+    selection, stage computation, template render, PDF render, `sendMail()`
+    attempt — still runs correctly up to the point of the expected,
+    harmless DNS-resolution failure, the same verification approach this
+    job's own original build used for the identical reason (real SMTP
+    delivery isn't testable in this environment).
   - `15 8 * * *` — `runLicenseExpiryAlerts()`: staggered 15 minutes after
     the overdue-reminder job purely so the two jobs' console output doesn't
     interleave, not for any functional reason. Same shape as
@@ -2437,7 +2504,7 @@ Status/derived-field conventions worth knowing before touching this code:
   API: `GET /templates` (calls
   `lib/emailTemplates.js`'s `getAllTemplates()`), `PUT /templates/:type`
   (400s if `subject`/`message` is missing/blank, or if `:type` isn't one of
-  the 4 known types — `setTemplate()` throws on an unrecognized type, caught
+  the known types — `setTemplate()` throws on an unrecognized type, caught
   and turned into a 400 rather than a 500), `POST /templates/:type/reset`
   (calls `resetTemplate()`, same unknown-type handling), and `GET /log` — a
   paginated read of `email_log`, mirroring `routes/activity.js`'s
@@ -2445,10 +2512,14 @@ Status/derived-field conventions worth knowing before touching this code:
   newest first) rather than the business list routes' opt-in `?page=`
   convention, since this is a chronological audit feed like activity log,
   not a pickable list. Each log entry gets a `type_label` computed from a
-  `TYPE_LABELS` map local to this route file (the 4 editable types plus
-  `overdue_reminder`, the one type with no template) — kept separate from
-  `emailTemplates.js`'s own `TYPE_LABELS` since that one only covers the 4
-  editable types and has no reason to know about the automated reminder.
+  `TYPE_LABELS` map local to this route file (every editable type — 9 as of
+  the overdue-reminder dunning ladder becoming customizable, see
+  `lib/emailTemplates.js` above — plus `license_expiry_alert`/
+  `license_renewal_confirm`/`campaign`, the types with no template of their
+  own, and a legacy `overdue_reminder` entry kept only so a pre-dunning-
+  ladder-customization log row still renders with a label) — kept separate
+  from `emailTemplates.js`'s own `TYPE_LABELS` since that one only covers
+  the editable types and has no reason to know about the non-editable ones.
 - `routes/users.js` (mounted at `/api/users`, `requireAuth` +
   `requirePermission('users', 'view'|'manage')` per route) — the in-app
   admin user-management API: `GET /` (list), `GET /:id` (user +

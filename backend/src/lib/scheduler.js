@@ -8,7 +8,7 @@ const { computeTotals } = require('./totals');
 const { nextInvoiceNumber } = require('./numbering');
 const { runBackup } = require('./backup');
 const { logEmail } = require('./emailLog');
-const { licenseRemindEmail } = require('./emailTemplates');
+const { licenseRemindEmail, overdueReminderEmail } = require('./emailTemplates');
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -32,41 +32,23 @@ function daysOverdue(dueDate) {
   return Math.round((now - due) / (24 * 60 * 60 * 1000));
 }
 
-// Builds the stage-specific subject/HTML for one reminder. Deliberately
-// hardcoded here rather than going through lib/emailTemplates.js's
-// admin-editable system, the same way the original single-stage reminder
-// text always was — see that file's own top comment on why this automated
-// digest stays non-customizable (nobody reviews it before it goes out,
-// unlike a human clicking "Send reminder" on InvoiceDetail.jsx, which still
-// uses the one plain, unstaged invoice_remind template regardless of how
-// overdue the invoice is).
-function dunningContent({ invoice, client, settings, balanceDue, overdueDays }) {
-  const amount = `${settings.currency_symbol}${balanceDue.toFixed(2)}`;
-  if (overdueDays >= DUNNING_FINAL_DAYS) {
-    return {
-      stage: 'final',
-      subject: `FINAL NOTICE: invoice ${invoice.number} is ${overdueDays} days overdue`,
-      html: `<p>Hi ${client.name},</p><p><strong>This is a final notice.</strong> Invoice ${invoice.number} for ${amount} was due on ${invoice.due_date} and is now ${overdueDays} days overdue. Please settle this balance immediately to avoid further action. The invoice is attached for your reference.</p>`,
-    };
-  }
-  if (overdueDays >= DUNNING_FIRM_DAYS) {
-    return {
-      stage: 'firm',
-      subject: `Second reminder: invoice ${invoice.number} is now overdue`,
-      html: `<p>Hi ${client.name},</p><p>Invoice ${invoice.number} for ${amount} was due on ${invoice.due_date} and remains unpaid, now ${overdueDays} days overdue. Please arrange payment as soon as possible. The invoice is attached again for your convenience.</p>`,
-    };
-  }
-  return {
-    stage: 'soft',
-    subject: `Payment reminder: invoice ${invoice.number}`,
-    html: `<p>Hi ${client.name},</p><p>This is an automated reminder that invoice ${invoice.number} for ${amount} was due on ${invoice.due_date}. Please find it attached.</p>`,
-  };
+// Which rung of the dunning ladder an overdue invoice is currently on.
+// The actual subject/message per stage comes from
+// lib/emailTemplates.js's overdueReminderEmail() — three admin-editable
+// templates (overdue_reminder_soft/_firm/_final, see that file's own note)
+// rather than hardcoded text here, the same way runLicenseExpiryAlerts()
+// below reuses the manual "Remind" button's own licenseRemindEmail()
+// template instead of writing its own copy.
+function dunningStage(overdueDays) {
+  if (overdueDays >= DUNNING_FINAL_DAYS) return 'final';
+  if (overdueDays >= DUNNING_FIRM_DAYS) return 'firm';
+  return 'soft';
 }
 
 // Auto-reminds invoices that are overdue and haven't been reminded (manually
 // or automatically) in the last 7 days, so this doesn't re-nag daily once a
 // human has already sent one. Each reminder's wording escalates with how
-// overdue the invoice currently is (see dunningContent() above) — the same
+// overdue the invoice currently is (see dunningStage() above) — the same
 // 7-day cadence just means a client 20 days overdue gets the firmer stage
 // on their next reminder rather than the soft one they got at day 6, with
 // no extra state needed beyond the days-overdue calculation itself.
@@ -99,7 +81,9 @@ async function runOverdueReminders() {
       const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order').all(invoice.id);
       const balanceDue = Math.round((invoice.total - invoice.amount_paid) * 100) / 100;
       const overdueDays = daysOverdue(invoice.due_date);
-      const { stage, subject, html } = dunningContent({ invoice, client, settings, balanceDue, overdueDays });
+      const stage = dunningStage(overdueDays);
+      const { subject, message } = overdueReminderEmail({ invoice, client, settings, balanceDue, overdueDays, stage });
+      const html = textToHtml(message);
 
       const buffer = await renderInvoicePdf({ invoice, client, items, settings });
       await sendMail({
@@ -111,7 +95,7 @@ async function runOverdueReminders() {
 
       db.prepare(`UPDATE invoices SET last_reminder_sent_at = datetime('now') WHERE id = ?`).run(invoice.id);
       logEmail({
-        type: 'overdue_reminder',
+        type: `overdue_reminder_${stage}`,
         to: client.email,
         subject,
         sentByName: 'Automated',

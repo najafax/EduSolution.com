@@ -11,12 +11,26 @@ const db = require('../db');
 // an unknown placeholder is left as literal text rather than silently
 // blanked, so a typo is visible/debuggable instead of vanishing.
 //
-// This intentionally does NOT cover the automated overdue-reminder digest
-// (lib/scheduler.js's runOverdueReminders()) — that email stays fully
-// automatic and non-customizable by design (see CLAUDE.md); its sends are
-// still recorded to the Email Center's sent log (lib/emailLog.js), just
-// under a distinct, non-editable `overdue_reminder` type that never reads
-// from this file.
+// `overdue_reminder_soft`/`_firm`/`_final` back the automated overdue-
+// invoice dunning ladder (lib/scheduler.js's runOverdueReminders()) — this
+// used to be explicitly excluded from this file, hardcoded straight into
+// that job instead, on the reasoning that "nobody reviews an automated
+// reminder before it goes out the way a human reviews a manual Send
+// click." That's still true, but it was never actually an argument against
+// letting the *wording itself* be reviewed and customized ahead of time —
+// an admin who wants their own tone, or a different call to action once an
+// invoice hits the final-notice stage, had no way to change it at all
+// short of editing this file directly. Same pattern runLicenseExpiryAlerts()
+// already established for `license_remind` below: the automated job now
+// calls the same admin-editable template a human's own action would use,
+// so a customization applies whether the send was triggered by a person or
+// the daily cron job. Three separate types, not one `overdue_reminder`
+// type with a `{{stage}}` placeholder, since each rung of the ladder is
+// genuinely different wording/tone/call-to-action (see runOverdueReminders'
+// own dunningStage()), not one template with a variable swapped in — and
+// deliberately distinct from `invoice_remind` above, which stays the one,
+// single-stage template the manual "Send reminder" button always uses
+// regardless of how overdue the invoice actually is.
 const DEFAULT_TEMPLATES = {
   quote_send: {
     subject: 'Quote {{quote_number}} from {{business_name}}',
@@ -46,6 +60,21 @@ const DEFAULT_TEMPLATES = {
     subject: "You're invited to the {{business_name}} client portal",
     message:
       'Hi {{client_name}},\n\n{{business_name}} has set up online access to your quotes, invoices, and licenses. Click the link below to set your password and get started:\n\n{{portal_url}}\n\nThis link will expire in 7 days.',
+  },
+  overdue_reminder_soft: {
+    subject: 'Payment reminder: invoice {{invoice_number}}',
+    message:
+      'Hi {{client_name}},\n\nThis is an automated reminder that invoice {{invoice_number}} for {{balance_due}} was due on {{due_date}}. Please find it attached.',
+  },
+  overdue_reminder_firm: {
+    subject: 'Second reminder: invoice {{invoice_number}} is now overdue',
+    message:
+      'Hi {{client_name}},\n\nInvoice {{invoice_number}} for {{balance_due}} was due on {{due_date}} and remains unpaid, now {{overdue_days}} days overdue. Please arrange payment as soon as possible. The invoice is attached again for your convenience.',
+  },
+  overdue_reminder_final: {
+    subject: 'FINAL NOTICE: invoice {{invoice_number}} is {{overdue_days}} days overdue',
+    message:
+      'Hi {{client_name}},\n\nFINAL NOTICE: Invoice {{invoice_number}} for {{balance_due}} was due on {{due_date}} and is now {{overdue_days}} days overdue. Please settle this balance immediately to avoid further action. The invoice is attached for your reference.',
   },
 };
 
@@ -87,6 +116,26 @@ const PLACEHOLDERS = {
     { key: 'business_name', label: 'Business name' },
     { key: 'portal_url', label: 'Portal invite link' },
   ],
+  overdue_reminder_soft: [
+    { key: 'client_name', label: 'Client name' },
+    { key: 'invoice_number', label: 'Invoice number' },
+    { key: 'balance_due', label: 'Balance due' },
+    { key: 'due_date', label: 'Due date' },
+  ],
+  overdue_reminder_firm: [
+    { key: 'client_name', label: 'Client name' },
+    { key: 'invoice_number', label: 'Invoice number' },
+    { key: 'balance_due', label: 'Balance due' },
+    { key: 'due_date', label: 'Due date' },
+    { key: 'overdue_days', label: 'Days overdue' },
+  ],
+  overdue_reminder_final: [
+    { key: 'client_name', label: 'Client name' },
+    { key: 'invoice_number', label: 'Invoice number' },
+    { key: 'balance_due', label: 'Balance due' },
+    { key: 'due_date', label: 'Due date' },
+    { key: 'overdue_days', label: 'Days overdue' },
+  ],
 };
 
 const TYPE_LABELS = {
@@ -96,6 +145,9 @@ const TYPE_LABELS = {
   receipt_send: 'Payment receipt',
   license_remind: 'License renewal reminder',
   portal_invite: 'Portal invite',
+  overdue_reminder_soft: 'Overdue reminder (early)',
+  overdue_reminder_firm: 'Overdue reminder (firm)',
+  overdue_reminder_final: 'Overdue reminder (final notice)',
 };
 
 function renderTemplate(str, vars) {
@@ -169,6 +221,30 @@ function portalInviteEmail({ client, settings, portalUrl }) {
   });
 }
 
+// `stage` is 'soft' | 'firm' | 'final' — see lib/scheduler.js's own
+// dunningStage() for how an overdue invoice lands on one of the three.
+// overdue_days is left off the 'soft' stage's own PLACEHOLDERS/default
+// text (an invoice that's only just gone overdue reads better without
+// calling out an exact day count), but the render still has it available
+// since {{overdue_days}} is harmless to pass through even where the
+// default template doesn't use it — an admin customizing the soft stage
+// is still free to add it themselves.
+const OVERDUE_REMINDER_TYPE_BY_STAGE = {
+  soft: 'overdue_reminder_soft',
+  firm: 'overdue_reminder_firm',
+  final: 'overdue_reminder_final',
+};
+
+function overdueReminderEmail({ invoice, client, settings, balanceDue, overdueDays, stage }) {
+  return buildEmail(OVERDUE_REMINDER_TYPE_BY_STAGE[stage], client.email, {
+    client_name: client.name,
+    invoice_number: invoice.number,
+    balance_due: `${settings.currency_symbol}${balanceDue.toFixed(2)}`,
+    due_date: invoice.due_date,
+    overdue_days: overdueDays,
+  });
+}
+
 // Admin management (routes/emailCenter.js). Returns every editable type with
 // its currently-effective subject/message (stored override or default) plus
 // `isCustom` so the frontend can show a "Reset to default" action only when
@@ -213,6 +289,7 @@ module.exports = {
   receiptSendEmail,
   licenseRemindEmail,
   portalInviteEmail,
+  overdueReminderEmail,
   getAllTemplates,
   setTemplate,
   resetTemplate,
