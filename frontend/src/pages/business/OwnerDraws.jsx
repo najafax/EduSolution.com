@@ -82,10 +82,44 @@ import { BankIcon, TrendDownIcon, TrendUpIcon, DownloadIcon, PlusIcon, PencilIco
 // shows a small "↳ draw of {amount} · {date}" subtitle, same "only show
 // the exception case" convention every other optional per-row detail in
 // this app already follows.
+//
+// **"Outstanding only" filter + balance-sorted list**: `BALANCE_OPTIONS`
+// is a second `StatusFilterChips` row below the existing type chips —
+// `?hasBalance=1` (`routes/ownerDraws.js`'s own `GET /`) forces `type =
+// 'draw'` and filters to a computed `balance > BALANCE_EPSILON`, so
+// finding "who still owes money" no longer means scanning the balance
+// column by eye. It also switches the list's own `ORDER BY` to balance
+// descending instead of the usual date-recency order — "outstanding only"
+// is about surfacing who owes the most, not what happened most recently
+// — so the two, biggest-balance-first and filtered-to-outstanding-draws,
+// pair naturally under one toggle rather than needing a separate sort
+// control. `selectType()`/`selectBalanceFilter()` keep the two chip rows
+// from contradicting each other (a return never has a balance, so picking
+// one clears the other) rather than silently producing an empty list.
+//
+// **Per-owner statement PDF**: `routes/ownerDraws.js`'s `GET
+// /statement/pdf?takenBy=` (`lib/reportPdf.js`'s `renderOwnerStatementPdf`,
+// modeled directly on that file's own `renderBankBalancePdf`) is a
+// printable ledger for one owner/partner — every draw/return in
+// chronological order with a running balance column, plus a closing
+// drawn/returned/outstanding summary. Reachable two ways: a "Statement"
+// button next to the "Filter by name" dropdown once a specific owner is
+// selected (covers the single-owner case), and a small download icon next
+// to each row of the "Outstanding by owner" panel above (covers the
+// multi-owner case without needing to touch the name filter first).
 const TYPE_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'draw', label: 'Draws' },
   { value: 'return', label: 'Returns' },
+];
+// "Outstanding only" only ever means "a draw with something still owed" —
+// it forces type='draw' server-side (see routes/ownerDraws.js's own
+// GET / above) and additionally sorts by balance descending there, so
+// switching it on both narrows the list and surfaces who owes the most
+// first, without needing a separate sort control of its own.
+const BALANCE_OPTIONS = [
+  { value: '', label: 'All balances' },
+  { value: 'outstanding', label: 'Outstanding only' },
 ];
 const EMPTY_FORM = { type: 'draw', taken_by_name: '', amount: '', draw_date: todayStr(), notes: '' };
 
@@ -108,6 +142,7 @@ export default function OwnerDraws() {
   const debouncedSearch = useDebouncedValue(search);
   const [typeFilter, setTypeFilter] = useState('');
   const [takenByFilter, setTakenByFilter] = useState('');
+  const [balanceFilter, setBalanceFilter] = useState('');
 
   const [returnTarget, setReturnTarget] = useState(null);
   const [returnDetail, setReturnDetail] = useState(null);
@@ -128,7 +163,7 @@ export default function OwnerDraws() {
     // jumping height on every search/filter refetch).
     if (draws.length === 0) setLoading(true);
     api.ownerDraws
-      .list(token, { q: debouncedSearch, page, type: typeFilter, takenBy: takenByFilter })
+      .list(token, { q: debouncedSearch, page, type: typeFilter, takenBy: takenByFilter, hasBalance: balanceFilter === 'outstanding' ? '1' : undefined })
       .then(({ draws, names, ...rest }) => {
         setDraws(draws);
         setNames(names);
@@ -143,12 +178,25 @@ export default function OwnerDraws() {
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(load, [token, debouncedSearch, page, typeFilter, takenByFilter]);
+  useEffect(load, [token, debouncedSearch, page, typeFilter, takenByFilter, balanceFilter]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(loadSummary, [token]);
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, typeFilter, takenByFilter]);
+  }, [debouncedSearch, typeFilter, takenByFilter, balanceFilter]);
+
+  // "Outstanding only" and a specific type are mutually exclusive (a
+  // return never has a balance — see routes/ownerDraws.js's own note on
+  // GET / above), so picking one clears the other rather than letting the
+  // two chip rows silently contradict each other.
+  function selectType(v) {
+    setTypeFilter(v);
+    if (v === 'return') setBalanceFilter('');
+  }
+  function selectBalanceFilter(v) {
+    setBalanceFilter(v);
+    if (v === 'outstanding') setTypeFilter('');
+  }
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -380,17 +428,28 @@ export default function OwnerDraws() {
                     {n.totalDraws.toFixed(2)} drawn · {n.totalReturns.toFixed(2)} returned
                   </p>
                 </div>
-                <span
-                  className={`shrink-0 text-sm font-semibold ${
-                    n.outstanding > 0.004
-                      ? 'text-amber-700 dark:text-amber-400'
-                      : n.outstanding < -0.004
-                        ? 'text-red-700 dark:text-red-400'
-                        : 'text-emerald-700 dark:text-emerald-400'
-                  }`}
-                >
-                  {n.outstanding.toFixed(2)}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span
+                    className={`text-sm font-semibold ${
+                      n.outstanding > 0.004
+                        ? 'text-amber-700 dark:text-amber-400'
+                        : n.outstanding < -0.004
+                          ? 'text-red-700 dark:text-red-400'
+                          : 'text-emerald-700 dark:text-emerald-400'
+                    }`}
+                  >
+                    {n.outstanding.toFixed(2)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => api.ownerDraws.statementPdf(n.name, token)}
+                    title={`Download statement for ${n.name}`}
+                    aria-label={`Download statement for ${n.name}`}
+                    className="rounded-md border border-slate-300 p-1.5 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <DownloadIcon width={14} height={14} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -411,9 +470,20 @@ export default function OwnerDraws() {
             />
           </div>
         )}
+        {takenByFilter && (
+          <button
+            type="button"
+            onClick={() => api.ownerDraws.statementPdf(takenByFilter, token)}
+            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <DownloadIcon width={16} height={16} />
+            Statement
+          </button>
+        )}
       </div>
-      <div className="mt-3">
-        <StatusFilterChips options={TYPE_OPTIONS} value={typeFilter} onChange={setTypeFilter} />
+      <div className="mt-3 flex flex-col gap-2">
+        <StatusFilterChips options={TYPE_OPTIONS} value={typeFilter} onChange={selectType} />
+        <StatusFilterChips options={BALANCE_OPTIONS} value={balanceFilter} onChange={selectBalanceFilter} />
       </div>
 
       {error && !showForm && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -524,9 +594,9 @@ export default function OwnerDraws() {
         ) : visibleDraws.length === 0 ? (
           <EmptyState
             icon={<BankIcon />}
-            title={search || typeFilter || takenByFilter ? 'No records match these filters.' : 'No owner draws recorded yet.'}
-            message={!search && !typeFilter && !takenByFilter && canManage ? 'Record money an owner or partner has taken out of the business.' : undefined}
-            action={!search && !typeFilter && !takenByFilter && canManage ? { label: 'New record', onClick: startCreate } : undefined}
+            title={search || typeFilter || takenByFilter || balanceFilter ? 'No records match these filters.' : 'No owner draws recorded yet.'}
+            message={!search && !typeFilter && !takenByFilter && !balanceFilter && canManage ? 'Record money an owner or partner has taken out of the business.' : undefined}
+            action={!search && !typeFilter && !takenByFilter && !balanceFilter && canManage ? { label: 'New record', onClick: startCreate } : undefined}
           />
         ) : (
           <>

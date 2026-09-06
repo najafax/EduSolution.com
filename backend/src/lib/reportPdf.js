@@ -457,10 +457,65 @@ function renderBankBalancePdf({ openingBalance, totalPayments, totalContribution
   return docToBuffer(doc, (d) => addPageFooter(d, settings));
 }
 
+// A printable per-owner ledger for routes/ownerDraws.js's own GET
+// /statement/pdf — every draw/return for one owner/partner, chronological
+// (oldest first, so the running balance column reads top-to-bottom the way
+// a real bank statement does — every other report here is newest/highest
+// first since those are rankings, not a ledger), with a running balance
+// computed fresh alongside each row rather than trusting any stored figure
+// (same don't-store-what-you-can-compute approach withComputedDraw() in
+// routes/ownerDraws.js already takes for a single draw's own balance —
+// this is that same math, just carried cumulatively across every record
+// for one owner instead of reset per draw). AMOUNT stays an unsigned raw
+// figure (a draw and a return are already visually distinguished by their
+// own TYPE column) — only the running BALANCE column needs a sign, since
+// that's the one number here that's genuinely a net and can go negative
+// (an owner who's returned more than they've ever drawn).
+function renderOwnerStatementPdf({ name, records, settings }) {
+  const doc = newDoc();
+  let y = drawReportHeader(doc, { title: 'OWNER DRAW STATEMENT', subtitle: name, settings });
+
+  if (records.length === 0) {
+    drawEmptyNotice(doc, 'No draws or returns recorded for this owner.', y);
+    return docToBuffer(doc, (d) => addPageFooter(d, settings));
+  }
+
+  let running = 0;
+  const rows = records.map((r) => {
+    running = Math.round((running + (r.type === 'draw' ? r.amount : -r.amount)) * 100) / 100;
+    return { ...r, running };
+  });
+
+  const columns = [
+    { key: 'draw_date', label: 'DATE', x: 0, width: 65 },
+    { key: 'type', label: 'TYPE', x: 68, width: 55, format: (r) => r.type.toUpperCase() },
+    { key: 'notes', label: 'NOTES', x: 126, width: 195, format: (r) => r.notes || '—' },
+    { key: 'amount', label: 'AMOUNT', x: 324, width: 78, align: 'right', format: (r) => amountOnly(r.amount) },
+    { key: 'running', label: 'BALANCE', x: 405, width: 90, align: 'right', format: (r) => signedAmountOnly(r.running) },
+  ];
+  y = drawReportTable(doc, { columns, rows }, y);
+
+  const totalDraws = records.filter((r) => r.type === 'draw').reduce((s, r) => s + r.amount, 0);
+  const totalReturns = records.filter((r) => r.type === 'return').reduce((s, r) => s + r.amount, 0);
+  y = drawSummaryBox(
+    doc,
+    [
+      { label: 'Total drawn', value: amountOnly(totalDraws) },
+      { label: 'Total returned', value: amountOnly(totalReturns) },
+      { label: 'Outstanding balance', value: signedAmountOnly(Math.round((totalDraws - totalReturns) * 100) / 100), bold: true },
+    ],
+    y,
+    { dividerBeforeLast: true },
+  );
+
+  return docToBuffer(doc, (d) => addPageFooter(d, settings));
+}
+
 module.exports = {
   renderSalesReportPdf,
   renderTaxReportPdf,
   renderExpenseReportPdf,
   renderProfitLossPdf,
   renderBankBalancePdf,
+  renderOwnerStatementPdf,
 };

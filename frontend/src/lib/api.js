@@ -200,7 +200,8 @@ export const api = {
   },
 
   ownerDraws: {
-    list: (token, { q, type, takenBy, page } = {}) => request(`/owner-draws${qs({ q, type, takenBy, page })}`, { token }),
+    list: (token, { q, type, takenBy, hasBalance, page } = {}) =>
+      request(`/owner-draws${qs({ q, type, takenBy, hasBalance, page })}`, { token }),
     summary: (token) => request('/owner-draws/summary', { token }),
     create: (payload, token) => request('/owner-draws', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/owner-draws/${id}`, { method: 'PUT', body: payload, token }),
@@ -209,6 +210,7 @@ export const api = {
     recordReturn: (id, payload, token) => request(`/owner-draws/${id}/returns`, { method: 'POST', body: payload, token }),
     exportCsv: (token) => downloadFile('/owner-draws/export.csv', token, 'owner-draws.csv'),
     exportXlsx: (token) => downloadFile('/owner-draws/export.xlsx', token, 'owner-draws.xlsx'),
+    statementPdf: (takenBy, token) => openPdf(`/owner-draws/statement/pdf${qs({ takenBy })}`, token),
   },
 
   recurringInvoices: {

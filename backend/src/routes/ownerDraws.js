@@ -4,6 +4,7 @@ const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
 const { toXlsxBuffer } = require('../lib/xlsx');
+const { renderOwnerStatementPdf } = require('../lib/reportPdf');
 
 // Money an owner/partner takes OUT of the business, with an explicit way
 // to record paying some or all of it back — see db/index.js's own
@@ -109,14 +110,32 @@ const LIST_SELECT = `SELECT od.*, pd.draw_date AS parent_draw_date, pd.amount AS
   FROM owner_draws od LEFT JOIN owner_draws pd ON pd.id = od.parent_draw_id`;
 
 router.get('/', view, (req, res) => {
-  const { q, type, takenBy, page: pageParam } = req.query;
+  const { q, type, takenBy, hasBalance, page: pageParam } = req.query;
   const conditions = [];
   const params = [];
   if (q) {
     conditions.push('(od.taken_by_name LIKE ? OR od.notes LIKE ?)');
     params.push(`%${q}%`, `%${q}%`);
   }
-  if (type && TYPES.includes(type)) {
+  // "Outstanding only" (OwnerDraws.jsx's own balance filter chip) only
+  // ever means "a draw with something still owed" — a return has no
+  // balance concept of its own (withComputedDraw() above always returns
+  // null for one), so this forces type='draw' and computes each row's
+  // balance the same way withComputedDraw() does, rather than fetching
+  // every row and filtering in JS (which would break LIMIT/OFFSET's own
+  // page math for the paginated case below). Takes priority over an
+  // explicit `type` param instead of ANDing with it — the two would
+  // otherwise be able to contradict each other (type=return AND
+  // type=draw is never true), and the frontend already clears its own
+  // type filter the moment "Outstanding only" is picked, so this is
+  // purely a defensive fallback for a caller that sends both anyway.
+  if (hasBalance === '1') {
+    conditions.push("od.type = 'draw'");
+    conditions.push(
+      `(od.amount - COALESCE((SELECT SUM(amount) FROM owner_draws r WHERE r.parent_draw_id = od.id AND r.type = 'return'), 0)) > ?`,
+    );
+    params.push(BALANCE_EPSILON);
+  } else if (type && TYPES.includes(type)) {
     conditions.push('od.type = ?');
     params.push(type);
   }
@@ -125,9 +144,17 @@ router.get('/', view, (req, res) => {
     params.push(takenBy);
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  // "Outstanding only" is about finding who owes the most, not what
+  // happened most recently — sorting by balance descending (biggest
+  // still-owed amount first) serves that directly, falling back to the
+  // usual date-recency order any other view of this list already uses.
+  const orderBy =
+    hasBalance === '1'
+      ? `(od.amount - COALESCE((SELECT SUM(amount) FROM owner_draws r WHERE r.parent_draw_id = od.id AND r.type = 'return'), 0)) DESC, od.draw_date DESC, od.id DESC`
+      : 'od.draw_date DESC, od.id DESC';
 
   if (!pageParam) {
-    const rows = db.prepare(`${LIST_SELECT} ${where} ORDER BY od.draw_date DESC, od.id DESC`).all(...params);
+    const rows = db.prepare(`${LIST_SELECT} ${where} ORDER BY ${orderBy}`).all(...params);
     return res.json({ draws: rows.map(withComputedDraw), names: distinctNames() });
   }
 
@@ -135,7 +162,7 @@ router.get('/', view, (req, res) => {
   const offset = (page - 1) * PAGE_SIZE;
   const { total } = db.prepare(`SELECT COUNT(*) AS total FROM owner_draws od ${where}`).get(...params);
   const rows = db
-    .prepare(`${LIST_SELECT} ${where} ORDER BY od.draw_date DESC, od.id DESC LIMIT ? OFFSET ?`)
+    .prepare(`${LIST_SELECT} ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
     .all(...params, PAGE_SIZE, offset);
   res.json({
     draws: rows.map(withComputedDraw),
@@ -207,14 +234,25 @@ router.post('/:id/returns', manage, (req, res) => {
 
 // Shared by both export routes below so the CSV and XLSX downloads can
 // never drift apart — one row query, one column list, two serializers.
+// Reuses LIST_SELECT/withComputedDraw so the download carries the exact
+// same computed balance/linked-draw info the list page itself now shows
+// (see OwnerDraws.jsx's own "Linked-return indicator" note) — `value: (r)
+// => …` accessors rather than plain `key`s for the three computed columns,
+// same convention routes/expenses.js's own currency-exchange columns
+// already follow, blank for whichever rows they don't apply to (Balance
+// for a return, Linked draw date/amount for a draw or an unlinked return).
 function loadDrawExport() {
+  const rows = db.prepare(`${LIST_SELECT} ORDER BY od.draw_date DESC, od.id DESC`).all().map(withComputedDraw);
   return {
-    rows: db.prepare('SELECT * FROM owner_draws ORDER BY draw_date DESC, id DESC').all(),
+    rows,
     columns: [
       { label: 'Date', key: 'draw_date' },
       { label: 'Type', key: 'type' },
       { label: 'Taken by', key: 'taken_by_name' },
       { label: 'Amount', key: 'amount' },
+      { label: 'Balance', value: (r) => (r.type === 'draw' ? r.balance : '') },
+      { label: 'Linked draw date', value: (r) => r.parent_draw_date || '' },
+      { label: 'Linked draw amount', value: (r) => (r.parent_draw_amount != null ? r.parent_draw_amount : '') },
       { label: 'Notes', key: 'notes' },
     ],
   };
@@ -234,6 +272,28 @@ router.get('/export.xlsx', view, async (req, res) => {
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'Content-Disposition': 'attachment; filename="owner-draws.xlsx"',
   });
+  res.send(buffer);
+});
+
+// A printable per-owner ledger — the "Bank Balance Statement" PDF's own
+// pattern (see lib/reportPdf.js), just scoped to one owner's own draws/
+// returns instead of the whole business's cash movements, and covering
+// their entire history rather than one date range (a single owner's own
+// record count is inherently small, same "don't paginate a naturally
+// small list" call this app already makes for GET /:id/returns above).
+// Matched by taken_by_name (query string, not a path param, so a name
+// with a slash in it can't break the route) since owner_draws has no
+// separate "owners" table of its own to reference by id — same free-text
+// identity every other taken_by_name filter/breakdown in this file already
+// keys on.
+router.get('/statement/pdf', view, async (req, res) => {
+  const { takenBy } = req.query;
+  if (!takenBy) return res.status(400).json({ error: 'takenBy is required' });
+  const records = db.prepare('SELECT * FROM owner_draws WHERE taken_by_name = ? ORDER BY draw_date ASC, id ASC').all(takenBy);
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const buffer = await renderOwnerStatementPdf({ name: takenBy, records, settings });
+  const safeName = takenBy.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'owner';
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="owner-draw-statement-${safeName}.pdf"` });
   res.send(buffer);
 });
 
