@@ -54,6 +54,36 @@ function distinctNames() {
     .map((r) => r.taken_by_name);
 }
 
+// Per-owner breakdown of the same totals GET /summary already computes
+// table-wide — one row per distinct taken_by_name, `outstanding` sorted
+// highest-first so whoever owes the most reads first. Grouped by name
+// rather than by individual draw (withComputedDraw()'s own per-draw
+// `balance` already answers that narrower question) since the KPI strip's
+// single outstandingBalance figure stops being useful the moment more than
+// one owner/partner is drawing money — this answers "who, specifically."
+// A name with returns but no draws (a freeform return with nothing to link
+// against, see db/index.js's own note on parent_draw_id) still gets a row,
+// with a negative `outstanding` — real activity, not an error.
+function byNameBreakdown() {
+  const rows = db
+    .prepare(
+      `SELECT taken_by_name AS name,
+        COALESCE(SUM(CASE WHEN type = 'draw' THEN amount ELSE 0 END), 0) AS totalDraws,
+        COALESCE(SUM(CASE WHEN type = 'return' THEN amount ELSE 0 END), 0) AS totalReturns
+       FROM owner_draws
+       GROUP BY taken_by_name`,
+    )
+    .all();
+  return rows
+    .map((r) => ({
+      name: r.name,
+      totalDraws: round2(r.totalDraws),
+      totalReturns: round2(r.totalReturns),
+      outstanding: round2(r.totalDraws - r.totalReturns),
+    }))
+    .sort((a, b) => b.outstanding - a.outstanding);
+}
+
 // Independent of pagination/search — the running balance across every
 // draw and return on file, not just what's currently filtered/visible.
 // Backs the KPI strip at the top of OwnerDraws.jsx, same convention
@@ -64,37 +94,48 @@ function distinctNames() {
 router.get('/summary', view, (req, res) => {
   const totalDraws = round2(db.prepare("SELECT COALESCE(SUM(amount), 0) AS t FROM owner_draws WHERE type = 'draw'").get().t);
   const totalReturns = round2(db.prepare("SELECT COALESCE(SUM(amount), 0) AS t FROM owner_draws WHERE type = 'return'").get().t);
-  res.json({ totalDraws, totalReturns, outstandingBalance: round2(totalDraws - totalReturns) });
+  res.json({ totalDraws, totalReturns, outstandingBalance: round2(totalDraws - totalReturns), byName: byNameBreakdown() });
 });
+
+// `od` is the row itself; `pd` is a self-join back to the specific draw a
+// linked return's own parent_draw_id points at (NULL for a draw row, and
+// for a freeform/unlinked return — see db/index.js's own note) — carried
+// as parent_draw_date/parent_draw_amount so OwnerDraws.jsx can show which
+// draw a linked return was recorded against right in the list, not just
+// inside that draw's own history modal. Every condition below is
+// od-qualified since od/pd share the same column names and an unqualified
+// reference would otherwise be ambiguous now that this is a two-table query.
+const LIST_SELECT = `SELECT od.*, pd.draw_date AS parent_draw_date, pd.amount AS parent_draw_amount
+  FROM owner_draws od LEFT JOIN owner_draws pd ON pd.id = od.parent_draw_id`;
 
 router.get('/', view, (req, res) => {
   const { q, type, takenBy, page: pageParam } = req.query;
   const conditions = [];
   const params = [];
   if (q) {
-    conditions.push('(taken_by_name LIKE ? OR notes LIKE ?)');
+    conditions.push('(od.taken_by_name LIKE ? OR od.notes LIKE ?)');
     params.push(`%${q}%`, `%${q}%`);
   }
   if (type && TYPES.includes(type)) {
-    conditions.push('type = ?');
+    conditions.push('od.type = ?');
     params.push(type);
   }
   if (takenBy) {
-    conditions.push('taken_by_name = ?');
+    conditions.push('od.taken_by_name = ?');
     params.push(takenBy);
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   if (!pageParam) {
-    const rows = db.prepare(`SELECT * FROM owner_draws ${where} ORDER BY draw_date DESC, id DESC`).all(...params);
+    const rows = db.prepare(`${LIST_SELECT} ${where} ORDER BY od.draw_date DESC, od.id DESC`).all(...params);
     return res.json({ draws: rows.map(withComputedDraw), names: distinctNames() });
   }
 
   const page = Math.max(1, Number(pageParam) || 1);
   const offset = (page - 1) * PAGE_SIZE;
-  const { total } = db.prepare(`SELECT COUNT(*) AS total FROM owner_draws ${where}`).get(...params);
+  const { total } = db.prepare(`SELECT COUNT(*) AS total FROM owner_draws od ${where}`).get(...params);
   const rows = db
-    .prepare(`SELECT * FROM owner_draws ${where} ORDER BY draw_date DESC, id DESC LIMIT ? OFFSET ?`)
+    .prepare(`${LIST_SELECT} ${where} ORDER BY od.draw_date DESC, od.id DESC LIMIT ? OFFSET ?`)
     .all(...params, PAGE_SIZE, offset);
   res.json({
     draws: rows.map(withComputedDraw),

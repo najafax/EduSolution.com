@@ -57,6 +57,31 @@ import { BankIcon, TrendDownIcon, TrendUpIcon, DownloadIcon, PlusIcon, PencilIco
 // there's nothing left to record, so a fully-repaid draw's return history
 // stays reachable from the list rather than becoming invisible the moment
 // the last payment closes it out.
+//
+// **Outstanding by owner**: the KPI strip's own `outstandingBalance` is a
+// single table-wide figure — useful with one owner/partner, ambiguous the
+// moment there's more than one, since it can't say *who* still owes what.
+// `GET /summary`'s `byName` (`routes/ownerDraws.js`'s own `byNameBreakdown()`)
+// answers that directly: one row per distinct `taken_by_name` with that
+// person's own totalDraws/totalReturns/outstanding, sorted highest-
+// outstanding-first. Rendered as its own small card right below the KPI
+// strip, and — same "don't show a redundant view of the same one figure"
+// call as the KPI strip's own single-owner case — only once
+// `summary.byName.length > 1`, so a business with just one owner/partner
+// never sees this card at all.
+//
+// **Linked-return indicator**: a return created via the "Record return"/
+// "View history" flow above carries `parent_draw_id`, but until now that
+// link was only ever visible inside the specific draw's own history modal
+// — scanning the main list, a linked return and a freeform/historical one
+// (see db/index.js's own note on `parent_draw_id`) looked identical.
+// `routes/ownerDraws.js`'s `GET /` now LEFT JOINs each row back to its own
+// parent draw and returns `parent_draw_date`/`parent_draw_amount` alongside
+// it (both `null` for a draw row or an unlinked return) — a linked return's
+// row (desktop table's "Taken by" cell, mobile accordion's own detail row)
+// shows a small "↳ draw of {amount} · {date}" subtitle, same "only show
+// the exception case" convention every other optional per-row detail in
+// this app already follows.
 const TYPE_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'draw', label: 'Draws' },
@@ -340,6 +365,38 @@ export default function OwnerDraws() {
         </div>
       )}
 
+      {/* Only worth showing once more than one owner/partner has drawn or
+          returned money — with a single owner this would just repeat the
+          "Outstanding balance" KPI card above under a different name. */}
+      {summary && summary.byName.length > 1 && (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Outstanding by owner</p>
+          <div className="mt-2 flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+            {summary.byName.map((n) => (
+              <div key={n.name} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900 dark:text-white">{n.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {n.totalDraws.toFixed(2)} drawn · {n.totalReturns.toFixed(2)} returned
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 text-sm font-semibold ${
+                    n.outstanding > 0.004
+                      ? 'text-amber-700 dark:text-amber-400'
+                      : n.outstanding < -0.004
+                        ? 'text-red-700 dark:text-red-400'
+                        : 'text-emerald-700 dark:text-emerald-400'
+                  }`}
+                >
+                  {n.outstanding.toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <div className="flex-1 sm:max-w-sm">
           <SearchInput value={search} onChange={setSearch} placeholder="Search draws and returns…" />
@@ -501,7 +558,14 @@ export default function OwnerDraws() {
                           {d.type}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{d.taken_by_name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">
+                        {d.taken_by_name}
+                        {d.type === 'return' && d.parent_draw_id && (
+                          <span className="mt-0.5 block text-xs font-normal text-slate-400 dark:text-slate-500">
+                            ↳ draw of {d.parent_draw_amount.toFixed(2)} · {d.parent_draw_date}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{d.notes || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{d.amount.toFixed(2)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -560,6 +624,14 @@ export default function OwnerDraws() {
                           }
                         >
                           {d.balance.toFixed(2)}
+                        </dd>
+                      </div>
+                    )}
+                    {d.type === 'return' && d.parent_draw_id && (
+                      <div className="flex justify-between">
+                        <dt className="text-slate-500 dark:text-slate-400">Linked to</dt>
+                        <dd className="text-slate-900 dark:text-white">
+                          {d.parent_draw_amount.toFixed(2)} · {d.parent_draw_date}
                         </dd>
                       </div>
                     )}
