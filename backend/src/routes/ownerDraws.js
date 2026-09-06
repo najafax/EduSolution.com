@@ -22,6 +22,26 @@ const manage = requirePermission('expenses', 'manage');
 
 const TYPES = ['draw', 'return'];
 const PAGE_SIZE = 20;
+const BALANCE_EPSILON = 0.005;
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+// How much has been returned against one specific draw, and what's left.
+// Only ever meaningful for a type='draw' row — a return itself never has
+// its own "returned_amount"/"balance" (nothing returns against a return),
+// so those come back as 0/null for one. Don't-store-what-you-can-compute,
+// same approach invoices.js's withComputed() takes for is_overdue — a
+// draw's balance is always derived fresh from its own linked returns
+// (owner_draws.parent_draw_id, see db/index.js) rather than a stored
+// running total that could drift out of sync.
+function withComputedDraw(draw) {
+  if (draw.type !== 'draw') return { ...draw, returned_amount: 0, balance: null };
+  const { t } = db
+    .prepare(`SELECT COALESCE(SUM(amount), 0) AS t FROM owner_draws WHERE parent_draw_id = ? AND type = 'return'`)
+    .get(draw.id);
+  const returned = round2(t);
+  return { ...draw, returned_amount: returned, balance: round2(draw.amount - returned) };
+}
 
 // Mirrors capitalContributions.js's own distinctContributors() — every
 // name used so far, independent of the current filter, so the filter
@@ -37,9 +57,11 @@ function distinctNames() {
 // Independent of pagination/search — the running balance across every
 // draw and return on file, not just what's currently filtered/visible.
 // Backs the KPI strip at the top of OwnerDraws.jsx, same convention
-// licenses.js's own GET /summary already establishes.
+// licenses.js's own GET /summary already establishes. This is the
+// table-wide total (every return counts against it, linked to a specific
+// draw or not) — a distinct question from withComputedDraw()'s own
+// per-draw balance above.
 router.get('/summary', view, (req, res) => {
-  const round2 = (n) => Math.round(n * 100) / 100;
   const totalDraws = round2(db.prepare("SELECT COALESCE(SUM(amount), 0) AS t FROM owner_draws WHERE type = 'draw'").get().t);
   const totalReturns = round2(db.prepare("SELECT COALESCE(SUM(amount), 0) AS t FROM owner_draws WHERE type = 'return'").get().t);
   res.json({ totalDraws, totalReturns, outstandingBalance: round2(totalDraws - totalReturns) });
@@ -65,7 +87,7 @@ router.get('/', view, (req, res) => {
 
   if (!pageParam) {
     const rows = db.prepare(`SELECT * FROM owner_draws ${where} ORDER BY draw_date DESC, id DESC`).all(...params);
-    return res.json({ draws: rows, names: distinctNames() });
+    return res.json({ draws: rows.map(withComputedDraw), names: distinctNames() });
   }
 
   const page = Math.max(1, Number(pageParam) || 1);
@@ -75,13 +97,71 @@ router.get('/', view, (req, res) => {
     .prepare(`SELECT * FROM owner_draws ${where} ORDER BY draw_date DESC, id DESC LIMIT ? OFFSET ?`)
     .all(...params, PAGE_SIZE, offset);
   res.json({
-    draws: rows,
+    draws: rows.map(withComputedDraw),
     names: distinctNames(),
     page,
     pageSize: PAGE_SIZE,
     total,
     totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
   });
+});
+
+// The return history behind one specific draw's own "Return" action on
+// OwnerDraws.jsx — mirrors licenses.js's own GET /:id/renewals shape (the
+// draw itself, computed, plus its full linked history, no pagination
+// since a single draw's own return count is inherently small).
+router.get('/:id/returns', view, (req, res) => {
+  const draw = db.prepare("SELECT * FROM owner_draws WHERE id = ? AND type = 'draw'").get(req.params.id);
+  if (!draw) return res.status(404).json({ error: 'Draw not found' });
+  const returns = db
+    .prepare(`SELECT * FROM owner_draws WHERE parent_draw_id = ? ORDER BY draw_date DESC, id DESC`)
+    .all(draw.id);
+  res.json({ draw: withComputedDraw(draw), returns });
+});
+
+// Records a partial or full payment back against one specific draw — the
+// actual action behind OwnerDraws.jsx's "Return" button. Deliberately a
+// separate, dedicated route from the generic POST / above (which still
+// exists for a freeform, unlinked return — see db/index.js's own note on
+// parent_draw_id) since this one always inherits taken_by_name from the
+// draw itself (the return is from whoever took it) and validates against
+// that specific draw's own remaining balance rather than accepting an
+// arbitrary amount.
+router.post('/:id/returns', manage, (req, res) => {
+  const draw = db.prepare("SELECT * FROM owner_draws WHERE id = ? AND type = 'draw'").get(req.params.id);
+  if (!draw) return res.status(404).json({ error: 'Draw not found' });
+
+  const { amount, draw_date, notes = '' } = req.body || {};
+  const amountNum = Number(amount);
+  if (!draw_date) return res.status(400).json({ error: 'draw_date is required' });
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    return res.status(400).json({ error: 'amount must be a positive number' });
+  }
+
+  const { balance } = withComputedDraw(draw);
+  if (amountNum > balance + BALANCE_EPSILON) {
+    return res.status(400).json({ error: `Amount cannot exceed the remaining balance of ${balance.toFixed(2)}` });
+  }
+
+  const result = db
+    .prepare(
+      'INSERT INTO owner_draws (type, parent_draw_id, taken_by_name, amount, draw_date, notes, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    )
+    .run('return', draw.id, draw.taken_by_name, amountNum, draw_date, notes, req.user.name);
+
+  logActivity({
+    userName: req.user.name,
+    action: 'recorded a return against',
+    entityType: 'owner_draw',
+    entityId: draw.id,
+    entityLabel: `${draw.taken_by_name} (${amountNum.toFixed(2)} against a draw of ${draw.amount.toFixed(2)})`,
+  });
+
+  const updatedDraw = withComputedDraw(db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(draw.id));
+  const returns = db
+    .prepare(`SELECT * FROM owner_draws WHERE parent_draw_id = ? ORDER BY draw_date DESC, id DESC`)
+    .all(draw.id);
+  res.status(201).json({ draw: updatedDraw, returns, return: db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(result.lastInsertRowid) });
 });
 
 // Shared by both export routes below so the CSV and XLSX downloads can
@@ -138,7 +218,7 @@ router.post('/', manage, (req, res) => {
     .prepare('INSERT INTO owner_draws (type, taken_by_name, amount, draw_date, notes, created_by_name) VALUES (?, ?, ?, ?, ?, ?)')
     .run(type, taken_by_name.trim(), Number(amount), draw_date, notes, req.user.name);
 
-  const draw = db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(result.lastInsertRowid);
+  const draw = withComputedDraw(db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(result.lastInsertRowid));
   logActivity({
     userName: req.user.name,
     action: type === 'return' ? 'recorded a return from' : 'recorded a draw for',
@@ -149,6 +229,18 @@ router.post('/', manage, (req, res) => {
   res.status(201).json({ draw });
 });
 
+// Returns how much has already been returned against `drawId`, excluding
+// one specific linked return row (`excludeReturnId`) from that sum — used
+// below so editing a linked return's own amount validates against the
+// draw's balance as it would be *without* this return's old value, not
+// double-counting it.
+function returnedAgainst(drawId, excludeReturnId) {
+  const { t } = db
+    .prepare(`SELECT COALESCE(SUM(amount), 0) AS t FROM owner_draws WHERE parent_draw_id = ? AND type = 'return' AND id != ?`)
+    .get(drawId, excludeReturnId || 0);
+  return round2(t);
+}
+
 router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Draw not found' });
@@ -157,11 +249,49 @@ router.put('/:id', manage, (req, res) => {
   if (error) return res.status(400).json({ error });
 
   const { type = 'draw', taken_by_name, amount, draw_date, notes = '' } = req.body;
+  const amountNum = Number(amount);
+
+  // A draw that already has recorded returns against it can't silently
+  // stop being a draw, or shrink below what's already been paid back —
+  // either would corrupt the balance every linked return's amount is
+  // computed against. A return that's itself linked to a draw
+  // (parent_draw_id set) can't silently stop being a return either, and
+  // its own amount can't be edited past what would push that draw's
+  // balance negative — same "don't let an edit corrupt a relationship"
+  // convention this app's own locked-status guards already follow
+  // elsewhere (a converted quote, a sent/paid invoice).
+  if (existing.type === 'draw') {
+    const returned = returnedAgainst(existing.id);
+    if (returned > 0) {
+      if (type !== 'draw') {
+        return res.status(400).json({ error: 'This draw has recorded returns and its type cannot be changed.' });
+      }
+      if (amountNum < returned - BALANCE_EPSILON) {
+        return res
+          .status(400)
+          .json({ error: `Amount cannot be less than the ${returned.toFixed(2)} already returned against this draw.` });
+      }
+    }
+  } else if (existing.parent_draw_id) {
+    if (type !== 'return') {
+      return res.status(400).json({ error: 'This return is linked to a draw and its type cannot be changed.' });
+    }
+    const parentDraw = db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(existing.parent_draw_id);
+    if (parentDraw) {
+      const remaining = round2(parentDraw.amount - returnedAgainst(parentDraw.id, existing.id));
+      if (amountNum > remaining + BALANCE_EPSILON) {
+        return res
+          .status(400)
+          .json({ error: `Amount cannot exceed the remaining balance of ${remaining.toFixed(2)} for this draw.` });
+      }
+    }
+  }
+
   db.prepare(
     `UPDATE owner_draws SET type = ?, taken_by_name = ?, amount = ?, draw_date = ?, notes = ?, updated_at = datetime('now') WHERE id = ?`,
-  ).run(type, taken_by_name.trim(), Number(amount), draw_date, notes, req.params.id);
+  ).run(type, taken_by_name.trim(), amountNum, draw_date, notes, req.params.id);
 
-  const draw = db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(req.params.id);
+  const draw = withComputedDraw(db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(req.params.id));
   logActivity({
     userName: req.user.name,
     action: type === 'return' ? 'updated a return from' : 'updated a draw for',
@@ -175,6 +305,17 @@ router.put('/:id', manage, (req, res) => {
 router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Draw not found' });
+
+  // Mirrors this app's other "checked-first 409, not a raw FK error"
+  // delete guards (routes/clients.js's own DELETE /:id) — deleting a draw
+  // that still has linked returns would either orphan them (dangling
+  // parent_draw_id) or silently erase real repayment history, neither of
+  // which this app lets happen to a real business record.
+  if (existing.type === 'draw' && returnedAgainst(existing.id) > 0) {
+    return res
+      .status(409)
+      .json({ error: 'This draw has recorded returns and cannot be deleted. Delete the returns first.' });
+  }
 
   db.prepare('DELETE FROM owner_draws WHERE id = ?').run(req.params.id);
   logActivity({

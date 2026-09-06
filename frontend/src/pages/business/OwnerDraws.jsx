@@ -17,7 +17,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
-import { BankIcon, TrendDownIcon, TrendUpIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
+import { BankIcon, TrendDownIcon, TrendUpIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, RefreshIcon } from '../../components/icons';
 
 // Money an owner/partner takes OUT of the business, with an explicit way to
 // record paying some or all of it back — the mirror of CapitalContributions
@@ -29,6 +29,24 @@ import { BankIcon, TrendDownIcon, TrendUpIcon, DownloadIcon, PlusIcon, PencilIco
 // type selector/filter and a KPI strip (Total drawn / Total returned /
 // Outstanding balance) added on top, mirroring Licenses.jsx's own
 // summary-strip convention.
+//
+// **Per-draw balance + partial returns**: each individual draw row also
+// carries its own computed `balance` (amount minus every return linked to
+// it via `parent_draw_id` — see db/index.js and routes/ownerDraws.js) —
+// distinct from the KPI strip's own table-wide outstandingBalance. A
+// `type: 'draw'` row with `balance > 0` gets a "Record return" row action
+// (openReturn/RefreshIcon) that opens `returnTarget`'s modal: the draw's
+// own amount/already-returned/remaining-balance summary, its full return
+// history (fetched via `GET /:id/returns`, same shape as Licenses.jsx's own
+// renewal-history modal), and a form to record a partial or full payment
+// back — `POST /:id/returns` (`api.ownerDraws.recordReturn`), which always
+// attributes the new return to the same person who took the draw and
+// validates the amount against that specific draw's own remaining balance
+// server-side (the same validation the modal's own client-side check
+// mirrors, so a bad amount surfaces immediately rather than only after a
+// round trip). The modal stays open after a successful partial payment
+// (`returnDetail` refreshed from the response) so recording several
+// installments against the same draw doesn't mean reopening it each time.
 const TYPE_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'draw', label: 'Draws' },
@@ -55,6 +73,15 @@ export default function OwnerDraws() {
   const debouncedSearch = useDebouncedValue(search);
   const [typeFilter, setTypeFilter] = useState('');
   const [takenByFilter, setTakenByFilter] = useState('');
+
+  const [returnTarget, setReturnTarget] = useState(null);
+  const [returnDetail, setReturnDetail] = useState(null);
+  const [returnDetailError, setReturnDetailError] = useState('');
+  const [returnAmount, setReturnAmount] = useState('');
+  const [returnDate, setReturnDate] = useState(todayStr());
+  const [returnNotes, setReturnNotes] = useState('');
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [returnError, setReturnError] = useState('');
 
   const { pendingIds, deleteWithUndo } = useUndoableDelete((id) => api.ownerDraws.remove(id, token));
   const visibleDraws = draws.filter((d) => !pendingIds.has(d.id));
@@ -139,6 +166,90 @@ export default function OwnerDraws() {
     // delete hasn't touched yet (or reloading needlessly if "Undo" is
     // clicked, which is harmless — just an extra fetch of unchanged data).
     setTimeout(loadSummary, 5200);
+  }
+
+  // Opens the Return modal — pre-fills from the already-known list row
+  // (`d.balance`, computed server-side by GET /) so the amount field and
+  // summary numbers render instantly, then swaps in the freshly-fetched,
+  // authoritative detail (including the full return history) once it
+  // arrives, the same "instant from cache, then confirm from the server"
+  // shape EmailPreviewModal's own "fetch on open" pattern follows.
+  function openReturn(d) {
+    setReturnTarget(d);
+    setReturnDetail(null);
+    setReturnDetailError('');
+    setReturnAmount(d.balance != null ? String(d.balance) : '');
+    setReturnDate(todayStr());
+    setReturnNotes('');
+    setReturnError('');
+    api.ownerDraws
+      .returns(d.id, token)
+      .then((detail) => {
+        setReturnDetail(detail);
+        setReturnAmount(detail.draw.balance != null ? String(detail.draw.balance) : '');
+      })
+      .catch((err) => setReturnDetailError(err.message));
+  }
+
+  async function submitReturn(e) {
+    e.preventDefault();
+    if (!returnTarget) return;
+    setReturnError('');
+    const amountNum = Number(returnAmount);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      setReturnError('Amount must be a positive number');
+      return;
+    }
+    const remaining = returnDetail?.draw?.balance ?? returnTarget.balance ?? 0;
+    if (amountNum > remaining + 0.005) {
+      setReturnError(`Amount cannot exceed the remaining balance of ${remaining.toFixed(2)}`);
+      return;
+    }
+    setReturnSubmitting(true);
+    try {
+      const { draw, returns } = await api.ownerDraws.recordReturn(
+        returnTarget.id,
+        { amount: amountNum, draw_date: returnDate, notes: returnNotes },
+        token,
+      );
+      setReturnDetail({ draw, returns });
+      setReturnTarget(draw);
+      setReturnAmount(draw.balance != null ? String(draw.balance) : '');
+      setReturnNotes('');
+      toast('Return recorded.', { type: 'success' });
+      load();
+      loadSummary();
+    } catch (err) {
+      setReturnError(err.message);
+    } finally {
+      setReturnSubmitting(false);
+    }
+  }
+
+  // Shared between the desktop table's action cell and each mobile
+  // MobileListAccordion card's expanded body, same convention Licenses.jsx's
+  // own rowActions() already establishes — so the two breakpoints can
+  // never drift apart on which buttons a row gets.
+  function rowActions(d) {
+    return (
+      <>
+        {d.type === 'draw' && d.balance > 0.004 && canManage && (
+          <IconActionButton
+            icon={RefreshIcon}
+            tone="emerald"
+            onClick={() => openReturn(d)}
+            title="Record return"
+            label="Record a return against this draw"
+          />
+        )}
+        {canManage && (
+          <>
+            <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(d)} title="Edit" label="Edit record" />
+            <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(d)} title="Delete" label="Delete record" />
+          </>
+        )}
+      </>
+    );
   }
 
   async function handleExportCsv() {
@@ -331,7 +442,7 @@ export default function OwnerDraws() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={canManage ? ['w-24', 'w-20', 'w-32', 'w-40', 'w-20', 'w-16'] : ['w-24', 'w-20', 'w-32', 'w-40', 'w-20']} />
+            <TableSkeleton rows={5} cols={canManage ? ['w-24', 'w-20', 'w-32', 'w-40', 'w-20', 'w-20', 'w-24'] : ['w-24', 'w-20', 'w-32', 'w-40', 'w-20', 'w-20']} />
           </div>
         ) : visibleDraws.length === 0 ? (
           <EmptyState
@@ -351,6 +462,7 @@ export default function OwnerDraws() {
                     <th className="px-4 py-3">Taken by</th>
                     <th className="px-4 py-3">Notes</th>
                     <th className="px-4 py-3 text-right">Amount</th>
+                    <th className="px-4 py-3 text-right">Balance</th>
                     {canManage && <th className="px-4 py-3" />}
                   </tr>
                 </thead>
@@ -372,12 +484,24 @@ export default function OwnerDraws() {
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{d.taken_by_name}</td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{d.notes || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{d.amount.toFixed(2)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        {d.type === 'draw' ? (
+                          <span
+                            className={
+                              d.balance > 0.004
+                                ? 'font-medium text-amber-700 dark:text-amber-400'
+                                : 'text-emerald-700 dark:text-emerald-400'
+                            }
+                          >
+                            {d.balance.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500">—</span>
+                        )}
+                      </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
-                          <div className="flex justify-end gap-1.5">
-                            <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(d)} title="Edit" label="Edit record" />
-                            <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(d)} title="Delete" label="Delete record" />
-                          </div>
+                          <div className="flex justify-end gap-1.5">{rowActions(d)}</div>
                         </td>
                       )}
                     </tr>
@@ -405,18 +529,27 @@ export default function OwnerDraws() {
                       </div>
                     }
                   >
+                    {d.type === 'draw' && (
+                      <div className="flex justify-between">
+                        <dt className="text-slate-500 dark:text-slate-400">Balance</dt>
+                        <dd
+                          className={
+                            d.balance > 0.004
+                              ? 'font-medium text-amber-700 dark:text-amber-400'
+                              : 'text-emerald-700 dark:text-emerald-400'
+                          }
+                        >
+                          {d.balance.toFixed(2)}
+                        </dd>
+                      </div>
+                    )}
                     {d.notes && (
                       <div className="flex justify-between">
                         <dt className="text-slate-500 dark:text-slate-400">Notes</dt>
                         <dd className="text-slate-900 dark:text-white">{d.notes}</dd>
                       </div>
                     )}
-                    {canManage && (
-                      <div className="flex gap-1.5 pt-1">
-                        <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(d)} title="Edit" label="Edit record" />
-                        <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(d)} title="Delete" label="Delete record" />
-                      </div>
-                    )}
+                    {canManage && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(d)}</div>}
                   </MobileListAccordion>
                 ))}
               </div>
@@ -428,6 +561,115 @@ export default function OwnerDraws() {
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
       {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New record" />}
+
+      <Modal open={!!returnTarget} onClose={() => setReturnTarget(null)} title={returnTarget ? `Return — ${returnTarget.taken_by_name}` : ''}>
+        {returnTarget && (
+          <div className="flex flex-col gap-4">
+            <div className="rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-800">
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Drawn</span>
+                <span className="font-medium text-slate-900 dark:text-white">{returnTarget.amount.toFixed(2)}</span>
+              </div>
+              <div className="mt-1 flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Already returned</span>
+                <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                  {(returnDetail?.draw.returned_amount ?? returnTarget.returned_amount ?? 0).toFixed(2)}
+                </span>
+              </div>
+              <div className="mt-1.5 flex justify-between border-t border-slate-200 pt-1.5 dark:border-slate-700">
+                <span className="text-slate-500 dark:text-slate-400">Balance to be paid</span>
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  {(returnDetail?.draw.balance ?? returnTarget.balance ?? 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">Return history</p>
+              {returnDetailError ? (
+                <p className="text-sm text-red-600 dark:text-red-400">{returnDetailError}</p>
+              ) : returnDetail === null ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+              ) : returnDetail.returns.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">No returns recorded yet.</p>
+              ) : (
+                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {returnDetail.returns.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-4 py-2 text-sm">
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {r.draw_date}
+                        {r.notes ? ` — ${r.notes}` : ''}
+                      </span>
+                      <span className="font-medium text-slate-900 dark:text-white">{r.amount.toFixed(2)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {(returnDetail?.draw.balance ?? returnTarget.balance ?? 0) > 0.004 ? (
+              <form onSubmit={submitReturn} className="flex flex-col gap-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Record a payment</p>
+                {returnError && <p className="text-sm text-red-600 dark:text-red-400">{returnError}</p>}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount</span>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      required
+                      value={returnAmount}
+                      onChange={(e) => setReturnAmount(e.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Date</span>
+                    <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
+                      <input
+                        type="date"
+                        required
+                        value={returnDate}
+                        onChange={(e) => setReturnDate(e.target.value)}
+                        className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
+                      />
+                    </div>
+                  </label>
+                </div>
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
+                  <input
+                    type="text"
+                    value={returnNotes}
+                    onChange={(e) => setReturnNotes(e.target.value)}
+                    placeholder="Optional context"
+                    className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={returnSubmitting}
+                    className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+                  >
+                    {returnSubmitting ? 'Recording…' : 'Record return'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReturnTarget(null)}
+                    className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Close
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <p className="text-sm text-emerald-700 dark:text-emerald-400">This draw has been fully repaid.</p>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {confirmDialog}
     </div>

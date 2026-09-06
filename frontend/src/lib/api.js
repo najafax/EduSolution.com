@@ -205,6 +205,8 @@ export const api = {
     create: (payload, token) => request('/owner-draws', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/owner-draws/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/owner-draws/${id}`, { method: 'DELETE', token }),
+    returns: (id, token) => request(`/owner-draws/${id}/returns`, { token }),
+    recordReturn: (id, payload, token) => request(`/owner-draws/${id}/returns`, { method: 'POST', body: payload, token }),
     exportCsv: (token) => downloadFile('/owner-draws/export.csv', token, 'owner-draws.csv'),
     exportXlsx: (token) => downloadFile('/owner-draws/export.xlsx', token, 'owner-draws.xlsx'),
   },

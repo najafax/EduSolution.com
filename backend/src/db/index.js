@@ -940,6 +940,30 @@ if (!invoiceColumns.has('void_reason')) {
   db.exec(`ALTER TABLE invoices ADD COLUMN void_reason TEXT NOT NULL DEFAULT '';`);
 }
 
+// parent_draw_id — links a type='return' row back to the specific
+// type='draw' row it's repaying, so a draw can carry its own running
+// balance (amount minus every linked return) rather than only the
+// table-wide totalDraws/totalReturns aggregate GET /summary already
+// computes. NULL on every draw row, and also NULL on a freeform return
+// not tied to one specific draw (e.g. historical bulk entry, or a return
+// recorded before this column existed) — those still count toward the
+// table-wide running balance, they just don't reduce any one draw's own
+// balance. Self-referencing FK, no ON DELETE action needed since
+// routes/ownerDraws.js's own DELETE /:id already blocks deleting a draw
+// that still has linked returns. owner_draws has carried real records
+// since this table's own first deploy (see its own CREATE TABLE comment
+// above), same ALTER TABLE treatment every other post-launch column in
+// this file follows.
+const ownerDrawColumns = new Set(db.prepare('PRAGMA table_info(owner_draws)').all().map((c) => c.name));
+if (!ownerDrawColumns.has('parent_draw_id')) {
+  db.exec(`ALTER TABLE owner_draws ADD COLUMN parent_draw_id INTEGER REFERENCES owner_draws(id);`);
+}
+// Only safe to create once the column above actually exists — the
+// CREATE INDEX block further up this file runs before this migration
+// section, so this one has to live down here instead, right after the
+// ALTER TABLE that adds the column it indexes.
+db.exec(`CREATE INDEX IF NOT EXISTS idx_owner_draws_parent ON owner_draws(parent_draw_id);`);
+
 db.pragma('foreign_keys = ON');
 
 // Bound params rather than string-interpolated into the exec() block above,

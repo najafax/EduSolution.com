@@ -1045,6 +1045,80 @@ deliberately untouched by either, always returning every row.
   returns" row when that period's respective total is non-zero — same
   "don't show a pointless `$0.00` line" convention the existing "Capital
   contributions" row already follows.
+- **Per-draw balance + partial returns**: the table-wide
+  `outstandingBalance` `GET /summary` above computes answers "how much is
+  outstanding across every draw," but not "how much is still owed on
+  *this specific* draw" — a business paying back one draw in several
+  installments over time had no way to track that against the one draw it
+  belonged to, only the running grand total. `owner_draws.parent_draw_id`
+  (`db/index.js`, `ALTER TABLE`-guarded — `owner_draws` already had real
+  records, same lesson `licenses.url` learned the hard way) links a
+  `type: 'return'` row back to the specific `type: 'draw'` row it's
+  repaying — `NULL` on every draw, and also `NULL` on a freeform return
+  not tied to one specific draw (the generic Draw/Return toggle on the
+  "New record" modal still creates one of these, e.g. for historical bulk
+  entry) — an unlinked return still counts toward the table-wide running
+  balance, it just doesn't reduce any one draw's own. `routes/ownerDraws.js`'s
+  `withComputedDraw(draw)` derives `returned_amount`/`balance` fresh on
+  every read (`amount` minus the `SUM` of that draw's own linked returns)
+  — the same don't-store-what-you-can-compute approach `invoices.js`'s
+  `withComputed()` takes for `is_overdue` — so `GET /` now returns both
+  fields on every row (`0`/`null` for a `type: 'return'` row, since
+  nothing ever returns against a return).
+  **`POST /:id/returns`** is the actual "record a partial or full payment
+  back" action — a dedicated route from the generic `POST /` above (kept
+  for the freeform case) since this one always inherits `taken_by_name`
+  from the draw itself (a return is from whoever took it) and validates
+  the submitted `amount` against that specific draw's own remaining
+  balance server-side, 400ing with the exact remaining figure if it would
+  overpay (`amount > balance`, a small epsilon tolerance for floating-
+  point noise) — the same validation the frontend's own modal mirrors
+  client-side so a bad amount surfaces immediately, not just after a round
+  trip. `GET /:id/returns` (mirrors `licenses.js`'s own `GET /:id/renewals`
+  shape) returns the draw itself plus its full linked return history,
+  newest first, no pagination for the same "a single draw's own return
+  count is inherently small" reasoning that route doesn't paginate either.
+  **Editing/deleting can't corrupt the relationship**: `PUT /:id` blocks
+  changing a draw's `type` away from `'draw'`, or shrinking its `amount`
+  below what's already been returned against it, the instant it has any
+  linked returns (409-style 400, same "don't let an edit corrupt a
+  relationship" convention as a converted quote's own locked-status guard)
+  — and, symmetrically, blocks changing a linked return's own `type` away
+  from `'return'`, or raising its `amount` past what would push its parent
+  draw's balance negative (computed *excluding* this return's own old
+  value, so re-saving an unchanged amount never false-positives).
+  `DELETE /:id` 409s on a draw that still has any linked returns — mirrors
+  `routes/clients.js`'s own checked-first delete guards, turning what
+  would otherwise be either an orphaned `parent_draw_id` or silently
+  erased repayment history into a clean, friendly error instead; deleting
+  a linked *return* itself is unaffected (its parent draw's own balance is
+  always recomputed fresh on the next read, so nothing needs updating by
+  hand).
+  `lib/api.js`'s `ownerDraws` object gained `returns(id, token)`/
+  `recordReturn(id, payload, token)` for the two new routes.
+  `pages/business/OwnerDraws.jsx`'s desktop table and mobile
+  `MobileListAccordion` cards both gained a "Balance" column/row (amber
+  when `> 0`, emerald once fully repaid; an em dash for a `type: 'return'`
+  row, which has none) alongside a `rowActions()` helper (mirroring
+  `Licenses.jsx`'s own shared-between-breakpoints convention) that adds a
+  "Record return" `IconActionButton` (`RefreshIcon`, tone `emerald`) —
+  shown only on a `type: 'draw'` row with `balance > 0`, same "never show
+  a button that would just error" convention this app follows everywhere
+  else. Clicking it opens a single combined `Modal` (`returnTarget` state)
+  showing the draw's own drawn/already-returned/remaining-balance summary,
+  its full return history (fetched via `GET /:id/returns`, same "instant
+  from the already-known list row, then confirmed from the server"
+  two-step `EmailPreviewModal.jsx`'s own "fetch on open" pattern follows),
+  and — while a balance remains — a form to record a payment (Amount,
+  defaulting to the current remaining balance; Date, defaulting to today;
+  optional Notes). A successful submit keeps the modal open rather than
+  closing it (`returnDetail`/`returnTarget` both refreshed from the
+  response, and the Amount field re-synced to the new remaining balance)
+  so recording several installments against the same draw in one sitting
+  doesn't mean reopening it each time; the list/KPI strip refresh in the
+  background via the page's existing `load()`/`loadSummary()`. Once the
+  balance reaches zero the form is replaced with a plain "This draw has
+  been fully repaid." line.
 - `routes/recurring.js` — CRUD for `recurring_invoices` (+ their
   `recurring_invoice_items` template line items) mounted at
   `/api/recurring-invoices`. Frequency is `weekly|monthly|yearly`. `GET /`
