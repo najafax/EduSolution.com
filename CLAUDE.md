@@ -317,14 +317,44 @@ routes also accepts `?q=` (already existed on `clients`/`products`/
 previously had zero backend search and did 100% client-side filtering) —
 `q` and `page` compose freely, and export routes (`GET /export.csv`/
 `GET /export.xlsx` — see `lib/xlsx.js` above for why every export-capable
-route ships both formats from one shared row/column definition) are
-deliberately untouched by either, always returning every row. **One
-exception**: `routes/invoices.js`'s own export pair (see that file's own
-note on `loadInvoiceExport()`) does accept `status`/`q`, since a business
-downloading "the overdue invoices" or "the currently-searched invoices"
-genuinely wants a filtered file, not a reminder to filter it themselves
-afterward in a spreadsheet — every other export-capable route in this app
-still ignores both, unchanged.
+route ships both formats from one shared row/column definition) used to be
+deliberately untouched by either, always returning every row, regardless of
+what was filtered on screen.
+**Filtered export is now the rule, not the exception**: starting with
+`routes/invoices.js`'s own export pair (see that file's own note on
+`loadInvoiceExport()`, first built for its own `?status=overdue` filter —
+see "Status/derived-field conventions" below), every export-capable list
+route now accepts the same filter params its own `GET /` does and reuses a
+shared `build*Where()` helper (`buildInvoiceWhere()`, `buildQuoteWhere()`,
+`buildClientWhere()`, `buildExpenseWhere()`, `buildContributionWhere()`,
+`buildLicenseWhere()`, `buildDrawWhere()` — one per resource, each defined
+right above its own `GET /` and reused by that resource's own export
+loader) so a filtered download can never drift from what `GET /` itself
+would return for the same query. A business downloading "the overdue
+invoices" or "the currently-searched clients" genuinely wants a filtered
+file, not a reminder to filter it themselves afterward in a spreadsheet.
+Called with no filter args (or hit directly with no query string), every
+one of these behaves exactly as it always did — the complete, unfiltered
+set — so this is additive, not a behavior change for an existing caller
+that never passes a filter. Several of these also give the downloaded
+filename a status/category suffix when filtered (e.g.
+`invoices-overdue.csv`, `licenses-expiring_soon.csv`,
+`expenses-rent.csv`) via a small `exportFilename()` helper local to that
+route file, so the file itself says what's in it — omitted for a filter
+that's inherently free text rather than a fixed value (a search query, a
+contributor/payee/taken-by name), since that wouldn't make a clean
+filename slug. `routes/ownerDraws.js`'s own `buildDrawWhere()` additionally
+returns the filter-dependent `orderBy` its own "Outstanding only" filter
+switches to (balance-descending instead of date-descending — see that
+route's own note), not just a WHERE clause, since it's the one list here
+where the active filter also changes the sort.
+`Clients.jsx`/`Quotes.jsx`/`Expenses.jsx`/`CapitalContributions.jsx`/
+`Licenses.jsx`/`OwnerDraws.jsx`/`Invoices.jsx`'s own `handleExportCsv()`/
+`handleExportXlsx()` all pass their page's current filter state
+(status/category/payee/contributor/type/takenBy/hasBalance, plus the
+debounced search box) through to `lib/api.js`'s matching `exportCsv()`/
+`exportXlsx()` calls, which build the query string the same way `list()`
+already does for that resource.
 
 - `routes/clients.js`, `routes/settings.js` — plain CRUD for `clients`, and
   GET/PUT for the single-row `business_settings` table (business name,

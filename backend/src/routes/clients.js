@@ -101,10 +101,21 @@ const PORTAL_STATUS_CASE = `CASE
   END AS portal_status`;
 const PORTAL_STATUS_JOIN = 'LEFT JOIN client_portal_accounts portal ON portal.client_id = clients.id';
 
-router.get('/', view, (req, res) => {
-  const { q, page: pageParam } = req.query;
+// Shared by GET / and both export routes below, so a filtered export can
+// never drift from what the list page itself is actually showing when the
+// download button is clicked. Mirrors routes/invoices.js's own
+// buildInvoiceWhere() — clients has no status concept, only this one q
+// filter, so there's nothing to translate the way statusWhere() does
+// elsewhere.
+function buildClientWhere({ q }) {
   const where = q ? 'WHERE clients.name LIKE ? OR clients.email LIKE ?' : '';
   const params = q ? [`%${q}%`, `%${q}%`] : [];
+  return { where, params };
+}
+
+router.get('/', view, (req, res) => {
+  const { q, page: pageParam } = req.query;
+  const { where, params } = buildClientWhere({ q });
   const listQuery = `SELECT clients.*, ${PORTAL_STATUS_CASE} FROM clients ${PORTAL_STATUS_JOIN}`;
 
   if (!pageParam) {
@@ -123,9 +134,17 @@ router.get('/', view, (req, res) => {
 
 // Shared by both export routes below so the CSV and XLSX downloads can
 // never drift apart — one row query, one column list, two serializers.
-function loadClientExport() {
+// **Filtered export**: accepts an optional `{ q }` and reuses
+// buildClientWhere() — the same WHERE clause GET / itself builds — so
+// "Export CSV"/"Export Excel" clicked from Clients.jsx while the search
+// box has something typed downloads exactly the matching clients rather
+// than always the full table, mirroring routes/invoices.js's own
+// loadInvoiceExport(). Called with no argument, behaves exactly as before
+// this existed — every client, unfiltered.
+function loadClientExport({ q } = {}) {
+  const { where, params } = buildClientWhere({ q });
   return {
-    rows: db.prepare('SELECT * FROM clients ORDER BY name').all(),
+    rows: db.prepare(`SELECT * FROM clients ${where} ORDER BY name`).all(...params),
     columns: [
       { label: 'Name', key: 'name' },
       { label: 'Email', key: 'email' },
@@ -137,14 +156,14 @@ function loadClientExport() {
 }
 
 router.get('/export.csv', view, (req, res) => {
-  const { rows, columns } = loadClientExport();
+  const { rows, columns } = loadClientExport({ q: req.query.q });
   const csv = toCsv(rows, columns);
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="clients.csv"' });
   res.send(csv);
 });
 
 router.get('/export.xlsx', view, async (req, res) => {
-  const { rows, columns } = loadClientExport();
+  const { rows, columns } = loadClientExport({ q: req.query.q });
   const buffer = await toXlsxBuffer(rows, columns, 'Clients');
   res.set({
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

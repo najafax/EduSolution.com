@@ -31,8 +31,11 @@ function distinctContributors() {
     .map((r) => r.contributor_name);
 }
 
-router.get('/', view, (req, res) => {
-  const { q, contributor, page: pageParam } = req.query;
+// Shared by GET / and both export routes below, so a filtered export can
+// never drift from what the list page itself is actually showing when the
+// download button is clicked. Mirrors routes/invoices.js's own
+// buildInvoiceWhere().
+function buildContributionWhere({ q, contributor }) {
   const conditions = [];
   const params = [];
   if (q) {
@@ -44,6 +47,12 @@ router.get('/', view, (req, res) => {
     params.push(contributor);
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  return { where, params };
+}
+
+router.get('/', view, (req, res) => {
+  const { q, contributor, page: pageParam } = req.query;
+  const { where, params } = buildContributionWhere({ q, contributor });
   // Total reflects every matching row, not just the current page — same
   // reasoning as expenses.js's own totalAmount, so a "Total" row stays
   // accurate once pagination means the page's own array isn't the full set.
@@ -75,9 +84,16 @@ router.get('/', view, (req, res) => {
 
 // Shared by both export routes below so the CSV and XLSX downloads can
 // never drift apart — one row query, one column list, two serializers.
-function loadContributionExport() {
+// **Filtered export**: accepts an optional `{ q, contributor }` and reuses
+// buildContributionWhere() — the same WHERE clause GET / itself builds —
+// so a download matches whatever's currently filtered on
+// CapitalContributions.jsx, mirroring routes/invoices.js's own
+// loadInvoiceExport(). Called with no argument, behaves exactly as before
+// this existed — every contribution, unfiltered.
+function loadContributionExport({ q, contributor } = {}) {
+  const { where, params } = buildContributionWhere({ q, contributor });
   return {
-    rows: db.prepare('SELECT * FROM capital_contributions ORDER BY contribution_date DESC, id DESC').all(),
+    rows: db.prepare(`SELECT * FROM capital_contributions ${where} ORDER BY contribution_date DESC, id DESC`).all(...params),
     columns: [
       { label: 'Date', key: 'contribution_date' },
       { label: 'Contributor', key: 'contributor_name' },
@@ -88,14 +104,16 @@ function loadContributionExport() {
 }
 
 router.get('/export.csv', view, (req, res) => {
-  const { rows, columns } = loadContributionExport();
+  const { q, contributor } = req.query;
+  const { rows, columns } = loadContributionExport({ q, contributor });
   const csv = toCsv(rows, columns);
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="capital-contributions.csv"' });
   res.send(csv);
 });
 
 router.get('/export.xlsx', view, async (req, res) => {
-  const { rows, columns } = loadContributionExport();
+  const { q, contributor } = req.query;
+  const { rows, columns } = loadContributionExport({ q, contributor });
   const buffer = await toXlsxBuffer(rows, columns, 'Capital contributions');
   res.set({
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

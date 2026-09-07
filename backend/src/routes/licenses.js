@@ -62,8 +62,11 @@ function statusWhere(status) {
   return null;
 }
 
-router.get('/', view, (req, res) => {
-  const { q, status, page: pageParam } = req.query;
+// Shared by GET / and both export routes below, so a filtered export can
+// never drift from what the list page itself is actually showing when the
+// download button is clicked — one place builds the WHERE clause, every
+// caller reuses it. Mirrors routes/invoices.js's own buildInvoiceWhere().
+function buildLicenseWhere({ q, status }) {
   const conditions = [];
   const params = [];
   if (q) {
@@ -76,6 +79,12 @@ router.get('/', view, (req, res) => {
     params.push(...statusFilter.params);
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  return { where, params };
+}
+
+router.get('/', view, (req, res) => {
+  const { q, status, page: pageParam } = req.query;
+  const { where, params } = buildLicenseWhere({ q, status });
   const baseFrom = 'FROM licenses JOIN clients ON clients.id = licenses.client_id';
 
   // Most recently renewed license first — SQLite sorts NULL last_renewed_at
@@ -132,15 +141,27 @@ router.get('/summary', view, (req, res) => {
 // still useful in the downloaded file for a human reading it, not just
 // for reimport. `Notes` was previously missing from this export
 // entirely — a license's notes never round-tripped even by accident.
-function loadLicenseExport() {
+// **Filtered export**: accepts an optional `{ q, status }` and reuses
+// buildLicenseWhere() — the same WHERE clause GET / itself builds — so
+// "Export CSV"/"Export Excel" clicked from Licenses.jsx download exactly
+// what's currently filtered on screen (e.g. only expiring-soon licenses)
+// rather than always the full table, mirroring routes/invoices.js's own
+// loadInvoiceExport(). Called with no argument, behaves exactly as before
+// this existed — every license, unfiltered, still in the export's own
+// expiry-ASC order (unrelated to the list's own last_renewed_at-DESC
+// order — see this function's own note above on why a downloaded report
+// reads better chronologically by expiry).
+function loadLicenseExport({ q, status } = {}) {
+  const { where, params } = buildLicenseWhere({ q, status });
   return {
     rows: db
       .prepare(
         `SELECT licenses.*, clients.name AS client_name, clients.email AS client_email
          FROM licenses JOIN clients ON clients.id = licenses.client_id
+         ${where}
          ORDER BY licenses.expiry_date ASC, licenses.id DESC`,
       )
-      .all()
+      .all(...params)
       .map(withComputed),
     columns: [
       { label: 'Client email', key: 'client_email' },
@@ -158,19 +179,28 @@ function loadLicenseExport() {
   };
 }
 
+// Same convention routes/invoices.js's own exportFilename() establishes —
+// a status-specific filename (e.g. "licenses-expiring_soon.csv") when the
+// download is actually filtered, plain "licenses.csv" otherwise.
+function exportFilename(status, ext) {
+  return status ? `licenses-${status}.${ext}` : `licenses.${ext}`;
+}
+
 router.get('/export.csv', view, (req, res) => {
-  const { rows, columns } = loadLicenseExport();
+  const { q, status } = req.query;
+  const { rows, columns } = loadLicenseExport({ q, status });
   const csv = toCsv(rows, columns);
-  res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="licenses.csv"' });
+  res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="${exportFilename(status, 'csv')}"` });
   res.send(csv);
 });
 
 router.get('/export.xlsx', view, async (req, res) => {
-  const { rows, columns } = loadLicenseExport();
+  const { q, status } = req.query;
+  const { rows, columns } = loadLicenseExport({ q, status });
   const buffer = await toXlsxBuffer(rows, columns, 'Licenses');
   res.set({
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'Content-Disposition': 'attachment; filename="licenses.xlsx"',
+    'Content-Disposition': `attachment; filename="${exportFilename(status, 'xlsx')}"`,
   });
   res.send(buffer);
 });

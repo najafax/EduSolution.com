@@ -41,8 +41,11 @@ function withComputedUsd(row) {
   return { ...row, amount_usd: amountUsd };
 }
 
-router.get('/', view, (req, res) => {
-  const { q, category, payee, page: pageParam } = req.query;
+// Shared by GET / and both export routes below, so a filtered export can
+// never drift from what the list page itself is actually showing when the
+// download button is clicked. Mirrors routes/invoices.js's own
+// buildInvoiceWhere().
+function buildExpenseWhere({ q, category, payee }) {
   const conditions = [];
   const params = [];
   if (q) {
@@ -58,6 +61,12 @@ router.get('/', view, (req, res) => {
     params.push(payee);
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  return { where, params };
+}
+
+router.get('/', view, (req, res) => {
+  const { q, category, payee, page: pageParam } = req.query;
+  const { where, params } = buildExpenseWhere({ q, category, payee });
   // Sum reflects every matching row, not just the current page, so the
   // "Total" row on the Expenses page stays accurate once pagination hides
   // rows from the client-side array it used to sum directly.
@@ -91,9 +100,16 @@ router.get('/', view, (req, res) => {
 // never drift apart — one row query, one column list, two serializers.
 // The four currency-exchange columns are blank for every other category's
 // row, same as `Payee`/`Notes` already are for rows that never set them.
-function loadExpenseExport() {
+// **Filtered export**: accepts an optional `{ q, category, payee }` and
+// reuses buildExpenseWhere() — the same WHERE clause GET / itself builds —
+// so a download matches whatever's currently filtered on Expenses.jsx,
+// mirroring routes/invoices.js's own loadInvoiceExport(). Called with no
+// argument, behaves exactly as before this existed — every expense,
+// unfiltered.
+function loadExpenseExport({ q, category, payee } = {}) {
+  const { where, params } = buildExpenseWhere({ q, category, payee });
   return {
-    rows: db.prepare('SELECT * FROM expenses ORDER BY expense_date DESC, id DESC').all().map(withComputedUsd),
+    rows: db.prepare(`SELECT * FROM expenses ${where} ORDER BY expense_date DESC, id DESC`).all(...params).map(withComputedUsd),
     // Every label here doubles as this row's import column name once
     // lib/csv.js's parseCsv() lowercases and underscores it — "Expense
     // date" (not the shorter, more report-like "Date") specifically so a
@@ -118,19 +134,30 @@ function loadExpenseExport() {
   };
 }
 
+// A category-specific filename (e.g. "expenses-rent.csv") when the
+// download is actually filtered by category, plain "expenses.csv"
+// otherwise — same convention routes/invoices.js's own exportFilename()
+// establishes. Not keyed on `payee`/`q` too — those are free text, not a
+// clean filename slug the way a fixed category value already is.
+function exportFilename(category, ext) {
+  return category ? `expenses-${category.replace(/\s+/g, '-')}.${ext}` : `expenses.${ext}`;
+}
+
 router.get('/export.csv', view, (req, res) => {
-  const { rows, columns } = loadExpenseExport();
+  const { q, category, payee } = req.query;
+  const { rows, columns } = loadExpenseExport({ q, category, payee });
   const csv = toCsv(rows, columns);
-  res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="expenses.csv"' });
+  res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="${exportFilename(category, 'csv')}"` });
   res.send(csv);
 });
 
 router.get('/export.xlsx', view, async (req, res) => {
-  const { rows, columns } = loadExpenseExport();
+  const { q, category, payee } = req.query;
+  const { rows, columns } = loadExpenseExport({ q, category, payee });
   const buffer = await toXlsxBuffer(rows, columns, 'Expenses');
   res.set({
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'Content-Disposition': 'attachment; filename="expenses.xlsx"',
+    'Content-Disposition': `attachment; filename="${exportFilename(category, 'xlsx')}"`,
   });
   res.send(buffer);
 });

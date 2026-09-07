@@ -37,8 +37,11 @@ function saveItems(quoteId, items) {
 
 const PAGE_SIZE = 20;
 
-router.get('/', view, (req, res) => {
-  const { status, q, page: pageParam } = req.query;
+// Shared by GET / and both export routes below, so a filtered export can
+// never drift from what the list page itself is actually showing when the
+// download button is clicked — one place builds the WHERE clause, every
+// caller reuses it. Mirrors routes/invoices.js's own buildInvoiceWhere().
+function buildQuoteWhere({ status, q }) {
   const conditions = [];
   const params = [];
   if (status) {
@@ -50,6 +53,12 @@ router.get('/', view, (req, res) => {
     params.push(`%${q}%`, `%${q}%`, `%${q}%`);
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  return { where, params };
+}
+
+router.get('/', view, (req, res) => {
+  const { status, q, page: pageParam } = req.query;
+  const { where, params } = buildQuoteWhere({ status, q });
   const baseFrom = 'FROM quotes JOIN clients ON clients.id = quotes.client_id';
 
   if (!pageParam) {
@@ -86,15 +95,26 @@ router.get('/', view, (req, res) => {
 // `description` the importer actually needs. Only the client columns
 // below are fixed for reimport purposes (so at least client matching
 // works if someone tries), not the rest of this shape.
-function loadQuoteExport() {
+//
+// **Filtered export**: accepts an optional `{ status, q }` and reuses
+// buildQuoteWhere() — the same WHERE clause GET / itself builds — so
+// "Export CSV"/"Export Excel" clicked from Quotes.jsx download exactly
+// what's currently filtered on screen rather than always the full table,
+// mirroring routes/invoices.js's own loadInvoiceExport(); see CLAUDE.md's
+// "Pagination convention" note on why this is the deliberate exception,
+// not the app-wide default. Called with no argument, behaves exactly as
+// before this existed — every quote, unfiltered.
+function loadQuoteExport({ status, q } = {}) {
+  const { where, params } = buildQuoteWhere({ status, q });
   return {
     rows: db
       .prepare(
         `SELECT quotes.*, clients.name AS client_name, clients.email AS client_email
          FROM quotes JOIN clients ON clients.id = quotes.client_id
+         ${where}
          ORDER BY quotes.issue_date DESC, quotes.id DESC`,
       )
-      .all(),
+      .all(...params),
     columns: [
       { label: 'Number', key: 'number' },
       { label: 'Client email', key: 'client_email' },
@@ -110,19 +130,29 @@ function loadQuoteExport() {
   };
 }
 
+// A status-specific filename (e.g. "quotes-sent.csv") when the download is
+// actually filtered, so the file itself says what's in it; plain
+// "quotes.csv" otherwise — same convention routes/invoices.js's own
+// exportFilename() already establishes.
+function exportFilename(status, ext) {
+  return status ? `quotes-${status}.${ext}` : `quotes.${ext}`;
+}
+
 router.get('/export.csv', view, (req, res) => {
-  const { rows, columns } = loadQuoteExport();
+  const { status, q } = req.query;
+  const { rows, columns } = loadQuoteExport({ status, q });
   const csv = toCsv(rows, columns);
-  res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="quotes.csv"' });
+  res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="${exportFilename(status, 'csv')}"` });
   res.send(csv);
 });
 
 router.get('/export.xlsx', view, async (req, res) => {
-  const { rows, columns } = loadQuoteExport();
+  const { status, q } = req.query;
+  const { rows, columns } = loadQuoteExport({ status, q });
   const buffer = await toXlsxBuffer(rows, columns, 'Quotes');
   res.set({
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'Content-Disposition': 'attachment; filename="quotes.xlsx"',
+    'Content-Disposition': `attachment; filename="${exportFilename(status, 'xlsx')}"`,
   });
   res.send(buffer);
 });

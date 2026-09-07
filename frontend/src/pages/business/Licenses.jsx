@@ -314,10 +314,13 @@ export default function Licenses() {
     updateLicenseStatus(l, 'active', 'reactivate');
   }
 
+  // Exports whatever's currently filtered on this page (status chip, and
+  // the search box once its debounce settles) rather than always the full
+  // table — see routes/invoices.js's own loadInvoiceExport() note.
   async function handleExportCsv() {
     setError('');
     try {
-      await api.licenses.exportCsv(token);
+      await api.licenses.exportCsv(token, { q: debouncedSearch, status });
     } catch (err) {
       setError(err.message);
     }
@@ -326,7 +329,7 @@ export default function Licenses() {
   async function handleExportXlsx() {
     setError('');
     try {
-      await api.licenses.exportXlsx(token);
+      await api.licenses.exportXlsx(token, { q: debouncedSearch, status });
     } catch (err) {
       setError(err.message);
     }

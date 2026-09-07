@@ -343,10 +343,14 @@ export default function Expenses() {
     deleteWithUndo([expense.id], `"${expense.description}" deleted.`);
   }
 
+  // Exports whatever's currently filtered on this page (category chip,
+  // payee filter, and the search box once its debounce settles) rather
+  // than always the full table — see routes/invoices.js's own
+  // loadInvoiceExport() note.
   async function handleExportCsv() {
     setError('');
     try {
-      await api.expenses.exportCsv(token);
+      await api.expenses.exportCsv(token, { q: debouncedSearch, category: categoryFilter, payee: payeeFilter });
     } catch (err) {
       setError(err.message);
     }
@@ -355,7 +359,7 @@ export default function Expenses() {
   async function handleExportXlsx() {
     setError('');
     try {
-      await api.expenses.exportXlsx(token);
+      await api.expenses.exportXlsx(token, { q: debouncedSearch, category: categoryFilter, payee: payeeFilter });
     } catch (err) {
       setError(err.message);
     }

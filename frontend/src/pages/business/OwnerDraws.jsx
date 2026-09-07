@@ -345,10 +345,19 @@ export default function OwnerDraws() {
     );
   }
 
+  // Exports whatever's currently filtered on this page (type/balance
+  // chips, taken-by dropdown, and the search box once its debounce
+  // settles) rather than always the full table — see routes/invoices.js's
+  // own loadInvoiceExport() note.
   async function handleExportCsv() {
     setError('');
     try {
-      await api.ownerDraws.exportCsv(token);
+      await api.ownerDraws.exportCsv(token, {
+        q: debouncedSearch,
+        type: typeFilter,
+        takenBy: takenByFilter,
+        hasBalance: balanceFilter === 'outstanding' ? '1' : undefined,
+      });
     } catch (err) {
       setError(err.message);
     }
@@ -357,7 +366,12 @@ export default function OwnerDraws() {
   async function handleExportXlsx() {
     setError('');
     try {
-      await api.ownerDraws.exportXlsx(token);
+      await api.ownerDraws.exportXlsx(token, {
+        q: debouncedSearch,
+        type: typeFilter,
+        takenBy: takenByFilter,
+        hasBalance: balanceFilter === 'outstanding' ? '1' : undefined,
+      });
     } catch (err) {
       setError(err.message);
     }

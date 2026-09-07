@@ -98,8 +98,11 @@ export const api = {
     create: (payload, token) => request('/clients', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/clients/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/clients/${id}`, { method: 'DELETE', token }),
-    exportCsv: (token) => downloadFile('/clients/export.csv', token, 'clients.csv'),
-    exportXlsx: (token) => downloadFile('/clients/export.xlsx', token, 'clients.xlsx'),
+    // { q } mirrors list()'s own search — see routes/invoices.js's
+    // loadInvoiceExport() note on why this follows the current filter
+    // rather than always the full table.
+    exportCsv: (token, { q } = {}) => downloadFile(`/clients/export.csv${qs({ q })}`, token, 'clients.csv'),
+    exportXlsx: (token, { q } = {}) => downloadFile(`/clients/export.xlsx${qs({ q })}`, token, 'clients.xlsx'),
     portalInvitePreview: (id, token) => request(`/clients/${id}/portal-invite-preview`, { token }),
     portalInvite: (id, payload, token) => request(`/clients/${id}/portal-invite`, { method: 'POST', body: payload, token }),
   },
@@ -131,8 +134,13 @@ export const api = {
     convertToInvoice: (id, payload, token) =>
       request(`/quotes/${id}/convert-to-invoice`, { method: 'POST', body: payload, token }),
     openPdf: (id, token) => openPdf(`/quotes/${id}/pdf`, token),
-    exportCsv: (token) => downloadFile('/quotes/export.csv', token, 'quotes.csv'),
-    exportXlsx: (token) => downloadFile('/quotes/export.xlsx', token, 'quotes.xlsx'),
+    // { status, q } mirrors list()'s own filters — see routes/invoices.js's
+    // loadInvoiceExport() note on why this is the one export shape that
+    // follows the current filter rather than always the full table.
+    exportCsv: (token, { status, q } = {}) =>
+      downloadFile(`/quotes/export.csv${qs({ status, q })}`, token, status ? `quotes-${status}.csv` : 'quotes.csv'),
+    exportXlsx: (token, { status, q } = {}) =>
+      downloadFile(`/quotes/export.xlsx${qs({ status, q })}`, token, status ? `quotes-${status}.xlsx` : 'quotes.xlsx'),
   },
 
   quoteRequests: {
@@ -193,8 +201,13 @@ export const api = {
     create: (payload, token) => request('/expenses', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/expenses/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/expenses/${id}`, { method: 'DELETE', token }),
-    exportCsv: (token) => downloadFile('/expenses/export.csv', token, 'expenses.csv'),
-    exportXlsx: (token) => downloadFile('/expenses/export.xlsx', token, 'expenses.xlsx'),
+    // { q, category, payee } mirrors list()'s own filters — see
+    // routes/invoices.js's loadInvoiceExport() note on why this follows
+    // the current filter rather than always the full table.
+    exportCsv: (token, { q, category, payee } = {}) =>
+      downloadFile(`/expenses/export.csv${qs({ q, category, payee })}`, token, category ? `expenses-${category}.csv` : 'expenses.csv'),
+    exportXlsx: (token, { q, category, payee } = {}) =>
+      downloadFile(`/expenses/export.xlsx${qs({ q, category, payee })}`, token, category ? `expenses-${category}.xlsx` : 'expenses.xlsx'),
     analytics: (token) => request('/expenses/analytics', { token }),
   },
 
@@ -203,8 +216,13 @@ export const api = {
     create: (payload, token) => request('/capital-contributions', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/capital-contributions/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/capital-contributions/${id}`, { method: 'DELETE', token }),
-    exportCsv: (token) => downloadFile('/capital-contributions/export.csv', token, 'capital-contributions.csv'),
-    exportXlsx: (token) => downloadFile('/capital-contributions/export.xlsx', token, 'capital-contributions.xlsx'),
+    // { q, contributor } mirrors list()'s own filters — see
+    // routes/invoices.js's loadInvoiceExport() note on why this follows
+    // the current filter rather than always the full table.
+    exportCsv: (token, { q, contributor } = {}) =>
+      downloadFile(`/capital-contributions/export.csv${qs({ q, contributor })}`, token, 'capital-contributions.csv'),
+    exportXlsx: (token, { q, contributor } = {}) =>
+      downloadFile(`/capital-contributions/export.xlsx${qs({ q, contributor })}`, token, 'capital-contributions.xlsx'),
   },
 
   ownerDraws: {
@@ -216,8 +234,13 @@ export const api = {
     remove: (id, token) => request(`/owner-draws/${id}`, { method: 'DELETE', token }),
     returns: (id, token) => request(`/owner-draws/${id}/returns`, { token }),
     recordReturn: (id, payload, token) => request(`/owner-draws/${id}/returns`, { method: 'POST', body: payload, token }),
-    exportCsv: (token) => downloadFile('/owner-draws/export.csv', token, 'owner-draws.csv'),
-    exportXlsx: (token) => downloadFile('/owner-draws/export.xlsx', token, 'owner-draws.xlsx'),
+    // { q, type, takenBy, hasBalance } mirrors list()'s own filters — see
+    // routes/invoices.js's loadInvoiceExport() note on why this follows
+    // the current filter rather than always the full table.
+    exportCsv: (token, { q, type, takenBy, hasBalance } = {}) =>
+      downloadFile(`/owner-draws/export.csv${qs({ q, type, takenBy, hasBalance })}`, token, 'owner-draws.csv'),
+    exportXlsx: (token, { q, type, takenBy, hasBalance } = {}) =>
+      downloadFile(`/owner-draws/export.xlsx${qs({ q, type, takenBy, hasBalance })}`, token, 'owner-draws.xlsx'),
     statementPdf: (takenBy, token) => openPdf(`/owner-draws/statement/pdf${qs({ takenBy })}`, token),
   },
 
@@ -243,8 +266,13 @@ export const api = {
     remind: (id, payload, token) => request(`/licenses/${id}/remind`, { method: 'POST', body: payload, token }),
     renewalConfirmPreview: (id, token) => request(`/licenses/${id}/renewal-confirm-preview`, { token }),
     sendRenewalConfirm: (id, token) => request(`/licenses/${id}/renewal-confirm`, { method: 'POST', token }),
-    exportCsv: (token) => downloadFile('/licenses/export.csv', token, 'licenses.csv'),
-    exportXlsx: (token) => downloadFile('/licenses/export.xlsx', token, 'licenses.xlsx'),
+    // { q, status } mirrors list()'s own filters — see routes/invoices.js's
+    // loadInvoiceExport() note on why this follows the current filter
+    // rather than always the full table.
+    exportCsv: (token, { q, status } = {}) =>
+      downloadFile(`/licenses/export.csv${qs({ q, status })}`, token, status ? `licenses-${status}.csv` : 'licenses.csv'),
+    exportXlsx: (token, { q, status } = {}) =>
+      downloadFile(`/licenses/export.xlsx${qs({ q, status })}`, token, status ? `licenses-${status}.xlsx` : 'licenses.xlsx'),
   },
 
   activity: {

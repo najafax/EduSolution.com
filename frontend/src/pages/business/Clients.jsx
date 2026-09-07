@@ -126,10 +126,12 @@ export default function Clients() {
     deleteWithUndo([client.id], `"${client.name}" deleted.`);
   }
 
+  // Exports whatever's currently searched on this page rather than always
+  // the full table — see routes/invoices.js's own loadInvoiceExport() note.
   async function handleExportCsv() {
     setError('');
     try {
-      await api.clients.exportCsv(token);
+      await api.clients.exportCsv(token, { q: debouncedSearch });
     } catch (err) {
       setError(err.message);
     }
@@ -138,7 +140,7 @@ export default function Clients() {
   async function handleExportXlsx() {
     setError('');
     try {
-      await api.clients.exportXlsx(token);
+      await api.clients.exportXlsx(token, { q: debouncedSearch });
     } catch (err) {
       setError(err.message);
     }

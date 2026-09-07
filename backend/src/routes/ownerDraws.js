@@ -109,8 +109,14 @@ router.get('/summary', view, (req, res) => {
 const LIST_SELECT = `SELECT od.*, pd.draw_date AS parent_draw_date, pd.amount AS parent_draw_amount
   FROM owner_draws od LEFT JOIN owner_draws pd ON pd.id = od.parent_draw_id`;
 
-router.get('/', view, (req, res) => {
-  const { q, type, takenBy, hasBalance, page: pageParam } = req.query;
+// Shared by GET / and both export routes below, so a filtered export can
+// never drift from what the list page itself is actually showing when the
+// download button is clicked — including the balance-descending sort
+// "Outstanding only" switches to (see that filter's own note here), not
+// just the WHERE clause. Mirrors routes/invoices.js's own
+// buildInvoiceWhere(), extended with `orderBy` since this list is the one
+// case where the filter itself also changes the sort.
+function buildDrawWhere({ q, type, takenBy, hasBalance }) {
   const conditions = [];
   const params = [];
   if (q) {
@@ -152,6 +158,12 @@ router.get('/', view, (req, res) => {
     hasBalance === '1'
       ? `(od.amount - COALESCE((SELECT SUM(amount) FROM owner_draws r WHERE r.parent_draw_id = od.id AND r.type = 'return'), 0)) DESC, od.draw_date DESC, od.id DESC`
       : 'od.draw_date DESC, od.id DESC';
+  return { where, params, orderBy };
+}
+
+router.get('/', view, (req, res) => {
+  const { q, type, takenBy, hasBalance, page: pageParam } = req.query;
+  const { where, params, orderBy } = buildDrawWhere({ q, type, takenBy, hasBalance });
 
   if (!pageParam) {
     const rows = db.prepare(`${LIST_SELECT} ${where} ORDER BY ${orderBy}`).all(...params);
@@ -241,8 +253,16 @@ router.post('/:id/returns', manage, (req, res) => {
 // same convention routes/expenses.js's own currency-exchange columns
 // already follow, blank for whichever rows they don't apply to (Balance
 // for a return, Linked draw date/amount for a draw or an unlinked return).
-function loadDrawExport() {
-  const rows = db.prepare(`${LIST_SELECT} ORDER BY od.draw_date DESC, od.id DESC`).all().map(withComputedDraw);
+// **Filtered export**: accepts an optional `{ q, type, takenBy, hasBalance }`
+// and reuses buildDrawWhere() — the same WHERE/ORDER BY GET / itself
+// builds, "Outstanding only"'s own balance-descending sort included — so a
+// download matches whatever's currently filtered on OwnerDraws.jsx,
+// mirroring routes/invoices.js's own loadInvoiceExport(). Called with no
+// argument, behaves exactly as before this existed — every draw/return,
+// unfiltered, in plain date-DESC order.
+function loadDrawExport({ q, type, takenBy, hasBalance } = {}) {
+  const { where, params, orderBy } = buildDrawWhere({ q, type, takenBy, hasBalance });
+  const rows = db.prepare(`${LIST_SELECT} ${where} ORDER BY ${orderBy}`).all(...params).map(withComputedDraw);
   return {
     rows,
     columns: [
@@ -259,14 +279,16 @@ function loadDrawExport() {
 }
 
 router.get('/export.csv', view, (req, res) => {
-  const { rows, columns } = loadDrawExport();
+  const { q, type, takenBy, hasBalance } = req.query;
+  const { rows, columns } = loadDrawExport({ q, type, takenBy, hasBalance });
   const csv = toCsv(rows, columns);
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="owner-draws.csv"' });
   res.send(csv);
 });
 
 router.get('/export.xlsx', view, async (req, res) => {
-  const { rows, columns } = loadDrawExport();
+  const { q, type, takenBy, hasBalance } = req.query;
+  const { rows, columns } = loadDrawExport({ q, type, takenBy, hasBalance });
   const buffer = await toXlsxBuffer(rows, columns, 'Owner draws');
   res.set({
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

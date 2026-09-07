@@ -150,10 +150,13 @@ export default function Quotes() {
     );
   }
 
+  // Exports whatever's currently filtered on this page (status chip, and
+  // the search box once its debounce settles) rather than always the full
+  // table — see routes/quotes.js's own loadQuoteExport() note.
   async function handleExportCsv() {
     setError('');
     try {
-      await api.quotes.exportCsv(token);
+      await api.quotes.exportCsv(token, { status, q: debouncedSearch });
     } catch (err) {
       setError(err.message);
     }
@@ -162,7 +165,7 @@ export default function Quotes() {
   async function handleExportXlsx() {
     setError('');
     try {
-      await api.quotes.exportXlsx(token);
+      await api.quotes.exportXlsx(token, { status, q: debouncedSearch });
     } catch (err) {
       setError(err.message);
     }

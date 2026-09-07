@@ -115,10 +115,14 @@ export default function CapitalContributions() {
     deleteWithUndo([contribution.id], `Contribution from "${contribution.contributor_name}" deleted.`);
   }
 
+  // Exports whatever's currently filtered on this page (contributor
+  // filter, and the search box once its debounce settles) rather than
+  // always the full table — see routes/invoices.js's own
+  // loadInvoiceExport() note.
   async function handleExportCsv() {
     setError('');
     try {
-      await api.capitalContributions.exportCsv(token);
+      await api.capitalContributions.exportCsv(token, { q: debouncedSearch, contributor: contributorFilter });
     } catch (err) {
       setError(err.message);
     }
@@ -127,7 +131,7 @@ export default function CapitalContributions() {
   async function handleExportXlsx() {
     setError('');
     try {
-      await api.capitalContributions.exportXlsx(token);
+      await api.capitalContributions.exportXlsx(token, { q: debouncedSearch, contributor: contributorFilter });
     } catch (err) {
       setError(err.message);
     }
