@@ -1181,6 +1181,93 @@ already does for that resource.
   background via the page's existing `load()`/`loadSummary()`. Once the
   balance reaches zero the form is replaced with a plain "This draw has
   been fully repaid." line.
+- **Shareholders and the daily earnings report**: `shareholders`
+  (`db/index.js`, brand new table — plain `CREATE TABLE IF NOT EXISTS`)
+  is a small standalone recipient list — `id`/`name`/`email`/`active` —
+  for the automated "how'd we do today" email every active shareholder
+  gets, once a day, only on a day a payment actually came in. Deliberately
+  **not** derived from `capital_contributions`/`owner_draws`: those are
+  transaction *logs* keyed on a free-text name with no email and no
+  notion of "this person still exists" beyond their most recent row,
+  while a shareholder here is a standing recipient with no relationship
+  to either table — adding one requires no contribution/draw history, and
+  a contribution/draw can still be recorded under a name that never
+  appears here. Also deliberately not a `users` row: a shareholder gets
+  no login, no session, no permissions, nothing beyond an automated
+  report landing in their inbox, so a staff account (with everything that
+  implies) would be the wrong trust level. `routes/shareholders.js`
+  (mounted `/api/shareholders`) is plain CRUD, gated on the existing
+  `financials` permission rather than a new `MODULES` entry — same
+  "reuse when the sensitivity level already matches" call
+  `routes/reports.js`/`routes/capitalContributions.js` already make
+  elsewhere, since a shareholder list (and what it's used to email) is
+  squarely financial-summary-sensitive data. No pagination/search — a
+  shareholder list is inherently tiny, same "don't build it until
+  needed" call this app already makes for comparably small lists
+  (`routes/licenses.js`'s own `GET /:id/renewals`).
+  `lib/dailyEarningsReport.js`'s `computeDailyEarnings(dateStr)` sums
+  `payments` received and `expenses` recorded on that exact date
+  (joining `payments` to `invoices`/`clients` for a client name/invoice
+  number per row); `runDailyEarningsReport(dateStr = yesterday)` is the
+  actual job — skips entirely if `SMTP_HOST` isn't set (same convention
+  every other automated email job in this app follows), then **skips
+  with no email sent at all if that day's `totalReceived` is `<= 0`** —
+  "if any earning is received only" is a hard gate on gross payments
+  received, checked before expenses are even considered, so a quiet day
+  never puts an empty or expense-only report in anyone's inbox — then
+  skips if there are no active shareholders. Only once all three checks
+  pass does it render a PDF (`lib/reportPdf.js`'s `renderDailyEarningsPdf()`
+  — a "DAILY EARNINGS STATEMENT" for that one date, sharing
+  `drawStatementSection`/`drawNetProfitBar` with `renderProfitLossPdf()`,
+  just listing that day's individual payments/expenses instead of a
+  period's category totals, since a single day's own transaction count is
+  small enough to list one by one) and email each active shareholder
+  independently (one bad address doesn't block the rest, same
+  `try/catch`-per-recipient shape `runMonthlyReport()`'s own send loop
+  uses) with the PDF attached. `date`/`totalReceived`/`totalExpenses`/
+  `netEarning` all report on **yesterday** by default — the job fires at
+  08:20 (see `lib/scheduler.js` below), so "today" has barely started and
+  has essentially no data of its own yet, the same "previous period"
+  framing `runMonthlyReport()` already uses for the month before it — but
+  `dateStr` is an overridable argument, which is what lets
+  `routes/shareholders.js`'s own `POST /send-report` (`financials:manage`,
+  no `date` param exposed in the UI — always "yesterday," matching exactly
+  what tomorrow morning's automatic run would also do) re-run the exact
+  same job on demand, so an admin can verify the whole pipeline (or resend
+  after a prior run failed) without waiting for the next 08:20. Each
+  successful send is logged both to `email_log` (type
+  `shareholder_daily_earnings` — unlike `runMonthlyReport()`'s own staff
+  digest, this goes to real external stakeholders rather than staff, so
+  it's treated as a real, auditable send rather than an internal
+  notification) and, once at all (not per recipient), to `activity_log`
+  ("sent daily earnings report to N shareholder(s) for {date}" —
+  attributed to `'Automated'`, same as every other unattended cron send
+  in this app). `lib/emailTemplates.js` gained a 7th editable type,
+  `shareholder_daily_earnings` — same reasoning the dunning ladder's own
+  reversal already documents (see that file's own top-of-file note): the
+  fact that nobody reviews any single day's automated send before it
+  fires doesn't mean the wording itself shouldn't be reviewable/
+  customizable ahead of time by an admin who wants their own tone.
+  `lib/scheduler.js` registers the cron trigger at `'20 8 * * *'` —
+  staggered 5 minutes after the license-expiry job, same "avoid
+  interleaved console output" reasoning every other same-hour job stagger
+  in this file already documents. This app's production deploy (Render)
+  runs in UTC, which is GMT year-round (GMT has no DST to diverge from),
+  so "08:20 server time" reads as "08:20 GMT" there — but the cron
+  expression itself is evaluated in whatever timezone the Node process is
+  actually running in, so if that host or its `TZ` env var ever changes,
+  this schedule moves with it rather than silently staying pinned to GMT.
+  `pages/business/Shareholders.jsx` (route `/shareholders`, `Navbar.jsx`
+  link right after Financials, gated on `financials`) is a thin list+
+  modal-form page — no detail page, no pagination, `active` is a plain
+  checkbox rather than the Cancel/Reactivate dedicated-button treatment
+  `Licenses.jsx`'s own `status` gets, since this is a much simpler
+  on/off toggle with no billing-cycle/renewal semantics attached — plus a
+  "Send yesterday's report now" header button (`financials:manage`-gated)
+  calling `POST /send-report` and rendering whichever outcome comes back
+  (sent count, or the specific reason it was skipped) as an inline
+  notice, so an admin testing the feature gets the same skip reasoning
+  the cron job itself would have logged, not just a generic "done."
 - `routes/recurring.js` — CRUD for `recurring_invoices` (+ their
   `recurring_invoice_items` template line items) mounted at
   `/api/recurring-invoices`. Frequency is `weekly|monthly|yearly`. `GET /`

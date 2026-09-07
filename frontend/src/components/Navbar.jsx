@@ -26,6 +26,7 @@ export const BUSINESS_LINKS = [
   { to: '/capital-contributions', label: 'Capital', module: 'expenses' },
   { to: '/owner-draws', label: 'Owner draws', module: 'expenses' },
   { to: '/financials', label: 'Financials', module: 'financials' },
+  { to: '/shareholders', label: 'Shareholders', module: 'financials' },
   { to: '/reports', label: 'Reports', module: 'financials' },
   { to: '/activity', label: 'Activity', module: 'activity' },
   { to: '/users', label: 'Users', module: 'users' },

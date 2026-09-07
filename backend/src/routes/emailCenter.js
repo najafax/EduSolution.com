@@ -40,6 +40,7 @@ const TYPE_LABELS = {
   overdue_reminder: 'Automated overdue reminder',
   license_expiry_alert: 'Automated license expiry alert',
   campaign: 'Promotional campaign',
+  shareholder_daily_earnings: 'Daily earnings report',
 };
 
 router.get('/templates', view, (req, res) => {

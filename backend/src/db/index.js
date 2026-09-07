@@ -253,6 +253,27 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- A shareholder/partner of the business who should hear about daily
+  -- earnings by email — see lib/scheduler.js's runDailyEarningsReport().
+  -- Deliberately a separate table from capital_contributions/owner_draws:
+  -- those are transaction *logs* keyed on a free-text name (no email, no
+  -- notion of "this person still exists" beyond their most recent row),
+  -- while this is a small, standalone recipient list with no relationship
+  -- to those tables at all — a shareholder can be added here with no
+  -- contribution/draw history yet, and a contribution/draw can still be
+  -- recorded under a name that never appears here. Not a users row
+  -- either: a shareholder gets no login, no permissions, nothing beyond an
+  -- automated report landing in their inbox, so giving them a staff
+  -- account (with everything that implies — a password, session
+  -- management, module grants) would be the wrong trust level entirely.
+  CREATE TABLE IF NOT EXISTS shareholders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS recurring_invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL REFERENCES clients(id),

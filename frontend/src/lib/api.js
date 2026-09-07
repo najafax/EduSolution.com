@@ -249,6 +249,16 @@ export const api = {
     statementPdf: (takenBy, token) => openPdf(`/owner-draws/statement/pdf${qs({ takenBy })}`, token),
   },
 
+  shareholders: {
+    list: (token) => request('/shareholders', { token }),
+    create: (payload, token) => request('/shareholders', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/shareholders/${id}`, { method: 'PUT', body: payload, token }),
+    remove: (id, token) => request(`/shareholders/${id}`, { method: 'DELETE', token }),
+    // Runs the daily-earnings job on demand, for yesterday's date — see
+    // routes/shareholders.js's own POST /send-report.
+    sendReport: (token) => request('/shareholders/send-report', { method: 'POST', token }),
+  },
+
   recurringInvoices: {
     list: (token, { q, page } = {}) => request(`/recurring-invoices${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/recurring-invoices/${id}`, { token }),

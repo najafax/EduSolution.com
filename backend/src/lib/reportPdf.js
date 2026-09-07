@@ -378,6 +378,60 @@ function renderExpenseReportPdf({ expenses, from, to, settings }) {
   return docToBuffer(doc, (d) => addPageFooter(d, settings));
 }
 
+// The daily counterpart to renderProfitLossPdf just below — one day's
+// worth of actual payments received and expenses recorded, rather than a
+// period's category totals, since a single day's own transaction count is
+// small enough to list individually (the same "list, don't just
+// aggregate" call routes/expenses.js's own currencyExchangeTransactions
+// makes for a comparably small, detail-worth-seeing set). Backs
+// lib/dailyEarningsReport.js's runDailyEarningsReport() — the automated
+// email sent to shareholders whenever a day actually brings in a payment.
+function renderDailyEarningsPdf({ date, payments, totalReceived, expenses, totalExpenses, settings }) {
+  const doc = newDoc();
+  let y = drawReportHeader(doc, { title: 'DAILY EARNINGS STATEMENT', subtitle: date, settings });
+
+  const paymentRows = payments.map((p) => ({
+    label: `${p.client_name} — ${p.invoice_number} (${titleCase(p.method.replace(/_/g, ' '))})`,
+    value: amountOnly(p.amount),
+  }));
+  y = drawStatementSection(
+    doc,
+    {
+      title: 'PAYMENTS RECEIVED',
+      rows: paymentRows.length ? paymentRows : [{ label: 'No payments recorded', value: amountOnly(0) }],
+      totalLabel: 'Total received',
+      totalValue: amountOnly(totalReceived),
+    },
+    y,
+  );
+
+  const expenseRows = expenses.map((e) => ({
+    label: `${titleCase(e.category)} — ${e.description}`,
+    value: amountOnly(e.amount),
+  }));
+  y = drawStatementSection(
+    doc,
+    {
+      title: 'EXPENSES',
+      rows: expenseRows.length ? expenseRows : [{ label: 'No expenses recorded', value: amountOnly(0) }],
+      totalLabel: 'Total expenses',
+      totalValue: amountOnly(totalExpenses),
+    },
+    y,
+  );
+
+  const netEarning = Math.round((totalReceived - totalExpenses) * 100) / 100;
+  y = drawNetProfitBar(doc, { value: signedAmountOnly(netEarning), positive: netEarning >= 0 }, y);
+
+  doc
+    .font('Helvetica')
+    .fontSize(8)
+    .fillColor(COLORS.muted)
+    .text('Payments received are cash actually collected on this date; expenses are those recorded with this same date.', MARGIN, y, { width: CONTENT_WIDTH });
+
+  return docToBuffer(doc, (d) => addPageFooter(d, settings));
+}
+
 function renderProfitLossPdf({ revenueTotal, expensesByCategory, totalExpenses, from, to, settings }) {
   const doc = newDoc();
   let y = drawReportHeader(doc, { title: 'PROFIT & LOSS', subtitle: `${from} to ${to}`, settings });
@@ -518,4 +572,5 @@ module.exports = {
   renderProfitLossPdf,
   renderBankBalancePdf,
   renderOwnerStatementPdf,
+  renderDailyEarningsPdf,
 };

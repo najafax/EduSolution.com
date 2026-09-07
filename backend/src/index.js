@@ -27,6 +27,7 @@ const reportsRoutes = require('./routes/reports');
 const emailCenterRoutes = require('./routes/emailCenter');
 const campaignsRoutes = require('./routes/campaigns');
 const websiteRoutes = require('./routes/website');
+const shareholdersRoutes = require('./routes/shareholders');
 const { startScheduler } = require('./lib/scheduler');
 
 const app = express();
@@ -78,6 +79,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/email-center', emailCenterRoutes);
 app.use('/api/campaigns', campaignsRoutes);
 app.use('/api/website', websiteRoutes);
+app.use('/api/shareholders', shareholdersRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

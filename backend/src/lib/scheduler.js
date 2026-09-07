@@ -9,6 +9,7 @@ const { nextInvoiceNumber } = require('./numbering');
 const { runBackup } = require('./backup');
 const { logEmail } = require('./emailLog');
 const { licenseRemindEmail, overdueReminderEmail } = require('./emailTemplates');
+const { runDailyEarningsReport } = require('./dailyEarningsReport');
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -412,6 +413,18 @@ function startScheduler() {
   cron.schedule('15 8 * * *', () => {
     runLicenseExpiryAlerts().catch((err) => console.error('[license-alerts] job failed:', err));
   });
+  // Daily at 08:20 server time — see lib/dailyEarningsReport.js. Staggered
+  // 5 minutes after the license-expiry job above, same reasoning as that
+  // job's own stagger from the overdue-reminder job before it. This app's
+  // production deploy (Render) runs in UTC, which is GMT year-round (GMT
+  // has no DST to diverge on), so "08:20 server time" is "08:20 GMT" on
+  // that deploy — but this cron expression is evaluated in whatever
+  // timezone the Node process itself is actually running in, so if that
+  // ever changes (a different host, an explicit TZ env var), this
+  // schedule moves with it rather than silently staying pinned to GMT.
+  cron.schedule('20 8 * * *', () => {
+    runDailyEarningsReport().catch((err) => console.error('[daily-earnings] job failed:', err));
+  });
   // Daily at 03:00 server time, ahead of the other jobs — see lib/backup.js.
   cron.schedule('0 3 * * *', () => {
     runBackup().catch((err) => console.error('[backup] job failed:', err));
@@ -432,5 +445,6 @@ module.exports = {
   runLicenseExpiryAlerts,
   expireOverdueQuotes,
   runMonthlyReport,
+  runDailyEarningsReport,
   runBackup,
 };

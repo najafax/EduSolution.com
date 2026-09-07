@@ -76,6 +76,18 @@ const DEFAULT_TEMPLATES = {
     message:
       'Hi {{client_name}},\n\nFINAL NOTICE: Invoice {{invoice_number}} for {{balance_due}} was due on {{due_date}} and is now {{overdue_days}} days overdue. Please settle this balance immediately to avoid further action. The invoice is attached for your reference.',
   },
+  // Sent to every active shareholder (routes/shareholders.js) once a day,
+  // only when a payment actually came in — see lib/dailyEarningsReport.js's
+  // runDailyEarningsReport(). Unlike runMonthlyReport()'s own staff digest,
+  // this goes to real external stakeholders, not staff, and — like the
+  // dunning ladder's own reversal (see this file's own top-of-file note) —
+  // there's a real reason to let an admin adjust the wording ahead of time
+  // even though nobody reviews any single day's send before it fires.
+  shareholder_daily_earnings: {
+    subject: "{{business_name}} — today's earnings: {{net_earning}}",
+    message:
+      "Hi {{shareholder_name}},\n\nHere's a quick summary of {{business_name}}'s earnings for {{date}}:\n\nReceived: {{total_received}}\nExpenses: {{total_expenses}}\nNet: {{net_earning}}\n\nThe full statement, with every payment and expense for the day, is attached.",
+  },
 };
 
 // Which placeholders are valid for each type, and a human label for the
@@ -136,6 +148,14 @@ const PLACEHOLDERS = {
     { key: 'due_date', label: 'Due date' },
     { key: 'overdue_days', label: 'Days overdue' },
   ],
+  shareholder_daily_earnings: [
+    { key: 'shareholder_name', label: 'Shareholder name' },
+    { key: 'business_name', label: 'Business name' },
+    { key: 'date', label: 'Date' },
+    { key: 'total_received', label: 'Total received' },
+    { key: 'total_expenses', label: 'Total expenses' },
+    { key: 'net_earning', label: 'Net earning' },
+  ],
 };
 
 const TYPE_LABELS = {
@@ -148,6 +168,7 @@ const TYPE_LABELS = {
   overdue_reminder_soft: 'Overdue reminder (early)',
   overdue_reminder_firm: 'Overdue reminder (firm)',
   overdue_reminder_final: 'Overdue reminder (final notice)',
+  shareholder_daily_earnings: 'Daily earnings report',
 };
 
 function renderTemplate(str, vars) {
@@ -245,6 +266,18 @@ function overdueReminderEmail({ invoice, client, settings, balanceDue, overdueDa
   });
 }
 
+function shareholderDailyEarningsEmail({ shareholder, settings, date, totalReceived, totalExpenses, netEarning }) {
+  const symbol = settings.currency_symbol || '$';
+  return buildEmail('shareholder_daily_earnings', shareholder.email, {
+    shareholder_name: shareholder.name,
+    business_name: settings.business_name || 'the business',
+    date,
+    total_received: `${symbol}${totalReceived.toFixed(2)}`,
+    total_expenses: `${symbol}${totalExpenses.toFixed(2)}`,
+    net_earning: `${symbol}${netEarning.toFixed(2)}`,
+  });
+}
+
 // Admin management (routes/emailCenter.js). Returns every editable type with
 // its currently-effective subject/message (stored override or default) plus
 // `isCustom` so the frontend can show a "Reset to default" action only when
@@ -290,6 +323,7 @@ module.exports = {
   licenseRemindEmail,
   portalInviteEmail,
   overdueReminderEmail,
+  shareholderDailyEarningsEmail,
   getAllTemplates,
   setTemplate,
   resetTemplate,
