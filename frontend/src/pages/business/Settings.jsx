@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import { resizeImage, dataUriByteLength } from '../../lib/imageResize';
 
 export default function Settings() {
   const { token, can } = useAuth();
@@ -193,7 +194,7 @@ const MAX_IMAGE_BYTES = 400 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg'];
 
 function ImageField({ label, value, onChange, onError, hint }) {
-  function handleFile(e) {
+  async function handleFile(e) {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-selecting the same file later
     if (!file) return;
@@ -202,14 +203,20 @@ function ImageField({ label, value, onChange, onError, hint }) {
       onError(`${label} must be a PNG or JPEG image`);
       return;
     }
-    if (file.size > MAX_IMAGE_BYTES) {
-      onError(`${label} must be smaller than 400KB`);
-      return;
+    try {
+      // A logo/signature/stamp is never printed larger than a few hundred
+      // px in the PDF header (see lib/pdf.js), so a phone-photographed or
+      // export-at-full-resolution source is downscaled well before it ever
+      // risks tripping the 400KB cap below.
+      const dataUri = await resizeImage(file, { maxDimension: 1000 });
+      if (dataUriByteLength(dataUri) > MAX_IMAGE_BYTES) {
+        onError(`${label} is still too large after resizing — please use a smaller or simpler image`);
+        return;
+      }
+      onChange(dataUri);
+    } catch (err) {
+      onError(err.message || `Could not read the selected file for ${label}`);
     }
-    const reader = new FileReader();
-    reader.onload = () => onChange(reader.result);
-    reader.onerror = () => onError(`Could not read the selected file for ${label}`);
-    reader.readAsDataURL(file);
   }
 
   return (

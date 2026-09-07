@@ -3,21 +3,17 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { roleLabel } from '../lib/roles';
 import { useConfirm } from '../lib/useConfirm';
+import { resizeImage, dataUriByteLength } from '../lib/imageResize';
 
 // Client-side gate before ever attempting the upload — mirrors
 // PortalInvoiceDetail.jsx's own PROOF_MAX_BYTES precedent, giving an
 // immediate, friendly error rather than relying solely on the backend's
-// own rejection (AVATAR_MAX_BYTES in routes/auth.js).
+// own rejection (AVATAR_MAX_BYTES in routes/auth.js). An avatar only ever
+// renders as a small circle (Sidebar's account row, DashboardRail's
+// profile card, Navbar's header), so resizeImage's own 512px cap below
+// means this ceiling is really just a sanity check against a truly huge
+// source file — the resized upload itself lands far under it in practice.
 const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
-
-function fileToDataUri(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 // Same two-initial-from-name-or-email calc as Sidebar.jsx's own account
 // row uses — kept as its own small copy here rather than a shared helper,
@@ -121,7 +117,11 @@ export default function MyAccount() {
     }
     setAvatarBusy(true);
     try {
-      const dataUri = await fileToDataUri(file);
+      const dataUri = await resizeImage(file, { maxDimension: 512 });
+      if (dataUriByteLength(dataUri) > AVATAR_MAX_BYTES) {
+        setAvatarError('Image is still too large after resizing — please use a smaller or simpler image.');
+        return;
+      }
       const { user: nextUser } = await api.updateAvatar(dataUri, token);
       updateUser(nextUser);
     } catch (err) {

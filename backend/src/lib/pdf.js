@@ -4,13 +4,21 @@ const MARGIN = 50;
 const CONTENT_WIDTH = 495;
 const PAGE_BOTTOM = 770;
 
+// brand/headerFill match frontend/src/index.css's own --color-lagoon-600/
+// -50 tokens exactly — this file predates the app-wide indigo→lagoon
+// rename documented in CLAUDE.md's "Mobile design system" section, which
+// swept every frontend component/page/chart but missed these PDFs (the
+// one place a client actually sees the business's branding), so the
+// quote/invoice/receipt PDFs — and, via lib/reportPdf.js's shared re-export
+// of this same COLORS object, all five report PDFs too — kept the old
+// indigo brand color after every other surface in the app had moved on.
 const COLORS = {
-  brand: '#4338ca',
+  brand: '#0e7c86',
   heading: '#0f172a',
   body: '#334155',
   muted: '#94a3b8',
   border: '#e2e8f0',
-  headerFill: '#eef2ff',
+  headerFill: '#edf8f7',
   rowAlt: '#f8fafc',
   positive: '#059669',
   negative: '#dc2626',

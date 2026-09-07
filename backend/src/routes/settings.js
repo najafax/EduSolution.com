@@ -28,6 +28,23 @@ function validateImageField(value, label) {
   return value;
 }
 
+// A lightweight sibling of GET / for callers that only ever need the
+// currency symbol/business name (QuoteForm.jsx/InvoiceForm.jsx's own
+// LineItemsEditor currency prop, see frontend/src/lib/api.js) — GET /
+// returns the full row, logo/signature/stamp images included, which can
+// run past a megabyte of base64 once all three are set (see the 400KB cap
+// each one is validated against below); a form that opens on every new
+// quote/invoice has no reason to pull that down just to read a 3-character
+// symbol. Same requirePermission('settings', 'view') gate as GET / itself,
+// so this changes nothing about who can see what, only how much a caller
+// that already could see it has to download to get it.
+router.get('/summary', requirePermission('settings', 'view'), (req, res) => {
+  const settings = db
+    .prepare('SELECT currency_symbol, business_name FROM business_settings WHERE id = 1')
+    .get();
+  res.json({ settings });
+});
+
 router.get('/', requirePermission('settings', 'view'), (req, res) => {
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   res.json({ settings });

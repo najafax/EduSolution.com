@@ -65,7 +65,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
     // items) never flashes the '$' fallback before the business's real
     // symbol arrives a moment later (see Dashboard.jsx's own note on this
     // race for the full story).
-    api.settings.get(token).then(({ settings }) => setSettings(settings)).catch(() => {}).finally(() => setSettingsLoaded(true));
+    api.settings.getSummary(token).then(({ settings }) => setSettings(settings)).catch(() => {}).finally(() => setSettingsLoaded(true));
   }, [token]);
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { usePortalAuth } from '../../context/PortalAuthContext';
 import StatusBadge from '../../components/StatusBadge';
 import { ChevronRightIcon, DownloadIcon, UploadIcon } from '../../components/icons';
+import { resizeImage, dataUriByteLength } from '../../lib/imageResize';
 
 const PROOF_FILE_TYPES = 'image/jpeg,image/png,image/webp,application/pdf';
 const PROOF_MAX_BYTES = 6 * 1024 * 1024;
@@ -11,7 +12,10 @@ const PROOF_MAX_BYTES = 6 * 1024 * 1024;
 // Reads a File as a base64 data URI — the same storage shape
 // business_settings already uses for logo/signature/stamp images, see
 // db/index.js's own note on payment_proofs. FileReader's readAsDataURL is
-// async-only (no sync equivalent), hence the Promise wrapper.
+// async-only (no sync equivalent), hence the Promise wrapper. Only used for
+// a PDF slip — an image goes through lib/imageResize.js's resizeImage()
+// instead, which can't canvas-render a PDF, so that path stays here as the
+// fallback for the one accepted type resizing can't touch.
 function fileToDataUri(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -78,8 +82,25 @@ export default function PortalInvoiceDetail() {
     }
     setUploading(true);
     try {
-      const fileData = await fileToDataUri(file);
-      await api.portal.invoices.uploadPaymentProof(id, { file_name: file.name, file_type: file.type, file_data: fileData, note: uploadNote }, token);
+      // A bank-slip photo is routinely several MB straight off a phone
+      // camera — resizing it before upload keeps the file well under the
+      // limit above and off the database as a multi-megabyte blob, without
+      // losing the detail a reference number needs to stay legible. A PDF
+      // slip can't be canvas-resized, so it uploads as-is.
+      let fileData;
+      let fileType = file.type;
+      if (file.type === 'application/pdf') {
+        fileData = await fileToDataUri(file);
+      } else {
+        fileData = await resizeImage(file, { maxDimension: 1800, quality: 0.88 });
+        fileType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        if (dataUriByteLength(fileData) > PROOF_MAX_BYTES) {
+          setError('File is still too large after resizing — please try a smaller photo.');
+          setUploading(false);
+          return;
+        }
+      }
+      await api.portal.invoices.uploadPaymentProof(id, { file_name: file.name, file_type: fileType, file_data: fileData, note: uploadNote }, token);
       setUploadNote('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       setUploadSuccess('Uploaded — thanks, we’ll review it shortly.');

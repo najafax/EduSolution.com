@@ -89,6 +89,11 @@ export const api = {
 
   settings: {
     get: (token) => request('/settings', { token }),
+    // A currency-symbol/business-name-only sibling of get() — see
+    // routes/settings.js's own note on GET /summary — for a caller that
+    // has no reason to pull down the full row's base64 logo/signature/
+    // stamp images just to read a 3-character symbol.
+    getSummary: (token) => request('/settings/summary', { token }),
     update: (payload, token) => request('/settings', { method: 'PUT', body: payload, token }),
   },
 

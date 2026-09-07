@@ -360,7 +360,20 @@ already does for that resource.
   GET/PUT for the single-row `business_settings` table (business name,
   address, tax ID, currency symbol, bank details, `session_timeout_minutes`
   — see "Idle session timeout" below — this is what prints on every PDF's
-  header/footer, plus the one security policy value). `clients.js` also has
+  header/footer, plus the one security policy value). `settings.js` also has
+  `GET /summary` (registered before `GET /` for the same "literal path
+  ahead of anything broader" convention this app already follows —
+  `SELECT currency_symbol, business_name FROM business_settings`, nothing
+  else, same `settings:view` gate as `GET /` itself) — for a caller that
+  only ever needs the currency symbol/business name to render (`QuoteForm.jsx`/
+  `InvoiceForm.jsx`'s own `LineItemsEditor` currency prop, via `lib/api.js`'s
+  `settings.getSummary()`), pulling the full row means downloading up to
+  three base64-encoded images (logo/signature/stamp, each capped at 400KB —
+  see `validateImageField` below — so combined this can run past a
+  megabyte) just to read a 3-character symbol. `GET /` itself is unchanged
+  and still `SELECT *`s the full row — every other caller (`Settings.jsx`'s
+  own edit form, anything that genuinely needs the images) keeps using it.
+  `clients.js` also has
   `GET /export.csv`/`GET /export.xlsx` (both registered before `GET /:id`
   so neither is shadowed by the `:id` param). `PUT /` validates
   `session_timeout_minutes` is a whole
@@ -1864,6 +1877,24 @@ already does for that resource.
   no headless browser). One shared header/items-table/totals layout, reused
   by `renderQuotePdf`/`renderInvoicePdf`/`renderReceiptPdf`, and by both the
   authenticated `:id/pdf` routes and the public `public.js` routes.
+  **Brand color matches the app's own lagoon palette now, not indigo**:
+  this file's `COLORS.brand`/`COLORS.headerFill` predate the app-wide
+  indigo→lagoon rename documented under "Mobile design system" below,
+  which swept every frontend component/page/chart/`StatusBadge` entry but
+  missed this file — a PDF is the one place a client actually sees the
+  business's own branding (more visible, arguably, than any single screen
+  in the app itself), so it had quietly kept shipping the old `#4338ca`
+  indigo brand color and `#eef2ff` header fill on every quote/invoice/
+  receipt long after the rest of the product moved on. Both are now
+  `#0e7c86`/`#edf8f7` — the exact hex values `frontend/src/index.css`'s own
+  `--color-lagoon-600`/`-50` tokens resolve to. `lib/reportPdf.js` (the five
+  report PDFs — sales/tax/expense/P&L/bank balance) re-exports this same
+  `COLORS` object rather than defining its own, so this one fix corrects
+  every PDF this app generates, not just the three this file renders
+  directly. The `minimal` PDF template's own `MINIMAL_COLORS` is
+  deliberately untouched — that template is accent-free by design (a
+  plain grayscale text-only layout, see its own note further down this
+  entry), so it was never carrying the stale color to begin with.
   `renderInvoicePdf` targets its "PAID" stamp directly over the Balance Due
   amount (via `drawTotals`'s own `info.balanceX`/`balanceY`/`pageIndex`
   output — see that function's own comment) rather than the plain
@@ -4948,6 +4979,62 @@ why.
   content" nav link) and `ImageIcon` (the Gallery tab). See "Video
   tutorials" above for `VideoIcon`/`PlayCircleIcon`, its own later
   addition to this same icon set.
+
+### Client-side image resizing
+
+Every image field in this app (Settings' logo/signature/stamp, Website's
+team/gallery photos, MyAccount's avatar, the client portal's payment-proof
+upload) stores whatever gets uploaded as base64 text — in SQLite, with no
+separate file storage service (see `db/index.js`'s own note on why) — so an
+unresized phone photo (routinely several MB, and a third bigger again once
+base64-encoded) both risked tripping a backend size cap outright (a logo
+capped at 400KB is a common miss for an unedited phone export) and bloated
+every future response that carried it back down. `frontend/src/lib/
+imageResize.js`'s `resizeImage(file, { maxDimension, quality })` runs the
+chosen file through an offscreen `<canvas>` before it's ever turned into a
+data URI — no new dependency, the same "a browser API already does the job"
+call this app already makes for `lib/csv.js`'s own hand-rolled parser. A
+PNG source stays PNG (only its pixel dimensions shrink) since a logo/stamp
+is routinely transparent and flattening that onto white to re-encode as
+JPEG would be a visible regression; every other raster type re-encodes as
+JPEG, since a photo has no transparency to protect and JPEG compresses far
+better at a size nobody can tell apart from the original on screen.
+`dataUriByteLength(dataUri)` mirrors every backend validator's own
+`Math.ceil((base64.length * 3) / 4)` calc (`routes/settings.js`,
+`routes/website.js`, `routes/clientPortal.js`), so a frontend pre-upload
+size check always agrees with what the server will actually enforce — each
+caller below still keeps its own byte-cap check *after* resizing (with a
+friendlier "still too large after resizing" message), since resizing
+shrinks the common case dramatically but doesn't guarantee every source
+lands under the cap (a very detailed PNG kept lossless, for one).
+
+Four call sites, each picking a `maxDimension` sized to how large the image
+actually ever renders: `Settings.jsx`'s logo/signature/stamp `ImageField`
+(1000px — none of the three is ever printed larger than a few hundred px in
+the PDF header, see `lib/pdf.js`), `Website.jsx`'s team/gallery `ImageField`
+(1200px), `MyAccount.jsx`'s avatar upload (512px — it only ever renders as
+a small circle, `Sidebar.jsx`'s account row/`DashboardRail.jsx`'s profile
+card/`Navbar.jsx`'s header avatar), and `PortalInvoiceDetail.jsx`'s payment-
+proof upload (1800px, more generous than the others since a bank-slip photo
+needs to stay legible enough for staff to actually read a reference number
+off it, whether by eye or `ScanPaymentSlip.jsx`'s own OCR pass — see
+"Payment slip scan" above). The one caller with a real branch: payment
+proofs also accept a PDF slip (`application/pdf`), which can't be
+canvas-resized at all — `PortalInvoiceDetail.jsx` checks `file.type` first
+and falls back to a plain `FileReader.readAsDataURL()` for that one type,
+resizing every image type as before.
+
+`routes/settings.js` gained a matching backend-side lightweight read for
+the same reason: `GET /api/settings/summary` (`SELECT currency_symbol,
+business_name`, same `settings:view` gate as the existing `GET /`) is what
+`QuoteForm.jsx`/`InvoiceForm.jsx` now call (via `lib/api.js`'s
+`settings.getSummary()`) instead of the full `GET /` — both forms only ever
+read `settings?.currency_symbol` for their `LineItemsEditor`'s currency
+prop, so pulling the complete row (logo/signature/stamp images included,
+up to ~1.2MB of base64 combined) on every new-quote/new-invoice page load
+was pure waste. `GET /` itself is unchanged and still `SELECT *`s the full
+row for every caller that genuinely needs the images (`Settings.jsx`'s own
+edit form).
 
 ### Idle session timeout
 

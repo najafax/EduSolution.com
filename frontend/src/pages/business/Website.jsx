@@ -13,6 +13,7 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import VideoThumbnail from '../../components/VideoThumbnail';
 import { PlusIcon, PencilIcon, TrashIcon, InboxIcon, GlobeIcon, UsersIcon, ImageIcon, ProductIcon, VideoIcon } from '../../components/icons';
+import { resizeImage, dataUriByteLength } from '../../lib/imageResize';
 
 // The staff-side CMS behind the public marketing site (routes/website.js /
 // GET /api/public/site) — six small resources, switched by tab rather than
@@ -47,11 +48,13 @@ export const SERVICE_ICON_OPTIONS = [
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_IMAGE_BYTES = 400 * 1024;
 
-// Shared by the Team and Gallery sections below — same FileReader-to-
-// data-URI approach Settings.jsx's own logo/signature upload already uses,
-// since this app has no separate file storage service.
+// Shared by the Team and Gallery sections below — same client-side resize
+// Settings.jsx's own logo/signature upload uses (lib/imageResize.js), since
+// this app has no separate file storage service and a team/gallery photo is
+// routinely a full-resolution phone export well past what a small team
+// headshot or gallery thumbnail ever needs to render at.
 function ImageField({ label, value, onChange, onError }) {
-  function handleFile(e) {
+  async function handleFile(e) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -60,14 +63,16 @@ function ImageField({ label, value, onChange, onError }) {
       onError(`${label} must be a PNG, JPEG or WEBP image`);
       return;
     }
-    if (file.size > MAX_IMAGE_BYTES) {
-      onError(`${label} must be smaller than 400KB`);
-      return;
+    try {
+      const dataUri = await resizeImage(file, { maxDimension: 1200 });
+      if (dataUriByteLength(dataUri) > MAX_IMAGE_BYTES) {
+        onError(`${label} is still too large after resizing — please use a smaller or simpler image`);
+        return;
+      }
+      onChange(dataUri);
+    } catch (err) {
+      onError(err.message || `Could not read the selected file for ${label}`);
     }
-    const reader = new FileReader();
-    reader.onload = () => onChange(reader.result);
-    reader.onerror = () => onError(`Could not read the selected file for ${label}`);
-    reader.readAsDataURL(file);
   }
 
   return (
