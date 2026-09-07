@@ -126,7 +126,7 @@ const EMPTY_FORM = { type: 'draw', taken_by_name: '', amount: '', draw_date: tod
 export default function OwnerDraws() {
   const { token, can } = useAuth();
   const { toast } = useToast();
-  const canManage = can('expenses', 'manage');
+  const canManage = can('financials', 'manage');
   const [draws, setDraws] = useState([]);
   const [names, setNames] = useState([]);
   const [summary, setSummary] = useState(null);

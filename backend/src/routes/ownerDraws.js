@@ -12,14 +12,13 @@ const { renderOwnerStatementPdf } = require('../lib/reportPdf');
 // column rather than reusing capital_contributions (money in, unrelated
 // to any specific draw) or an expenses row tagged "shareholder payments"
 // (a plain expense has no notion of a running balance or a later
-// repayment against it). Gated on the existing 'expenses' permission
-// rather than a new MODULES entry — same "reuse when the sensitivity
-// level already matches" call capitalContributions.js/reports.js already
-// make: this is the same kind of non-invoice cash-movement data.
+// repayment against it). Gated on 'financials' (was 'expenses' —
+// reclassified per "Sensitive modules and super-admin-gated financial data"
+// in CLAUDE.md, alongside capitalContributions.js's own identical move).
 const router = Router();
 router.use(requireAuth);
-const view = requirePermission('expenses', 'view');
-const manage = requirePermission('expenses', 'manage');
+const view = requirePermission('financials', 'view');
+const manage = requirePermission('financials', 'manage');
 
 const TYPES = ['draw', 'return'];
 const PAGE_SIZE = 20;

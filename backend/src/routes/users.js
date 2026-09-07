@@ -2,7 +2,7 @@ const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { MODULES, isAdminRole, getPermissions, setPermissions } = require('../lib/permissions');
+const { MODULES, SENSITIVE_MODULES, isAdminRole, getPermissions, setPermissions } = require('../lib/permissions');
 const { logActivity } = require('../lib/activity');
 const { notifyOfAdminTierChange } = require('../lib/adminChangeNotify');
 
@@ -319,7 +319,7 @@ router.delete('/:id', manage, (req, res) => {
 });
 
 router.get('/meta/modules', view, (req, res) => {
-  res.json({ modules: MODULES });
+  res.json({ modules: MODULES, sensitiveModules: SENSITIVE_MODULES });
 });
 
 module.exports = router;

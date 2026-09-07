@@ -27,7 +27,7 @@ const EMPTY_FORM = { contributor_name: '', amount: '', contribution_date: todayS
 export default function CapitalContributions() {
   const { token, can } = useAuth();
   const { toast } = useToast();
-  const canManage = can('expenses', 'manage');
+  const canManage = can('financials', 'manage');
   const [contributions, setContributions] = useState([]);
   const [contributors, setContributors] = useState([]);
   const [pageInfo, setPageInfo] = useState(null);

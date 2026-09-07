@@ -33,6 +33,17 @@ function emptyPermissions(modules) {
   return map;
 }
 
+// An unrestricted admin already bypasses every ordinary module (see
+// lib/permissions.js's SENSITIVE_MODULES on the backend) — the only thing
+// still worth a super admin editing for that account is the sensitive
+// module list (financials today), which an unrestricted admin does NOT
+// automatically get. A restricted admin already shows the full grid below
+// instead, which already covers the sensitive modules too, so this section
+// is deliberately only for the unrestricted case.
+function showsSensitiveGrid(form, isSuperAdmin) {
+  return isSuperAdmin && form.role === 'admin' && !form.restricted;
+}
+
 export default function Users() {
   const { user: currentUser, token, can, isSuperAdmin } = useAuth();
   const canView = can('users', 'view');
@@ -40,6 +51,7 @@ export default function Users() {
 
   const [users, setUsers] = useState([]);
   const [modules, setModules] = useState([]);
+  const [sensitiveModules, setSensitiveModules] = useState([]);
   const [pageInfo, setPageInfo] = useState(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -67,10 +79,11 @@ export default function Users() {
     // result count, which read as the page visibly jumping.
     if (users.length === 0) setLoading(true);
     Promise.all([api.users.list(token, { q: debouncedSearch, page }), api.users.modules(token)])
-      .then(([{ users, ...rest }, { modules }]) => {
+      .then(([{ users, ...rest }, { modules, sensitiveModules }]) => {
         setUsers(users);
         setPageInfo(rest.totalPages ? rest : null);
         setModules(modules);
+        setSensitiveModules(sensitiveModules || []);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -141,13 +154,26 @@ export default function Users() {
     setSubmitting(true);
     try {
       const gridShown = form.role === 'staff' || (form.role === 'admin' && form.restricted);
+      const sensitiveGridShown = showsSensitiveGrid(form, isSuperAdmin);
+      // The full grid sends every module's permissions state as-is. The
+      // sensitive-only section (unrestricted admin) sends just the
+      // sensitive modules' entries — setPermissions() on the backend only
+      // touches modules present in the map, so this can't accidentally
+      // grant/clear anything else for that account.
+      let permissionsPayload;
+      if (gridShown) {
+        permissionsPayload = permissions;
+      } else if (sensitiveGridShown) {
+        permissionsPayload = {};
+        for (const m of sensitiveModules) permissionsPayload[m] = permissions[m];
+      }
       const payload = {
         name: form.name,
         email: form.email,
         role: form.role,
         active: form.active,
         restricted: form.role === 'admin' ? form.restricted : undefined,
-        permissions: gridShown ? permissions : undefined,
+        permissions: permissionsPayload,
       };
       if (editingId) {
         await api.users.update(editingId, payload, token);
@@ -213,8 +239,10 @@ export default function Users() {
       </div>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         Everyone with an account can see and edit shared business data unless restricted below. Admins have full
-        access by default — a super admin can restrict a specific admin's access too, the same way staff access is
-        controlled — and only a super admin can create, edit, or remove another admin or super admin account.
+        access by default, except a handful of sensitive modules (Financials, Capital contributions, Owner draws,
+        Shareholders, Reports) that only a super admin can grant a specific admin into — a super admin can also
+        restrict a specific admin's access more broadly, the same way staff access is controlled — and only a super
+        admin can create, edit, or remove another admin or super admin account.
       </p>
 
       <div className="mt-4 sm:max-w-sm">
@@ -355,6 +383,52 @@ export default function Users() {
                 </table>
               </div>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Manage access also grants view access.</p>
+            </div>
+          )}
+
+          {/* An unrestricted admin already sees every ordinary module, but
+              NOT the sensitive ones (Financials, and anything sharing its
+              permission — Capital contributions, Owner draws, Shareholders,
+              Reports) — those need an explicit grant here from a super
+              admin, same as staff. Deliberately a small, separate section
+              rather than the full grid above: everything else on this
+              account is unaffected either way, so showing the whole module
+              list would just be confusing (every other checkbox would look
+              like it does something when it doesn't for this account). */}
+          {showsSensitiveGrid(form, isSuperAdmin) && sensitiveModules.length > 0 && (
+            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Sensitive modules</h3>
+              <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+                This admin has full access to every ordinary module already, but not these — they show the business's
+                real cash position, so only a super admin can grant a specific admin account into them.
+              </p>
+              <div className="mt-2 flex flex-col gap-1.5">
+                {sensitiveModules.map((m) => (
+                  <div key={m} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-1.5 dark:bg-slate-900">
+                    <span className="text-sm text-slate-900 dark:text-white">{moduleLabel(m)}</span>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(permissions[m]?.can_view)}
+                          onChange={() => togglePermission(m, 'view')}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        View
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(permissions[m]?.can_manage)}
+                          onChange={() => togglePermission(m, 'manage')}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        Manage
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

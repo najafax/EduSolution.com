@@ -8,15 +8,16 @@ const { toXlsxBuffer } = require('../lib/xlsx');
 // Money an owner/partner puts INTO the business — the deliberate mirror of
 // an expenses row tagged 'shareholder payments' (money taken OUT), but its
 // own table/route rather than a negative expense amount (see db/index.js's
-// CREATE TABLE comment for why). Gated on the existing 'expenses' permission
-// rather than a new MODULES entry — same "reuse when the sensitivity level
-// already matches" call routes/reports.js makes for 'financials': this is
-// the same kind of non-invoice cash-movement data expenses already covers,
-// and 'shareholder payments' (its outbound mirror) already lives there.
+// CREATE TABLE comment for why). Gated on 'financials' (was 'expenses' —
+// reclassified per "Sensitive modules and super-admin-gated financial data"
+// in CLAUDE.md, so this reads as real cash-position data, restricted the
+// same way Financials/Owner draws/Reports/Shareholders now are, rather than
+// as ordinary Expenses-page-level data everyone with 'expenses' access could
+// already see).
 const router = Router();
 router.use(requireAuth);
-const view = requirePermission('expenses', 'view');
-const manage = requirePermission('expenses', 'manage');
+const view = requirePermission('financials', 'view');
+const manage = requirePermission('financials', 'manage');
 
 const PAGE_SIZE = 20;
 

@@ -974,14 +974,17 @@ already does for that resource.
   dropdown pattern) composed with `?page=` (see "Pagination convention"
   above), always returns `totalAmount` (independent of pagination, same
   reasoning as `expenses`'s own `totalAmount`), and has a matching
-  `GET /export.csv`/`GET /export.xlsx`. Gated by the existing `expenses` permission rather
-  than a new `MODULES` entry — same "reuse when the sensitivity level
-  already matches" call `routes/reports.js` makes reusing `financials`
-  (see below): this is the same kind of non-invoice cash-movement data
-  `expenses` already covers, and its outbound mirror (`shareholder
-  payments`) already lives there. `pages/business/CapitalContributions.jsx`
+  `GET /export.csv`/`GET /export.xlsx`. **Gated on `financials`, not
+  `expenses`** — originally reused the `expenses` permission on the same
+  "reuse when the sensitivity level already matches" call `routes/reports.js`
+  makes reusing `financials` (this is the same kind of non-invoice
+  cash-movement data `expenses` already covers, and its outbound mirror
+  — `shareholder payments` — already lives there), but reclassified onto
+  `financials` once that module became more restricted than `expenses` —
+  see "Sensitive modules — super-admin-gated financial data" below.
+  `pages/business/CapitalContributions.jsx`
   (route `/capital-contributions`, nav link "Capital" right after
-  "Expenses" in `Navbar.jsx`'s `BUSINESS_LINKS`, also gated on `expenses`)
+  "Expenses" in `Navbar.jsx`'s `BUSINESS_LINKS`, gated on `financials`)
   is the same list+modal-form+FAB shape as `Expenses.jsx`, including the
   confirm-then-undo-toast delete pattern (`lib/useConfirm.js` +
   `lib/useUndoableDelete.js` together, see `components/ConfirmDialog.jsx`
@@ -1038,12 +1041,10 @@ already does for that resource.
   running balance or a later repayment recorded against it, and treating a
   draw as a normal expense would also wrongly pull it into `netProfit`
   (see "Financial impact" below for why that would be wrong).
-  Gated on the existing `expenses` permission rather than a new `MODULES`
-  entry — same "reuse when the sensitivity level already matches" call
-  `capitalContributions.js`/`reports.js` already make: this is the same
-  kind of non-invoice cash-movement data `expenses` already covers, and
-  its own outbound-money category (`shareholder payments`) already lives
-  there. Follows `capitalContributions.js`'s exact conventions: `GET /`
+  **Gated on `financials`, not `expenses`** — same reclassification
+  `capitalContributions.js` went through and for the same reason, see
+  "Sensitive modules — super-admin-gated financial data" below. Follows
+  `capitalContributions.js`'s exact conventions: `GET /`
   supports `?q=` (matching `taken_by_name`/`notes`), `?type=` (exact match
   against `TYPES`), and `?takenBy=` (the `taken_by_name` analog of
   `contributor`, via the same `distinctNames()`-backed dropdown pattern
@@ -1062,8 +1063,9 @@ already does for that resource.
   `'recorded a return from'`, and the update/delete equivalents) rather
   than one generic verb, so the activity feed reads naturally either way.
   `pages/business/OwnerDraws.jsx` (route `/owner-draws`, nav link "Owner
-  draws" right after "Capital" in `Navbar.jsx`'s `BUSINESS_LINKS`, also
-  gated on `expenses`) is the same list+modal-form+FAB shape as
+  draws" right after "Capital" in `Navbar.jsx`'s `BUSINESS_LINKS`, gated on
+  `financials` — see "Sensitive modules — super-admin-gated financial
+  data" below) is the same list+modal-form+FAB shape as
   `CapitalContributions.jsx`, with two additions on top: a KPI strip
   (`KpiCard`s for Total drawn/Total returned/Outstanding balance, from
   `GET /summary` — refreshed on load and, since the actual DELETE behind
@@ -3194,6 +3196,106 @@ logged in on" list. Built together since the first three all touch
   equivalent notice since the affected row simply disappears from the list
   it's already looking at, but a bulk action clearing several rows at once
   benefits from an explicit confirmation of what just happened.
+
+### Sensitive modules — super-admin-gated financial data (`backend/src/`, `frontend/src/`)
+
+A follow-up narrowing of the admin-tier bypass, distinct from "Restricted
+admins" above: that feature lets a super admin restrict a *specific* admin
+account across every module at once (opt-in, per account, off by default).
+This one instead restricts a *specific set of modules* — Financials,
+Capital contributions, Owner draws, Shareholders, and Reports, all of which
+surface the business's real cash position — for *every* plain admin
+account by default, restricted or not, with a super admin able to grant a
+given admin back into them individually. Requested directly ("Capital,
+Owner Draws, Financials, Shareholders - these pages must access by Super
+admin, and right to super admin to give access to admins"); Reports was
+folded in too since it already reuses the `financials` permission (see
+"Roles and permissions" above) and is exactly the same sensitivity level.
+
+- `lib/permissions.js`'s `SENSITIVE_MODULES` (currently just
+  `['financials']`) is the list. `hasPermission()`/`effectivePermissions()`
+  both changed from a single `isUnrestrictedAdmin(user)` bypass check to a
+  two-tier one: `role === 'super_admin'` still bypasses everything
+  unconditionally (that tier exists precisely to be un-restrictable, see
+  "Super admin and the Finance permission preset" above) — but
+  `isUnrestrictedAdmin(user)` (a plain, non-restricted `admin`) now only
+  bypasses a module that is **not** in `SENSITIVE_MODULES`; for a sensitive
+  one it falls through to a real `user_permissions` row, exactly the same
+  default-deny path staff and a restricted admin already went through for
+  every module. This is additive on top of "Restricted admins" above, not a
+  replacement for it — an admin who is *also* `restricted` was already
+  gated on real grants for everything, sensitive modules included, so
+  nothing changes for that account; the new behavior only bites for the
+  common case, an ordinary unrestricted admin.
+  `Capital contributions`/`Owner draws` (`routes/capitalContributions.js`/
+  `routes/ownerDraws.js`) were reclassified from the `expenses` permission
+  to `financials` for this — they used to reuse `expenses` on the "same
+  sensitivity level" precedent (see "Business module" above), but that
+  precedent no longer holds once Financials itself became more restricted
+  than Expenses: leaving them on `expenses` would have meant either also
+  locking down the ordinary Expenses page (not asked for) or leaving two of
+  the four requested pages unrestricted. `routes/shareholders.js`/
+  `routes/reports.js` already reused `financials`, so those needed no
+  route change at all — reclassifying `financials` itself was enough to
+  cover both.
+- **This is an immediate behavior change for every existing plain admin
+  account**, not just new ones — the moment this ships, every admin who
+  isn't `super_admin` loses Financials/Capital contributions/Owner draws/
+  Shareholders/Reports access (both the nav links, via the existing
+  `can(module, 'view')` gating those pages already had, and the backend
+  routes themselves, via `requirePermission`) until a super admin
+  explicitly grants it back — there is no migration or one-time backfill
+  that quietly preserves the old access, since the whole point is that it
+  shouldn't be preserved automatically. Every *other* module an admin had
+  is completely unaffected.
+- `routes/users.js`'s `GET /meta/modules` now also returns
+  `sensitiveModules: SENSITIVE_MODULES` alongside the existing `modules`
+  list, so the frontend doesn't need its own duplicated copy of which
+  modules are sensitive — `pages/Users.jsx` reads it the same way it
+  already reads `modules`. No other backend route needed a change:
+  `POST /`/`PUT /:id` already accepted an arbitrary `permissions` map and
+  passed it straight to `setPermissions()` for *any* role, so granting a
+  plain admin a real `user_permissions` row for `financials` was already
+  possible mechanically — it just had no effect before this, since
+  `hasPermission()` bypassed the check before ever consulting it.
+- `pages/Users.jsx`'s edit/create form gains a second, smaller
+  "Sensitive modules" panel (amber-tinted, distinct from the full
+  Module permissions grid below it), shown via `showsSensitiveGrid(form,
+  isSuperAdmin)` — `isSuperAdmin && form.role === 'admin' && !form.restricted`
+  — i.e. only for the common case the full grid doesn't already cover: an
+  *unrestricted* admin, edited by a super admin. (A *restricted* admin
+  already shows the full grid, which already includes the sensitive
+  modules; staff already shows the full grid too; a plain admin viewer, or
+  editing their own account, never reaches this panel at all — the Role
+  select only offers "Admin"/"Super Admin" to a super admin viewer in the
+  first place.) It lists just `sensitiveModules` (one row today —
+  Financials) with the same View/Manage checkboxes and "manage implies
+  view" behavior the full grid uses, reusing the same `permissions`/
+  `togglePermission` state — `handleSubmit` sends only the sensitive
+  modules' entries in this case (`{ financials: permissions.financials }`,
+  not the whole `permissions` map), since `setPermissions()` only touches
+  modules present in the map and every other module's stored row for an
+  unrestricted admin is irrelevant noise that shouldn't be written. The
+  page's own intro paragraph was reworded to state the new default
+  directly, rather than leaving it to be discovered from a missing nav
+  link.
+- Verified end-to-end against an isolated copy of the dev database (never
+  the real one): `hasPermission()`/`effectivePermissions()` called directly
+  for a super admin, an unrestricted plain admin, and staff confirmed the
+  exact matrix above (plain admin: `financials` false, every ordinary
+  module still true; staff: `financials` false, same as before); a real
+  running backend against that same isolated database confirmed
+  `GET /api/financials/summary`, `GET /api/capital-contributions`,
+  `GET /api/owner-draws`, `GET /api/shareholders`, and
+  `GET /api/reports/sales/pdf` all 403 for a freshly-logged-in unrestricted
+  admin while `GET /api/clients` (an ordinary module) still 200s for the
+  same account and token; a super admin's `PUT /api/users/:id` granting
+  `{ financials: { can_view: true, can_manage: true } }` left every other
+  module's stored permission row for that admin untouched (all still
+  `false`, since an unrestricted admin never needed real rows for ordinary
+  modules) and, per `requireAuth`'s re-fetch-on-every-request design (see
+  "Backend" above), took effect on the admin's very next request with no
+  new login/token needed.
 
 ### MOD Report public submission link (`backend/src/`, `frontend/src/`)
 
