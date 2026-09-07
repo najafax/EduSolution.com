@@ -3293,27 +3293,34 @@ folded in too since it already reuses the `financials` permission (see
   plain admin a real `user_permissions` row for `financials` was already
   possible mechanically — it just had no effect before this, since
   `hasPermission()` bypassed the check before ever consulting it.
-- `pages/Users.jsx`'s edit/create form gains a second, smaller
-  "Sensitive modules" panel (amber-tinted, distinct from the full
-  Module permissions grid below it), shown via `showsSensitiveGrid(form,
+- `pages/Users.jsx`'s edit/create form presents this as the same "Module
+  permissions" table used everywhere else, not a separately-branded
+  concept — it originally rendered a second, amber-tinted "Sensitive
+  modules" panel below the main grid, but that read as its own feature
+  rather than what it actually is (the identical view/manage grid over a
+  shorter module list), so it was folded into one "Module permissions"
+  heading/table at explicit request. `showsSensitiveGrid(form,
   isSuperAdmin)` — `isSuperAdmin && form.role === 'admin' && !form.restricted`
-  — i.e. only for the common case the full grid doesn't already cover: an
-  *unrestricted* admin, edited by a super admin. (A *restricted* admin
-  already shows the full grid, which already includes the sensitive
-  modules; staff already shows the full grid too; a plain admin viewer, or
-  editing their own account, never reaches this panel at all — the Role
-  select only offers "Admin"/"Super Admin" to a super admin viewer in the
-  first place.) It lists just `sensitiveModules` (one row today —
-  Financials) with the same View/Manage checkboxes and "manage implies
-  view" behavior the full grid uses, reusing the same `permissions`/
-  `togglePermission` state — `handleSubmit` sends only the sensitive
-  modules' entries in this case (`{ financials: permissions.financials }`,
-  not the whole `permissions` map), since `setPermissions()` only touches
-  modules present in the map and every other module's stored row for an
-  unrestricted admin is irrelevant noise that shouldn't be written. The
-  page's own intro paragraph was reworded to state the new default
-  directly, rather than leaving it to be discovered from a missing nav
-  link.
+  — still decides *which* module list the one table shows: an
+  *unrestricted* admin (the common case the full grid doesn't already
+  cover) sees just `sensitiveModules` (one row today — Financials) with a
+  one-line note under the heading explaining why only these show; a
+  *restricted* admin or a staff account sees the full `modules` list, same
+  as before, with the "Finance" preset button (which only makes sense
+  against the full list) hidden for the sensitive-only case. Both paths
+  render the exact same `<table>` markup and share the same `permissions`/
+  `togglePermission` state — `handleSubmit` still sends only the sensitive
+  modules' entries when just that subset was shown (`{ financials:
+  permissions.financials }`, not the whole `permissions` map), since
+  `setPermissions()` only touches modules present in the map and every
+  other module's stored row for an unrestricted admin is irrelevant noise
+  that shouldn't be written — this payload-scoping behavior is unchanged
+  by the visual unification, only the surrounding markup moved. A plain
+  admin viewer, or editing their own account, never reaches the
+  sensitive-only case at all — the Role select only offers "Admin"/"Super
+  Admin" to a super admin viewer in the first place. The page's own intro
+  paragraph points at "Module permissions" by name now rather than a
+  separate "sensitive modules" concept, matching the unified UI.
 - Verified end-to-end against an isolated copy of the dev database (never
   the real one): `hasPermission()`/`effectivePermissions()` called directly
   for a super admin, an unrestricted plain admin, and staff confirmed the

@@ -239,10 +239,10 @@ export default function Users() {
       </div>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         Everyone with an account can see and edit shared business data unless restricted below. Admins have full
-        access by default, except a handful of sensitive modules (Financials, Capital contributions, Owner draws,
-        Shareholders, Reports) that only a super admin can grant a specific admin into — a super admin can also
-        restrict a specific admin's access more broadly, the same way staff access is controlled — and only a super
-        admin can create, edit, or remove another admin or super admin account.
+        access by default, except a handful of modules (Financials, Capital contributions, Owner draws,
+        Shareholders, Reports) that only a super admin can grant a specific admin into via Module permissions — a
+        super admin can also restrict a specific admin's access more broadly, the same way staff access is
+        controlled — and only a super admin can create, edit, or remove another admin or super admin account.
       </p>
 
       <div className="mt-4 sm:max-w-sm">
@@ -335,102 +335,84 @@ export default function Users() {
             )}
           </div>
 
-          {(form.role === 'staff' || (form.role === 'admin' && form.restricted)) && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Module permissions</h3>
-                <button
-                  type="button"
-                  onClick={applyFinancePreset}
-                  className="rounded-md border border-lagoon-200 bg-lagoon-50 px-2.5 py-1 text-xs font-medium text-lagoon-700 hover:bg-lagoon-100 dark:border-lagoon-800 dark:bg-lagoon-950 dark:text-lagoon-300 dark:hover:bg-lagoon-900"
-                  title="Grant view + manage on Invoices, Expenses, and Financials only; clear everything else"
-                >
-                  Finance
-                </button>
-              </div>
-              <div className="mt-1.5 max-h-56 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
-                <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-                  <thead>
-                    <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                      <th className="px-4 py-1.5">Module</th>
-                      <th className="px-4 py-1.5 text-center">View</th>
-                      <th className="px-4 py-1.5 text-center">Manage</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {modules.map((m) => (
-                      <tr key={m}>
-                        <td className="px-4 py-1.5 text-slate-900 dark:text-white">{moduleLabel(m)}</td>
-                        <td className="px-4 py-1.5 text-center">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(permissions[m]?.can_view)}
-                            onChange={() => togglePermission(m, 'view')}
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                        </td>
-                        <td className="px-4 py-1.5 text-center">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(permissions[m]?.can_manage)}
-                            onChange={() => togglePermission(m, 'manage')}
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                        </td>
+          {(() => {
+            // The two prior sections ("Module permissions" for staff/a
+            // restricted admin, and a separately-styled "Sensitive modules"
+            // box for an unrestricted admin) rendered the exact same kind
+            // of view/manage checkbox grid, just over two different module
+            // lists — staff/restricted admin got every module, an
+            // unrestricted admin got only the sensitive ones (Financials,
+            // and anything sharing its permission — Capital contributions,
+            // Owner draws, Shareholders, Reports; see lib/permissions.js's
+            // SENSITIVE_MODULES). Splitting that into a visually distinct
+            // amber "Sensitive modules" panel read as a separate concept
+            // from ordinary module permissions, when it's really the same
+            // grid over a shorter list — so this renders as one "Module
+            // permissions" table either way; only which modules appear in
+            // it (and whether the Finance preset applies) differs.
+            const gridShown = form.role === 'staff' || (form.role === 'admin' && form.restricted);
+            const sensitiveGridShown = showsSensitiveGrid(form, isSuperAdmin);
+            const gridModules = gridShown ? modules : sensitiveGridShown ? sensitiveModules : null;
+            if (!gridModules || gridModules.length === 0) return null;
+            return (
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Module permissions</h3>
+                  {gridShown && (
+                    <button
+                      type="button"
+                      onClick={applyFinancePreset}
+                      className="rounded-md border border-lagoon-200 bg-lagoon-50 px-2.5 py-1 text-xs font-medium text-lagoon-700 hover:bg-lagoon-100 dark:border-lagoon-800 dark:bg-lagoon-950 dark:text-lagoon-300 dark:hover:bg-lagoon-900"
+                      title="Grant view + manage on Invoices, Expenses, and Financials only; clear everything else"
+                    >
+                      Finance
+                    </button>
+                  )}
+                </div>
+                {sensitiveGridShown && (
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    This admin already has full access to every ordinary module — these show the business's real cash
+                    position, so they're the only ones that need an explicit grant here.
+                  </p>
+                )}
+                <div className="mt-1.5 max-h-56 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                    <thead>
+                      <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                        <th className="px-4 py-1.5">Module</th>
+                        <th className="px-4 py-1.5 text-center">View</th>
+                        <th className="px-4 py-1.5 text-center">Manage</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {gridModules.map((m) => (
+                        <tr key={m}>
+                          <td className="px-4 py-1.5 text-slate-900 dark:text-white">{moduleLabel(m)}</td>
+                          <td className="px-4 py-1.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(permissions[m]?.can_view)}
+                              onChange={() => togglePermission(m, 'view')}
+                              className="h-4 w-4 rounded border-slate-300"
+                            />
+                          </td>
+                          <td className="px-4 py-1.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(permissions[m]?.can_manage)}
+                              onChange={() => togglePermission(m, 'manage')}
+                              className="h-4 w-4 rounded border-slate-300"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Manage access also grants view access.</p>
               </div>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Manage access also grants view access.</p>
-            </div>
-          )}
-
-          {/* An unrestricted admin already sees every ordinary module, but
-              NOT the sensitive ones (Financials, and anything sharing its
-              permission — Capital contributions, Owner draws, Shareholders,
-              Reports) — those need an explicit grant here from a super
-              admin, same as staff. Deliberately a small, separate section
-              rather than the full grid above: everything else on this
-              account is unaffected either way, so showing the whole module
-              list would just be confusing (every other checkbox would look
-              like it does something when it doesn't for this account). */}
-          {showsSensitiveGrid(form, isSuperAdmin) && sensitiveModules.length > 0 && (
-            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Sensitive modules</h3>
-              <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
-                This admin has full access to every ordinary module already, but not these — they show the business's
-                real cash position, so only a super admin can grant a specific admin account into them.
-              </p>
-              <div className="mt-2 flex flex-col gap-1.5">
-                {sensitiveModules.map((m) => (
-                  <div key={m} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-1.5 dark:bg-slate-900">
-                    <span className="text-sm text-slate-900 dark:text-white">{moduleLabel(m)}</span>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(permissions[m]?.can_view)}
-                          onChange={() => togglePermission(m, 'view')}
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                        View
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(permissions[m]?.can_manage)}
-                          onChange={() => togglePermission(m, 'manage')}
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                        Manage
-                      </label>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div className="mt-4 flex gap-3">
             <button
