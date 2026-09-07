@@ -391,9 +391,22 @@ deliberately untouched by either, always returning every row.
   `?status=`, plus `?q=` (matching document number, joined client name, and
   status — the same fields the frontend used to filter client-side before
   this route grew server-side search) and `?page=` (see "Pagination
-  convention" above); `status`/`q` compose (both narrow the same query), and
-  `?status=` predates this feature — it's not currently driven by any
-  frontend UI on the list pages, but stays available for other callers.
+  convention" above); `status`/`q` compose (both narrow the same query).
+  On `quotes.js`, `?status=` still predates this feature and isn't
+  currently driven by any frontend UI on `Quotes.jsx` — it stays available
+  for other callers. On `invoices.js` it now also is: **`?status=overdue`**
+  isn't a stored `invoices.status` value (see "Status/derived-field
+  conventions" below — only `draft | sent | void | paid` are ever stored,
+  same as every other status filter this app derives at read time rather
+  than storing) — `statusWhere('overdue')` (mirroring `routes/licenses.js`'s
+  own `statusWhere()` for `expired`/`expiring_soon`, the identical "mix a
+  derived value into a stored-column filter" precedent) translates it into
+  `status = 'sent' AND (total - amount_paid) > 0 AND due_date < today`,
+  the exact condition `withComputed()`'s own `is_overdue` field already
+  uses, so the filter and the badge can never disagree. `Invoices.jsx`'s
+  own `STATUS_OPTIONS` chip row gained an "Overdue" entry between "Sent"
+  and "Paid" for this — same `StatusFilterChips` single-select shape every
+  other status filter in this app already uses, no new UI pattern needed.
   **Export/reimport**: unlike `clients`/`expenses`/`licenses`/`products`,
   this export is deliberately *not* a full reimport source, and can't be
   made one by renaming columns the way those four were — `loadInvoiceExport()`/

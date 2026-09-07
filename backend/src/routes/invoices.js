@@ -59,13 +59,28 @@ function saveItems(invoiceId, items) {
 
 const PAGE_SIZE = 20;
 
+// 'overdue' isn't a stored status — withComputed() above derives it from
+// status/due_date/amount_paid at read time, same "don't store what you can
+// compute" approach routes/licenses.js's own statusWhere() already applies
+// to 'expired'/'expiring_soon' there. Mirrors withComputed()'s own
+// is_overdue condition exactly (status='sent', a real balance left, due
+// date in the past) so this filter can never disagree with the badge/
+// dashboard's own overdue query.
+function statusWhere(status) {
+  if (status === 'overdue') {
+    return { clause: "invoices.status = 'sent' AND (invoices.total - invoices.amount_paid) > 0 AND invoices.due_date < ?", params: [today()] };
+  }
+  return { clause: 'invoices.status = ?', params: [status] };
+}
+
 router.get('/', view, (req, res) => {
   const { status, q, page: pageParam } = req.query;
   const conditions = [];
   const params = [];
   if (status) {
-    conditions.push('invoices.status = ?');
-    params.push(status);
+    const statusFilter = statusWhere(status);
+    conditions.push(statusFilter.clause);
+    params.push(...statusFilter.params);
   }
   if (q) {
     conditions.push('(invoices.number LIKE ? OR clients.name LIKE ? OR invoices.status LIKE ?)');

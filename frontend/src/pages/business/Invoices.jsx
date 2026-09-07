@@ -19,10 +19,16 @@ import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, 
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import InvoiceForm from './InvoiceForm';
 
+// 'overdue' isn't a stored invoice status — routes/invoices.js's own
+// statusWhere() derives it from status/due_date/amount_paid the same way
+// withComputed()'s is_overdue field already does, mirroring how
+// Licenses.jsx's own status chips mix stored values with a derived
+// 'expiring_soon'/'expired' pair into one filter.
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'draft', label: 'Draft' },
   { value: 'sent', label: 'Sent' },
+  { value: 'overdue', label: 'Overdue' },
   { value: 'paid', label: 'Paid' },
   { value: 'void', label: 'Void' },
 ];
