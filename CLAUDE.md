@@ -318,7 +318,13 @@ previously had zero backend search and did 100% client-side filtering) —
 `q` and `page` compose freely, and export routes (`GET /export.csv`/
 `GET /export.xlsx` — see `lib/xlsx.js` above for why every export-capable
 route ships both formats from one shared row/column definition) are
-deliberately untouched by either, always returning every row.
+deliberately untouched by either, always returning every row. **One
+exception**: `routes/invoices.js`'s own export pair (see that file's own
+note on `loadInvoiceExport()`) does accept `status`/`q`, since a business
+downloading "the overdue invoices" or "the currently-searched invoices"
+genuinely wants a filtered file, not a reminder to filter it themselves
+afterward in a spreadsheet — every other export-capable route in this app
+still ignores both, unchanged.
 
 - `routes/clients.js`, `routes/settings.js` — plain CRUD for `clients`, and
   GET/PUT for the single-row `business_settings` table (business name,

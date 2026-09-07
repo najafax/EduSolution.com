@@ -167,8 +167,16 @@ export const api = {
       request(`/invoices/${id}/payments/${paymentId}/send-receipt`, { method: 'POST', body: payload, token }),
     openPdf: (id, token) => openPdf(`/invoices/${id}/pdf`, token),
     openReceiptPdf: (id, paymentId, token) => openPdf(`/invoices/${id}/payments/${paymentId}/pdf`, token),
-    exportCsv: (token) => downloadFile('/invoices/export.csv', token, 'invoices.csv'),
-    exportXlsx: (token) => downloadFile('/invoices/export.xlsx', token, 'invoices.xlsx'),
+    // { status, q } mirrors list()'s own filters, applied server-side (see
+    // routes/invoices.js's loadInvoiceExport()) so the download matches
+    // whatever's currently filtered on Invoices.jsx rather than always the
+    // full table — the filename itself reflects the status filter too
+    // (e.g. "invoices-overdue.csv"), falling back to plain "invoices.csv"
+    // when nothing's filtered.
+    exportCsv: (token, { status, q } = {}) =>
+      downloadFile(`/invoices/export.csv${qs({ status, q })}`, token, status ? `invoices-${status}.csv` : 'invoices.csv'),
+    exportXlsx: (token, { status, q } = {}) =>
+      downloadFile(`/invoices/export.xlsx${qs({ status, q })}`, token, status ? `invoices-${status}.xlsx` : 'invoices.xlsx'),
     // openPdf() is generic despite its name — it just fetches, blobs, and
     // opens in a new tab using the response's own Content-Type, which
     // works exactly as well for a JPEG/PNG payment slip as it does for a

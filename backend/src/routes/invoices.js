@@ -73,8 +73,11 @@ function statusWhere(status) {
   return { clause: 'invoices.status = ?', params: [status] };
 }
 
-router.get('/', view, (req, res) => {
-  const { status, q, page: pageParam } = req.query;
+// Shared by GET / and both export routes below, so a filtered export can
+// never drift from what the list page itself is actually showing when the
+// download button is clicked — one place builds the WHERE clause, every
+// caller reuses it rather than re-deriving the same status/q conditions.
+function buildInvoiceWhere({ status, q }) {
   const conditions = [];
   const params = [];
   if (status) {
@@ -87,6 +90,12 @@ router.get('/', view, (req, res) => {
     params.push(`%${q}%`, `%${q}%`, `%${q}%`);
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  return { where, params };
+}
+
+router.get('/', view, (req, res) => {
+  const { status, q, page: pageParam } = req.query;
+  const { where, params } = buildInvoiceWhere({ status, q });
   const baseFrom = 'FROM invoices JOIN clients ON clients.id = invoices.client_id';
 
   if (!pageParam) {
@@ -129,15 +138,29 @@ router.get('/', view, (req, res) => {
 // `description` the importer actually needs. Only the client columns
 // below are fixed for reimport purposes (so at least client matching
 // works if someone tries), not the rest of this shape.
-function loadInvoiceExport() {
+//
+// **Filtered export**: unlike every other export-capable list route in
+// this app (see "Pagination convention" above — those deliberately ignore
+// `q`/`page` so a downloaded file is always the complete, unfiltered set),
+// this one accepts an optional `{ status, q }` and reuses buildInvoiceWhere()
+// — the same WHERE clause GET / itself builds — so "Export CSV"/"Export
+// Excel" clicked from Invoices.jsx download exactly what's currently on
+// screen (e.g. only overdue invoices, once that filter's selected) rather
+// than always the full table regardless of what's filtered. Called with no
+// argument (or `{}`), it behaves exactly as before this existed — every
+// invoice, unfiltered — so a caller that never passes a filter (or hits
+// these routes directly) sees no change.
+function loadInvoiceExport({ status, q } = {}) {
+  const { where, params } = buildInvoiceWhere({ status, q });
   return {
     rows: db
       .prepare(
         `SELECT invoices.*, clients.name AS client_name, clients.email AS client_email
          FROM invoices JOIN clients ON clients.id = invoices.client_id
+         ${where}
          ORDER BY invoices.issue_date DESC, invoices.id DESC`,
       )
-      .all()
+      .all(...params)
       .map(withComputed),
     columns: [
       { label: 'Number', key: 'number' },
@@ -157,19 +180,29 @@ function loadInvoiceExport() {
   };
 }
 
+// A status-specific filename (e.g. "invoices-overdue.csv") when the
+// download is actually filtered, so the file itself says what's in it
+// rather than reading like the full table; plain "invoices.csv" otherwise,
+// unchanged from before filtering existed.
+function exportFilename(status, ext) {
+  return status ? `invoices-${status}.${ext}` : `invoices.${ext}`;
+}
+
 router.get('/export.csv', view, (req, res) => {
-  const { rows, columns } = loadInvoiceExport();
+  const { status, q } = req.query;
+  const { rows, columns } = loadInvoiceExport({ status, q });
   const csv = toCsv(rows, columns);
-  res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="invoices.csv"' });
+  res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="${exportFilename(status, 'csv')}"` });
   res.send(csv);
 });
 
 router.get('/export.xlsx', view, async (req, res) => {
-  const { rows, columns } = loadInvoiceExport();
+  const { status, q } = req.query;
+  const { rows, columns } = loadInvoiceExport({ status, q });
   const buffer = await toXlsxBuffer(rows, columns, 'Invoices');
   res.set({
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'Content-Disposition': 'attachment; filename="invoices.xlsx"',
+    'Content-Disposition': `attachment; filename="${exportFilename(status, 'xlsx')}"`,
   });
   res.send(buffer);
 });

@@ -176,10 +176,14 @@ export default function Invoices() {
     );
   }
 
+  // Exports whatever's currently filtered on this page (status chip, and
+  // the search box once its debounce settles) rather than always the full
+  // table — see routes/invoices.js's own loadInvoiceExport() note on why
+  // this route accepts the same status/q the list itself does.
   async function handleExportCsv() {
     setError('');
     try {
-      await api.invoices.exportCsv(token);
+      await api.invoices.exportCsv(token, { status, q: debouncedSearch });
     } catch (err) {
       setError(err.message);
     }
@@ -188,7 +192,7 @@ export default function Invoices() {
   async function handleExportXlsx() {
     setError('');
     try {
-      await api.invoices.exportXlsx(token);
+      await api.invoices.exportXlsx(token, { status, q: debouncedSearch });
     } catch (err) {
       setError(err.message);
     }
