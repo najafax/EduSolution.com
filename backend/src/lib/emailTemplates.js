@@ -84,7 +84,11 @@ const DEFAULT_TEMPLATES = {
   // there's a real reason to let an admin adjust the wording ahead of time
   // even though nobody reviews any single day's send before it fires.
   shareholder_daily_earnings: {
-    subject: "{{business_name}} — today's earnings: {{net_earning}}",
+    // Sent the morning after — {{date}} is the day being reported on
+    // (yesterday, by default), never the day the email actually lands, so
+    // the subject says so explicitly rather than reading "today's
+    // earnings" on an email that always arrives a day late.
+    subject: '{{business_name}} — earnings for {{date}}: {{net_earning}}',
     message:
       "Hi {{shareholder_name}},\n\nHere's a quick summary of {{business_name}}'s earnings for {{date}}:\n\nReceived: {{total_received}}\nExpenses: {{total_expenses}}\nNet: {{net_earning}}\n\nThe full statement, with every payment and expense for the day, is attached.",
   },

@@ -10,6 +10,14 @@ const { renderDailyEarningsPdf } = require('./reportPdf');
 const { shareholderDailyEarningsEmail } = require('./emailTemplates');
 const { logEmail } = require('./emailLog');
 const { logActivity } = require('./activity');
+// computeSummary() is routes/financials.js's own GET /summary computation,
+// exported for exactly this kind of in-process reuse (routes/dashboard.js
+// already calls it the same way) — called with no from/to here so it
+// returns its own unfiltered/"as of today" bankBalance, the running
+// balance at the moment this report actually renders (see its own note on
+// why that's a different instant than `dateStr` below, which is always
+// yesterday's date by the time this runs).
+const { computeSummary } = require('../routes/financials');
 
 // Payments/expenses recorded against yesterday's date — the job runs at
 // 08:20 (see lib/scheduler.js), so "today" has barely started and has
@@ -71,10 +79,11 @@ async function runDailyEarningsReport(dateStr = yesterday()) {
   }
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const { bankBalance } = computeSummary();
 
   let buffer;
   try {
-    buffer = await renderDailyEarningsPdf({ date, payments, totalReceived, expenses, totalExpenses, settings });
+    buffer = await renderDailyEarningsPdf({ date, payments, totalReceived, expenses, totalExpenses, bankBalance, settings });
   } catch (err) {
     console.error('[daily-earnings] Failed to render PDF:', err.message);
     return { sent: 0, skipped: false, error: true };

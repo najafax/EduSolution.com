@@ -1186,7 +1186,7 @@ already does for that resource.
 - **Shareholders and the daily earnings report**: `shareholders`
   (`db/index.js`, brand new table — plain `CREATE TABLE IF NOT EXISTS`)
   is a small standalone recipient list — `id`/`name`/`email`/`active` —
-  for the automated "how'd we do today" email every active shareholder
+  for the automated "how'd we do yesterday" email every active shareholder
   gets, once a day, only on a day a payment actually came in. Deliberately
   **not** derived from `capital_contributions`/`owner_draws`: those are
   transaction *logs* keyed on a free-text name with no email and no
@@ -1250,6 +1250,41 @@ already does for that resource.
   fact that nobody reviews any single day's automated send before it
   fires doesn't mean the wording itself shouldn't be reviewable/
   customizable ahead of time by an admin who wants their own tone.
+  **The default subject is date-anchored, not "today"-anchored**: it
+  originally read `` "{{business_name}} — today's earnings:
+  {{net_earning}}" ``, which was wrong the instant it shipped — the email
+  always arrives the *morning after* the day it reports on (see the
+  08:20-fires/yesterday's-data framing above), so "today's earnings" in a
+  Monday-morning inbox actually meant Sunday's figures, not Monday's, with
+  nothing in the subject line saying so. Fixed to `` "{{business_name}} —
+  earnings for {{date}}: {{net_earning}}" `` — `{{date}}` was already a
+  valid placeholder on this template (see `PLACEHOLDERS` below), it just
+  wasn't used in the subject before. This reads correctly for the cron
+  job's own default (yesterday) and equally for `POST /send-report`
+  or a future re-run against an arbitrary past `dateStr`, since the
+  subject now states whichever date the attached PDF actually covers
+  rather than assuming "today."
+  **The PDF also states the running bank balance now** — `lib/reportPdf.js`'s
+  `renderDailyEarningsPdf()` gained an optional `bankBalance` param, drawn
+  as one more `drawSummaryBox()` row right below the NET PROFIT bar
+  (`Bank balance`, no separate "as of" date on the label itself — the
+  header's own "Generated {date}" line right above it already states that
+  exact date once, so repeating it on the label would just wrap the label
+  onto two lines for no added clarity). This is deliberately the balance
+  **at the moment the report renders** (i.e. this morning, when the cron
+  job actually runs), not the balance as of the reported date (yesterday)
+  — `lib/dailyEarningsReport.js` gets it by calling
+  `routes/financials.js`'s own exported `computeSummary()` with no
+  `from`/`to` args, the exact same in-process reuse
+  `routes/dashboard.js`'s own `GET /overview` already makes of that
+  function, which returns its `bankBalance` "as of today" for the
+  unfiltered case — so a shareholder reading this report sees the
+  business's real, current cash position alongside yesterday's activity,
+  not a stale running total. Verified end-to-end against an isolated copy
+  of the dev database (never the real one): `computeDailyEarnings()` +
+  `computeSummary()` + `renderDailyEarningsPdf()` called directly produced
+  a real PDF, and `pdftotext` confirmed the rendered "Bank balance" row
+  reads the correct figure with no page-overlap or clipping.
   `lib/scheduler.js` registers the cron trigger at `'20 8 * * *'` —
   staggered 5 minutes after the license-expiry job, same "avoid
   interleaved console output" reasoning every other same-hour job stagger

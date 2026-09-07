@@ -386,7 +386,7 @@ function renderExpenseReportPdf({ expenses, from, to, settings }) {
 // makes for a comparably small, detail-worth-seeing set). Backs
 // lib/dailyEarningsReport.js's runDailyEarningsReport() — the automated
 // email sent to shareholders whenever a day actually brings in a payment.
-function renderDailyEarningsPdf({ date, payments, totalReceived, expenses, totalExpenses, settings }) {
+function renderDailyEarningsPdf({ date, payments, totalReceived, expenses, totalExpenses, bankBalance, settings }) {
   const doc = newDoc();
   let y = drawReportHeader(doc, { title: 'DAILY EARNINGS STATEMENT', subtitle: date, settings });
 
@@ -422,6 +422,23 @@ function renderDailyEarningsPdf({ date, payments, totalReceived, expenses, total
 
   const netEarning = Math.round((totalReceived - totalExpenses) * 100) / 100;
   y = drawNetProfitBar(doc, { value: signedAmountOnly(netEarning), positive: netEarning >= 0 }, y);
+
+  // The running bank balance as of whenever this report actually rendered
+  // (see lib/dailyEarningsReport.js — this is `financials.js`'s own
+  // computeSummary() called with no range, so it's the exact same
+  // "as of today" figure the Financials/Dashboard pages show, not a
+  // balance as of the reported date `date` above, which is always
+  // yesterday by the time this renders). No separate "as of" date printed
+  // on the label itself — `drawReportHeader`'s own "Generated {date}" line
+  // already states that same generation date once, right above; repeating
+  // it here just to wrap the label onto two lines would be redundant, not
+  // clarifying. Only drawn when the caller actually supplied one — this
+  // stayed optional rather than required so an old call site (there are
+  // none today, but future ones) can't crash on a missing figure.
+  if (typeof bankBalance === 'number') {
+    y += 6;
+    y = drawSummaryBox(doc, [{ label: 'Bank balance', value: signedAmountOnly(bankBalance), bold: true }], y);
+  }
 
   doc
     .font('Helvetica')
