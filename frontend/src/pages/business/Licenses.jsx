@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { todayStr, todayPlus, timeAgo } from '../../lib/date';
+import { todayStr, advanceExpiryStr, timeAgo } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import SearchInput from '../../components/SearchInput';
 import StatusFilterChips from '../../components/StatusFilterChips';
@@ -60,7 +60,7 @@ const EMPTY_FORM = {
   billing_cycle: 'yearly',
   amount: '',
   start_date: todayStr(),
-  expiry_date: todayPlus(365),
+  expiry_date: advanceExpiryStr(todayStr(), 'yearly'),
   url: '',
   notes: '',
   status: 'active',
@@ -659,7 +659,9 @@ export default function Licenses() {
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Billing cycle</span>
               <select
                 value={form.billing_cycle}
-                onChange={(e) => setForm((f) => ({ ...f, billing_cycle: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, billing_cycle: e.target.value, expiry_date: advanceExpiryStr(f.start_date, e.target.value) }))
+                }
                 className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               >
                 <option value="monthly">Monthly</option>
@@ -686,7 +688,9 @@ export default function Licenses() {
                   type="date"
                   required
                   value={form.start_date}
-                  onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, start_date: e.target.value, expiry_date: advanceExpiryStr(e.target.value, f.billing_cycle) }))
+                  }
                   className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
                 />
               </div>
@@ -703,6 +707,9 @@ export default function Licenses() {
                   className="h-full w-full appearance-none border-0 bg-transparent p-0 text-base focus:outline-none dark:text-white"
                 />
               </div>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Auto-calculated from start date + billing cycle — edit if this license runs on a different schedule.
+              </p>
             </label>
 
             {editingId && (

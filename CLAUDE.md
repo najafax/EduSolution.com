@@ -2034,6 +2034,21 @@ already does for that resource.
   printed, which read as arbitrary on a receipt that had a "REFERENCE"/
   "NOTES" section long enough to push the rest of the page down; both PDF
   templates get the same fix, not just the default one.
+  **Quote PDFs now print bank details too, same as invoices**:
+  `renderQuotePdf`/`renderQuotePdfMinimal` used to hardcode
+  `bankDetails: ''` into their own `drawSignatureAndPayment`/
+  `drawMinimalSignatureAndPayment` call — a quote was deliberately the one
+  document type that never showed the "PAYMENTS PAYABLE TO" box, since
+  nothing is actually owed yet at the quote stage. Changed at explicit
+  request to `bankDetails: settings.bank_details`, the exact same value
+  `renderInvoicePdf`/`renderInvoicePdfMinimal` already pass — so a
+  business that wants a prospective client to see how they'd eventually
+  pay (or just wants one consistent footer across every document type) now
+  gets it on both. `drawSignatureAndPayment` already treated a blank
+  `bankDetails` as "draw nothing" for either document, so a business with
+  `business_settings.bank_details` left empty sees no visible change on
+  its quotes either way — this only affects businesses that have actually
+  filled that field in.
 - `lib/mailer.js` — `sendMail()` wraps `nodemailer` with SMTP settings from
   env (`SMTP_HOST`/`PORT`/`USER`/`PASS`/`FROM`/`SECURE`). If `SMTP_HOST`
   isn't set, it throws `EMAIL_NOT_CONFIGURED` rather than crashing — routes
@@ -5743,6 +5758,23 @@ frontend stops holding/sending it.
   row (see `routes/licenses.js` above for the exact shape and why it's
   worth showing — a link staff need to actually click, not free-text
   worth hiding behind a tap the way `notes` is).
+  **Expiry date is auto-calculated from Start date + Billing cycle**:
+  `lib/date.js`'s `advanceExpiryStr(dateStr, cycle)` is the frontend mirror
+  of `lib/licenseRenewal.js`'s own `advanceExpiry()` — same month-end clamp
+  (Jan 31 + monthly lands on Feb 28/29, not March), just computed client-
+  side so the form's own "Expiry date" field can update live rather than
+  waiting on a round trip. The "Start date" input's `onChange` and the
+  "Billing cycle" `<select>`'s `onChange` both recompute `expiry_date` from
+  the field they just changed (a yearly license starting `2026-09-01`
+  auto-fills `2027-09-01`, not the old `todayPlus(365)`-style approximation
+  `EMPTY_FORM` used to default to) — `EMPTY_FORM` itself now seeds via the
+  same function. "Expiry date" stays a normal, freely-editable date input
+  either way (a small caption under it says so) — for a license on an
+  irregular schedule, staff can still type over the auto-filled value, it
+  just gets recomputed again the next time Start date or Billing cycle
+  changes, the same "recomputed value, still an override until the next
+  trigger" trade-off `LineItemsEditor`'s own `onProductTaxRate` already
+  documents for the Tax rate field.
   **Last payment column**: the desktop table and mobile accordion also
   carry a "Last payment" field (positioned right before "Amount," so a
   payment date and the amount received on it read together) —

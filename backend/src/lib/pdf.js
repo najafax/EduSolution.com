@@ -568,9 +568,10 @@ function drawSignatureBlock(doc, settings, y, rightBound) {
 // The signature block (left column) and a "PAYMENTS PAYABLE TO" box (right
 // column) side by side. Either column is independently optional — a
 // business with no signature/stamp uploaded yet just doesn't get that
-// column, same for a quote (which never has bank details — see
-// renderQuotePdf) or an invoice whose business_settings.bank_details is
-// blank. Draws nothing at all if neither has anything to show.
+// column, same for either document type when business_settings.bank_details
+// is blank (quotes and invoices both print it now — see renderQuotePdf/
+// renderInvoicePdf, both of which pass the same settings.bank_details).
+// Draws nothing at all if neither has anything to show.
 function drawSignatureAndPayment(doc, { settings, bankDetails }, y) {
   const hasSig = Boolean(settings.signature_image || settings.stamp_image);
   const hasBank = Boolean(bankDetails);
@@ -932,7 +933,7 @@ function renderQuotePdfMinimal({ quote, client, items, settings }) {
     symbol,
   );
   y = drawMinimalNotes(doc, quote.notes, y);
-  y = drawMinimalSignatureAndPayment(doc, { settings, bankDetails: '' }, y);
+  y = drawMinimalSignatureAndPayment(doc, { settings, bankDetails: settings.bank_details }, y);
   drawMinimalThankYouFooter(doc, settings, y);
 
   return docToBuffer(doc, (d) => addPageFooter(d, settings));
@@ -1067,7 +1068,7 @@ function renderQuotePdf({ quote, client, items, settings }) {
     symbol,
   );
   y = drawCommentsBox(doc, quote.notes, y);
-  y = drawSignatureAndPayment(doc, { settings, bankDetails: '' }, y);
+  y = drawSignatureAndPayment(doc, { settings, bankDetails: settings.bank_details }, y);
   drawThankYouFooter(doc, settings, y);
 
   return docToBuffer(doc, (d) => addPageFooter(d, settings));

@@ -40,6 +40,25 @@ export function startOfYearStr() {
   return `${new Date().getFullYear()}-01-01`;
 }
 
+// One billing cycle forward from `dateStr` — the frontend mirror of
+// backend/src/lib/licenseRenewal.js's own advanceExpiry(), same month-end
+// clamp (e.g. Jan 31 + monthly lands on Feb 28/29, not March) so a license's
+// auto-calculated expiry date always matches what a real renewal would
+// produce. Used by Licenses.jsx to auto-fill "Expiry date" from "Start
+// date"/"Billing cycle" — e.g. a yearly license starting 2026-09-01 expires
+// exactly 2027-09-01.
+export function advanceExpiryStr(dateStr, cycle) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  const originalDay = d.getDate();
+  if (cycle === 'yearly') d.setFullYear(d.getFullYear() + 1);
+  else d.setMonth(d.getMonth() + 1); // monthly, the default
+  if (d.getDate() !== originalDay) d.setDate(0);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // A short relative-time string ("just now", "5 minutes ago", "3 days ago")
 // for a SQLite `datetime('now')` timestamp (a space-separated
 // "YYYY-MM-DD HH:MM:SS" UTC string, not ISO 8601) — used by
