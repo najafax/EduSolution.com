@@ -436,7 +436,8 @@ export default function MyAccount() {
         </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Every device currently signed in as you. Sign out a device you don't recognize or left logged in
-          somewhere.
+          somewhere. Only 3 devices can be signed in at once — signing in on a 4th automatically signs the
+          oldest one out.
         </p>
         {sessionsNotice && <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{sessionsNotice}</p>}
         {sessionsError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{sessionsError}</p>}

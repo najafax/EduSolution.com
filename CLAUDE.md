@@ -3246,6 +3246,30 @@ logged in on" list. Built together since the first three all touch
   equivalent notice since the affected row simply disappears from the list
   it's already looking at, but a bulk action clearing several rows at once
   benefits from an explicit confirmation of what just happened.
+  **A hard cap of 3 concurrent active sessions per account**:
+  `lib/sessions.js`'s `MAX_ACTIVE_SESSIONS = 3` is a fixed constant, not a
+  `business_settings` field — this app has no other per-account security
+  policy that's admin-tunable per user (only the single, business-wide
+  `session_timeout_minutes`, see "Idle session timeout" above), so a
+  hardcoded cap needed no new settings UI to ship. `enforceSessionLimit
+  (userId)`, called at the end of `createSession()` (i.e. only on a fresh
+  `POST /login`, never on `change-password`'s own `req.sessionJti` reuse —
+  refreshing a token after a password change was never a new device to
+  begin with, so it can't push anyone over the cap), queries every
+  non-revoked session for that user ordered oldest-first
+  (`created_at ASC, id ASC` — the same order `GET /api/auth/sessions`
+  already lists them in) and, whenever a fresh login pushes the count past
+  3, revokes exactly enough of the oldest ones to bring it back to 3. A
+  device revoked this way gets no proactive notice — same as a manual
+  "Sign out" click from `MyAccount.jsx` today — it simply finds out via
+  the existing "This session has been signed out" 401 (`requireAuth`,
+  see above) the next time it makes an API call; no websocket/polling was
+  added to push a live logout, since nothing else in this app's session
+  handling does that either. `MyAccount.jsx`'s "Active sessions" card
+  description gained a line stating the cap and the auto-sign-out
+  behavior, so a user signing in on a 4th device understands why an older
+  one disappeared from their own list rather than discovering it only as
+  a mysterious logout somewhere else.
 
 ### Sensitive modules — super-admin-gated financial data (`backend/src/`, `frontend/src/`)
 
