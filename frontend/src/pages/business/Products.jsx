@@ -12,7 +12,7 @@ import { PlusIcon, PencilIcon, TrashIcon, UploadIcon } from '../../components/ic
 import { useConfirm } from '../../lib/useConfirm';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 
-const EMPTY_FORM = { name: '', description: '', unit_price: '', tax_rate: '', visible_in_portal: false };
+const EMPTY_FORM = { name: '', description: '', unit_price: '', tax_rate: '', cost_price: '', visible_in_portal: false };
 
 // Same template content as pages/business/Import.jsx's own `products` entry
 // in its TEMPLATES map — duplicated rather than imported (this page has no
@@ -283,6 +283,7 @@ export default function Products() {
       description: product.description,
       unit_price: product.unit_price,
       tax_rate: product.tax_rate,
+      cost_price: product.cost_price,
       visible_in_portal: Boolean(product.visible_in_portal),
     });
     setEditingId(product.id);
@@ -393,6 +394,24 @@ export default function Products() {
           </label>
           <div className="sm:col-span-2">
             <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Cost price (USD)</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.cost_price}
+                onChange={(e) => setForm((f) => ({ ...f, cost_price: e.target.value }))}
+                placeholder="0"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              />
+            </label>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              What this actually costs to fulfil (e.g. paying an overseas supplier) — never shown to clients, only used
+              on the Deals page to calculate profit.
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Description</span>
               <input
                 type="text"
@@ -453,6 +472,7 @@ export default function Products() {
                     <th className="px-4 py-3">Description</th>
                     <th className="px-4 py-3 text-right">Unit price</th>
                     <th className="px-4 py-3 text-right">Tax</th>
+                    <th className="px-4 py-3 text-right">Cost (USD)</th>
                     {canManage && <th className="px-4 py-3" />}
                   </tr>
                 </thead>
@@ -472,6 +492,9 @@ export default function Products() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600 dark:text-slate-400">
                         {product.tax_rate ? `${product.tax_rate}%` : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600 dark:text-slate-400">
+                        {product.cost_price ? `$${product.cost_price.toFixed(2)}` : '—'}
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
@@ -518,6 +541,10 @@ export default function Products() {
                   <div className="flex justify-between">
                     <dt className="text-slate-500 dark:text-slate-400">Tax</dt>
                     <dd className="text-slate-900 dark:text-white">{product.tax_rate ? `${product.tax_rate}%` : '—'}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500 dark:text-slate-400">Cost (USD)</dt>
+                    <dd className="text-slate-900 dark:text-white">{product.cost_price ? `$${product.cost_price.toFixed(2)}` : '—'}</dd>
                   </div>
                   {canManage && (
                     <div className="flex gap-1.5 pt-1">

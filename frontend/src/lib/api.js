@@ -259,6 +259,17 @@ export const api = {
     sendReport: (token) => request('/shareholders/send-report', { method: 'POST', token }),
   },
 
+  deals: {
+    list: (token, { q, status, page } = {}) => request(`/deals${qs({ q, status, page })}`, { token }),
+    get: (id, token) => request(`/deals/${id}`, { token }),
+    create: (payload, token) => request('/deals', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/deals/${id}`, { method: 'PUT', body: payload, token }),
+    remove: (id, token) => request(`/deals/${id}`, { method: 'DELETE', token }),
+    // The one real action — locks the deal and writes the actual expense +
+    // owner_draws rows. See routes/deals.js's own POST /:id/distribute.
+    distribute: (id, token) => request(`/deals/${id}/distribute`, { method: 'POST', token }),
+  },
+
   recurringInvoices: {
     list: (token, { q, page } = {}) => request(`/recurring-invoices${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/recurring-invoices/${id}`, { token }),

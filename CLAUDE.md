@@ -3271,6 +3271,143 @@ logged in on" list. Built together since the first three all touch
   one disappeared from their own list rather than discovering it only as
   a mysterious logout somewhere else.
 
+### Deals — internal profit calculator + shareholder distribution (`backend/src/`, `frontend/src/`)
+
+A purely internal profit calculation, never shown anywhere a client can see
+it — the "I received MVR 4,000 for a product, spent $97 buying USD to pay
+my supplier, and need to split the rest among shareholders by their
+ownership %" workflow. Deliberately not layered onto the invoice itself
+(explicit request: "i dont want anything to be visible in invoice") — a
+deal can optionally link back to a paid invoice purely for staff-side
+traceability, but the invoice's own data/UI is completely untouched either
+way. Designed to introduce **zero new financial math**: a draft deal is
+just a calculator with no bookkeeping side effects, and the one real
+action — `POST /:id/distribute` — commits it by writing a real `currency
+exchange` expense (the USD cost) and real `owner_draws` rows (the
+shareholder split), the exact same primitives a human would create by hand
+elsewhere in this app. `routes/financials.js`'s existing `bankBalance`/
+`netProfit` math already accounts for both correctly with no changes
+needed there — verified end-to-end against an isolated copy of the dev
+database (never the real one): distributing a deal moved `totalExpenses`/
+`totalOwnerDraws`/`bankBalance` by exactly the deal's own cost/net-profit
+figures, with no drift.
+
+- **Cost is product-driven, not typed per deal**: `products.cost_price`
+  (`db/index.js`, `ALTER TABLE`-guarded — `products` already had real
+  catalog rows) is what it actually costs (in USD — this app's
+  profit-distribution feature is USD-specific, mirroring the existing
+  `currency exchange` expense category's own USD-only convention) to
+  fulfil a sale of that product, e.g. paying an overseas supplier —
+  distinct from `unit_price` (what the client is charged, in the
+  business's own currency) and never shown anywhere client-facing.
+  Optional, defaults to 0 like `tax_rate`. `routes/products.js`'s
+  `POST`/`PUT` validate it the same way `unit_price` is (a non-negative
+  number, no upper bound the way `tax_rate`'s percentage has).
+  `Products.jsx`'s create/edit form gains a "Cost price (USD)" field (with
+  a caption stating it's never client-facing) and the list gains a "Cost
+  (USD)" column (desktop table + mobile accordion row), same em-dash-when-
+  blank convention `tax_rate`'s own column already follows.
+- **Distribution is by a fixed ownership `%` per shareholder**, not
+  negotiated per deal: `shareholders.ownership_percent` (`db/index.js`,
+  `ALTER TABLE`-guarded) is a 0–100 number, editable under the same
+  `financials` permission every other field on that table already sits
+  behind (per "Sensitive modules" below — super-admin-gated by default,
+  delegatable). `routes/shareholders.js`'s `validate()` grew the same
+  0–100 range check `routes/products.js`'s own `tax_rate` validation
+  already uses. `Shareholders.jsx` gains an "Ownership (%)" field in the
+  form and its own column/detail row in the list, same em-dash-when-blank
+  convention as everywhere else. Percentages across shareholders are
+  **not** required to sum to 100 — whatever isn't allocated simply stays
+  in the bank balance as retained cash, no separate bookkeeping needed for
+  that.
+- `deals` and `deal_items` (`db/index.js`, both brand-new tables, plain
+  `CREATE TABLE IF NOT EXISTS`) — `deals` holds `description`, an optional
+  `invoice_id` (traceability only, `ON DELETE SET NULL`), `payee` (the
+  supplier name, becomes the eventual expense's own `payee`),
+  `revenue_amount` (MVR), `exchange_rate` (MVR per USD, nullable),
+  `status` (`draft` | `distributed`, one-way — the same "once real money
+  has moved, the record becomes historical" precedent invoices.js's own
+  sent/paid lock already sets), `expense_id` (set once distributed), and
+  `distributed_at`. `deal_items` mirrors `invoice_items`/`quote_items` in
+  shape (a denormalized `description` snapshot, `product_id` with no
+  `REFERENCES` constraint for the same reason those two tables' own
+  `product_id` columns don't — `products.js` allows deleting a product
+  with no reference check) but `cost_price` is USD from the product's own
+  `cost_price` at the time it was added, not MVR from `unit_price` — this
+  is what the sale actually cost to fulfil, not what the client was
+  charged for it. `owner_draws.deal_id` (`db/index.js`, `ALTER TABLE`-
+  guarded — `owner_draws` already had real records) links a draw back to
+  the specific distribution that created it, `ON DELETE SET NULL` so
+  deleting a deal record later never erases the real draw it already
+  produced.
+- `routes/deals.js` (mounted `/api/deals`) is gated on the existing
+  `financials` permission, not a new `MODULES` entry — this is exactly
+  the same sensitivity level as Capital contributions/Owner draws/
+  Shareholders/Reports, all of which already reuse it. `withComputedDeal()`
+  is the don't-store-what-you-can-compute helper (same approach
+  `invoices.js`'s own `withComputed()` takes for `is_overdue`) that
+  derives `cost_usd_total` (Σ `item.quantity × item.cost_price`),
+  `cost_mvr` (`cost_usd_total × exchange_rate`, `0` when no rate is set),
+  and `net_profit` (`revenue_amount − cost_mvr`) fresh on every read from
+  the deal's own row + its current items — every `GET`/`POST`/`PUT`
+  response carries these three fields so the frontend never has to
+  recompute them independently and risk drifting from the backend's own
+  numbers. `GET /` follows the "Pagination convention" (opt-in `?page=`,
+  plus `?q=`/`?status=` filters) every other business list route uses.
+  `POST /`/`PUT /:id` validate `description`/`revenue_amount`/
+  `exchange_rate` (a positive number when given at all) and each item's
+  own `description`/`quantity`/`cost_price`, and — same as every other
+  optional invoice/client reference in this app — 400 if a given
+  `invoice_id` doesn't actually exist. `PUT`/`DELETE /:id` both 409 once
+  `status` is `distributed`, mirroring the sent/paid invoice lock.
+  `POST /:id/distribute` is the one real action: 409s if already
+  distributed; 400s if there's a USD cost but no `exchange_rate` set to
+  convert it, or if `net_profit <= 0` (nothing to distribute — review the
+  numbers first); 400s if no active shareholder has `ownership_percent >
+  0` (add one on the Shareholders page first). Otherwise, in one
+  `db.transaction()`: inserts a `currency exchange` expense for
+  `cost_mvr` (only when `cost_usd_total > 0` — a deal with no USD cost
+  never creates a phantom `$0.00` expense) with `payee`/`exchange_rate`
+  carried over from the deal, inserts one `owner_draws` row per eligible
+  shareholder (`amount = round2(net_profit × ownership_percent / 100)`,
+  `type: 'draw'`, `deal_id` set, `notes: `Distribution from deal:
+  ${description}``), and flips the deal to `distributed`. `GET /:id`
+  additionally returns the linked invoice's own summary (number/total/
+  amount_paid/client name, for display only) and linked expense summary,
+  plus the deal's own `distributions` (its `owner_draws` rows, empty
+  until distributed).
+- `pages/business/Deals.jsx` (route `/deals`, `Navbar.jsx`/`Sidebar.jsx`
+  link right after Shareholders, gated on `financials`) is the standard
+  list+modal-form+FAB shape (`StatusFilterChips` for All/Draft/Distributed,
+  `SearchInput`, the usual desktop-table + `MobileListAccordion` split,
+  `Pagination`) with three modals: the create/edit form, a "Distribute"
+  confirmation modal (shows the revenue/cost/net-profit summary and a live
+  split preview per eligible shareholder before committing), and a
+  read-only "View split" modal for an already-distributed deal (fetched
+  via `GET /:id`, showing exactly what each shareholder was paid). A
+  banner warns (non-blocking) when no active shareholder has an ownership
+  percentage set at all, so staff understand up front why "Distribute"
+  would otherwise fail. The create/edit form's "Link to a paid invoice"
+  field (`SearchableSelect`, options built from `api.invoices.list()`
+  filtered to `amount_paid > 0`) pre-fills `revenue_amount` from the
+  invoice's `total` and — only when no cost items have been added yet —
+  auto-populates the cost-items block from that invoice's own line items:
+  for each one, the matching product's current `cost_price` is looked up
+  by `product_id` (an item with no `product_id`, or a since-deleted
+  product, comes in at `$0`, same as any other line item — still freely
+  editable). The cost-items block itself is a small bespoke editor (not
+  `components/LineItemsEditor.jsx`, which is tightly coupled to the
+  invoice/quote tax-and-discount shape) — a `ProductPicker` sub-component
+  modeled on `LineItemsEditor.jsx`'s own inline `ProductPicker` (never
+  "holds" a selection; every pick immediately appends a row and resets to
+  an empty search box) alongside a "+ Add custom cost item" fallback for a
+  cost not tied to any catalog product, each row showing description ×
+  quantity × cost price = a computed line amount. A live summary box at
+  the bottom mirrors `withComputedDeal()`'s own formula exactly, so the
+  form's own running total never disagrees with what a save would
+  actually compute. `lib/api.js`'s `deals` object holds `list`/`get`/
+  `create`/`update`/`remove`/`distribute`.
+
 ### Sensitive modules — super-admin-gated financial data (`backend/src/`, `frontend/src/`)
 
 A follow-up narrowing of the admin-tier bypass, distinct from "Restricted

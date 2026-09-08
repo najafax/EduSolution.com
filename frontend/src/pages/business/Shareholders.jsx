@@ -17,7 +17,7 @@ import { UsersIcon, PlusIcon, PencilIcon, TrashIcon, SendIcon } from '../../comp
 // makes for comparably small per-entity lists (routes/licenses.js's own
 // GET /:id/renewals). A shareholder is just a name + email + active flag,
 // not a login account, so this form is deliberately thinner than Users.jsx.
-const EMPTY_FORM = { name: '', email: '', active: true };
+const EMPTY_FORM = { name: '', email: '', active: true, ownership_percent: '' };
 
 export default function Shareholders() {
   const { token, can } = useAuth();
@@ -52,7 +52,12 @@ export default function Shareholders() {
   }
 
   function startEdit(shareholder) {
-    setForm({ name: shareholder.name, email: shareholder.email, active: Boolean(shareholder.active) });
+    setForm({
+      name: shareholder.name,
+      email: shareholder.email,
+      active: Boolean(shareholder.active),
+      ownership_percent: shareholder.ownership_percent,
+    });
     setEditingId(shareholder.id);
     setShowForm(true);
   }
@@ -171,6 +176,22 @@ export default function Shareholders() {
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Ownership (%)</span>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={form.ownership_percent}
+              onChange={(e) => setForm((f) => ({ ...f, ownership_percent: e.target.value }))}
+              placeholder="0"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              This shareholder's cut of a deal's net profit when distributed — see the Deals page.
+            </p>
+          </label>
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -202,7 +223,7 @@ export default function Shareholders() {
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={3} cols={canManage ? ['w-40', 'w-56', 'w-20', 'w-16'] : ['w-40', 'w-56', 'w-20']} />
+            <TableSkeleton rows={3} cols={canManage ? ['w-40', 'w-56', 'w-16', 'w-20', 'w-16'] : ['w-40', 'w-56', 'w-16', 'w-20']} />
           </div>
         ) : shareholders.length === 0 ? (
           <EmptyState
@@ -219,6 +240,7 @@ export default function Shareholders() {
                   <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3 text-right">Ownership</th>
                     <th className="px-4 py-3">Status</th>
                     {canManage && <th className="px-4 py-3" />}
                   </tr>
@@ -228,6 +250,9 @@ export default function Shareholders() {
                     <tr key={s.id}>
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{s.name}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{s.email}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
+                        {s.ownership_percent ? `${s.ownership_percent}%` : '—'}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -277,6 +302,10 @@ export default function Shareholders() {
                       </div>
                     }
                   >
+                    <div className="flex justify-between">
+                      <dt className="text-slate-500 dark:text-slate-400">Ownership</dt>
+                      <dd className="text-slate-900 dark:text-white">{s.ownership_percent ? `${s.ownership_percent}%` : '—'}</dd>
+                    </div>
                     {canManage && (
                       <div className="flex gap-1.5 pt-1">
                         <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(s)} title="Edit" label="Edit shareholder" />

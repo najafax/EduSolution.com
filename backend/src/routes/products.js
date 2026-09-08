@@ -29,8 +29,19 @@ router.get('/', view, (req, res) => {
   res.json({ products, page, pageSize: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) });
 });
 
+// cost_price (USD, optional, defaults to 0) is what it actually costs to
+// fulfil a sale of this product — e.g. paying an overseas supplier — kept
+// separate from unit_price validation below since it has no upper bound the
+// way tax_rate does (a percentage) and is never client-facing; it only
+// feeds routes/deals.js's own profit calculation.
+function validateCostPrice(cost_price) {
+  const costNum = Number(cost_price);
+  if (!Number.isFinite(costNum) || costNum < 0) return null;
+  return costNum;
+}
+
 router.post('/', manage, (req, res) => {
-  const { name, description = '', unit_price = 0, tax_rate = 0, visible_in_portal = false } = req.body || {};
+  const { name, description = '', unit_price = 0, tax_rate = 0, cost_price = 0, visible_in_portal = false } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
   const priceNum = Number(unit_price);
   if (!Number.isFinite(priceNum) || priceNum < 0) {
@@ -40,10 +51,14 @@ router.post('/', manage, (req, res) => {
   if (!Number.isFinite(taxNum) || taxNum < 0 || taxNum > 100) {
     return res.status(400).json({ error: 'tax_rate must be a number between 0 and 100' });
   }
+  const costNum = validateCostPrice(cost_price);
+  if (costNum === null) return res.status(400).json({ error: 'cost_price must be a non-negative number' });
 
   const result = db
-    .prepare('INSERT INTO products (name, description, unit_price, tax_rate, visible_in_portal) VALUES (?, ?, ?, ?, ?)')
-    .run(name.trim(), description, priceNum, taxNum, visible_in_portal ? 1 : 0);
+    .prepare(
+      'INSERT INTO products (name, description, unit_price, tax_rate, cost_price, visible_in_portal) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+    .run(name.trim(), description, priceNum, taxNum, costNum, visible_in_portal ? 1 : 0);
   const product = db.prepare('SELECT * FROM products WHERE id = ?').get(result.lastInsertRowid);
   logActivity({ userName: req.user.name, action: 'created', entityType: 'product', entityId: product.id, entityLabel: product.name });
   res.status(201).json({ product });
@@ -53,7 +68,7 @@ router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });
 
-  const { name, description = '', unit_price = 0, tax_rate = 0, visible_in_portal = false } = req.body || {};
+  const { name, description = '', unit_price = 0, tax_rate = 0, cost_price = 0, visible_in_portal = false } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
   const priceNum = Number(unit_price);
   if (!Number.isFinite(priceNum) || priceNum < 0) {
@@ -63,10 +78,12 @@ router.put('/:id', manage, (req, res) => {
   if (!Number.isFinite(taxNum) || taxNum < 0 || taxNum > 100) {
     return res.status(400).json({ error: 'tax_rate must be a number between 0 and 100' });
   }
+  const costNum = validateCostPrice(cost_price);
+  if (costNum === null) return res.status(400).json({ error: 'cost_price must be a non-negative number' });
 
   db.prepare(
-    `UPDATE products SET name = ?, description = ?, unit_price = ?, tax_rate = ?, visible_in_portal = ?, updated_at = datetime('now') WHERE id = ?`,
-  ).run(name.trim(), description, priceNum, taxNum, visible_in_portal ? 1 : 0, req.params.id);
+    `UPDATE products SET name = ?, description = ?, unit_price = ?, tax_rate = ?, cost_price = ?, visible_in_portal = ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(name.trim(), description, priceNum, taxNum, costNum, visible_in_portal ? 1 : 0, req.params.id);
 
   const product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   logActivity({ userName: req.user.name, action: 'updated', entityType: 'product', entityId: product.id, entityLabel: product.name });

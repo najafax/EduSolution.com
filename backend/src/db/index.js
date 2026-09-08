@@ -609,6 +609,60 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_website_gallery_visible ON website_gallery(visible);
   CREATE INDEX IF NOT EXISTS idx_website_videos_visible ON website_videos(visible);
 
+  -- A single internal profit calculation: money received (MVR) for a job or
+  -- product sale, netted against what it actually cost to buy USD to pay a
+  -- supplier, with the remainder split among active shareholders by their
+  -- own ownership_percent (see that column on shareholders below).
+  -- Deliberately never shown anywhere client-facing, even when linked to a
+  -- real invoice (invoice_id, optional — purely for staff-side traceability,
+  -- e.g. "which sale funded this") — a client is never meant to see any of
+  -- this. A draft deal has no bookkeeping side effects of its own; it's a
+  -- calculator until routes/deals.js's own POST /:id/distribute commits it
+  -- — at that point it creates one real 'currency exchange' expense row for
+  -- the USD cost (expense_id) and one real owner_draws row per shareholder
+  -- (see owner_draws.deal_id below), so routes/financials.js's existing
+  -- bankBalance/netProfit math accounts for both correctly with no changes
+  -- needed there. status moves draft -> distributed once, one-way — a
+  -- distributed deal is locked, the same "once real money has moved, the
+  -- record becomes historical" precedent invoices.js's own sent/paid lock
+  -- already sets. Brand-new table, no production data yet, so a plain
+  -- CREATE TABLE IF NOT EXISTS is enough.
+  CREATE TABLE IF NOT EXISTS deals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    description TEXT NOT NULL,
+    invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+    payee TEXT NOT NULL DEFAULT '',
+    revenue_amount REAL NOT NULL DEFAULT 0,
+    exchange_rate REAL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL,
+    distributed_at TEXT,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- The supplier-cost side of one deal — mirrors invoice_items/quote_items in
+  -- shape (a denormalized description snapshot, no REFERENCES on product_id
+  -- for the same reason those two tables' own product_id columns don't —
+  -- products.js allows deleting a product with no reference check), but
+  -- cost_price is USD from products.cost_price rather than MVR from
+  -- unit_price, since this is what the sale actually cost to fulfil, not
+  -- what the client was charged for it.
+  CREATE TABLE IF NOT EXISTS deal_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id INTEGER NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
+    product_id INTEGER,
+    description TEXT NOT NULL,
+    quantity REAL NOT NULL DEFAULT 1,
+    cost_price REAL NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_deals_status ON deals(status);
+  CREATE INDEX IF NOT EXISTS idx_deals_invoice ON deals(invoice_id);
+  CREATE INDEX IF NOT EXISTS idx_deal_items_deal ON deal_items(deal_id);
+
   -- Added once the query patterns above (list routes' ORDER BY, the
   -- scheduler's WHERE clauses, routes/reports.js's date-range SUMs) were
   -- audited against what was actually indexed. SQLite doesn't index a
@@ -984,6 +1038,46 @@ if (!ownerDrawColumns.has('parent_draw_id')) {
 // section, so this one has to live down here instead, right after the
 // ALTER TABLE that adds the column it indexes.
 db.exec(`CREATE INDEX IF NOT EXISTS idx_owner_draws_parent ON owner_draws(parent_draw_id);`);
+
+// `cost_price` added to `products` — what it costs (in USD; see
+// routes/deals.js's own note on why this app's profit-distribution feature
+// is USD-specific, mirroring the "currency exchange" expense category's own
+// USD-only convention) to actually fulfil a sale of this product, e.g.
+// paying an overseas supplier — distinct from unit_price (what the client
+// is charged, in the business's own currency). Never shown anywhere
+// client-facing; it only feeds routes/deals.js's own profit calculation.
+// Defaults to 0 like tax_rate, since most products may never need cost
+// tracked. Reuses the already-declared productColumns set from the
+// tax_rate migration above.
+if (!productColumns.has('cost_price')) {
+  db.exec(`ALTER TABLE products ADD COLUMN cost_price REAL NOT NULL DEFAULT 0;`);
+}
+
+// `ownership_percent` added to `shareholders` — how much of a distributed
+// deal's net profit (see routes/deals.js) this shareholder is owed, e.g. 40
+// for a 40% stake. Editable only under the `financials` permission
+// (super-admin-gated by default, same as every other sensitive money page
+// — see "Sensitive modules" in CLAUDE.md), same gate every other field on
+// this table already sits behind. Defaults to 0 — an existing shareholder
+// added before this feature shipped is owed nothing until an admin
+// explicitly sets a real percentage, rather than the migration guessing an
+// even split.
+const shareholderColumns = new Set(db.prepare('PRAGMA table_info(shareholders)').all().map((c) => c.name));
+if (!shareholderColumns.has('ownership_percent')) {
+  db.exec(`ALTER TABLE shareholders ADD COLUMN ownership_percent REAL NOT NULL DEFAULT 0;`);
+}
+
+// `deal_id` links a draw back to the specific deals.js distribution that
+// created it (see routes/deals.js's own POST /:id/distribute) — NULL for
+// every ordinary manually-recorded draw, same as parent_draw_id above is
+// NULL for a freeform return. ON DELETE SET NULL rather than CASCADE:
+// deleting a deal record later shouldn't also erase the real money-out draw
+// it already produced. Reuses the already-declared ownerDrawColumns set
+// from the parent_draw_id migration above.
+if (!ownerDrawColumns.has('deal_id')) {
+  db.exec(`ALTER TABLE owner_draws ADD COLUMN deal_id INTEGER REFERENCES deals(id) ON DELETE SET NULL;`);
+}
+db.exec(`CREATE INDEX IF NOT EXISTS idx_owner_draws_deal ON owner_draws(deal_id);`);
 
 db.pragma('foreign_keys = ON');
 
