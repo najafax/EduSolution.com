@@ -23,6 +23,7 @@ import {
   SettingsIcon,
   LogoutIcon,
   GlobeIcon,
+  TrendDownIcon,
 } from './icons';
 
 // One icon per BUSINESS_LINKS entry (see Navbar.jsx) — a few modules
@@ -46,6 +47,7 @@ const LINK_ICONS = {
   '/financials': BankIcon,
   '/shareholders': UsersIcon,
   '/profit-distribution': BankIcon,
+  '/supplier-costs': TrendDownIcon,
   '/reports': ReportIcon,
   '/activity': HistoryIcon,
   '/users': UsersIcon,

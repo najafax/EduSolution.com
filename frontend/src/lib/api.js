@@ -268,23 +268,15 @@ export const api = {
     create: (payload, token) => request('/deals', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/deals/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/deals/${id}`, { method: 'DELETE', token }),
-    // Pays shareholders their share of the deal's *estimated* net profit
-    // (revenue minus its own typed-in exchange-rate estimate of the USD
-    // cost) — deliberately does not touch the USD cost side at all, see
-    // convertUsd() just below and routes/deals.js's own POST
-    // /:id/distribute for why those are two separate actions now.
+    // Pays shareholders their share of net profit as this deal currently
+    // computes it — deliberately does not touch the USD cost side at all;
+    // recording a real USD purchase now lives on the Expenses page and
+    // routes/supplierCosts.js's own report/record action, not here. See
+    // routes/deals.js's own POST /:id/distribute.
     distribute: (id, token) => request(`/deals/${id}/distribute`, { method: 'POST', token }),
     // Distributes every eligible draft in one call. See routes/deals.js's
     // own POST /distribute-all.
     distributeAll: (token) => request('/deals/distribute-all', { method: 'POST', token }),
-    // Records the *real* USD purchase, at whatever the real rate turns out
-    // to be that day — this is the one action that writes the real
-    // 'currency exchange' expense and actually subtracts the cost from the
-    // bank balance; nothing does before this runs, so the money genuinely
-    // stays in the bank until the real conversion happens. Independent of
-    // distribute() above — can run before, after, or without it ever
-    // running. See routes/deals.js's own POST /:id/convert-usd.
-    convertUsd: (id, payload, token) => request(`/deals/${id}/convert-usd`, { method: 'POST', body: payload, token }),
     // TEMPORARY — see routes/deals.js's own DELETE /drafts. Bulk-clears
     // test/draft records; never touches an already-distributed deal.
     removeDrafts: (token) => request('/deals/drafts', { method: 'DELETE', token }),
@@ -293,6 +285,18 @@ export const api = {
     // owner_draws payout rows too, fully reversing its effect on bankBalance,
     // then the deal itself.
     removeDistributed: (token) => request('/deals/distributed', { method: 'DELETE', token }),
+  },
+
+  // Backs pages/business/SupplierCosts.jsx — an automatic, month/year
+  // rollup of how much USD is owed to suppliers, computed straight from
+  // sold invoice line items × each product's own cost_price. See
+  // routes/supplierCosts.js.
+  supplierCosts: {
+    report: (token) => request('/supplier-costs', { token }),
+    // Recomputes the given month's USD cost server-side and writes it as a
+    // real 'currency exchange' expense at the given rate. See
+    // routes/supplierCosts.js's own POST /record.
+    record: (payload, token) => request('/supplier-costs/record', { method: 'POST', body: payload, token }),
   },
 
   recurringInvoices: {

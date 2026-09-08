@@ -10,18 +10,26 @@ const { logActivity } = require('../lib/activity');
 // and, once distributed, splits that net profit among active shareholders
 // by their own `ownership_percent`. A draft deal is purely a calculator —
 // no owner_draws row exists until POST /:id/distribute commits it, which
-// pays shareholders their share off the deal's own *estimated* exchange
-// rate. **The USD cost itself is a separate, independent action** —
-// POST /:id/convert-usd, recorded whenever the real USD purchase actually
-// happens at whatever the real rate turns out to be, is the one thing that
-// writes the real 'currency exchange' expense and actually subtracts the
-// cost from bankBalance; until then the money for it just sits in the
-// bank, untouched. See distributeDeal()'s and convertDealToUsd()'s own
-// notes below for the full story of why these are two separate manual
-// actions rather than one. Gated on 'financials', same as Capital
-// contributions/Owner draws/Shareholders/Reports — this is exactly that
-// level of sensitive cash data, not a reason to declare a new MODULES
-// entry of its own.
+// pays shareholders their share off the deal's own typed-in exchange rate.
+// Gated on 'financials', same as Capital contributions/Owner draws/
+// Shareholders/Reports — this is exactly that level of sensitive cash
+// data, not a reason to declare a new MODULES entry of its own.
+//
+// **This module deliberately does not write or track the real USD
+// purchase itself** — an earlier version of this feature had its own
+// per-deal POST /:id/convert-usd action for that, but it was removed at
+// explicit request: recording an actual currency-exchange purchase
+// already has a real, single home on the Expenses page (the
+// `category: 'currency exchange'` rows routes/expenses.js already
+// supports), and duplicating that as a second, deal-scoped mechanism was
+// the wrong shape — a deal's `cost_price`/`exchange_rate` here exist only
+// to size *how much* USD a sale is expected to need, not to record when
+// or at what rate it was actually bought. See routes/supplierCosts.js for
+// the automatic, month/year rollup of that same USD-owed-to-suppliers
+// figure (computed straight from sold invoice line items, independent of
+// this `deals` table entirely) and its own "Record as expense" action,
+// which is what now feeds the real Expenses currency-exchange category.
+
 const router = Router();
 router.use(requireAuth);
 const view = requirePermission('financials', 'view');
@@ -169,10 +177,8 @@ router.post('/', manage, (req, res) => {
 router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Deal not found' });
-  if (existing.status === 'distributed' || existing.expense_id) {
-    return res
-      .status(409)
-      .json({ error: 'This deal has already been distributed or had its USD purchase recorded, and can no longer be edited.' });
+  if (existing.status === 'distributed') {
+    return res.status(409).json({ error: 'This deal has already been distributed and can no longer be edited.' });
   }
 
   const error = validate(req.body);
@@ -203,15 +209,15 @@ router.put('/:id', manage, (req, res) => {
 // deal, which is real, already-recorded financial history and stays
 // permanently locked here the same as PUT/DELETE /:id below. Registered
 // ahead of DELETE /:id so 'drafts' is never swallowed as an :id value.
-// A draft can now carry a real linked expense of its own (POST
-// /:id/convert-usd below can run on a still-draft deal — converting to
-// USD and distributing to shareholders are independent actions, see that
-// route's own note), so this also reverses that expense before deleting
-// the draft itself, same reasoning DELETE /distributed below already
-// applies to a distributed deal's own expense_id — otherwise this cleanup
-// tool would leave a real, still-subtracting expense behind with no deal
-// left to explain it. Remove this route (and its Profit Distribution page
-// button) once it's no longer needed for cleanup.
+// A draft's own expense_id will never be set by any current write path
+// (the per-deal USD-conversion action that used to set it was removed —
+// see the top-of-file note), but this still reverses one if it's set on a
+// legacy row left over from before that removal, same reasoning
+// DELETE /distributed below still applies to a distributed deal's own
+// expense_id — otherwise this cleanup tool would leave a real,
+// still-subtracting expense behind with no deal left to explain it.
+// Remove this route (and its Profit Distribution page button) once it's
+// no longer needed for cleanup.
 router.delete('/drafts', manage, (req, res) => {
   const drafts = db.prepare("SELECT * FROM deals WHERE status = 'draft'").all();
   if (drafts.length === 0) return res.json({ deleted: 0 });
@@ -280,10 +286,8 @@ router.delete('/distributed', manage, (req, res) => {
 router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Deal not found' });
-  if (existing.status === 'distributed' || existing.expense_id) {
-    return res
-      .status(409)
-      .json({ error: 'This deal has already been distributed or had its USD purchase recorded, and cannot be deleted.' });
+  if (existing.status === 'distributed') {
+    return res.status(409).json({ error: 'This deal has already been distributed and cannot be deleted.' });
   }
 
   db.prepare('DELETE FROM deals WHERE id = ?').run(req.params.id);
@@ -296,23 +300,20 @@ router.delete('/:id', manage, (req, res) => {
 // shareholder, the same primitive a human would create by hand elsewhere
 // in this app. `computedDeal` is a withComputedDeal() result (raw row +
 // cost_usd_total/cost_mvr/net_profit, cost_mvr computed from the deal's own
-// *typed-in, estimated* exchange_rate); the caller is responsible for
-// eligibility checks (a positive net profit, a real exchange rate whenever
-// there's a USD cost, a real linked+paid invoice) and for wrapping this in
-// its own db.transaction() — a bulk caller distributing several deals at
-// once wraps them all in one transaction, not one each.
+// typed-in exchange_rate); the caller is responsible for eligibility
+// checks (a positive net profit, a real exchange rate whenever there's a
+// USD cost, a real linked+paid invoice) and for wrapping this in its own
+// db.transaction() — a bulk caller distributing several deals at once
+// wraps them all in one transaction, not one each.
 //
-// Deliberately does **not** write the 'currency exchange' expense for the
-// USD cost — see convertDealToUsd() below and its own POST /:id/convert-usd
-// route for why that's now a separate, later, manual action instead: this
-// used to write both the expense and the shareholder payout together the
-// instant Distribute was clicked, using whatever estimated rate happened
-// to be typed into the deal at the time — which meant the cost portion
-// left the bank balance for a USD purchase that, in reality, hadn't
-// happened yet. Distributing now only ever pays shareholders their share
-// of the *estimated* net profit; the cost side stays untouched in the
-// bank balance until the real purchase is recorded separately, at
-// whichever rate turns out to be real that day.
+// Deliberately does **not** write a 'currency exchange' expense for the
+// USD cost — that side of the ledger is no longer this module's job at
+// all (see the top-of-file note): the actual USD purchase is recorded on
+// the Expenses page directly, or via routes/supplierCosts.js's own
+// automatic month/year rollup and its "Record as expense" action, neither
+// of which this deal's own exchange_rate feeds into. Distributing only
+// ever pays shareholders their share of net profit as this deal
+// currently computes it.
 //
 // Recorded as owner_draws.type = 'profit_distribution', not 'draw' — this
 // is a one-way profit payout, not money that's expected to come back the
@@ -337,41 +338,10 @@ function distributeDeal(computedDeal, shareholders, userName, today) {
   );
 }
 
-// The other half of a deal's real-money footprint, and the one that used
-// to happen automatically inside distributeDeal() above — writes the real
-// 'currency exchange' expense for the deal's USD cost, at whatever rate
-// the caller actually got when they went and bought the USD (never the
-// deal's own typed-in estimate, though it's a reasonable starting point
-// for the form to prefill). This is the one action that actually
-// subtracts the cost from bankBalance — nothing does before this runs,
-// so the money genuinely sits in the bank, untouched, for however long it
-// takes between distributing and actually converting. Independent of
-// distributeDeal() above: a deal can be converted before, after, or
-// without ever being distributed (a deal with no shareholders configured
-// yet, say) — the two actions don't gate each other, matching the
-// deliberate choice not to reconcile a later real rate against an
-// already-paid-out estimate (see POST /:id/convert-usd's own note).
-// Overwrites the deal's own exchange_rate with the real one used, so a
-// later read of this deal (its own cost_mvr/net_profit, the "View split"
-// modal) reflects reality, not the stale estimate — distributeDeal()'s
-// own payout is unaffected either way, since it already ran off whatever
-// estimate was in force at the time.
-function convertDealToUsd(computedDeal, realRate, today) {
-  const costMvr = round2(computedDeal.cost_usd_total * realRate);
-  const info = db
-    .prepare('INSERT INTO expenses (category, description, amount, expense_date, payee, exchange_rate) VALUES (?, ?, ?, ?, ?, ?)')
-    .run('currency exchange', `Supplier cost for deal: ${computedDeal.description}`, costMvr, today, computedDeal.payee || '', realRate);
-  db.prepare(`UPDATE deals SET exchange_rate = ?, expense_id = ?, converted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(
-    realRate,
-    info.lastInsertRowid,
-    computedDeal.id,
-  );
-}
-
-// Distributing a deal pays shareholders their share of *estimated* net
-// profit (revenue minus the deal's own typed-in exchange-rate estimate of
-// the USD cost — it no longer writes the cost itself as an expense, see
-// distributeDeal()'s own note) — it never adds the deal's own
+// Distributing a deal pays shareholders their share of net profit as
+// currently computed (revenue minus the deal's own typed-in exchange-rate
+// conversion of the USD cost — it never writes the cost itself as an
+// expense, see distributeDeal()'s own note) — it never adds the deal's own
 // revenue_amount to bankBalance anywhere (see routes/financials.js's own
 // comment on this). That's correct precisely when the revenue was already
 // added some other way, i.e. a real invoice payment — for a deal with no
@@ -431,46 +401,6 @@ router.post('/:id/distribute', manage, (req, res) => {
     entityLabel: `${deal.description} (net ${computed.net_profit.toFixed(2)})`,
   });
   res.json({ deal: updated, distributions });
-});
-
-// The other half of a deal's real money movement, entirely independent of
-// POST /:id/distribute above (see convertDealToUsd()'s own note on why
-// the two don't gate each other) — recorded whenever the real USD
-// purchase actually happens, at whatever the real rate is that day, not
-// the deal's own typed-in estimate. 409s if there's no USD cost to
-// convert at all, or if this deal's purchase has already been recorded
-// (expense_id set) — a second conversion would just double-count the
-// expense. `exchange_rate` in the body is required and validated the
-// same way create/update already validate it; it's expected to prefill
-// from the deal's own current (estimated) rate on the frontend, but is
-// freely overridable — this is the one place that rate becomes real.
-router.post('/:id/convert-usd', manage, (req, res) => {
-  const deal = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
-  if (!deal) return res.status(404).json({ error: 'Deal not found' });
-  if (deal.expense_id) return res.status(409).json({ error: "This deal's USD purchase has already been recorded." });
-
-  const computed = withComputedDeal(deal);
-  if (!(computed.cost_usd_total > 0)) {
-    return res.status(400).json({ error: 'This deal has no USD cost to convert.' });
-  }
-  const rateNum = Number(req.body.exchange_rate);
-  if (!Number.isFinite(rateNum) || rateNum <= 0) {
-    return res.status(400).json({ error: 'exchange_rate must be a positive number' });
-  }
-
-  const today = new Date().toISOString().slice(0, 10);
-  const convert = db.transaction(() => convertDealToUsd(computed, rateNum, today));
-  convert();
-
-  const updated = withComputedDeal(db.prepare('SELECT * FROM deals WHERE id = ?').get(deal.id));
-  logActivity({
-    userName: req.user.name,
-    action: 'recorded USD purchase for',
-    entityType: 'deal',
-    entityId: deal.id,
-    entityLabel: `${deal.description} (${updated.cost_mvr.toFixed(2)} at rate ${rateNum})`,
-  });
-  res.json({ deal: updated });
 });
 
 // Bulk sibling of the single-deal action above — distributes every

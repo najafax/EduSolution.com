@@ -3846,6 +3846,129 @@ profit and never expected back the way a real draw is.
   renders (200, correct content-type, non-trivial byte count) with the
   new distribution math wired through it.
 
+### Supplier Costs — automatic, month/year USD-owed report (`backend/src/`, `frontend/src/`)
+
+A follow-up that walked back Phase D's own per-deal "Record USD purchase"
+mechanism (the `POST /:id/convert-usd` route and its UI, documented in the
+section just above) once real use of it made clear it was the wrong shape
+entirely: "USD conversion will not be individual line item, usd exchange
+feature is already in expenses page, Cost price is just to calculate how
+much I am spending for suppliers" — followed by a firmer requirement once
+a page was proposed in response: "It must me automatically calculated how
+much USD i need to spend on supplier, based on line items sold, by month,
+year." Two decisions were confirmed directly (`AskUserQuestion`) before
+building this: remove the per-deal convert-usd feature outright rather
+than keep it as a redundant manual override, and let the new report
+itself write the real expense via a "Record as expense" action rather
+than staying purely informational. The report's own data source was
+pinned to invoices only, not quotes — a quote is a proposal, not a sale.
+
+- **Convert-to-USD removed from `routes/deals.js`**: `convertDealToUsd()`
+  and `POST /:id/convert-usd` are gone entirely, along with the
+  `expense_id`/`converted_at` guard clause on `PUT`/`DELETE /:id` (both
+  now just check `status === 'distributed'`, same as before that feature
+  ever existed). `distributeDeal()` was already expense-free since Phase
+  D (it only ever wrote the shareholder `owner_draws` payout) — that part
+  is unchanged, only the comments explaining *why* it stays expense-free
+  were updated to point at this new report instead of the removed
+  action. The `deals.expense_id`/`converted_at` columns themselves are
+  left in the schema, unused by any current write path, rather than
+  dropped — no production deploy of the convert-usd feature had shipped
+  beyond this session's own testing, so there's no real data migration
+  risk either way, but dropping a column is more churn than leaving an
+  inert one costs. `DELETE /drafts`/`DELETE /distributed` (the temporary
+  test-cleanup routes) still reverse a legacy row's `expense_id`-linked
+  expense if one happens to be set, purely so a leftover test record from
+  before this removal still cleans up correctly. `pages/business/
+  ProfitDistribution.jsx` lost `ConversionPill`, the convert-target state/
+  handlers, the "Record USD purchase" row action and modal, and every
+  `expense_id`/`converted_at` reference in the Distribute/View-split
+  modals — the page's own intro copy and top-of-file comment now point at
+  this report (linked directly from the intro paragraph) for where a real
+  USD purchase actually gets recorded.
+- `routes/supplierCosts.js` (mounted at `/api/supplier-costs`, gated on
+  the existing `financials` permission — same "reuse when the sensitivity
+  level already matches" call `routes/reports.js`/`routes/deals.js`
+  themselves already make, not a reason for a new `MODULES` entry) is the
+  automatic calculation itself, computed fresh on every request from
+  `invoice_items` joined to `invoices` (for `issue_date`) and left-joined
+  to `products` (for `cost_price`) — **not** from `deals`/`deal_items` at
+  all, which stays exactly what it always was: a one-off internal
+  calculator with no bearing on this report. Filtered to `status != 'void'`
+  only — the same "issued" convention `routes/invoices.js`'s own
+  `GET /invoices/analytics` already uses for `amountInvoiced` (every
+  invoice regardless of draft/sent/paid, only void excluded), not a new
+  filtering rule invented for this report. A line item's USD cost is
+  `quantity × product.cost_price`; an item with no `product_id` (a
+  manually-typed line) or a since-deleted product reads as $0, the same
+  "no live link, so no cost" precedent `routes/deals.js`'s own
+  invoice-pick auto-populate logic already established for the identical
+  case — still counted in `unmatchedItemCount` so the report states
+  plainly how much of what was sold it could actually price, rather than
+  silently under-reporting. `GET /` returns `byMonth` (a trailing 12
+  months, gap months included at zero, oldest first — a shorter, more
+  actionable window than the full-history `byYear` view, since "how much
+  do I owe this month" is the report's headline question), `byYear`
+  (earliest sale's year through the current year, gap years included at
+  zero — the exact same convention every other analytics endpoint in this
+  app follows), and an all-time `totals` — each entry carrying
+  `usdCost`/`itemCount`/`matchedItemCount`/`unmatchedItemCount`. Both
+  `yearOf()`/`monthOf()` are hardened the same way `routes/expenses.js`'s
+  own `GET /analytics` already is (a blank/malformed `issue_date` is
+  excluded from the date-keyed breakdowns rather than computing as year 0
+  and corrupting the range), and the whole handler is wrapped in try/catch
+  for the same "return a proper JSON error, not an unhandled exception"
+  reason. `POST /record` (`manage`-gated) is the "Record as expense"
+  action — takes `{ month, exchange_rate }`, **recomputes that month's USD
+  cost fresh server-side** rather than trusting whatever total the client
+  happened to be looking at, 400s if there's nothing to record or the rate
+  isn't a positive number, and inserts a real `category: 'currency
+  exchange'` expense (`description: "Supplier cost for <Month Year>"`,
+  `amount` = the recomputed USD cost × the given rate, `notes` stating how
+  many line items and how much USD it was calculated from) — the exact
+  same expense category `routes/expenses.js` already supports, so this
+  report feeds the *existing* mechanism rather than inventing a second
+  one. No "already recorded this month" tracking or lock — a business can
+  record the same month more than once (e.g. a partial purchase now, the
+  rest later), and if that's a mistake it's the same one-off manual
+  correction any other wrong expense entry already gets on the Expenses
+  page.
+- `pages/business/SupplierCosts.jsx` (route `/supplier-costs`,
+  `Navbar.jsx`/`Sidebar.jsx` link right after Profit Distribution, gated
+  on `financials`) follows the same shape every other analytics page in
+  this app does — a `KpiCard` strip (This month/This year/All-time USD
+  owed, plus an Unmatched-line-items count so staff can see at a glance
+  how much of the figure is trustworthy), a "By month" table (trailing 12
+  months) and a "Year by year" table, both with the standard `hidden
+  overflow-x-auto sm:block` desktop table + `MobileListAccordion`
+  `sm:hidden` mobile counterpart. A "Record as expense" button appears on
+  any month row with a non-zero `usdCost`, opening a small `Modal` (rate
+  input, live MVR preview computed the same way the backend will) that
+  calls `POST /record` — success toasts the recorded amount; the report
+  itself isn't re-fetched afterward, since recording an expense doesn't
+  change what was actually sold. `lib/api.js`'s `supplierCosts` object
+  holds `report()`/`record()`.
+- Verified end-to-end against an isolated copy of the dev database (never
+  the real one, same scratch-path-not-`/tmp` methodology this app's own
+  prior deal-distribution testing already established): confirmed the
+  baseline report correctly read 7 pre-existing sold line items with none
+  matched to a product (`usdCost: 0`, `unmatchedItemCount: 7`); created a
+  real product with `cost_price: 25`, a client, and a draft invoice with
+  one matched line item (qty 4) and one manual line item, and confirmed
+  the report's current-month/current-year/totals all moved by exactly the
+  expected `+100` USD (`4 × 25`), with the manual line item counted as
+  `+1` unmatched and `+0` cost; called `POST /record` with rate `19` and
+  confirmed it wrote a real expense for exactly `100 × 19 = 1900` (MVR),
+  with the correct description/notes, and that the site-wide currency-
+  exchange expense total moved by exactly that delta; voided the test
+  invoice and confirmed the report dropped back to the exact original
+  baseline (void correctly excluded); and confirmed `POST /record`
+  rejects a malformed month, a missing/zero rate, and a month with
+  nothing to record, and that a `financials:view`-only (no `manage`)
+  grant can read `GET /` but is correctly rejected on `POST /record`.
+  Cleaned up the scratch database copy afterward and confirmed the real
+  `data.sqlite3`'s own md5sum was unchanged throughout.
+
 ### Sensitive modules — super-admin-gated financial data (`backend/src/`, `frontend/src/`)
 
 A follow-up narrowing of the admin-tier bypass, distinct from "Restricted
