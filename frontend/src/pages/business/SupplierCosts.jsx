@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import Modal from '../../components/Modal';
 import KpiCard from '../../components/KpiCard';
 import MobileListAccordion from '../../components/MobileListAccordion';
-import { TrendDownIcon, TrendUpIcon, BankIcon, AlertTriangleIcon, RefreshIcon } from '../../components/icons';
+import { TrendDownIcon, TrendUpIcon, BankIcon, RefreshIcon } from '../../components/icons';
 
 // Automatic, aggregate "how much USD do I owe suppliers" report — computed
 // server-side straight from real sold invoice line items × each matched
@@ -104,7 +104,7 @@ export default function SupplierCosts() {
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <KpiCard
           icon={<TrendDownIcon />}
           label="This month"
@@ -114,13 +114,6 @@ export default function SupplierCosts() {
         />
         <KpiCard icon={<TrendUpIcon />} label="This year" value={`$${(currentYear?.usdCost ?? 0).toFixed(2)}`} tone="neutral" />
         <KpiCard icon={<BankIcon />} label="All-time" value={`$${data.totals.usdCost.toFixed(2)}`} tone="neutral" />
-        <KpiCard
-          icon={<AlertTriangleIcon />}
-          label="Unmatched line items"
-          value={data.totals.unmatchedItemCount}
-          sub="no matching product on file"
-          tone={data.totals.unmatchedItemCount > 0 ? 'warning' : 'positive'}
-        />
       </div>
 
       <Modal
@@ -203,7 +196,6 @@ export default function SupplierCosts() {
               <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
                 <th className="px-5 py-3">Month</th>
                 <th className="px-4 py-3 text-right">Line items</th>
-                <th className="px-4 py-3 text-right">Unmatched</th>
                 <th className="px-4 py-3 text-right">USD owed</th>
                 {canManage && <th className="px-5 py-3" />}
               </tr>
@@ -213,7 +205,6 @@ export default function SupplierCosts() {
                 <tr key={m.month}>
                   <td className="px-5 py-3 font-medium text-slate-900 dark:text-white">{monthLabel(m.month)}</td>
                   <td className="px-4 py-3 text-right dark:text-white">{m.itemCount}</td>
-                  <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400">{m.unmatchedItemCount || '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-medium dark:text-white">${m.usdCost.toFixed(2)}</td>
                   {canManage && (
                     <td className="whitespace-nowrap px-5 py-3 text-right">
@@ -250,10 +241,6 @@ export default function SupplierCosts() {
                 <dt className="text-slate-500 dark:text-slate-400">Line items</dt>
                 <dd className="text-slate-900 dark:text-white">{m.itemCount}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-500 dark:text-slate-400">Unmatched</dt>
-                <dd className="text-slate-900 dark:text-white">{m.unmatchedItemCount || '—'}</dd>
-              </div>
               {canManage && m.usdCost > 0 && (
                 <div className="pt-1">
                   <button
@@ -280,7 +267,6 @@ export default function SupplierCosts() {
               <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
                 <th className="px-5 py-3">Year</th>
                 <th className="px-4 py-3 text-right">Line items</th>
-                <th className="px-4 py-3 text-right">Unmatched</th>
                 <th className="px-5 py-3 text-right">USD owed</th>
               </tr>
             </thead>
@@ -289,7 +275,6 @@ export default function SupplierCosts() {
                 <tr key={y.year}>
                   <td className="px-5 py-3 font-medium text-slate-900 dark:text-white">{y.year}</td>
                   <td className="px-4 py-3 text-right dark:text-white">{y.itemCount}</td>
-                  <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400">{y.unmatchedItemCount || '—'}</td>
                   <td className="px-5 py-3 text-right font-medium dark:text-white">${y.usdCost.toFixed(2)}</td>
                 </tr>
               ))}
@@ -312,10 +297,6 @@ export default function SupplierCosts() {
               <div className="flex justify-between">
                 <dt className="text-slate-500 dark:text-slate-400">Line items</dt>
                 <dd className="text-slate-900 dark:text-white">{y.itemCount}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-500 dark:text-slate-400">Unmatched</dt>
-                <dd className="text-slate-900 dark:text-white">{y.unmatchedItemCount || '—'}</dd>
               </div>
             </MobileListAccordion>
           ))}

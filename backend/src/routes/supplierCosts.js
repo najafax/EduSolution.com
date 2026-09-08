@@ -27,9 +27,10 @@ const { logActivity } = require('../lib/activity');
 // same "match by content, not id" precedent `POST /invoices/:id/payments`'s
 // own license auto-renewal already established for the identical shape of
 // problem (a historical row with no live foreign key to the thing it's
-// really about). Only once neither resolves does an item count as
-// unmatched — the report still states that count plainly so staff know how
-// much of what was sold it couldn't price at all.
+// really about). An item resolving to neither just contributes $0 to
+// `usdCost` — there's no separate matched/unmatched tracking surfaced
+// anywhere; between the product_id join and the description fallback,
+// every item sold going forward is expected to resolve to a real product.
 const router = Router();
 router.use(requireAuth);
 const view = requirePermission('financials', 'view');
@@ -116,9 +117,7 @@ function monthKeysTrailing(count) {
 
 function summarizeRows(rows) {
   const usdCost = round2(rows.reduce((sum, r) => sum + r.quantity * (r.resolvedCostPrice || 0), 0));
-  const matchedItemCount = rows.filter((r) => r.resolvedCostPrice !== null).length;
-  const unmatchedItemCount = rows.length - matchedItemCount;
-  return { usdCost, itemCount: rows.length, matchedItemCount, unmatchedItemCount };
+  return { usdCost, itemCount: rows.length };
 }
 
 // GET / — the report itself: a trailing 12-month view (gap months included

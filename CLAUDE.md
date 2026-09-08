@@ -4024,6 +4024,39 @@ pinned to invoices only, not quotes — a quote is a proposal, not a sale.
   `POST /record` at rate 19 wrote a real expense for exactly
   `2118 × 19 = 40242` (MVR), with the site-wide currency-exchange total
   moving by that exact delta.
+- **Follow-up: the matched/unmatched distinction was removed outright.**
+  Once the description-fallback match above shipped, the two specific
+  products behind every unmatched row on the live report ("Edupage Pro
+  License," "Timetable Software") were expected to resolve correctly from
+  then on, and any *new* line item — whether it names a real product by
+  `product_id` or by a matching `description` — resolves the same way
+  going forward. Requested directly: "Now you can remove unmatched line
+  also the unmatched line items KPI card, as from now on future items
+  will match." `summarizeRows()` no longer computes or returns
+  `matchedItemCount`/`unmatchedItemCount` at all — it's back to the
+  original two-field `{ usdCost, itemCount }` shape, with an item that
+  resolves to neither a `product_id` join nor a description match simply
+  contributing `$0` to `usdCost` (unchanged mechanically, just no longer
+  counted or surfaced separately). `SupplierCosts.jsx` lost the
+  "Unmatched line items" `KpiCard` (the KPI strip is now 3 cards — This
+  month/This year/All-time — in a `grid-cols-2 sm:grid-cols-3` grid,
+  down from 4 in `grid-cols-2 sm:grid-cols-4`) and the "Unmatched" column
+  from both the "By month" and "Year by year" tables, desktop `<table>`
+  and mobile `MobileListAccordion` alike — each list's own "Line items"
+  column is untouched, since the ask was specifically about the
+  unmatched *count*, not the item-count concept as a whole. The now-
+  unused `AlertTriangleIcon` import was dropped from `SupplierCosts.jsx`
+  too. Verified against a fresh isolated copy of the dev database (same
+  scratch-path-not-`/tmp` methodology as above, cleaned up afterward with
+  the real `data.sqlite3`'s md5sum confirmed unchanged): `GET /` now
+  returns no `matchedItemCount`/`unmatchedItemCount` field anywhere in
+  the response; a batch of 7 pre-existing legacy line items with no
+  resolvable product still correctly summed to `usdCost: 0`; a fresh
+  product ("Edupage Pro License," cost $120) plus a new invoice line item
+  naming it with no `product_id` still correctly matched by description
+  and added exactly `$120` to that month's/the all-time `usdCost`; and
+  `POST /record` at rate 19 still wrote a real currency-exchange expense
+  for exactly `120 × 19 = 2280` (MVR).
 
 ### Sensitive modules — super-admin-gated financial data (`backend/src/`, `frontend/src/`)
 
