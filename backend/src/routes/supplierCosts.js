@@ -17,13 +17,19 @@ const { logActivity } = require('../lib/activity');
 // own analytics already use for `amountInvoiced`: every invoice regardless
 // of status except `void` (draft included — see that route's own
 // `issuedThisYear`/`amountInvoiced` split), keyed by the invoice's own
-// `issue_date`. A line item resolves its USD cost by joining to `products`
-// on `product_id`; an item with no `product_id` (a manually-typed line) or
-// a since-deleted product comes in at $0, same "no live link, so it just
-// reads as no cost" precedent routes/deals.js's own invoice-pick
-// auto-populate logic already establishes for the identical case — it's
-// still counted in `unmatchedItemCount` so the report can say plainly how
-// much of what was sold it could actually price.
+// `issue_date`. A line item resolves its USD cost primarily by joining to
+// `products` on `product_id` — but an item with no `product_id` (most
+// commonly a bulk-imported historical invoice: routes/import.js's own
+// `processInvoices()` always collapses a document to one synthetic line
+// item with no `product_id` at all, see CLAUDE.md's own note on that) or a
+// since-deleted product falls back to matching its own `description`
+// against a current product's `name` (trimmed, case-insensitive) — the
+// same "match by content, not id" precedent `POST /invoices/:id/payments`'s
+// own license auto-renewal already established for the identical shape of
+// problem (a historical row with no live foreign key to the thing it's
+// really about). Only once neither resolves does an item count as
+// unmatched — the report still states that count plainly so staff know how
+// much of what was sold it couldn't price at all.
 const router = Router();
 router.use(requireAuth);
 const view = requirePermission('financials', 'view');
@@ -35,13 +41,45 @@ const MONTHS_BACK = 12;
 function soldItemRows() {
   return db
     .prepare(
-      `SELECT i.issue_date AS issue_date, ii.quantity AS quantity, ii.product_id AS product_id, p.cost_price AS cost_price
+      `SELECT i.issue_date AS issue_date, ii.description AS description, ii.quantity AS quantity, ii.product_id AS product_id, p.cost_price AS cost_price
        FROM invoice_items ii
        JOIN invoices i ON i.id = ii.invoice_id
        LEFT JOIN products p ON p.id = ii.product_id
        WHERE i.status != 'void'`,
     )
     .all();
+}
+
+// Current products keyed by name (trimmed, lowercased) → cost_price, for
+// the description-fallback match above. Built fresh on every request
+// (this app's own "fetch every row once, loop in JS" precedent — cheap at
+// this app's scale, see routes/expenses.js's own GET /analytics) rather
+// than cached, so a product's cost_price edit or a newly-added product is
+// reflected immediately. When more than one product shares a name, the
+// highest id wins — same "most recently created row wins a duplicate-name
+// collision" precedent routes/import.js's own license-matching logic
+// already uses for the identical ambiguity.
+function productCostByName() {
+  const map = new Map();
+  const products = db.prepare('SELECT id, name, cost_price FROM products ORDER BY id ASC').all();
+  for (const p of products) {
+    map.set(p.name.trim().toLowerCase(), p.cost_price);
+  }
+  return map;
+}
+
+// Resolves one row's real USD cost per item — the product_id join's own
+// cost_price when that resolved to a real product, else the
+// description-fallback match above, else null (genuinely unmatched).
+function resolveCostPrice(row, nameMap) {
+  if (row.product_id && row.cost_price !== null) return row.cost_price;
+  const key = (row.description || '').trim().toLowerCase();
+  return key && nameMap.has(key) ? nameMap.get(key) : null;
+}
+
+function resolvedSoldItemRows() {
+  const nameMap = productCostByName();
+  return soldItemRows().map((row) => ({ ...row, resolvedCostPrice: resolveCostPrice(row, nameMap) }));
 }
 
 // Same yearOf()/monthOf() hardening every other analytics route in this app
@@ -77,8 +115,8 @@ function monthKeysTrailing(count) {
 }
 
 function summarizeRows(rows) {
-  const usdCost = round2(rows.reduce((sum, r) => sum + r.quantity * (r.cost_price || 0), 0));
-  const matchedItemCount = rows.filter((r) => r.product_id && r.cost_price !== null).length;
+  const usdCost = round2(rows.reduce((sum, r) => sum + r.quantity * (r.resolvedCostPrice || 0), 0));
+  const matchedItemCount = rows.filter((r) => r.resolvedCostPrice !== null).length;
   const unmatchedItemCount = rows.length - matchedItemCount;
   return { usdCost, itemCount: rows.length, matchedItemCount, unmatchedItemCount };
 }
@@ -93,7 +131,7 @@ function summarizeRows(rows) {
 // GET /analytics is.
 router.get('/', view, (req, res) => {
   try {
-    const rows = soldItemRows();
+    const rows = resolvedSoldItemRows();
     const { currentYear, yearOf, monthOf } = makeDateHelpers();
 
     const byMonth = monthKeysTrailing(MONTHS_BACK).map((month) => ({
@@ -142,7 +180,7 @@ router.post('/record', manage, (req, res) => {
   }
 
   const { monthOf } = makeDateHelpers();
-  const rows = soldItemRows().filter((r) => monthOf(r.issue_date) === month);
+  const rows = resolvedSoldItemRows().filter((r) => monthOf(r.issue_date) === month);
   const { usdCost } = summarizeRows(rows);
   if (!(usdCost > 0)) {
     return res.status(400).json({ error: 'There is no supplier cost to record for that month.' });

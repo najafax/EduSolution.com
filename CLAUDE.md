@@ -3968,6 +3968,62 @@ pinned to invoices only, not quotes — a quote is a proposal, not a sale.
   grant can read `GET /` but is correctly rejected on `POST /record`.
   Cleaned up the scratch database copy afterward and confirmed the real
   `data.sqlite3`'s own md5sum was unchanged throughout.
+- **Follow-up: unmatched line items now also match by description, not
+  just `product_id`.** Reported directly with a concrete real-world case:
+  every currently-unmatched line item on the live report was one of two
+  specific products, "Edupage Pro License" and "Timetable Software" —
+  both real catalog entries with a `cost_price` set, but with no
+  `product_id` on the actual sold invoice line items. This is exactly the
+  shape `routes/import.js`'s own `processInvoices()` produces (every
+  bulk-imported historical invoice collapses to one synthetic line item
+  with no `product_id` at all, see that route's own note in CLAUDE.md) —
+  a very likely explanation for a business with real historical data
+  bulk-imported before this report existed. `soldItemRows()`'s own
+  resolution now tries the `product_id` join first (unchanged), and only
+  when that comes up empty (no `product_id`, or a since-deleted product)
+  falls back to matching the item's own `description` against a current
+  product's `name` (trimmed, case-insensitive) — the same "match by
+  content, not id" precedent `POST /invoices/:id/payments`'s own license
+  auto-renewal already established for the identical shape of problem (a
+  historical row with no live foreign key to the real thing it's about).
+  `productCostByName()` builds this lookup fresh on every request from
+  the live `products` table (same "fetch every row once, loop in JS"
+  precedent this app's other analytics routes already use, not cached),
+  so a product's `cost_price` edit or a brand-new product is reflected
+  immediately, including retroactively against every past month's own
+  already-sold line items with a matching description — the same
+  don't-store-what-you-can-compute behavior the original `product_id`
+  join already had (editing a linked product's `cost_price` already
+  changed a past month's own computed figure before this fallback
+  existed; this extends that same behavior to a name match too). When
+  more than one product shares a name, the highest id wins — same
+  "most-recently-created row wins a duplicate-name collision" precedent
+  `routes/import.js`'s own license-matching logic already uses for the
+  identical ambiguity. `resolveCostPrice()`/`resolvedSoldItemRows()` are
+  the two small helpers both `GET /` and `POST /record` now share, so the
+  fallback can never behave differently between the report and the
+  record action. `SupplierCosts.jsx`'s own "Unmatched line items" KPI sub
+  text was tightened from "no product / cost price on file" to "no
+  matching product on file," since a plain product-id mismatch is no
+  longer the only thing that resolves a cost.
+  Verified end-to-end against a fresh isolated copy of the dev database
+  (same scratch-path-not-`/tmp` methodology as above, cleaned up
+  afterward with the real `data.sqlite3`'s md5sum confirmed unchanged):
+  created two real products ("Edupage Pro License" cost $120, "Timetable
+  Software" cost $60) and an invoice with two line items naming them
+  exactly but carrying no `product_id`, and confirmed the report's
+  current-month/totals moved by exactly the expected `+240` USD
+  (`1×120 + 2×60`) with `matchedItemCount` up by 2 and
+  `unmatchedItemCount` unchanged; added a third item with deliberately
+  mismatched case/whitespace (`"  EDUPAGE pro license "`) and confirmed
+  it matched too; added a second product sharing the exact same name at
+  a different price ($999) and confirmed every row matching that name —
+  including the one already-sold earlier — recomputed against the
+  higher-id product's price (expected `usdCost` moved to exactly
+  `2×999 + 1×60 = 2118`, matching the response exactly); and confirmed
+  `POST /record` at rate 19 wrote a real expense for exactly
+  `2118 × 19 = 40242` (MVR), with the site-wide currency-exchange total
+  moving by that exact delta.
 
 ### Sensitive modules — super-admin-gated financial data (`backend/src/`, `frontend/src/`)
 

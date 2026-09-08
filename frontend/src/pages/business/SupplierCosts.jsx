@@ -118,7 +118,7 @@ export default function SupplierCosts() {
           icon={<AlertTriangleIcon />}
           label="Unmatched line items"
           value={data.totals.unmatchedItemCount}
-          sub="no product / cost price on file"
+          sub="no matching product on file"
           tone={data.totals.unmatchedItemCount > 0 ? 'warning' : 'positive'}
         />
       </div>
