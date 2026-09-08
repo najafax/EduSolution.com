@@ -120,6 +120,10 @@ export default function ProfitDistribution() {
   // DELETE /drafts. Remove this button (and that route) once it's no
   // longer needed for cleanup.
   const [deletingDrafts, setDeletingDrafts] = useState(false);
+  // TEMPORARY: bulk-clears distributed/test records, reversing their real
+  // expense + owner_draws side effects too — see routes/deals.js's own
+  // DELETE /distributed.
+  const [deletingDistributed, setDeletingDistributed] = useState(false);
 
   const { confirm, confirmDialog } = useConfirm();
 
@@ -383,6 +387,32 @@ export default function ProfitDistribution() {
     }
   }
 
+  // TEMPORARY: see routes/deals.js's own DELETE /distributed note — this
+  // is the one that actually undoes a test distribution's effect on the
+  // bank balance, by deleting the linked expense + shareholder payout rows
+  // along with the deal itself, not just the deal record on its own.
+  async function handleDeleteDistributed() {
+    if (
+      !(await confirm({
+        title: 'Delete every distributed record?',
+        message:
+          'This permanently deletes every already-distributed record, along with the supplier-cost expense and shareholder payouts it created — reversing its effect on the bank balance. Only use this for test data; a real distribution should never be deleted this way.',
+        confirmLabel: 'Delete distributed',
+      }))
+    )
+      return;
+    setDeletingDistributed(true);
+    try {
+      const { deleted } = await api.deals.removeDistributed(token);
+      toast(`Deleted ${deleted} distributed record${deleted === 1 ? '' : 's'} and their linked expense/payout entries.`, { type: 'success' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingDistributed(false);
+    }
+  }
+
   function rowActions(deal) {
     if (!canManage) return null;
     if (deal.status === 'draft') {
@@ -436,8 +466,8 @@ export default function ProfitDistribution() {
         )}
       </div>
 
-      {canManage && draftCount > 0 && (
-        <div className="mt-3 flex items-center justify-end">
+      {canManage && (
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
           <button
             onClick={handleDeleteDrafts}
             disabled={deletingDrafts}
@@ -446,6 +476,15 @@ export default function ProfitDistribution() {
           >
             <TrashIcon width={14} height={14} />
             {deletingDrafts ? 'Deleting…' : 'Delete all drafts (test cleanup)'}
+          </button>
+          <button
+            onClick={handleDeleteDistributed}
+            disabled={deletingDistributed}
+            title="Temporary cleanup tool — deletes distributed records AND their linked expense/shareholder-payout rows, reversing the bank balance effect"
+            className="flex min-h-9 items-center gap-1.5 rounded-md border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+          >
+            <TrashIcon width={14} height={14} />
+            {deletingDistributed ? 'Deleting…' : 'Delete all distributed (test cleanup)'}
           </button>
         </div>
       )}

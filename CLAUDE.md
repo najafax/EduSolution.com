@@ -3451,10 +3451,85 @@ profit and never expected back the way a real draw is.
   it's no longer needed. `ProfitDistribution.jsx`'s own button sits in a
   small, visually distinct row below the main header (a red-bordered
   outline button, not styled like the rest of the page's real actions),
-  shown only while `canManage` and at least one draft exists, behind the
-  shared `useConfirm()` dialog every other destructive action in this app
-  already uses — the confirm message states plainly that only drafts are
-  affected.
+  shown whenever `canManage` (not gated on the currently-filtered/
+  paginated `deals` array actually containing a draft, since the button
+  clears every draft in the database regardless of what the page happens
+  to be showing right now), behind the shared `useConfirm()` dialog every
+  other destructive action in this app already uses — the confirm message
+  states plainly that only drafts are affected.
+- **TEMPORARY: bulk-delete distributed records too, and actually reverse
+  their effect on the bank balance**: `DELETE /api/deals/drafts` alone
+  left no way to clean up a *distributed* test record — deleting the deal
+  row (which `PUT`/`DELETE /:id` both still correctly refuse for any
+  distributed deal, test or real) is only half the problem, since the
+  real `currency exchange` expense and `owner_draws` payout rows
+  `distributeDeal()` wrote are still sitting there, still subtracting
+  from `bankBalance`, with no deal left to explain why. `DELETE
+  /api/deals/distributed` (`financials:manage`, registered alongside
+  `DELETE /drafts` ahead of `DELETE /:id` for the same routing reason)
+  deletes every `status = 'distributed'` deal *and* fully reverses what
+  distributing it wrote: every `owner_draws` row with that `deal_id`, and
+  the deal's own linked `expenses` row (`deal.expense_id`) when one
+  exists — all inside one `db.transaction()` per batch, then the deals
+  themselves. This is what actually undoes a test distribution's
+  bank-balance effect, not just the deal record. Only ever touches rows
+  matched by a deal's own `deal_id`/`expense_id` — a manually-entered
+  expense or owner draw is never touched, even if it happens to be a
+  `currency exchange` row, since those have no `deal_id`/aren't
+  referenced by any deal's `expense_id`. `ProfitDistribution.jsx`'s
+  matching "Delete all distributed (test cleanup)" button sits next to
+  "Delete all drafts" in that same small red-bordered row, same
+  `canManage`-only gate, behind its own `useConfirm()` prompt whose
+  message spells out that this deletes the linked expense/payout rows
+  too and reverses the bank balance — explicitly warning it should never
+  be used on a real, non-test distribution, since (unlike voiding an
+  invoice, which keeps a `void_reason` audit trail) this erases the
+  financial history outright rather than just correcting it. Remove this
+  route and button (and `DELETE /drafts`, and this whole note) together
+  once test cleanup is no longer needed.
+  **This is also the direct answer to "where does the amount go after
+  distribution," and to the bank-balance-drop report that prompted this
+  route**: `POST /:id/distribute` was never adding the deal's own
+  `revenue_amount` to `bankBalance` anywhere — a deal's revenue is
+  assumed to already be sitting in the bank account (e.g. via a real,
+  separately-recorded invoice payment, if the deal happens to be linked
+  to one), so distributing only ever records where that money then
+  *leaves* the account: the USD cost as a `currency exchange` expense
+  (subtracted), and the remaining net profit as `profit_distribution`
+  payouts to shareholders (also subtracted, see the note on that type
+  above). For a deal actually linked to a real paid invoice this nets out
+  correctly — the payment already added the revenue, and distributing
+  correctly moves it back out to the supplier/shareholders. But for a
+  **test deal with a typed-in `revenue_amount` and no real linked
+  invoice/payment**, nothing ever added that money to `bankBalance` in
+  the first place — so distributing it just subtracts the full
+  `revenue_amount` (cost + payouts, which together always sum to exactly
+  the revenue) from a balance that money never actually entered,
+  producing a drop that looks like it came from nowhere (reported
+  directly: "before the update bank balance was 14500, after entering
+  test data in profit distribution, bank balance drops to 7542.5" — a
+  drop of exactly 6957.5, reproduced and verified below as exactly the
+  test deal's own `revenue_amount`). This isn't a bug in the distribute
+  math itself — a business's real distributions, backed by real invoice
+  payments, still net out correctly — it's what happens when test data
+  with no real backing payment gets distributed for real, and it's
+  exactly the scenario `DELETE /api/deals/distributed` above exists to
+  clean up: deleting the test deal alone would leave the phantom expense/
+  payout rows (and the balance drop) behind, while this route removes
+  all three together and restores `bankBalance` to what it was before.
+  Verified end-to-end against an isolated copy of the dev database (never
+  the real one): recorded the database's own real `bankBalance` as a
+  baseline, created a shareholder and a zero-cost test deal with
+  `revenue_amount: 6957.5` (no linked invoice), distributed it, and
+  confirmed `bankBalance` dropped by exactly 6957.5 — the identical delta
+  reported (14500 → 7542.5) — reproducing the report exactly; then called
+  `DELETE /deals/distributed` and confirmed `bankBalance` returned to the
+  exact baseline, the deal was gone (404), and no `owner_draws` rows were
+  left over. Repeated with a second deal that *did* have a USD cost (and
+  therefore a real linked `expenses` row) to confirm that row is deleted
+  too, not just the deal — `bankBalance` returned to baseline again, and
+  the expense count dropped back to what it was before. A final call with
+  nothing left to delete reported `deleted: 0` cleanly.
 - **Bulk distribute**: `POST /api/deals/distribute-all`
   (`financials:manage`) distributes every eligible draft deal in one
   call instead of opening and confirming each one — "eligible" is the

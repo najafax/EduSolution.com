@@ -212,6 +212,47 @@ router.delete('/drafts', manage, (req, res) => {
   res.json({ deleted: drafts.length });
 });
 
+// TEMPORARY, same reasoning as DELETE /drafts above but for the other
+// side of the ledger — bulk-deletes every *distributed* deal, fully
+// reversing what POST /:id/distribute (or /distribute-all) wrote for it:
+// the linked 'currency exchange' expense (if any) and every owner_draws
+// row tied to that deal (deal_id = deal.id), then the deal itself. This
+// is what actually undoes a test distribution's effect on bankBalance —
+// deleting just the deal row alone (which PUT/DELETE /:id both still
+// refuse to do for a real, non-test distributed deal) would leave the
+// expense/payout rows behind, still subtracting from the running balance
+// with no deal left to explain them. Only ever touches rows this
+// feature itself created (matched by deal_id / the deal's own stored
+// expense_id) — never a manually-entered expense or owner draw. Remove
+// this route (and its Profit Distribution page button) once it's no
+// longer needed for cleanup; a real, non-test distributed deal should
+// never be deleted this way in production, since it erases genuine
+// financial history rather than test data.
+router.delete('/distributed', manage, (req, res) => {
+  const distributed = db.prepare("SELECT * FROM deals WHERE status = 'distributed'").all();
+  if (distributed.length === 0) return res.json({ deleted: 0 });
+
+  const deleteAll = db.transaction(() => {
+    for (const deal of distributed) {
+      db.prepare('DELETE FROM owner_draws WHERE deal_id = ?').run(deal.id);
+      if (deal.expense_id) {
+        db.prepare('DELETE FROM expenses WHERE id = ?').run(deal.expense_id);
+      }
+    }
+    db.prepare("DELETE FROM deals WHERE status = 'distributed'").run();
+  });
+  deleteAll();
+
+  logActivity({
+    userName: req.user.name,
+    action: 'bulk deleted',
+    entityType: 'deal',
+    entityId: null,
+    entityLabel: `${distributed.length} distributed deal(s) and their linked expense/payout records (test cleanup)`,
+  });
+  res.json({ deleted: distributed.length });
+});
+
 router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Deal not found' });
