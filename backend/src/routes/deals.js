@@ -315,7 +315,26 @@ function distributeDeal(computedDeal, shareholders, userName, today) {
   ).run(expenseId, computedDeal.id);
 }
 
+// Distributing a deal only ever subtracts (the USD cost as an expense, the
+// net profit as shareholder payouts) — it never adds the deal's own
+// revenue_amount to bankBalance anywhere (see routes/financials.js's own
+// comment on this). That's correct precisely when the revenue was already
+// added some other way, i.e. a real invoice payment — for a deal with no
+// linked, actually-paid invoice, distributing subtracts money that was
+// never added in the first place, making bankBalance drop by the deal's
+// full revenue_amount out of nowhere. Requiring a linked, paid invoice
+// before distribution is allowed closes that gap at the source, rather
+// than relying on staff to only ever use this for real, invoice-backed
+// deals (which the temporary DELETE /distributed cleanup route above was
+// built to clean up after when that didn't hold).
 function eligibilityError(computedDeal) {
+  if (!computedDeal.invoice_id) {
+    return 'Link this deal to a real, paid invoice before distributing — see "Link to a paid invoice" on the record. Without one, the revenue was never added to the bank balance, so distributing it would incorrectly subtract money that was never there.';
+  }
+  const invoice = db.prepare('SELECT amount_paid FROM invoices WHERE id = ?').get(computedDeal.invoice_id);
+  if (!invoice || !(invoice.amount_paid > 0)) {
+    return 'The invoice linked to this deal has no recorded payment yet — link one that\'s actually been paid before distributing.';
+  }
   if (computedDeal.cost_usd_total > 0 && !(computedDeal.exchange_rate > 0)) {
     return 'Set an exchange rate before distributing — this deal has a supplier cost in USD to convert.';
   }

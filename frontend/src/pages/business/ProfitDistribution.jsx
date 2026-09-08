@@ -267,6 +267,10 @@ export default function ProfitDistribution() {
       setFormError('Description is required.');
       return;
     }
+    if (!form.invoice_id) {
+      setFormError('Link this record to a real, paid invoice — distributing an unlinked record would subtract money that was never added to the bank balance.');
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -554,7 +558,7 @@ export default function ProfitDistribution() {
           </div>
           <div className="sm:col-span-2">
             <label className="block">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Link to a paid invoice (optional)</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Link to a paid invoice</span>
               <SearchableSelect
                 options={invoiceOptions}
                 value={form.invoice_id}
@@ -563,7 +567,10 @@ export default function ProfitDistribution() {
               />
             </label>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              For your own traceability only — the invoice itself is never changed and shows nothing about this record.
+              Required — the invoice itself is never changed and shows nothing about this record, this is purely for
+              your own traceability, but distributing requires a real, paid invoice behind the revenue figure above.
+              Without one, the revenue was never actually added to the bank balance, so distributing would incorrectly
+              subtract money that isn't there.
             </p>
           </div>
           <label className="block">
@@ -721,6 +728,19 @@ export default function ProfitDistribution() {
         {distributeTarget && (
           <div className="grid gap-3">
             <p className="text-sm text-slate-600 dark:text-slate-400">{distributeTarget.description}</p>
+            {(() => {
+              const linkedInvoice = distributeTarget.invoice_id ? invoices.find((inv) => inv.id === distributeTarget.invoice_id) : null;
+              if (!distributeTarget.invoice_id || !linkedInvoice || !(linkedInvoice.amount_paid > 0)) {
+                return (
+                  <p className="text-sm text-amber-700 dark:text-amber-400">
+                    This record isn't linked to a real, paid invoice — edit it and pick one before distributing.
+                    Without one, the revenue was never actually added to the bank balance, so distributing would
+                    incorrectly subtract money that isn't there.
+                  </p>
+                );
+              }
+              return null;
+            })()}
             <div className="grid gap-1 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Revenue</span>
@@ -776,7 +796,13 @@ export default function ProfitDistribution() {
               <button
                 type="button"
                 onClick={handleDistribute}
-                disabled={distributing || eligibleShareholders.length === 0 || distributeTarget.net_profit <= 0}
+                disabled={
+                  distributing ||
+                  eligibleShareholders.length === 0 ||
+                  distributeTarget.net_profit <= 0 ||
+                  !distributeTarget.invoice_id ||
+                  !invoices.find((inv) => inv.id === distributeTarget.invoice_id && inv.amount_paid > 0)
+                }
                 className="min-h-11 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-60"
               >
                 {distributing ? 'Distributing…' : 'Distribute'}

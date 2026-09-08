@@ -3530,6 +3530,79 @@ profit and never expected back the way a real draw is.
   too, not just the deal — `bankBalance` returned to baseline again, and
   the expense count dropped back to what it was before. A final call with
   nothing left to delete reported `deleted: 0` cleanly.
+- **The real fix, not just a cleanup tool: distributing now requires a
+  real, paid invoice to be linked.** `DELETE /api/deals/distributed`
+  above cleans up *after* the fact, for test data — it doesn't stop the
+  underlying scenario from happening to a real deal. A follow-up report
+  made the same root cause concrete from the cost side: "when I entered
+  sample data of MVR 4000, in profit distribution, dollar rate 19, cost
+  price usd 97.5, when I click distribute, total 4000 is deducted from
+  bank balance, ... where did the cost price go? It has to be in bank
+  until I buy USD right?" — i.e. the cost portion shouldn't read as
+  "spent" until the money it's spent *from* was actually received in the
+  first place. Asked directly whether an unlinked deal's distribute
+  should instead auto-add its own `revenue_amount` to `bankBalance` (so
+  only the retained/undistributed profit moves the balance) or require a
+  real linked invoice before distribution is allowed at all — the
+  business owner chose the latter: **every deal must be linked to a real,
+  already-paid invoice before it can be distributed.**
+  `eligibilityError(computedDeal)` (see "Bulk distribute" below — the one
+  function both `POST /:id/distribute` and `POST /distribute-all` already
+  shared, so this closes the gap for both at once with no risk of the two
+  routes drifting) now checks, *ahead of* its existing exchange-rate/
+  net-profit checks: 400s with "Link this deal to a real, paid invoice
+  before distributing..." when `deal.invoice_id` is unset, and 400s with
+  "The invoice linked to this deal has no recorded payment yet..." when
+  the linked invoice exists but its `amount_paid` isn't a positive
+  number (covers both "linked to an invoice with no payment yet" and a
+  since-deleted invoice id). This is what actually closes the "where did
+  the money go" gap at the source rather than relying on staff to only
+  ever distribute deals that are genuinely invoice-backed: once a deal
+  can't be distributed without a real payment behind it, that payment
+  already added the revenue to `bankBalance` via the normal
+  `POST /invoices/:id/payments` flow *before* the deal ever existed —
+  so distributing correctly nets out from there (cost leaves as an
+  expense, the rest leaves as shareholder payouts, whatever isn't
+  distributed stays retained in the balance), with nothing ever
+  vanishing, because nothing is subtracted that wasn't first added by a
+  real payment.
+  `ProfitDistribution.jsx`'s create/edit form's "Link to a paid invoice"
+  field dropped its "(optional)" label and now gates `handleSubmit`
+  itself (the same `if (!form.invoice_id)` custom-widget-can't-carry-
+  `required` pattern `QuoteForm.jsx`/`InvoiceForm.jsx`/
+  `RecurringInvoices.jsx`'s own Client field already uses, since
+  `SearchableSelect` isn't a native form control) — its caption now
+  states plainly that distributing needs a real, paid invoice behind the
+  revenue figure. The "Distribute" confirmation modal shows an inline
+  amber warning and disables the Distribute button outright whenever the
+  target record has no `invoice_id`, or its linked invoice (looked up
+  from the already-loaded `invoices` list) has no recorded payment — the
+  same "never show a button that would just error" convention this app
+  follows everywhere else — rather than only surfacing the rejection
+  after a failed request. `invoiceOptions` (the picker's own option list)
+  was already filtered to `amount_paid > 0` before this change, so in
+  practice the create/edit form itself only ever offers a genuinely paid
+  invoice to link in the first place; the backend check is what actually
+  enforces the rule for every path (a bulk `distribute-all` skip, an
+  older draft created before this rule existed, or a direct API call).
+  Verified end-to-end against an isolated copy of the dev database (same
+  scratch-path-not-`/tmp` methodology as above): a deal created with no
+  invoice link is rejected on `POST /:id/distribute` with the "link a
+  real, paid invoice" message and leaves `bankBalance` completely
+  unchanged; a deal linked to a real invoice with `amount_paid = 0` is
+  rejected with the "no recorded payment yet" message; a deal linked to a
+  real, already-paid invoice (`revenue_amount: 4000`, `exchange_rate: 19`,
+  a `97.5` USD cost item, reproducing the exact numbers from the report)
+  distributes successfully and drops `bankBalance` by exactly its own
+  `revenue_amount` (4000) — the *same*-looking delta as the original bug
+  report, but now correct, since that same 4000 was already added to
+  `bankBalance` beforehand by the invoice's own real payment, not
+  invented by the deal itself; and `POST /distribute-all` against a mix
+  of one linked+paid draft and one unlinked draft distributes the first
+  and skips the second with the identical "link a real, paid invoice"
+  reason. `DELETE /api/deals/distributed` afterward still restored
+  `bankBalance` to the exact pre-test baseline, confirming the cleanup
+  route and this new eligibility rule compose correctly together.
 - **Bulk distribute**: `POST /api/deals/distribute-all`
   (`financials:manage`) distributes every eligible draft deal in one
   call instead of opening and confirming each one — "eligible" is the
