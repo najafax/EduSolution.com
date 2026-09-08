@@ -35,7 +35,7 @@ const ExpenseAnalytics = lazy(() => import('./pages/business/ExpenseAnalytics'))
 const CapitalContributions = lazy(() => import('./pages/business/CapitalContributions'));
 const OwnerDraws = lazy(() => import('./pages/business/OwnerDraws'));
 const Shareholders = lazy(() => import('./pages/business/Shareholders'));
-const Deals = lazy(() => import('./pages/business/Deals'));
+const ProfitDistribution = lazy(() => import('./pages/business/ProfitDistribution'));
 const Settings = lazy(() => import('./pages/business/Settings'));
 const Quotes = lazy(() => import('./pages/business/Quotes'));
 const QuoteRequests = lazy(() => import('./pages/business/QuoteRequests'));
@@ -193,7 +193,7 @@ export default function App() {
                 <Route path="/capital-contributions" element={<Protected><CapitalContributions /></Protected>} />
                 <Route path="/owner-draws" element={<Protected><OwnerDraws /></Protected>} />
                 <Route path="/shareholders" element={<Protected><Shareholders /></Protected>} />
-                <Route path="/deals" element={<Protected><Deals /></Protected>} />
+                <Route path="/profit-distribution" element={<Protected><ProfitDistribution /></Protected>} />
                 <Route path="/settings" element={<Protected><Settings /></Protected>} />
                 <Route path="/import" element={<Protected><Import /></Protected>} />
 

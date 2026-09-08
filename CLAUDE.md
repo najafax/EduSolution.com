@@ -3376,8 +3376,11 @@ figures, with no drift.
   amount_paid/client name, for display only) and linked expense summary,
   plus the deal's own `distributions` (its `owner_draws` rows, empty
   until distributed).
-- `pages/business/Deals.jsx` (route `/deals`, `Navbar.jsx`/`Sidebar.jsx`
-  link right after Shareholders, gated on `financials`) is the standard
+- `pages/business/ProfitDistribution.jsx` (route `/profit-distribution`,
+  `Navbar.jsx`/`Sidebar.jsx` link right after Shareholders, gated on
+  `financials` — renamed from `Deals.jsx`/`/deals` shortly after this
+  feature first shipped, see "Profit Distribution: rename..." below for
+  why and what stayed on the old internal names) is the standard
   list+modal-form+FAB shape (`StatusFilterChips` for All/Draft/Distributed,
   `SearchInput`, the usual desktop-table + `MobileListAccordion` split,
   `Pagination`) with three modals: the create/edit form, a "Distribute"
@@ -3407,6 +3410,186 @@ figures, with no drift.
   form's own running total never disagrees with what a save would
   actually compute. `lib/api.js`'s `deals` object holds `list`/`get`/
   `create`/`update`/`remove`/`distribute`.
+
+### Profit Distribution: rename, bulk actions, and a real "not a draw" accounting fix (`backend/src/`, `frontend/src/`)
+
+A batch of four follow-up requests made right after the feature above
+first shipped: rename the page's user-facing name, a temporary bulk
+delete-drafts tool for clearing out test records, a single "distribute
+all eligible drafts" button instead of one at a time, and — the one real
+correctness fix in the batch — excluding a distribution payout from the
+Owner Draws page's own "draw" totals, since it's money paid out of net
+profit and never expected back the way a real draw is.
+
+- **Rename, backend internals unchanged**: only the user-facing surface
+  renamed — the page component (`Deals.jsx` → `ProfitDistribution.jsx`),
+  its route (`/deals` → `/profit-distribution`), the `Navbar.jsx`/
+  `Sidebar.jsx` nav entry, the page's own `<h1>`/copy, and the two
+  captions elsewhere that pointed at "the Deals page"
+  (`Products.jsx`'s own `cost_price` caption, `Shareholders.jsx`'s own
+  `ownership_percent` caption). Everything else keeps its original name —
+  the `deals`/`deal_items` tables, `routes/deals.js`, the `/api/deals`
+  mount path, and `lib/api.js`'s own `deals` object — same "the page's
+  name and its backend implementation don't have to match" precedent
+  this app already follows elsewhere (Capital Contributions/Owner Draws
+  both reuse the `expenses`/`financials` permission internally without
+  that leaking into either page's own display name). A record itself is
+  still called a "deal" in code/comments and in a few places in the UI
+  copy (the create/edit modal's own field labels reference "this
+  record"/"this deal" interchangeably) — renaming the *concept* everywhere
+  wasn't what was asked, just the page itself.
+- **TEMPORARY: bulk-delete drafts**: `DELETE /api/deals/drafts`
+  (`financials:manage`, registered ahead of `DELETE /:id` so `'drafts'` is
+  never swallowed as an `:id` value) deletes every `status = 'draft'`
+  deal in one call — never a `distributed` one, which stays exactly as
+  permanently locked as `PUT`/`DELETE /:id` already make it elsewhere on
+  this router. Built specifically to clear out test/draft records created
+  while trying this feature out, not as a permanent bulk-management
+  tool — both the route and its own comment, and the frontend button
+  and its own label ("Delete all drafts (test cleanup)"), say so
+  directly; remove all three (the route, the button, this note) once
+  it's no longer needed. `ProfitDistribution.jsx`'s own button sits in a
+  small, visually distinct row below the main header (a red-bordered
+  outline button, not styled like the rest of the page's real actions),
+  shown only while `canManage` and at least one draft exists, behind the
+  shared `useConfirm()` dialog every other destructive action in this app
+  already uses — the confirm message states plainly that only drafts are
+  affected.
+- **Bulk distribute**: `POST /api/deals/distribute-all`
+  (`financials:manage`) distributes every eligible draft deal in one
+  call instead of opening and confirming each one — "eligible" is the
+  exact same bar the single-deal `POST /:id/distribute` already enforces
+  (a real `exchange_rate` whenever there's a USD cost to convert, a
+  positive net profit), factored out into a shared `eligibilityError()`
+  helper so the two routes can never drift on what counts as eligible.
+  An ineligible draft is skipped with its own reason rather than failing
+  the whole batch — mirrors `routes/import.js`'s own "partial success is
+  normal, not a failure state" convention for bulk operations — and the
+  actual expense/owner_draws-writing work (`distributeDeal()`, extracted
+  from what used to be `POST /:id/distribute`'s own inline transaction
+  body) is shared by both routes too, so a bulk distribution and a
+  single one can never compute or record a payout differently. 400s if
+  no active shareholder has an ownership percentage set, or if there are
+  no drafts at all — same guardrails the single-deal route already has,
+  checked once up front rather than per-deal. Every deal actually
+  distributed in the batch still gets its own row in `owner_draws`/
+  possible `expenses` insert exactly as a single distribute would, all
+  inside one `db.transaction()` for the whole batch — and one summary
+  `activity_log` entry (`'bulk distributed'`, `entityLabel`: `` `${N}
+  deal(s) (net total ${total})` `` ), not one per deal, same
+  "summarize, don't spam the feed" precedent `routes/import.js`'s bulk
+  imports already set. `ProfitDistribution.jsx`'s own "Distribute all"
+  header button (shown only while there's at least one draft) opens the
+  shared confirm dialog, then renders a small dismissible results panel
+  below the header listing exactly what happened — `Distributed N,
+  skipped M`, plus each skipped deal's own reason — since a partial
+  batch result is the normal case here, not something to bury in a
+  toast alone (the toast still fires too, for the at-a-glance summary).
+- **The real fix: a profit distribution is not a "draw"**. Before this,
+  `POST /:id/distribute` wrote each shareholder's payout as a plain
+  `owner_draws` row with `type: 'draw'` — mechanically correct (the cash
+  really did leave the business, same primitive a human would create by
+  hand), but semantically wrong: `owner_draws`'s whole `type: 'draw'` |
+  `'return'` model exists to track money that's *expected back* (see
+  `routes/ownerDraws.js`'s own top-of-file note), and a profit
+  distribution is the opposite of that — a one-way payout of a deal's
+  own net profit that's never going to be repaid. Recording it as a
+  plain draw meant it inflated the Owner Draws page's own "Total draws"/
+  "Outstanding balance" figures as if it were an ordinary, still-owed
+  draw, which it structurally can never be.
+  `distributeDeal()` (see "Bulk distribute" above) now writes it as
+  `owner_draws.type = 'profit_distribution'` instead — a third value on
+  a column that otherwise only ever holds what `routes/ownerDraws.js`'s
+  own `TYPES` constant lists (`['draw', 'return']`, deliberately
+  **unchanged** by this) — so a `profit_distribution` row can only ever
+  be created by a deal actually being distributed, never by hand through
+  the manual Owner Draws form, whose own `validate()` still only accepts
+  the original two values.
+  `routes/ownerDraws.js` was updated to treat this new type as
+  permanently out of scope for its own draw/return ledger, not just
+  filterable away: `buildDrawWhere()` (shared by `GET /`, both exports,
+  and — via its own `orderBy`/`hasBalance` logic — the "Outstanding
+  only" filter) now always ANDs in `type != 'profit_distribution'`, so
+  `GET /`, `GET /export.csv`/`GET /export.xlsx`, and the "Outstanding
+  only" balance math never surface or count one of these rows, with no
+  way to opt back in via any combination of query params.
+  `byNameBreakdown()` gained the identical `WHERE type !=
+  'profit_distribution'` — without it, a shareholder who only ever
+  received distributions (no real draw/return of their own) would still
+  get a row in the per-name table, with `totalDraws`/`totalReturns`/
+  `outstanding` all reading `0` — real but pointless noise, since that
+  name never took or returned a draw. `GET /statement/pdf`'s own query
+  picked up the same exclusion (a per-owner statement is this same
+  draw/return ledger, just scoped to one name and printed). Both
+  `PUT /:id` and `DELETE /:id` now 409 outright on a
+  `type: 'profit_distribution'` row ("...cannot be edited/deleted here —
+  see the Profit Distribution page"), the same "once real money has
+  moved, locked" precedent a sent/paid invoice or a distributed deal
+  itself already follows — editing or deleting one here would desync it
+  from the deal that produced it (still marked `distributed`, still
+  showing the payout in its own "View split") with no way back short of
+  touching the database directly.
+  **Still real money leaving the business, though** — excluding it from
+  the *draw* ledger doesn't mean excluding it from the business's actual
+  cash position. `routes/financials.js`'s `computeSummary()` gained a
+  new `totalOwnerDistributions` sum (`SUM(amount) WHERE type =
+  'profit_distribution'`, scoped by the same optional `from`/`to` filter
+  every other total here already respects) — kept as its own figure
+  rather than folded into `totalOwnerDraws` (which stays exactly what it
+  was, `type = 'draw'` only, unaffected by this whole change) or
+  `totalOwnerReturns` — and `bankBalance` now subtracts a matching
+  `distributionsThroughAsOf` sum alongside the existing
+  `drawsThroughAsOf`/`returnsThroughAsOf` terms, so the running balance
+  still correctly reflects that cash having left the account even though
+  it's no longer counted as an "owner draw." `totalOwnerDistributions` is
+  returned on the response alongside the existing owner-draw totals.
+  `routes/reports.js`'s `GET /bank-balance/pdf` (opening/closing balance,
+  split at the period boundary the same way `bankBalance` above splits
+  at an "as of" cutoff) and `lib/reportPdf.js`'s `renderBankBalancePdf()`
+  got the identical treatment — a `distributionsBefore`/
+  `totalDistributions` pair subtracted the same way `drawsBefore`/
+  `totalDraws` already are, and a conditional "Profit distributions" row
+  (only rendered when non-zero, same "don't show a pointless `$0.00`
+  line" convention the existing "Capital contributions"/"Owner draws"/
+  "Owner returns" rows already follow) — this is the exact kind of "the
+  same figure disagrees between two report views" bug this app has
+  fixed before (see `routes/financials.js`'s own note on `netProfit`
+  vs. the P&L PDF), so both had to move together rather than fixing only
+  the JSON endpoint. `Financials.jsx` gained a matching "Profit
+  distributions" `KpiCard` (icon: `BanknoteIcon`, tone `neutral`,
+  positioned between "Owner draws (net)" and "Bank balance") so the
+  figure reads as its own line rather than being silently absorbed into
+  either neighboring card — `bankBalance`'s own `sub` text was updated to
+  "Starting balance + net profit + contributions − owner draws −
+  distributions" to match.
+  Verified end-to-end against an isolated copy of the dev database
+  (never the real one, and — since SQLite's WAL-mode file needs a real
+  filesystem's mmap support to open cleanly — copied to a scratch path
+  on the same filesystem as the project itself rather than `/tmp`, which
+  silently produced a "database disk image is malformed" false-corrupt
+  error on this sandbox's particular `/tmp` mount): creating two
+  shareholders (60/40 ownership) and distributing a deal with a real USD
+  cost confirmed the split arithmetic, that both payout rows land as
+  `type: 'profit_distribution'`, that `GET /owner-draws` and its own
+  `GET /owner-draws/summary` (including the per-name breakdown) both
+  exclude them entirely, that `PUT`/`DELETE` on one of those rows 409s,
+  and that `bankBalance` moves by exactly `-revenue_amount` for a fully
+  distributed deal with no cost items retained (the cost becomes an
+  expense, 100% of net profit is paid out, so nothing is left behind) —
+  while `totalOwnerDraws` itself stayed completely unchanged by the
+  distribution, confirming the two ledgers no longer overlap. Bulk
+  distribute was verified against a mix of one eligible and two
+  ineligible drafts (one missing an exchange rate, one with zero
+  profit), confirming the eligible one distributes, the other two are
+  skipped with the exact reasons the single-deal route itself would give
+  for the same conditions, and a second `distribute-all` call is a
+  no-op once nothing eligible remains. `DELETE /api/deals/drafts` was
+  verified to remove only draft rows (three created for the test) while
+  leaving both already-distributed deals from earlier in the same run
+  untouched, and to report `deleted: 0` cleanly on an empty follow-up
+  call. The bank-balance PDF route was hit directly to confirm it still
+  renders (200, correct content-type, non-trivial byte count) with the
+  new distribution math wired through it.
 
 ### Sensitive modules — super-admin-gated financial data (`backend/src/`, `frontend/src/`)
 

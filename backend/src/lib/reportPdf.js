@@ -496,17 +496,34 @@ function renderProfitLossPdf({ revenueTotal, expensesByCategory, totalExpenses, 
 // `to`. A single drawSummaryBox (not two drawStatementSection blocks like
 // P&L) since this is a short four-line reconciliation, not a
 // category-by-category breakdown.
-function renderBankBalancePdf({ openingBalance, totalPayments, totalContributions, totalExpenses, totalDraws, totalReturns, closingBalance, from, to, settings }) {
+function renderBankBalancePdf({
+  openingBalance,
+  totalPayments,
+  totalContributions,
+  totalExpenses,
+  totalDraws,
+  totalReturns,
+  totalDistributions,
+  closingBalance,
+  from,
+  to,
+  settings,
+}) {
   const doc = newDoc();
   let y = drawReportHeader(doc, { title: 'BANK BALANCE STATEMENT', subtitle: `${from} to ${to}`, settings });
 
   const rows = [{ label: 'Opening balance', value: signedAmountOnly(openingBalance) }, { label: 'Payments received', value: amountOnly(totalPayments) }];
   // Only shown when relevant — most businesses never have one, and a
-  // zero-value "Capital contributions"/"Owner draws"/"Owner returns" row on
-  // every statement would just be noise for the common case.
+  // zero-value "Capital contributions"/"Owner draws"/"Owner returns"/
+  // "Profit distributions" row on every statement would just be noise for
+  // the common case. Profit distributions (routes/deals.js's own
+  // distributeDeal()) are a one-way payout of a deal's net profit, kept
+  // separate from "Owner draws" for the same reason routes/financials.js's
+  // own bankBalance keeps them in a distinct total — see that file's note.
   if (totalContributions) rows.push({ label: 'Capital contributions', value: amountOnly(totalContributions) });
   if (totalDraws) rows.push({ label: 'Owner draws', value: signedAmountOnly(-totalDraws) });
   if (totalReturns) rows.push({ label: 'Owner returns', value: amountOnly(totalReturns) });
+  if (totalDistributions) rows.push({ label: 'Profit distributions', value: signedAmountOnly(-totalDistributions) });
   rows.push(
     { label: 'Expenses', value: signedAmountOnly(-totalExpenses) },
     { label: 'Closing balance', value: signedAmountOnly(closingBalance), bold: true },
@@ -519,7 +536,7 @@ function renderBankBalancePdf({ openingBalance, totalPayments, totalContribution
     .fontSize(8)
     .fillColor(COLORS.muted)
     .text(
-      "Opening balance is the starting balance set in Settings plus every payment received and capital contribution recorded before this period, minus expenses and net owner draws. Not a live bank feed — money moving outside this app (loans, tax remittances) isn't reflected.",
+      "Opening balance is the starting balance set in Settings plus every payment received and capital contribution recorded before this period, minus expenses, net owner draws, and profit distributions. Not a live bank feed — money moving outside this app (loans, tax remittances) isn't reflected.",
       MARGIN,
       y,
       { width: CONTENT_WIDTH },

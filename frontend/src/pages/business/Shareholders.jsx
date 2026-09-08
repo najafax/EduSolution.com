@@ -189,7 +189,7 @@ export default function Shareholders() {
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              This shareholder's cut of a deal's net profit when distributed — see the Deals page.
+              This shareholder's cut of a deal's net profit when distributed — see the Profit Distribution page.
             </p>
           </label>
           <label className="flex items-center gap-2">

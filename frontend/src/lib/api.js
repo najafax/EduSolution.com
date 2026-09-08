@@ -259,6 +259,9 @@ export const api = {
     sendReport: (token) => request('/shareholders/send-report', { method: 'POST', token }),
   },
 
+  // Backs pages/business/ProfitDistribution.jsx — kept as `deals` here (and
+  // on the backend, /api/deals + routes/deals.js) as internal plumbing;
+  // only the page's own name/route/copy changed to "Profit Distribution".
   deals: {
     list: (token, { q, status, page } = {}) => request(`/deals${qs({ q, status, page })}`, { token }),
     get: (id, token) => request(`/deals/${id}`, { token }),
@@ -268,6 +271,12 @@ export const api = {
     // The one real action — locks the deal and writes the actual expense +
     // owner_draws rows. See routes/deals.js's own POST /:id/distribute.
     distribute: (id, token) => request(`/deals/${id}/distribute`, { method: 'POST', token }),
+    // Distributes every eligible draft in one call. See routes/deals.js's
+    // own POST /distribute-all.
+    distributeAll: (token) => request('/deals/distribute-all', { method: 'POST', token }),
+    // TEMPORARY — see routes/deals.js's own DELETE /drafts. Bulk-clears
+    // test/draft records; never touches an already-distributed deal.
+    removeDrafts: (token) => request('/deals/drafts', { method: 'DELETE', token }),
   },
 
   recurringInvoices: {

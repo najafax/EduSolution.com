@@ -189,6 +189,29 @@ router.put('/:id', manage, (req, res) => {
   res.json({ deal });
 });
 
+// TEMPORARY: bulk-deletes every draft deal, for clearing out test records
+// created while trying out this feature — never touches a distributed
+// deal, which is real, already-recorded financial history and stays
+// permanently locked here the same as PUT/DELETE /:id below. Registered
+// ahead of DELETE /:id so 'drafts' is never swallowed as an :id value.
+// Remove this route (and its Profit Distribution page button) once it's
+// no longer needed for cleanup.
+router.delete('/drafts', manage, (req, res) => {
+  const drafts = db.prepare("SELECT id, description FROM deals WHERE status = 'draft'").all();
+  if (drafts.length === 0) return res.json({ deleted: 0 });
+
+  db.prepare("DELETE FROM deals WHERE status = 'draft'").run();
+
+  logActivity({
+    userName: req.user.name,
+    action: 'bulk deleted',
+    entityType: 'deal',
+    entityId: null,
+    entityLabel: `${drafts.length} draft deal(s) (test cleanup)`,
+  });
+  res.json({ deleted: drafts.length });
+});
+
 router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Deal not found' });
@@ -201,28 +224,74 @@ router.delete('/:id', manage, (req, res) => {
   res.status(204).end();
 });
 
-// The one real action: locks the deal, writes a real 'currency exchange'
-// expense for the USD cost (only when there actually is one) and one real
-// owner_draws row per active, >0%-owned shareholder — the same primitives
-// a human would create by hand elsewhere in this app, just computed and
-// attributed together in one transaction so they can never drift apart or
-// be recorded only halfway.
+// The real work behind both POST /:id/distribute and POST /distribute-all
+// below — writes a real 'currency exchange' expense for the USD cost (only
+// when there actually is one) and one real owner_draws row per active,
+// >0%-owned shareholder — the same primitives a human would create by hand
+// elsewhere in this app, just computed and attributed together so they can
+// never drift apart or be recorded only halfway. `computedDeal` is a
+// withComputedDeal() result (raw row + cost_usd_total/cost_mvr/net_profit);
+// the caller is responsible for eligibility checks (a positive net profit,
+// a real exchange rate whenever there's a USD cost) and for wrapping this
+// in its own db.transaction() — a bulk caller distributing several deals
+// at once wraps them all in one transaction, not one each.
+//
+// Recorded as owner_draws.type = 'profit_distribution', not 'draw' — this
+// is a one-way profit payout, not money that's expected to come back the
+// way a real draw is, so it's deliberately a distinct type from the two
+// TYPES a human can create via the manual Owner Draws form (see
+// routes/ownerDraws.js's own TYPES constant, unchanged by this). That
+// router excludes 'profit_distribution' from its own draw/return totals,
+// list, exports, and per-name breakdown entirely (see its own notes) —
+// it still counts against routes/financials.js's bankBalance, since the
+// cash really did leave the business.
+function distributeDeal(computedDeal, shareholders, userName, today) {
+  let expenseId = computedDeal.expense_id;
+  if (computedDeal.cost_usd_total > 0) {
+    const info = db
+      .prepare('INSERT INTO expenses (category, description, amount, expense_date, payee, exchange_rate) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(
+        'currency exchange',
+        `Supplier cost for deal: ${computedDeal.description}`,
+        computedDeal.cost_mvr,
+        today,
+        computedDeal.payee || '',
+        computedDeal.exchange_rate,
+      );
+    expenseId = info.lastInsertRowid;
+  }
+
+  for (const sh of shareholders) {
+    const amount = round2((computedDeal.net_profit * sh.ownership_percent) / 100);
+    if (amount <= 0) continue;
+    db.prepare(
+      `INSERT INTO owner_draws (type, deal_id, taken_by_name, amount, draw_date, notes, created_by_name) VALUES ('profit_distribution', ?, ?, ?, ?, ?, ?)`,
+    ).run(computedDeal.id, sh.name, amount, today, `Distribution from deal: ${computedDeal.description}`, userName);
+  }
+
+  db.prepare(
+    `UPDATE deals SET status = 'distributed', expense_id = ?, distributed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+  ).run(expenseId, computedDeal.id);
+}
+
+function eligibilityError(computedDeal) {
+  if (computedDeal.cost_usd_total > 0 && !(computedDeal.exchange_rate > 0)) {
+    return 'Set an exchange rate before distributing — this deal has a supplier cost in USD to convert.';
+  }
+  if (computedDeal.net_profit <= 0) {
+    return `This deal has no profit to distribute (net profit is ${computedDeal.net_profit.toFixed(2)}). Review the cost and revenue first.`;
+  }
+  return null;
+}
+
 router.post('/:id/distribute', manage, (req, res) => {
   const deal = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
   if (!deal) return res.status(404).json({ error: 'Deal not found' });
   if (deal.status === 'distributed') return res.status(409).json({ error: 'This deal has already been distributed.' });
 
   const computed = withComputedDeal(deal);
-  if (computed.cost_usd_total > 0 && !(deal.exchange_rate > 0)) {
-    return res
-      .status(400)
-      .json({ error: 'Set an exchange rate before distributing — this deal has a supplier cost in USD to convert.' });
-  }
-  if (computed.net_profit <= 0) {
-    return res.status(400).json({
-      error: `This deal has no profit to distribute (net profit is ${computed.net_profit.toFixed(2)}). Review the cost and revenue first.`,
-    });
-  }
+  const error = eligibilityError(computed);
+  if (error) return res.status(400).json({ error });
 
   const shareholders = db
     .prepare('SELECT * FROM shareholders WHERE active = 1 AND ownership_percent > 0 ORDER BY name COLLATE NOCASE')
@@ -234,27 +303,7 @@ router.post('/:id/distribute', manage, (req, res) => {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const distribute = db.transaction(() => {
-    let expenseId = deal.expense_id;
-    if (computed.cost_usd_total > 0) {
-      const info = db
-        .prepare('INSERT INTO expenses (category, description, amount, expense_date, payee, exchange_rate) VALUES (?, ?, ?, ?, ?, ?)')
-        .run('currency exchange', `Supplier cost for deal: ${deal.description}`, computed.cost_mvr, today, deal.payee || '', deal.exchange_rate);
-      expenseId = info.lastInsertRowid;
-    }
-
-    for (const sh of shareholders) {
-      const amount = round2((computed.net_profit * sh.ownership_percent) / 100);
-      if (amount <= 0) continue;
-      db.prepare(
-        `INSERT INTO owner_draws (type, deal_id, taken_by_name, amount, draw_date, notes, created_by_name) VALUES ('draw', ?, ?, ?, ?, ?, ?)`,
-      ).run(deal.id, sh.name, amount, today, `Distribution from deal: ${deal.description}`, req.user.name);
-    }
-
-    db.prepare(
-      `UPDATE deals SET status = 'distributed', expense_id = ?, distributed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-    ).run(expenseId, deal.id);
-  });
+  const distribute = db.transaction(() => distributeDeal(computed, shareholders, req.user.name, today));
   distribute();
 
   const updated = withComputedDeal(db.prepare('SELECT * FROM deals WHERE id = ?').get(deal.id));
@@ -267,6 +316,65 @@ router.post('/:id/distribute', manage, (req, res) => {
     entityLabel: `${deal.description} (net ${computed.net_profit.toFixed(2)})`,
   });
   res.json({ deal: updated, distributions });
+});
+
+// Bulk sibling of the single-deal action above — distributes every
+// eligible draft deal in one go, instead of opening and confirming each
+// one individually. "Eligible" is the exact same bar POST /:id/distribute
+// enforces (a real exchange rate whenever there's a USD cost, a positive
+// net profit); an ineligible draft is skipped with a reason rather than
+// failing the whole batch, mirroring routes/import.js's own "partial
+// success is normal, not a failure state" convention for bulk operations.
+// Registered ahead of POST /:id/distribute purely for readability — the
+// two paths don't actually collide (one segment vs. two), unlike
+// DELETE /drafts above, which genuinely needs to come first.
+router.post('/distribute-all', manage, (req, res) => {
+  const shareholders = db
+    .prepare('SELECT * FROM shareholders WHERE active = 1 AND ownership_percent > 0 ORDER BY name COLLATE NOCASE')
+    .all();
+  if (shareholders.length === 0) {
+    return res
+      .status(400)
+      .json({ error: 'No active shareholders have an ownership percentage set — add one on the Shareholders page first.' });
+  }
+
+  const drafts = db
+    .prepare("SELECT * FROM deals WHERE status = 'draft' ORDER BY created_at, id")
+    .all()
+    .map(withComputedDeal);
+  if (drafts.length === 0) {
+    return res.status(400).json({ error: 'There are no draft deals to distribute.' });
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const distributed = [];
+  const skipped = [];
+
+  const runAll = db.transaction(() => {
+    for (const deal of drafts) {
+      const error = eligibilityError(deal);
+      if (error) {
+        skipped.push({ id: deal.id, description: deal.description, reason: error });
+        continue;
+      }
+      distributeDeal(deal, shareholders, req.user.name, today);
+      distributed.push({ id: deal.id, description: deal.description, net_profit: deal.net_profit });
+    }
+  });
+  runAll();
+
+  if (distributed.length > 0) {
+    const totalNet = round2(distributed.reduce((sum, d) => sum + d.net_profit, 0));
+    logActivity({
+      userName: req.user.name,
+      action: 'bulk distributed',
+      entityType: 'deal',
+      entityId: null,
+      entityLabel: `${distributed.length} deal(s) (net total ${totalNet.toFixed(2)})`,
+    });
+  }
+
+  res.json({ distributed, skipped });
 });
 
 module.exports = router;

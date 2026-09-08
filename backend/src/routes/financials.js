@@ -112,6 +112,17 @@ function computeSummary(from, to) {
   const totalOwnerReturns = db
     .prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return'${drawDateFilter}`)
     .get(...dateArgs).total;
+  // A profit distribution (routes/deals.js's own distributeDeal(), type =
+  // 'profit_distribution') is a one-way payout of a deal's net profit —
+  // never expected back the way a real draw is, so it's deliberately kept
+  // out of totalOwnerDraws above (that figure, and everything
+  // routes/ownerDraws.js itself shows, means "what's outstanding and could
+  // still be returned"). It still needs its own place in bankBalance below
+  // though — the cash really did leave the business — so it gets a
+  // separate total rather than silently folding into either figure above.
+  const totalOwnerDistributions = db
+    .prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'profit_distribution'${drawDateFilter}`)
+    .get(...dateArgs).total;
 
   // Bank balance is fundamentally a running total, not a period sum — so
   // unlike every figure above, a period filter doesn't scope it to "just
@@ -132,8 +143,20 @@ function computeSummary(from, to) {
     .get(asOf).total;
   const drawsThroughAsOf = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'draw' AND draw_date <= ?").get(asOf).total;
   const returnsThroughAsOf = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return' AND draw_date <= ?").get(asOf).total;
+  const distributionsThroughAsOf = db
+    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'profit_distribution' AND draw_date <= ?")
+    .get(asOf).total;
   const bankBalance =
-    Math.round((startingBalance + paidThroughAsOf + contributionsThroughAsOf - expensesThroughAsOf - drawsThroughAsOf + returnsThroughAsOf) * 100) / 100;
+    Math.round(
+      (startingBalance +
+        paidThroughAsOf +
+        contributionsThroughAsOf -
+        expensesThroughAsOf -
+        drawsThroughAsOf +
+        returnsThroughAsOf -
+        distributionsThroughAsOf) *
+        100,
+    ) / 100;
 
   // Deliberately NOT scoped to the period filter — this widget is titled
   // "Revenue, last 6 months" on Financials.jsx, a fixed trailing window
@@ -191,6 +214,7 @@ function computeSummary(from, to) {
     totalCapitalContributions: Math.round(totalCapitalContributions * 100) / 100,
     totalOwnerDraws: Math.round(totalOwnerDraws * 100) / 100,
     totalOwnerReturns: Math.round(totalOwnerReturns * 100) / 100,
+    totalOwnerDistributions: Math.round(totalOwnerDistributions * 100) / 100,
     bankBalance,
     bankBalanceAsOf: asOf,
     quoteCounts,

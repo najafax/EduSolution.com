@@ -20,6 +20,10 @@ router.use(requireAuth);
 const view = requirePermission('financials', 'view');
 const manage = requirePermission('financials', 'manage');
 
+// The only two types the manual create/edit form (and this validate())
+// can ever produce — 'profit_distribution' (see routes/deals.js's own
+// distributeDeal()) is deliberately NOT in this list, so it can only ever
+// be written by a deal actually being distributed, never by hand here.
 const TYPES = ['draw', 'return'];
 const PAGE_SIZE = 20;
 const BALANCE_EPSILON = 0.005;
@@ -71,6 +75,7 @@ function byNameBreakdown() {
         COALESCE(SUM(CASE WHEN type = 'draw' THEN amount ELSE 0 END), 0) AS totalDraws,
         COALESCE(SUM(CASE WHEN type = 'return' THEN amount ELSE 0 END), 0) AS totalReturns
        FROM owner_draws
+       WHERE type != 'profit_distribution'
        GROUP BY taken_by_name`,
     )
     .all();
@@ -116,7 +121,16 @@ const LIST_SELECT = `SELECT od.*, pd.draw_date AS parent_draw_date, pd.amount AS
 // buildInvoiceWhere(), extended with `orderBy` since this list is the one
 // case where the filter itself also changes the sort.
 function buildDrawWhere({ q, type, takenBy, hasBalance }) {
-  const conditions = [];
+  // A profit-distribution payout (routes/deals.js's own distributeDeal(),
+  // type = 'profit_distribution') is permanently excluded here, not just
+  // filterable — it's a one-way payout from a deal's own net profit, never
+  // something a business is tracking as "owed and expected back" the way
+  // a real draw is, so it has no place on this list, its exports, or the
+  // "Outstanding only" balance math at all. It's still a real owner_draws
+  // row (bankBalance and the deal's own "View split" modal both still
+  // account for it), just not one this router's own draw/return ledger
+  // ever surfaces.
+  const conditions = ["od.type != 'profit_distribution'"];
   const params = [];
   if (q) {
     conditions.push('(od.taken_by_name LIKE ? OR od.notes LIKE ?)');
@@ -310,7 +324,11 @@ router.get('/export.xlsx', view, async (req, res) => {
 router.get('/statement/pdf', view, async (req, res) => {
   const { takenBy } = req.query;
   if (!takenBy) return res.status(400).json({ error: 'takenBy is required' });
-  const records = db.prepare('SELECT * FROM owner_draws WHERE taken_by_name = ? ORDER BY draw_date ASC, id ASC').all(takenBy);
+  // Same 'profit_distribution' exclusion as buildDrawWhere() above — this
+  // is a draw/return ledger, and a distribution isn't either of those.
+  const records = db
+    .prepare("SELECT * FROM owner_draws WHERE taken_by_name = ? AND type != 'profit_distribution' ORDER BY draw_date ASC, id ASC")
+    .all(takenBy);
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   const buffer = await renderOwnerStatementPdf({ name: takenBy, records, settings });
   const safeName = takenBy.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'owner';
@@ -366,6 +384,16 @@ function returnedAgainst(drawId, excludeReturnId) {
 router.put('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Draw not found' });
+  // A profit-distribution payout is written once, by routes/deals.js's own
+  // distributeDeal(), and stays locked here the same way a sent/paid
+  // invoice locks against routes/invoices.js's own PUT /:id — editing it
+  // through this generic form would let it drift from the deal's own
+  // recorded net profit/split with nothing tying the two back together.
+  if (existing.type === 'profit_distribution') {
+    return res
+      .status(409)
+      .json({ error: 'This is a profit distribution from a deal and cannot be edited here — see the Profit Distribution page.' });
+  }
 
   const error = validate(req.body);
   if (error) return res.status(400).json({ error });
@@ -427,6 +455,15 @@ router.put('/:id', manage, (req, res) => {
 router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Draw not found' });
+  // Same lock as PUT /:id above — deleting a profit-distribution row here
+  // would desync it from the deal that produced it (still marked
+  // 'distributed', still showing this payout in its own "View split")
+  // with no way back short of editing the database directly.
+  if (existing.type === 'profit_distribution') {
+    return res
+      .status(409)
+      .json({ error: 'This is a profit distribution from a deal and cannot be deleted here — see the Profit Distribution page.' });
+  }
 
   // Mirrors this app's other "checked-first 409, not a raw FK error"
   // delete guards (routes/clients.js's own DELETE /:id) — deleting a draw

@@ -27,7 +27,7 @@ export const BUSINESS_LINKS = [
   { to: '/owner-draws', label: 'Owner draws', module: 'financials' },
   { to: '/financials', label: 'Financials', module: 'financials' },
   { to: '/shareholders', label: 'Shareholders', module: 'financials' },
-  { to: '/deals', label: 'Deals', module: 'financials' },
+  { to: '/profit-distribution', label: 'Profit Distribution', module: 'financials' },
   { to: '/reports', label: 'Reports', module: 'financials' },
   { to: '/activity', label: 'Activity', module: 'activity' },
   { to: '/users', label: 'Users', module: 'users' },

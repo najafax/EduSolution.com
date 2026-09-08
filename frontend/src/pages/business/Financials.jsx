@@ -8,7 +8,18 @@ import MeterBar from '../../components/MeterBar';
 import RevenueTrendChart from '../../components/RevenueTrendChart';
 import StatusBreakdownChart from '../../components/StatusBreakdownChart';
 import StatusFilterChips from '../../components/StatusFilterChips';
-import { InvoiceIcon, CheckCircleIcon, ClockIcon, AlertTriangleIcon, ExpenseIcon, TrendUpIcon, TrendDownIcon, BankIcon, UsersIcon } from '../../components/icons';
+import {
+  InvoiceIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  AlertTriangleIcon,
+  ExpenseIcon,
+  TrendUpIcon,
+  TrendDownIcon,
+  BankIcon,
+  UsersIcon,
+  BanknoteIcon,
+} from '../../components/icons';
 import { money } from '../../lib/money';
 import { todayStr, startOfMonthStr } from '../../lib/date';
 import MobileListAccordion from '../../components/MobileListAccordion';
@@ -171,6 +182,20 @@ export default function Financials() {
       tone: summary.totalOwnerDraws - summary.totalOwnerReturns > 0 ? 'warning' : 'neutral',
     },
     {
+      key: 'profitDistributions',
+      label: 'Profit distributions',
+      value: money(symbol, summary.totalOwnerDistributions),
+      // Deliberately not folded into "Owner draws (net)" above — a profit
+      // distribution (see the Profit Distribution page) is a one-way
+      // payout of a deal's net profit, never expected back, so it's kept
+      // as its own figure rather than diluting what "owner draws" means:
+      // money that could still be returned. See routes/financials.js's
+      // own note on why bankBalance keeps this as a separate total too.
+      sub: 'Paid to shareholders, never returned',
+      icon: <BanknoteIcon />,
+      tone: 'neutral',
+    },
+    {
       key: 'bankBalance',
       label: 'Bank balance',
       value: money(symbol, summary.bankBalance),
@@ -182,7 +207,7 @@ export default function Financials() {
       sub:
         summary.bankBalanceAsOf && summary.bankBalanceAsOf !== todayStr()
           ? `As of ${summary.bankBalanceAsOf}`
-          : 'Starting balance + net profit + contributions − owner draws',
+          : 'Starting balance + net profit + contributions − owner draws − distributions',
       icon: <BankIcon />,
       tone: isPositiveBalance ? 'positive' : 'negative',
     },

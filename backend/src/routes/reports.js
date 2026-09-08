@@ -120,8 +120,17 @@ router.get('/bank-balance/pdf', async (req, res) => {
     .get(range.from).total;
   const drawsBefore = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'draw' AND draw_date < ?").get(range.from).total;
   const returnsBefore = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return' AND draw_date < ?").get(range.from).total;
+  // Same 'profit_distribution' handling as routes/financials.js's own
+  // bankBalance — a one-way payout from a deal's net profit, excluded from
+  // drawsBefore/totalDraws below (that's a draw/return-only figure) but
+  // still real cash that left the business, so it gets its own line here.
+  const distributionsBefore = db
+    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'profit_distribution' AND draw_date < ?")
+    .get(range.from).total;
   const openingBalance =
-    Math.round((startingBalance + paidBefore + contributionsBefore - expensesBefore - drawsBefore + returnsBefore) * 100) / 100;
+    Math.round(
+      (startingBalance + paidBefore + contributionsBefore - expensesBefore - drawsBefore + returnsBefore - distributionsBefore) * 100,
+    ) / 100;
 
   const totalPayments = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at BETWEEN ? AND ?').get(range.from, range.to).total;
   const totalExpenses = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date BETWEEN ? AND ?').get(range.from, range.to).total;
@@ -134,8 +143,13 @@ router.get('/bank-balance/pdf', async (req, res) => {
   const totalReturns = db
     .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return' AND draw_date BETWEEN ? AND ?")
     .get(range.from, range.to).total;
+  const totalDistributions = db
+    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'profit_distribution' AND draw_date BETWEEN ? AND ?")
+    .get(range.from, range.to).total;
   const closingBalance =
-    Math.round((openingBalance + totalPayments + totalContributions - totalExpenses - totalDraws + totalReturns) * 100) / 100;
+    Math.round(
+      (openingBalance + totalPayments + totalContributions - totalExpenses - totalDraws + totalReturns - totalDistributions) * 100,
+    ) / 100;
 
   const buffer = await renderBankBalancePdf({
     openingBalance,
@@ -144,6 +158,7 @@ router.get('/bank-balance/pdf', async (req, res) => {
     totalExpenses,
     totalDraws,
     totalReturns,
+    totalDistributions,
     closingBalance,
     from: range.from,
     to: range.to,

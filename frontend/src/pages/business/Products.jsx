@@ -407,7 +407,7 @@ export default function Products() {
             </label>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               What this actually costs to fulfil (e.g. paying an overseas supplier) — never shown to clients, only used
-              on the Deals page to calculate profit.
+              on the Profit Distribution page to calculate profit.
             </p>
           </div>
           <div className="sm:col-span-2">

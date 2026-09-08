@@ -45,7 +45,7 @@ const LINK_ICONS = {
   '/owner-draws': BankIcon,
   '/financials': BankIcon,
   '/shareholders': UsersIcon,
-  '/deals': BankIcon,
+  '/profit-distribution': BankIcon,
   '/reports': ReportIcon,
   '/activity': HistoryIcon,
   '/users': UsersIcon,

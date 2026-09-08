@@ -14,14 +14,19 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
-import { BankIcon, PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XIcon, UsersIcon } from '../../components/icons';
+import { BankIcon, PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XIcon, UsersIcon, RefreshIcon } from '../../components/icons';
 
 // Internal profit calculator — revenue received (MVR) minus what it cost to
 // buy USD to pay a supplier, split among shareholders by ownership_percent
 // once distributed. Deliberately never shown anywhere a client can see it,
-// even when a deal links back to a real invoice (see db/index.js's own
-// CREATE TABLE comment for the full reasoning). A draft deal is purely a
+// even when a record links back to a real invoice (see db/index.js's own
+// CREATE TABLE comment for the full reasoning). A draft record is purely a
 // calculator; "Distribute" is the one action with real consequences.
+//
+// Named "Profit Distribution" on this page/nav/route — the backend (the
+// `deals`/`deal_items` tables, routes/deals.js, /api/deals, and this file's
+// own api.deals.* calls) keeps its original internal names; only the
+// user-facing surface changed.
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'draft', label: 'Draft' },
@@ -71,7 +76,7 @@ function ProductPicker({ products, onPick }) {
   );
 }
 
-export default function Deals() {
+export default function ProfitDistribution() {
   const { token, can } = useAuth();
   const { toast } = useToast();
   const canManage = can('financials', 'manage');
@@ -104,6 +109,17 @@ export default function Deals() {
   const [distributeError, setDistributeError] = useState('');
 
   const [viewTarget, setViewTarget] = useState(null);
+
+  // Bulk distribute-all: a single confirm-then-act button, no form of its
+  // own — reports back what actually happened (distributed vs. skipped,
+  // each skip with its own reason) since a batch can partially succeed.
+  const [bulkDistributing, setBulkDistributing] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+
+  // TEMPORARY: bulk-clears draft/test records — see routes/deals.js's own
+  // DELETE /drafts. Remove this button (and that route) once it's no
+  // longer needed for cleanup.
+  const [deletingDrafts, setDeletingDrafts] = useState(false);
 
   const { confirm, confirmDialog } = useConfirm();
 
@@ -149,6 +165,7 @@ export default function Deals() {
   }, [token]);
 
   const eligibleShareholders = useMemo(() => shareholders.filter((s) => s.active && s.ownership_percent > 0), [shareholders]);
+  const draftCount = useMemo(() => deals.filter((d) => d.status === 'draft').length, [deals]);
 
   const invoiceOptions = useMemo(
     () =>
@@ -263,10 +280,10 @@ export default function Deals() {
       };
       if (editingId) {
         await api.deals.update(editingId, payload, token);
-        toast('Deal updated.', { type: 'success' });
+        toast('Record updated.', { type: 'success' });
       } else {
         await api.deals.create(payload, token);
-        toast('Deal created.', { type: 'success' });
+        toast('Record created.', { type: 'success' });
       }
       setShowForm(false);
       load();
@@ -278,10 +295,10 @@ export default function Deals() {
   }
 
   async function handleDelete(deal) {
-    if (!(await confirm({ title: `Delete "${deal.description}"?`, message: 'This draft deal will be removed.', confirmLabel: 'Delete' }))) return;
+    if (!(await confirm({ title: `Delete "${deal.description}"?`, message: 'This draft record will be removed.', confirmLabel: 'Delete' }))) return;
     try {
       await api.deals.remove(deal.id, token);
-      toast('Deal deleted.', { type: 'success' });
+      toast('Record deleted.', { type: 'success' });
       load();
     } catch (err) {
       setError(err.message);
@@ -294,7 +311,7 @@ export default function Deals() {
     setDistributing(true);
     try {
       await api.deals.distribute(distributeTarget.id, token);
-      toast('Deal distributed.', { type: 'success' });
+      toast('Profit distributed.', { type: 'success' });
       setDistributeTarget(null);
       load();
     } catch (err) {
@@ -313,20 +330,73 @@ export default function Deals() {
     }
   }
 
+  // Distributes every eligible draft record in one call — see
+  // routes/deals.js's own POST /distribute-all. An ineligible draft (no
+  // profit, or a USD cost with no exchange rate set) is skipped with its
+  // own reason rather than blocking the rest of the batch.
+  async function handleDistributeAll() {
+    if (
+      !(await confirm({
+        title: 'Distribute all eligible drafts?',
+        message:
+          'Every draft record with a positive net profit (and a real exchange rate for any USD cost) will be distributed now. This writes real expense and owner-payout records and cannot be undone from here.',
+        confirmLabel: 'Distribute all',
+      }))
+    )
+      return;
+    setBulkResult(null);
+    setBulkDistributing(true);
+    try {
+      const { distributed, skipped } = await api.deals.distributeAll(token);
+      setBulkResult({ distributed, skipped });
+      toast(
+        `Distributed ${distributed.length} deal${distributed.length === 1 ? '' : 's'}${skipped.length > 0 ? `, skipped ${skipped.length}` : ''}.`,
+        { type: distributed.length > 0 ? 'success' : 'error' },
+      );
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBulkDistributing(false);
+    }
+  }
+
+  // TEMPORARY: see routes/deals.js's own DELETE /drafts note.
+  async function handleDeleteDrafts() {
+    if (
+      !(await confirm({
+        title: 'Delete every draft record?',
+        message: 'This clears out test/draft records only — any already-distributed record is real financial history and is never touched.',
+        confirmLabel: 'Delete drafts',
+      }))
+    )
+      return;
+    setDeletingDrafts(true);
+    try {
+      const { deleted } = await api.deals.removeDrafts(token);
+      toast(`Deleted ${deleted} draft record${deleted === 1 ? '' : 's'}.`, { type: 'success' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingDrafts(false);
+    }
+  }
+
   function rowActions(deal) {
     if (!canManage) return null;
     if (deal.status === 'draft') {
       return (
         <>
-          <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(deal)} title="Edit" label="Edit deal" />
+          <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(deal)} title="Edit" label="Edit record" />
           <IconActionButton
             icon={CheckCircleIcon}
             tone="emerald"
             onClick={() => setDistributeTarget(deal)}
             title="Distribute"
-            label="Distribute deal"
+            label="Distribute record"
           />
-          <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(deal)} title="Delete" label="Delete deal" />
+          <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(deal)} title="Delete" label="Delete record" />
         </>
       );
     }
@@ -337,33 +407,85 @@ export default function Deals() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Deals</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Profit Distribution</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Revenue received minus what it cost to buy USD for a supplier — the rest split among shareholders by
             ownership. Purely internal; nothing here is ever shown to a client.
           </p>
         </div>
         {canManage && (
-          <button
-            onClick={startCreate}
-            className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
-          >
-            <PlusIcon width={16} height={16} />
-            New deal
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {draftCount > 0 && (
+              <button
+                onClick={handleDistributeAll}
+                disabled={bulkDistributing}
+                className="flex min-h-11 items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-4 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+              >
+                <RefreshIcon width={16} height={16} className={bulkDistributing ? 'animate-spin' : ''} />
+                {bulkDistributing ? 'Distributing…' : 'Distribute all'}
+              </button>
+            )}
+            <button
+              onClick={startCreate}
+              className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+            >
+              <PlusIcon width={16} height={16} />
+              New record
+            </button>
+          </div>
         )}
       </div>
 
+      {canManage && draftCount > 0 && (
+        <div className="mt-3 flex items-center justify-end">
+          <button
+            onClick={handleDeleteDrafts}
+            disabled={deletingDrafts}
+            title="Temporary cleanup tool — clears draft/test records only, never a distributed one"
+            className="flex min-h-9 items-center gap-1.5 rounded-md border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+          >
+            <TrashIcon width={14} height={14} />
+            {deletingDrafts ? 'Deleting…' : 'Delete all drafts (test cleanup)'}
+          </button>
+        </div>
+      )}
+
+      {bulkResult && (
+        <div className="mt-4 rounded-md border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-slate-900 dark:text-white">
+              Distributed {bulkResult.distributed.length}, skipped {bulkResult.skipped.length}
+            </p>
+            <button
+              onClick={() => setBulkResult(null)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              aria-label="Dismiss"
+            >
+              <XIcon width={14} height={14} />
+            </button>
+          </div>
+          {bulkResult.skipped.length > 0 && (
+            <ul className="mt-2 space-y-1 text-slate-600 dark:text-slate-400">
+              {bulkResult.skipped.map((s) => (
+                <li key={s.id}>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">{s.description}:</span> {s.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {shareholders.length > 0 && eligibleShareholders.length === 0 && (
         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-          No active shareholder has an ownership percentage set yet, so a deal can't be distributed. Set one on the
+          No active shareholder has an ownership percentage set yet, so a record can't be distributed. Set one on the
           Shareholders page.
         </p>
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <div className="sm:max-w-sm">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search deals…" />
+          <SearchInput value={search} onChange={setSearch} placeholder="Search records…" />
         </div>
         <StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />
       </div>
@@ -373,7 +495,7 @@ export default function Deals() {
       <Modal
         open={showForm}
         onClose={() => setShowForm(false)}
-        title={editingId ? 'Edit deal' : 'New deal'}
+        title={editingId ? 'Edit record' : 'New record'}
         maxWidthClass="max-w-2xl"
       >
         <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
@@ -402,7 +524,7 @@ export default function Deals() {
               />
             </label>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              For your own traceability only — the invoice itself is never changed and shows nothing about this deal.
+              For your own traceability only — the invoice itself is never changed and shows nothing about this record.
             </p>
           </div>
           <label className="block">
@@ -554,7 +676,7 @@ export default function Deals() {
           setDistributeTarget(null);
           setDistributeError('');
         }}
-        title="Distribute this deal"
+        title="Distribute this record"
         maxWidthClass="max-w-lg"
       >
         {distributeTarget && (
@@ -669,7 +791,7 @@ export default function Deals() {
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Paid to shareholders</p>
               <div className="mt-1 divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-700">
                 {viewTarget.distributions.length === 0 ? (
-                  <p className="px-3 py-3 text-sm text-slate-500 dark:text-slate-400">No draws were recorded for this deal.</p>
+                  <p className="px-3 py-3 text-sm text-slate-500 dark:text-slate-400">No payouts were recorded for this record.</p>
                 ) : (
                   viewTarget.distributions.map((d) => (
                     <div key={d.id} className="flex justify-between px-3 py-2 text-sm">
@@ -695,9 +817,9 @@ export default function Deals() {
         ) : deals.length === 0 ? (
           <EmptyState
             icon={<BankIcon />}
-            title={search || status ? 'No deals match this filter.' : 'No deals yet.'}
+            title={search || status ? 'No records match this filter.' : 'No records yet.'}
             message={canManage ? 'Record a deal to work out how much profit there is to distribute.' : undefined}
-            action={canManage ? { label: 'New deal', onClick: startCreate } : undefined}
+            action={canManage ? { label: 'New record', onClick: startCreate } : undefined}
           />
         ) : (
           <>
@@ -789,7 +911,7 @@ export default function Deals() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New deal" />}
+      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New record" />}
 
       {confirmDialog}
     </div>
