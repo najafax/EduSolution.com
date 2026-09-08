@@ -21,7 +21,12 @@ import { BankIcon, PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XIcon, User
 // once distributed. Deliberately never shown anywhere a client can see it,
 // even when a record links back to a real invoice (see db/index.js's own
 // CREATE TABLE comment for the full reasoning). A draft record is purely a
-// calculator; "Distribute" is the one action with real consequences.
+// calculator; "Distribute" (pays shareholders off the record's own
+// estimated rate) and "Record USD purchase" (the real conversion, at
+// whatever the real rate turns out to be — the one action that actually
+// subtracts the cost from the bank balance, whenever it actually happens)
+// are the two independent real actions — see routes/deals.js's own note on
+// why they're separate rather than one.
 //
 // Named "Profit Distribution" on this page/nav/route — the backend (the
 // `deals`/`deal_items` tables, routes/deals.js, /api/deals, and this file's
@@ -49,6 +54,26 @@ function StatusPill({ status }) {
       }`}
     >
       {status === 'distributed' ? 'Distributed' : 'Draft'}
+    </span>
+  );
+}
+
+// A deal with a USD cost reads as one of three states, independent of
+// its own draft/distributed status — nothing rendered at all once there's
+// no USD cost to convert in the first place (the common case for a
+// service deal with no supplier cost).
+function ConversionPill({ deal }) {
+  if (!(deal.cost_usd_total > 0)) return null;
+  if (deal.expense_id) {
+    return (
+      <span className="inline-flex shrink-0 rounded-full bg-lagoon-50 px-2 py-0.5 text-xs font-medium text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-300">
+        USD converted
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+      Pending USD conversion
     </span>
   );
 }
@@ -107,6 +132,16 @@ export default function ProfitDistribution() {
   const [distributeTarget, setDistributeTarget] = useState(null);
   const [distributing, setDistributing] = useState(false);
   const [distributeError, setDistributeError] = useState('');
+
+  // Recording the real USD purchase — independent of distribute above, see
+  // routes/deals.js's own POST /:id/convert-usd. convertRate prefills from
+  // the deal's own current (estimated) exchange_rate but is freely
+  // editable, since the whole point is entering the real rate you actually
+  // got.
+  const [convertTarget, setConvertTarget] = useState(null);
+  const [convertRate, setConvertRate] = useState('');
+  const [converting, setConverting] = useState(false);
+  const [convertError, setConvertError] = useState('');
 
   const [viewTarget, setViewTarget] = useState(null);
 
@@ -329,6 +364,33 @@ export default function ProfitDistribution() {
     }
   }
 
+  function openConvert(deal) {
+    setConvertTarget(deal);
+    setConvertRate(deal.exchange_rate ? String(deal.exchange_rate) : '');
+    setConvertError('');
+  }
+
+  async function handleConvert() {
+    if (!convertTarget) return;
+    const rateNum = Number(convertRate);
+    if (!Number.isFinite(rateNum) || rateNum <= 0) {
+      setConvertError('Enter the real exchange rate you actually got.');
+      return;
+    }
+    setConvertError('');
+    setConverting(true);
+    try {
+      await api.deals.convertUsd(convertTarget.id, { exchange_rate: rateNum }, token);
+      toast('USD purchase recorded — the cost has now left the bank balance.', { type: 'success' });
+      setConvertTarget(null);
+      load();
+    } catch (err) {
+      setConvertError(err.message);
+    } finally {
+      setConverting(false);
+    }
+  }
+
   async function openView(deal) {
     try {
       const data = await api.deals.get(deal.id, token);
@@ -374,7 +436,8 @@ export default function ProfitDistribution() {
     if (
       !(await confirm({
         title: 'Delete every draft record?',
-        message: 'This clears out test/draft records only — any already-distributed record is real financial history and is never touched.',
+        message:
+          'This clears out test/draft records only — any already-distributed record is real financial history and is never touched. A draft that already had its USD purchase recorded has that expense reversed too.',
         confirmLabel: 'Delete drafts',
       }))
     )
@@ -417,8 +480,23 @@ export default function ProfitDistribution() {
     }
   }
 
+  // "Record USD purchase" is independent of a record's own draft/
+  // distributed status (see routes/deals.js's own convertDealToUsd() note
+  // on why the two actions don't gate each other) — shown whenever there's
+  // a real USD cost still waiting to be converted, alongside whatever
+  // status-specific actions the record already has.
   function rowActions(deal) {
     if (!canManage) return null;
+    const convertAction =
+      deal.cost_usd_total > 0 && !deal.expense_id ? (
+        <IconActionButton
+          icon={RefreshIcon}
+          tone="amber"
+          onClick={() => openConvert(deal)}
+          title="Record USD purchase"
+          label="Record the real USD purchase for this record"
+        />
+      ) : null;
     if (deal.status === 'draft') {
       return (
         <>
@@ -430,11 +508,17 @@ export default function ProfitDistribution() {
             title="Distribute"
             label="Distribute record"
           />
+          {convertAction}
           <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(deal)} title="Delete" label="Delete record" />
         </>
       );
     }
-    return <IconActionButton icon={UsersIcon} tone="lagoon" onClick={() => openView(deal)} title="View split" label="View distribution" />;
+    return (
+      <>
+        <IconActionButton icon={UsersIcon} tone="lagoon" onClick={() => openView(deal)} title="View split" label="View distribution" />
+        {convertAction}
+      </>
+    );
   }
 
   return (
@@ -444,7 +528,8 @@ export default function ProfitDistribution() {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Profit Distribution</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Revenue received minus what it cost to buy USD for a supplier — the rest split among shareholders by
-            ownership. Purely internal; nothing here is ever shown to a client.
+            ownership. Distributing pays shareholders off an estimate; the USD cost only leaves the bank once you
+            separately record the real purchase. Purely internal; nothing here is ever shown to a client.
           </p>
         </div>
         {canManage && (
@@ -750,7 +835,7 @@ export default function ProfitDistribution() {
                 </span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>Supplier cost</span>
+                <span>Supplier cost {distributeTarget.cost_usd_total > 0 && !distributeTarget.expense_id ? '(estimate)' : ''}</span>
                 <span>
                   {symbol}
                   {distributeTarget.cost_mvr.toFixed(2)}
@@ -766,6 +851,14 @@ export default function ProfitDistribution() {
                 </span>
               </div>
             </div>
+
+            {distributeTarget.cost_usd_total > 0 && !distributeTarget.expense_id && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                This only pays shareholders their share of the estimate above — the USD cost itself stays in the bank
+                balance, untouched, until you record the real purchase separately with "Record USD purchase" (whenever
+                that actually happens, at whatever the real rate is that day).
+              </p>
+            )}
 
             {eligibleShareholders.length === 0 ? (
               <p className="text-sm text-amber-700 dark:text-amber-400">
@@ -851,6 +944,16 @@ export default function ProfitDistribution() {
                   <span>{viewTarget.deal.distributed_at.slice(0, 10)}</span>
                 </div>
               )}
+              {viewTarget.deal.cost_usd_total > 0 && (
+                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                  <span>USD purchase</span>
+                  <span>
+                    {viewTarget.deal.converted_at
+                      ? `Recorded ${viewTarget.deal.converted_at.slice(0, 10)} at rate ${viewTarget.deal.exchange_rate}`
+                      : 'Not yet recorded — cost still reserved in the bank balance'}
+                  </span>
+                </div>
+              )}
             </div>
             <div>
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Paid to shareholders</p>
@@ -869,6 +972,73 @@ export default function ProfitDistribution() {
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(convertTarget)}
+        onClose={() => {
+          setConvertTarget(null);
+          setConvertError('');
+        }}
+        title="Record USD purchase"
+        maxWidthClass="max-w-lg"
+      >
+        {convertTarget && (
+          <div className="grid gap-3">
+            <p className="text-sm text-slate-600 dark:text-slate-400">{convertTarget.description}</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Enter the real rate you actually got today when you bought the USD ({symbol}
+              {convertTarget.cost_usd_total.toFixed(2)} to convert) — this is what actually subtracts the cost from
+              the bank balance. It's stayed there, untouched, until now.
+            </p>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Exchange rate (MVR per USD)</span>
+              <input
+                type="number"
+                min="0"
+                step="0.0001"
+                autoFocus
+                value={convertRate}
+                onChange={(e) => setConvertRate(e.target.value)}
+                placeholder="e.g. 15.4"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              />
+            </label>
+            <div className="grid gap-1 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
+              <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Cost (USD)</span>
+                <span>${convertTarget.cost_usd_total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between font-semibold text-slate-900 dark:text-white">
+                <span>Cost to record ({symbol})</span>
+                <span>
+                  {symbol}
+                  {round2(convertTarget.cost_usd_total * (Number(convertRate) || 0)).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {convertError && <p className="text-sm text-red-600 dark:text-red-400">{convertError}</p>}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleConvert}
+                disabled={converting}
+                className="min-h-11 rounded-md bg-amber-600 px-4 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-60"
+              >
+                {converting ? 'Recording…' : 'Record purchase'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConvertTarget(null)}
+                className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         )}
@@ -920,7 +1090,10 @@ export default function ProfitDistribution() {
                         {deal.net_profit.toFixed(2)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <StatusPill status={deal.status} />
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <StatusPill status={deal.status} />
+                          <ConversionPill deal={deal} />
+                        </div>
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
@@ -942,7 +1115,10 @@ export default function ProfitDistribution() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-slate-900 dark:text-white">{deal.description}</p>
-                        <StatusPill status={deal.status} />
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <StatusPill status={deal.status} />
+                          <ConversionPill deal={deal} />
+                        </div>
                       </div>
                       <p
                         className={`shrink-0 font-medium ${

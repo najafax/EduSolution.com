@@ -3371,7 +3371,13 @@ figures, with no drift.
   carried over from the deal, inserts one `owner_draws` row per eligible
   shareholder (`amount = round2(net_profit × ownership_percent / 100)`,
   `type: 'draw'`, `deal_id` set, `notes: `Distribution from deal:
-  ${description}``), and flips the deal to `distributed`. `GET /:id`
+  ${description}``), and flips the deal to `distributed`. **This
+  description of `POST /:id/distribute` writing the expense itself is the
+  original, since-superseded behavior** — see "Profit Distribution: rename,
+  bulk actions..." below's own "distributing and converting to USD are now
+  two separate manual actions" note for the current split (distribute only
+  ever writes the `owner_draws` payout now; a separate `POST
+  /:id/convert-usd` is what writes the real expense). `GET /:id`
   additionally returns the linked invoice's own summary (number/total/
   amount_paid/client name, for display only) and linked expense summary,
   plus the deal's own `distributions` (its `owner_draws` rows, empty
@@ -3603,6 +3609,105 @@ profit and never expected back the way a real draw is.
   reason. `DELETE /api/deals/distributed` afterward still restored
   `bankBalance` to the exact pre-test baseline, confirming the cleanup
   route and this new eligibility rule compose correctly together.
+- **A second, deeper follow-up: distributing and converting to USD are now
+  two separate manual actions, and the USD cost only leaves the bank once
+  the real conversion is recorded.** The fix directly above (requiring a
+  real, paid invoice) closed the "where did the money go" gap for the
+  *revenue* side, but a second report made the *cost* side of the same
+  root cause concrete: "when I entered sample data of MVR 4000, dollar
+  rate 19, cost price usd 97.5, when I click distribute, total 4000 is
+  deducted from bank balance... where did the cost price go? It has to be
+  in bank until I buy USD right?" — `POST /:id/distribute` used to write
+  both the shareholder payout *and* the `currency exchange` expense for
+  the USD cost together, in one shot, using whatever `exchange_rate`
+  happened to be typed into the deal at the time — so the cost portion
+  left the bank balance for a USD purchase that, in the real world,
+  hadn't actually happened yet, at a rate that wasn't real yet either.
+  Asked directly whether shareholders should be paid before or after the
+  real USD conversion — auto-add the estimate to the payout and reconcile
+  later, or block distribute until the real conversion is recorded first —
+  the business owner chose to let distribute run on the estimate, with the
+  real conversion recorded separately whenever it actually happens, and no
+  automatic reconciliation between the two.
+  `distributeDeal()` (shared by `POST /:id/distribute` and
+  `POST /distribute-all`) no longer writes the `currency exchange` expense
+  at all — it only ever inserts the `owner_draws` `profit_distribution`
+  rows, off the deal's own typed-in *estimated* `exchange_rate`. A new,
+  entirely independent function and route, `convertDealToUsd()` /
+  `POST /:id/convert-usd` (`financials:manage`), is the one action that
+  actually writes the real expense: it takes a required `exchange_rate` in
+  the body (the frontend prefills it from the deal's current estimate, but
+  it's freely overridable — this is the one place that rate becomes real),
+  computes `cost_mvr` fresh from `cost_usd_total × that rate`, inserts the
+  real expense, and overwrites the deal's own `exchange_rate` with it (so
+  a later read of the deal — its `cost_mvr`/`net_profit`, the "View split"
+  modal — reflects the real number, not the stale estimate; the
+  shareholder payout itself is *not* retroactively adjusted, matching the
+  no-reconciliation choice above), stamping the new `deals.converted_at`
+  column (`db/index.js`, `ALTER TABLE`-guarded — `deals` already had real,
+  in-use rows by the time this shipped, having already been through two
+  live rounds of use and fixes, same lesson `licenses.url` learned the
+  hard way) and `expense_id`. 409s if the deal's purchase has already been
+  recorded (`expense_id` set — a second conversion would double-count the
+  expense) and 400s if there's no USD cost to convert at all.
+  **Distributing and converting are deliberately independent of each
+  other** — a deal can be converted before, after, or without ever being
+  distributed (e.g. no shareholders configured yet), and distribute's own
+  `eligibilityError()` is unchanged by any of this (it still requires a
+  real exchange-rate *estimate* whenever there's a cost, purely so a
+  net-profit figure can be computed for the payout split — nothing about
+  eligibility now depends on whether conversion has happened). This is
+  what actually closes the "it has to be in bank until I buy USD" gap: the
+  cost stays in the bank balance, completely untouched, for however long
+  it takes between distributing (or creating the deal at all) and actually
+  recording the real purchase — nothing is ever subtracted for a
+  conversion that hasn't happened yet.
+  **Locking and cleanup follow the same "once real money has moved"
+  precedent, extended to cover conversion too**: `PUT`/`DELETE /:id` now
+  409 once `status === 'distributed'` **or** `expense_id` is set — a
+  still-`draft` deal that's already had its USD purchase recorded is just
+  as locked as a distributed one, since a real expense now exists that an
+  edit/delete would otherwise silently desync from. The temporary
+  `DELETE /api/deals/drafts` cleanup route was updated to match: a draft
+  can now carry a real linked expense of its own (conversion doesn't
+  require distributing first), so this route now reverses that expense
+  too before deleting the draft — otherwise the cleanup tool would leave a
+  real, still-subtracting expense behind with no deal left to explain it,
+  exactly the gap `DELETE /api/deals/distributed` was originally built to
+  close for a distributed deal's own expense.
+  `ProfitDistribution.jsx` gained a `ConversionPill` next to each record's
+  status pill ("Pending USD conversion," amber, or "USD converted,"
+  lagoon — nothing rendered at all once there's no USD cost in the first
+  place) and a "Record USD purchase" `IconActionButton` (`RefreshIcon`,
+  tone `amber`) shown independently of a record's own draft/distributed
+  status whenever there's a cost still waiting to be converted — opening a
+  small modal (prefilled with the deal's current estimated rate, freely
+  overridable, with a live preview of the MVR amount that would actually
+  be recorded) that calls the new `api.deals.convertUsd()`. The Distribute
+  confirmation modal's own "Supplier cost" line is labeled "(estimate)"
+  whenever conversion hasn't happened yet, with an added note stating
+  plainly that distributing only pays the shareholder split — the USD cost
+  itself stays reserved in the bank until "Record USD purchase" is used
+  separately. The "View split" modal gained a "USD purchase" row showing
+  either "Recorded {date} at rate {rate}" or "Not yet recorded — cost
+  still reserved in the bank balance."
+  Verified end-to-end against an isolated copy of the dev database (same
+  scratch-path-not-`/tmp` methodology as above): distributing a deal
+  linked to a real paid invoice (revenue 4000, estimated rate 19, USD cost
+  97.5) dropped `bankBalance` by exactly the shareholder payout (2147.5)
+  and left `expense_id` null; separately calling convert-usd at a
+  *different*, real rate (20) then dropped `bankBalance` by exactly the
+  real cost (1950, not the original 1852.5 estimate) and updated the
+  deal's own `exchange_rate`/`cost_mvr` to match; a second convert-usd call
+  on the same deal was rejected with 409; converting a still-`draft` deal
+  (before ever distributing it) correctly subtracted its real cost
+  immediately and locked `PUT`/`DELETE` on it even though `status` stayed
+  `draft`; `DELETE /api/deals/drafts` correctly reversed that draft's real
+  expense and restored the balance; `DELETE /api/deals/distributed`
+  reversed the first deal's own owner_draws + real expense and restored
+  `bankBalance` to the exact original baseline; and `POST /distribute-all`
+  against a linked+paid draft with a USD cost confirmed it still never
+  writes an expense (`expense_id` stayed null after the bulk distribute).
 - **Bulk distribute**: `POST /api/deals/distribute-all`
   (`financials:manage`) distributes every eligible draft deal in one
   call instead of opening and confirming each one — "eligible" is the
@@ -3613,10 +3718,12 @@ profit and never expected back the way a real draw is.
   An ineligible draft is skipped with its own reason rather than failing
   the whole batch — mirrors `routes/import.js`'s own "partial success is
   normal, not a failure state" convention for bulk operations — and the
-  actual expense/owner_draws-writing work (`distributeDeal()`, extracted
-  from what used to be `POST /:id/distribute`'s own inline transaction
-  body) is shared by both routes too, so a bulk distribution and a
-  single one can never compute or record a payout differently. 400s if
+  actual owner_draws-writing work (`distributeDeal()`, extracted from what
+  used to be `POST /:id/distribute`'s own inline transaction body — see
+  "distributing and converting to USD are now two separate manual
+  actions" below for why this no longer also writes an expense) is shared
+  by both routes too, so a bulk distribution and a single one can never
+  compute or record a payout differently. 400s if
   no active shareholder has an ownership percentage set, or if there are
   no drafts at all — same guardrails the single-deal route already has,
   checked once up front rather than per-deal. Every deal actually

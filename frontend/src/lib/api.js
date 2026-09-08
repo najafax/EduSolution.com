@@ -268,12 +268,23 @@ export const api = {
     create: (payload, token) => request('/deals', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/deals/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/deals/${id}`, { method: 'DELETE', token }),
-    // The one real action — locks the deal and writes the actual expense +
-    // owner_draws rows. See routes/deals.js's own POST /:id/distribute.
+    // Pays shareholders their share of the deal's *estimated* net profit
+    // (revenue minus its own typed-in exchange-rate estimate of the USD
+    // cost) — deliberately does not touch the USD cost side at all, see
+    // convertUsd() just below and routes/deals.js's own POST
+    // /:id/distribute for why those are two separate actions now.
     distribute: (id, token) => request(`/deals/${id}/distribute`, { method: 'POST', token }),
     // Distributes every eligible draft in one call. See routes/deals.js's
     // own POST /distribute-all.
     distributeAll: (token) => request('/deals/distribute-all', { method: 'POST', token }),
+    // Records the *real* USD purchase, at whatever the real rate turns out
+    // to be that day — this is the one action that writes the real
+    // 'currency exchange' expense and actually subtracts the cost from the
+    // bank balance; nothing does before this runs, so the money genuinely
+    // stays in the bank until the real conversion happens. Independent of
+    // distribute() above — can run before, after, or without it ever
+    // running. See routes/deals.js's own POST /:id/convert-usd.
+    convertUsd: (id, payload, token) => request(`/deals/${id}/convert-usd`, { method: 'POST', body: payload, token }),
     // TEMPORARY — see routes/deals.js's own DELETE /drafts. Bulk-clears
     // test/draft records; never touches an already-distributed deal.
     removeDrafts: (token) => request('/deals/drafts', { method: 'DELETE', token }),

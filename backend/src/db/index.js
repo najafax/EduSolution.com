@@ -1079,6 +1079,24 @@ if (!ownerDrawColumns.has('deal_id')) {
 }
 db.exec(`CREATE INDEX IF NOT EXISTS idx_owner_draws_deal ON owner_draws(deal_id);`);
 
+// `converted_at` on `deals` — stamped once the deal's real USD purchase is
+// recorded via routes/deals.js's own POST /:id/convert-usd, separate from
+// `distributed_at`. Distributing (paying shareholders their share of net
+// profit) and converting (actually buying the USD, at whatever the real
+// rate turns out to be that day) are two independent manual actions, not
+// one — see that route's own note for why: the cost side must not leave
+// the bank balance until the real conversion happens, even though the
+// shareholder payout can go out earlier off the deal's own typed-in
+// estimate. `deals` already had real, in-use rows by the time this
+// shipped (this feature had already been through two live rounds of use
+// and follow-up fixes), so this is the guarded ALTER TABLE treatment, not
+// an edit to the CREATE TABLE statement above — same lesson `licenses.url`
+// learned the hard way.
+const dealColumns = new Set(db.prepare('PRAGMA table_info(deals)').all().map((c) => c.name));
+if (!dealColumns.has('converted_at')) {
+  db.exec(`ALTER TABLE deals ADD COLUMN converted_at TEXT;`);
+}
+
 db.pragma('foreign_keys = ON');
 
 // Bound params rather than string-interpolated into the exec() block above,
