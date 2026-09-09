@@ -150,6 +150,15 @@ export default function Dashboard() {
   // against a brand-new business with nothing invoiced yet (0/0).
   const ringPct = (value) => (summary && summary.totalInvoiced > 0 ? (value / summary.totalInvoiced) * 100 : 0);
 
+  async function handleDownloadReceipt(invoiceId, paymentId) {
+    setError('');
+    try {
+      await api.invoices.openReceiptPdf(invoiceId, paymentId, token);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   function shortcutsRow() {
     return (
       <div className="mt-6">
@@ -419,9 +428,13 @@ export default function Dashboard() {
                     {summary.recentPayments.slice(0, 5).map((p) => (
                       <div key={p.id} className="flex flex-col gap-1 px-6 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                          <Link to={`/invoices/${p.invoice_id}`} className="font-medium text-lagoon-600 hover:text-lagoon-500">
-                            {p.invoice_number}
-                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadReceipt(p.invoice_id, p.id)}
+                            className="font-medium text-lagoon-600 hover:text-lagoon-500"
+                          >
+                            {p.receipt_number}
+                          </button>
                           <span className="ml-2 text-slate-500 dark:text-slate-400">{p.client_name}</span>
                         </div>
                         <div className="flex items-center gap-4">
