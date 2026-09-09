@@ -413,21 +413,28 @@ function startScheduler() {
   cron.schedule('15 8 * * *', () => {
     runLicenseExpiryAlerts().catch((err) => console.error('[license-alerts] job failed:', err));
   });
-  // Daily at 08:20 server time — see lib/dailyEarningsReport.js. Staggered
-  // 5 minutes after the license-expiry job above, same reasoning as that
-  // job's own stagger from the overdue-reminder job before it. This app's
-  // production deploy (Render) runs in UTC, which is GMT year-round (GMT
-  // has no DST to diverge on), so "08:20 server time" is "08:20 GMT" on
-  // that deploy — but this cron expression is evaluated in whatever
-  // timezone the Node process itself is actually running in, so if that
-  // ever changes (a different host, an explicit TZ env var), this
-  // schedule moves with it rather than silently staying pinned to GMT.
-  cron.schedule('20 8 * * *', () => {
-    runDailyEarningsReport().catch((err) => console.error('[daily-earnings] job failed:', err));
-  });
   // Daily at 03:00 server time, ahead of the other jobs — see lib/backup.js.
   cron.schedule('0 3 * * *', () => {
     runBackup().catch((err) => console.error('[backup] job failed:', err));
+  });
+  // Daily at 03:30 server time — see lib/dailyEarningsReport.js. This app's
+  // production deploy (Render) runs in UTC, which is GMT year-round (GMT
+  // has no DST to diverge on), and this business's own market (Maldives)
+  // is GMT+5 with no DST of its own either — so "03:30 server time" is
+  // "08:30 Maldives time" on that deploy, the actual time this report is
+  // meant to land in a shareholder's inbox, at explicit request. Scheduled
+  // 30 minutes after the backup job above (not for any dependency between
+  // the two — this report reads fresh from the live DB regardless of
+  // whether that morning's backup has run yet — just so their console/log
+  // output can't interleave), and well ahead of the 07:00–08:15 block of
+  // daily jobs below, which this report also has no dependency on. This
+  // cron expression is evaluated in whatever timezone the Node process
+  // itself is actually running in, so if that ever changes (a different
+  // host, an explicit TZ env var), this schedule moves with it rather than
+  // silently staying pinned to GMT/Maldives time — re-derive the UTC
+  // offset above if the deploy's own timezone ever changes.
+  cron.schedule('30 3 * * *', () => {
+    runDailyEarningsReport().catch((err) => console.error('[daily-earnings] job failed:', err));
   });
   // 09:00 on the 1st of each month — after the daily jobs above have had
   // their usual run, and comfortably after runBackup()'s 03:00 slot so a

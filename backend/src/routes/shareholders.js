@@ -90,7 +90,7 @@ router.delete('/:id', manage, (req, res) => {
   res.json({ ok: true });
 });
 
-// Runs the exact same job the 08:20 cron trigger fires — see
+// Runs the exact same job the 08:30-Maldives-time cron trigger fires — see
 // lib/dailyEarningsReport.js — on demand, for yesterday's date, so an
 // admin can verify the pipeline (and resend if a prior run failed) without
 // waiting for tomorrow morning. Not logged as a distinct activity entry of

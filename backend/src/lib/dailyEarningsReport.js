@@ -20,10 +20,11 @@ const { logActivity } = require('./activity');
 const { computeSummary } = require('../routes/financials');
 
 // Payments/expenses recorded against yesterday's date — the job runs at
-// 08:20 (see lib/scheduler.js), so "today" has barely started and has
-// essentially no data of its own yet; reporting on the just-completed day
-// is the only reading that makes sense, the same "previous period" framing
-// runMonthlyReport() already uses for the month before it.
+// 08:30 Maldives time (see lib/scheduler.js), so "today" has barely started
+// and has essentially no data of its own yet; reporting on the
+// just-completed day is the only reading that makes sense, the same
+// "previous period" framing runMonthlyReport() already uses for the month
+// before it.
 function yesterday() {
   const d = new Date();
   d.setDate(d.getDate() - 1);

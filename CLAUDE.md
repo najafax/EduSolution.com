@@ -1228,15 +1228,15 @@ already does for that resource.
   `try/catch`-per-recipient shape `runMonthlyReport()`'s own send loop
   uses) with the PDF attached. `date`/`totalReceived`/`totalExpenses`/
   `netEarning` all report on **yesterday** by default — the job fires at
-  08:20 (see `lib/scheduler.js` below), so "today" has barely started and
-  has essentially no data of its own yet, the same "previous period"
-  framing `runMonthlyReport()` already uses for the month before it — but
-  `dateStr` is an overridable argument, which is what lets
+  08:30 Maldives time (see `lib/scheduler.js` below), so "today" has barely
+  started and has essentially no data of its own yet, the same "previous
+  period" framing `runMonthlyReport()` already uses for the month before
+  it — but `dateStr` is an overridable argument, which is what lets
   `routes/shareholders.js`'s own `POST /send-report` (`financials:manage`,
   no `date` param exposed in the UI — always "yesterday," matching exactly
   what tomorrow morning's automatic run would also do) re-run the exact
   same job on demand, so an admin can verify the whole pipeline (or resend
-  after a prior run failed) without waiting for the next 08:20. Each
+  after a prior run failed) without waiting for the next scheduled run. Each
   successful send is logged both to `email_log` (type
   `shareholder_daily_earnings` — unlike `runMonthlyReport()`'s own staff
   digest, this goes to real external stakeholders rather than staff, so
@@ -1254,7 +1254,8 @@ already does for that resource.
   originally read `` "{{business_name}} — today's earnings:
   {{net_earning}}" ``, which was wrong the instant it shipped — the email
   always arrives the *morning after* the day it reports on (see the
-  08:20-fires/yesterday's-data framing above), so "today's earnings" in a
+  08:30-Maldives-time-fires/yesterday's-data framing above), so "today's
+  earnings" in a
   Monday-morning inbox actually meant Sunday's figures, not Monday's, with
   nothing in the subject line saying so. Fixed to `` "{{business_name}} —
   earnings for {{date}}: {{net_earning}}" `` — `{{date}}` was already a
@@ -1285,15 +1286,23 @@ already does for that resource.
   `computeSummary()` + `renderDailyEarningsPdf()` called directly produced
   a real PDF, and `pdftotext` confirmed the rendered "Bank balance" row
   reads the correct figure with no page-overlap or clipping.
-  `lib/scheduler.js` registers the cron trigger at `'20 8 * * *'` —
-  staggered 5 minutes after the license-expiry job, same "avoid
-  interleaved console output" reasoning every other same-hour job stagger
-  in this file already documents. This app's production deploy (Render)
-  runs in UTC, which is GMT year-round (GMT has no DST to diverge from),
-  so "08:20 server time" reads as "08:20 GMT" there — but the cron
-  expression itself is evaluated in whatever timezone the Node process is
-  actually running in, so if that host or its `TZ` env var ever changes,
-  this schedule moves with it rather than silently staying pinned to GMT.
+  `lib/scheduler.js` registers the cron trigger at `'30 3 * * *'` —
+  30 minutes after the backup job (not for any dependency between the two,
+  just so their console/log output can't interleave), and well ahead of
+  the 07:00–08:15 block of daily jobs, none of which this report depends
+  on either. This app's production deploy (Render) runs in UTC, which is
+  GMT year-round (GMT has no DST to diverge from), and this business's own
+  market (the Maldives) is GMT+5 with no DST of its own either — so
+  "03:30 server time" reads as "08:30 Maldives time" there, the actual
+  time this report is meant to land in a shareholder's inbox, at explicit
+  request (moved here from an original `'20 8 * * *'`/"08:20 server time"
+  schedule, which worked out to 13:20 Maldives time — well past the
+  intended "first thing in the morning" framing). The cron expression
+  itself is evaluated in whatever timezone the Node process is actually
+  running in, so if that host or its `TZ` env var ever changes, this
+  schedule moves with it rather than silently staying pinned to GMT/
+  Maldives time — re-derive the UTC offset above if the deploy's own
+  timezone ever changes.
   `pages/business/Shareholders.jsx` (route `/shareholders`, `Navbar.jsx`
   link right after Financials, gated on `financials`) is a thin list+
   modal-form page — no detail page, no pagination, `active` is a plain
