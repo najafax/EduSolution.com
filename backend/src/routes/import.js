@@ -826,8 +826,40 @@ function processLicenses(rows, commit) {
         );
         licenseId = result.lastInsertRowid;
       }
+      // Two consecutive rows in the same group can land with an identical
+      // expiryDate — most commonly a copy-pasted CSV row that shares its
+      // predecessor's start_date and leaves Expiry date blank, so both
+      // default to the exact same advanceExpiry() result (see
+      // validateLicenseRow() below). Inserting a license_renewals row for
+      // that pair would record a "renewal" with no actual advancement —
+      // previous_expiry_date === new_expiry_date, which reads as a genuine
+      // data error on the Licenses page's own "Renewal history" modal (a
+      // date range that goes nowhere) rather than a real historical event.
+      // Skipped rather than inserted; the earlier row is still accounted
+      // for in `imported` and its own result message below, just without a
+      // phantom renewal entry backing it.
       for (let i = 1; i < group.length; i++) {
-        insertRenewal.run(licenseId, group[i - 1].values.expiryDate, group[i].values.expiryDate, `${group[i].values.startDate} 00:00:00`);
+        const h = group[i - 1];
+        const previousExpiry = h.values.expiryDate;
+        const nextExpiry = group[i].values.expiryDate;
+        if (previousExpiry === nextExpiry) {
+          results[h.index] = {
+            row: h.rowNumber,
+            status: 'ok',
+            message: `merged into row ${current.rowNumber} (${current.values.name}) — same expiry date as the next row, so no renewal was recorded for it`,
+            preview: h.values.name,
+            id: licenseId,
+          };
+          continue;
+        }
+        insertRenewal.run(licenseId, previousExpiry, nextExpiry, `${group[i].values.startDate} 00:00:00`);
+        results[h.index] = {
+          row: h.rowNumber,
+          status: 'ok',
+          message: `imported as renewal history for row ${current.rowNumber} (${current.values.name})`,
+          preview: h.values.name,
+          id: licenseId,
+        };
       }
       imported += group.length;
       results[current.index] = {
@@ -843,15 +875,6 @@ function processLicenses(rows, commit) {
         preview: current.values.name,
         id: licenseId,
       };
-      for (const h of history) {
-        results[h.index] = {
-          row: h.rowNumber,
-          status: 'ok',
-          message: `imported as renewal history for row ${current.rowNumber} (${current.values.name})`,
-          preview: h.values.name,
-          id: licenseId,
-        };
-      }
     } else {
       results[current.index] = {
         row: current.rowNumber,
@@ -865,11 +888,15 @@ function processLicenses(rows, commit) {
             : 'ready to import',
         preview: current.values.name,
       };
-      for (const h of history) {
+      for (let i = 1; i < group.length; i++) {
+        const h = group[i - 1];
+        const sameExpiry = h.values.expiryDate === group[i].values.expiryDate;
         results[h.index] = {
           row: h.rowNumber,
           status: 'ok',
-          message: `ready to import as renewal history for row ${current.rowNumber} (${current.values.name})`,
+          message: sameExpiry
+            ? `will merge into row ${current.rowNumber} (${current.values.name}) — same expiry date as the next row, so no renewal will be recorded for it`
+            : `ready to import as renewal history for row ${current.rowNumber} (${current.values.name})`,
           preview: h.values.name,
         };
       }

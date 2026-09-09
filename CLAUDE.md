@@ -2375,6 +2375,26 @@ already does for that resource.
   step makes the distinction obvious before anything commits. If more than
   one existing license somehow already shares a client+name (e.g. from
   duplicates created before this matching existed), the highest id wins.
+  **A degenerate `license_renewals` row — same expiry on both sides — is
+  never inserted**: two consecutive rows within the same group can land
+  with an identical `expiry_date`, most commonly a copy-pasted CSV row
+  that shares its predecessor's `start_date` and leaves the Expiry date
+  column blank, so both default to the exact same
+  `advanceExpiry(start_date, billing_cycle)` result. The renewal-history
+  loop used to insert a `license_renewals` row for every consecutive pair
+  in the sorted group unconditionally, which meant that pair produced a
+  row with `previous_expiry_date === new_expiry_date` — a "renewal" with
+  no actual advancement, which read as a broken date range (e.g. `2027-
+  09-09 → 2027-09-09`) on the Licenses page's own "Renewal history"
+  modal, not a real historical event. Fixed by skipping the insert
+  whenever the pair's two expiry dates are identical — the earlier row
+  is still counted in `imported` and still gets its own `results` line,
+  just worded `"merged into row N (...) — same expiry date as the next
+  row, so no renewal was recorded for it"` (`"will merge..."`/`"...no
+  renewal will be recorded..."` in preview) instead of `"imported as
+  renewal history for row N (...)"`, so the preview step shows this
+  distinction before anything commits, same as every other row-level
+  outcome this importer reports.
   **Products** (`processProducts()`) is the simplest importer in this file
   — no client to resolve, no dates, no multi-table writes, just `name`
   (required), `description`, `unit_price` (required, non-negative),
@@ -6564,11 +6584,20 @@ frontend stops holding/sending it.
   body) opens a `Modal` listing that license's renewal log from `GET
   /:id/renewals` — fetched fresh on open (no caching across opens, mirroring
   `EmailPreviewModal`'s own "fetch on open" pattern rather than prefetching
-  history for every row up front), each entry showing just the renewal date
-  and the previous→new expiry it produced (`renewed_at.slice(0, 10)` for
-  the date, since `renewed_at` is a full datetime but every other date
-  shown in this app's UI is date-only), newest first, with a "No renewals
-  recorded yet." empty state for a license that's never been renewed.
+  history for every row up front), each entry showing just the renewal
+  **year** and the previous→new expiry it produced (`renewed_at.slice(0, 4)`
+  — year only, not the full date; the specific day a renewal happened is a
+  minor detail next to the previous→new expiry range on the right, and a
+  bare year makes it immediately clear which period each row belongs to.
+  This was originally the full `renewed_at.slice(0, 10)` date, matching
+  every other date shown in this app's UI, but narrowed to year-only at
+  explicit request specifically for this one modal — every other date
+  display in the app is unaffected), newest first, with a "No renewals
+  recorded yet." empty state for a license that's never been renewed. See
+  `routes/import.js`'s own note above on why a previous→new pair can no
+  longer show an identical date on both sides (a real, now-fixed bug in
+  the CSV renewal-history importer, not the manual Renew button, which was
+  independently verified to always advance a genuine cycle correctly).
   The form's "Activation URL"
   field (a plain `type="url"` input, spanning both grid columns like
   "License name" above it) is captured on create/edit and round-tripped

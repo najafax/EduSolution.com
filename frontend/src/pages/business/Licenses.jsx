@@ -836,7 +836,12 @@ export default function Licenses() {
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {renewals.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-4 py-2.5 text-sm">
-                <span className="text-slate-500 dark:text-slate-400">{r.renewed_at.slice(0, 10)}</span>
+                {/* Year only, not the full renewed_at date — the specific
+                    day of the renewal itself is a minor detail; what a
+                    staff member scanning this list actually wants at a
+                    glance is which year/period each row belongs to,
+                    matching the expiry range on the right. */}
+                <span className="text-slate-500 dark:text-slate-400">{r.renewed_at.slice(0, 4)}</span>
                 <span className="text-slate-900 dark:text-white">
                   {r.previous_expiry_date} → {r.new_expiry_date}
                 </span>
