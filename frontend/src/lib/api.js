@@ -468,7 +468,6 @@ export const api = {
     me: (token) => request('/portal/me', { token }),
     getSettings: (token) => request('/portal/settings', { token }),
     changePassword: (payload, token) => request('/portal/change-password', { method: 'POST', body: payload, token }),
-    activity: (token) => request('/portal/activity', { token }),
 
     quotes: {
       list: (token) => request('/portal/quotes', { token }),

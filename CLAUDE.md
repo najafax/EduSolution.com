@@ -4834,31 +4834,28 @@ rather than eight overlapping diffs.
   control cluster, right-anchored (the header always has room, same
   reasoning `NotificationCenter.jsx`'s own default `align="right"` already
   documents for `Navbar.jsx`'s header).
-- **Recent activity timeline**: `routes/clientPortal.js` gains `GET
-  /activity` (`requireClientAuth`) — deliberately **not** a read of
-  `activity_log` (that's a staff-wide audit trail with no `client_id`
-  column at all; exposing it directly would risk leaking another client's
-  rows alongside this one), but a small set of purpose-built queries
-  against the same `quotes`/`invoices`/`payments`/`licenses` tables every
-  other route in this router already scopes to `client_id`, merged into
-  one chronological list of `{ type, label, date, link, amount }` entries
-  (`amount` only set for a `payment` entry, so the frontend can format it
-  with the currency symbol it already has rather than this route needing
-  to know it) and capped at `ACTIVITY_LIMIT` (10, most recent first) — a
-  list this small doesn't need pagination, same "don't build it until
-  needed" call this app already makes elsewhere. Four entry types: quote
-  sent (`issue_date`, gated through the same `CLIENT_VISIBLE_QUOTE` filter
-  every other quote read in this router uses), quote responded
-  (`client_responded_at`), invoice issued (`issue_date`), payment received
-  (`payments.paid_at`, joined to its invoice), and license renewed
-  (`last_renewed_at`). `pages/portal/PortalDashboard.jsx` renders this as a
-  "Recent activity" panel below the existing shortcut tiles — an
-  independent, best-effort fetch (failure just leaves the panel absent,
-  same reasoning `Dashboard.jsx`'s own "Needs attention" panel fetches are
-  kept separate from its main summary call) that renders nothing at all
-  once loaded-and-empty, same "only show the exception case" convention
-  this app already follows (a brand-new client with no history yet doesn't
-  need an empty panel telling them so).
+- **Recent activity timeline — built, then removed.** This originally
+  shipped as `GET /activity` on `routes/clientPortal.js` (`requireClientAuth`)
+  — deliberately not a read of `activity_log` (that's a staff-wide audit
+  trail with no `client_id` column at all; exposing it directly would risk
+  leaking another client's rows alongside this one), but a small set of
+  purpose-built queries against the same `quotes`/`invoices`/`payments`/
+  `licenses` tables every other route in this router already scopes to
+  `client_id`, merged into one chronological list of `{ type, label, date,
+  link, amount }` entries capped at 10 — plus `pages/portal/
+  PortalDashboard.jsx`'s own "Recent activity" panel rendering it below the
+  shortcut tiles. Removed outright at explicit request, the same "the
+  portal is meant to stay a simple read/upload surface, not a bookkeeping/
+  activity-log tool" reasoning the Statement of account PDF below was
+  pulled for — both pieces (the route and the panel) were deleted rather
+  than left dead/unreachable, along with `lib/api.js`'s `portal.activity()`
+  call. `routes/clientPortal.js`'s `CLIENT_VISIBLE_QUOTE` filter is
+  otherwise unaffected — every other route in this file that relies on it
+  (`GET /quotes`, `GET /quotes/:id`, etc.) is untouched. The notification
+  bell (`components/portal/PortalNotificationCenter.jsx`, above) never
+  depended on this route — it reads `GET /quotes`/`GET /invoices`/
+  `GET /licenses`/`GET /payment-proofs/rejected` directly — so removing
+  this timeline has no effect on it.
 - **Statement of account PDF — built, then removed.** This originally
   shipped as `GET /statement/pdf?from=&to=` on `routes/clientPortal.js`
   plus `lib/reportPdf.js`'s `renderClientStatementPdf()` and a "Download
@@ -5122,16 +5119,13 @@ touches is its own row.
   for one invoice) — `PortalNotificationCenter.jsx`'s bell needs this
   across the client's *whole* invoice set in one call, same reasoning the
   bell's other categories each already hit their own already-scoped list
-  endpoint rather than a per-invoice one. `GET /activity` (see "Recent
-  activity timeline" above) gains a matching `payment_proof_rejected`
-  entry type — one more purpose-built query against `payment_proofs`
-  joined to `invoices` (still scoped to `client_id`, same as every other
-  query in that route), `label: `Payment proof rejected for invoice
-  ${number}``, `date: reviewed_at`, `link` straight to
-  `/portal/invoices/:id`. `PortalDashboard.jsx`'s `ACTIVITY_ICONS` map
-  gained a `payment_proof_rejected: AlertTriangleIcon` entry so this reads
-  correctly in the "Recent activity" panel rather than falling back to the
-  map's generic `QuoteIcon` default.
+  endpoint rather than a per-invoice one. (At the time this shipped, the
+  now-removed `GET /activity` — see "Recent activity timeline" above —
+  also gained a matching `payment_proof_rejected` entry type; that whole
+  route and `PortalDashboard.jsx`'s own timeline panel were later deleted,
+  taking that entry type with them, but this dedicated
+  `GET /payment-proofs/rejected` route and the bell category below are
+  unaffected — they never depended on `GET /activity` at all.)
   `PortalNotificationCenter.jsx` gained a 5th category, "Payment proof
   rejected" — same live-computed-on-open pattern as the other four
   (`rejectedProofs` state, fetched via the new endpoint above alongside
