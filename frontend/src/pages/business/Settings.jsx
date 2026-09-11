@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { resizeImage, dataUriByteLength } from '../../lib/imageResize';
+import { ImageIcon } from '../../components/icons';
 
 export default function Settings() {
   const { token, can } = useAuth();
@@ -223,12 +224,24 @@ function ImageField({ label, value, onChange, onError, hint }) {
     <div className="block">
       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
       {value ? (
-        <div className="mt-1 flex items-center gap-3">
-          <img src={value} alt={label} className="h-16 max-w-[160px] rounded-md border border-slate-200 object-contain dark:border-slate-700" />
+        // Deliberately no <img> preview here — this renders as a plain file
+        // attachment (icon + "uploaded" label) rather than showing the image
+        // itself. The stored value/upload flow is unchanged: still a base64
+        // data URI in the same field, still what lib/pdf.js prints on every
+        // quote/invoice/receipt.
+        <div className="mt-1 flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+            <ImageIcon width={18} height={18} />
+          </span>
+          <span className="flex-1 text-sm text-slate-700 dark:text-slate-300">{label} attached</span>
+          <label className="flex min-h-11 cursor-pointer items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700">
+            Replace
+            <input type="file" accept="image/png,image/jpeg" onChange={handleFile} className="hidden" />
+          </label>
           <button
             type="button"
             onClick={() => onChange('')}
-            className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             Remove
           </button>
