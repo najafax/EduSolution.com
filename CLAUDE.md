@@ -6104,6 +6104,19 @@ canvas-resized at all — `PortalInvoiceDetail.jsx` checks `file.type` first
 and falls back to a plain `FileReader.readAsDataURL()` for that one type,
 resizing every image type as before.
 
+**`Settings.jsx`'s own `ImageField` shows an uploaded logo/signature/stamp
+as a plain file attachment, not an inline image preview** — once one of the
+three is set, the field renders an icon + "{label} attached" row with
+Replace/Remove actions instead of an `<img src={value}>` thumbnail (at
+explicit request: staff reviewing this page don't need to see the image
+itself, just confirm one is on file). This is purely a display choice on
+this one field — the stored value, the resize-then-validate upload flow
+above, and every other `ImageField`-style caller (`Website.jsx`'s team/
+gallery photos, which still preview normally) are unchanged; the backend
+still receives and stores the exact same base64 data URI in
+`business_settings`, and `lib/pdf.js` still prints it on every quote/
+invoice/receipt exactly as before.
+
 `routes/settings.js` gained a matching backend-side lightweight read for
 the same reason: `GET /api/settings/summary` (`SELECT currency_symbol,
 business_name`, same `settings:view` gate as the existing `GET /`) is what
