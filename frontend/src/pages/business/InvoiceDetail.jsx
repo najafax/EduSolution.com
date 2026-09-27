@@ -11,7 +11,7 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import VoidReasonModal from '../../components/VoidReasonModal';
 import RecordPaymentModal from '../../components/RecordPaymentModal';
-import { PencilIcon, DownloadIcon, SendIcon, BellIcon, XIcon, TrashIcon, PlusIcon, LinkIcon, CheckCircleIcon } from '../../components/icons';
+import { PencilIcon, DownloadIcon, SendIcon, BellIcon, XIcon, TrashIcon, PlusIcon, LinkIcon, CheckCircleIcon, RefreshIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 export default function InvoiceDetail() {
@@ -170,6 +170,26 @@ export default function InvoiceDetail() {
     }
   }
 
+  async function handleRecover() {
+    if (
+      !(await confirm({
+        title: 'Recover this invoice?',
+        message: 'This puts the invoice back to its status right before it was voided, so it counts in financial totals and reports again.',
+        confirmLabel: 'Recover',
+        danger: false,
+      }))
+    )
+      return;
+    setError('');
+    try {
+      await api.invoices.recover(id, token);
+      setNotice('Invoice recovered.');
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   if (error && !data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
   if (!data || !settingsLoaded) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
 
@@ -224,6 +244,12 @@ export default function InvoiceDetail() {
             <button onClick={() => { setVoidError(''); setVoidModalOpen(true); }} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
               <XIcon width={16} height={16} />
               Void
+            </button>
+          )}
+          {canManage && invoice.status === 'void' && (
+            <button onClick={handleRecover} className="flex min-h-11 items-center gap-1.5 rounded-md border border-lagoon-300 px-3 text-sm font-medium text-lagoon-700 hover:bg-lagoon-50 disabled:opacity-60 dark:border-lagoon-700 dark:text-lagoon-400 dark:hover:bg-lagoon-950">
+              <RefreshIcon width={16} height={16} />
+              Recover
             </button>
           )}
         </div>

@@ -445,7 +445,8 @@ router.put('/:id', manage, (req, res) => {
 // already void, already paid (voiding paid money needs a real refund
 // process, not a status flip), or has any recorded payments at all (a
 // partially-paid invoice can't just have its payments silently orphaned
-// by voiding it).
+// by voiding it). Not permanent, though — see POST /:id/recover just
+// below, for undoing a void that turns out to have been a mistake.
 router.post('/:id/void', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Invoice not found' });
@@ -463,8 +464,48 @@ router.post('/:id/void', manage, (req, res) => {
     return res.status(400).json({ error: 'A reason is required to void an invoice' });
   }
 
-  db.prepare(`UPDATE invoices SET status = 'void', void_reason = ?, updated_at = datetime('now') WHERE id = ?`).run(reason, req.params.id);
+  db.prepare(
+    `UPDATE invoices SET status = 'void', void_reason = ?, void_previous_status = ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(reason, existing.status, req.params.id);
   logActivity({ userName: req.user.name, action: 'voided', entityType: 'invoice', entityId: existing.id, entityLabel: `${existing.number} — ${reason}` });
+  res.json(getInvoiceWithItems(req.params.id));
+});
+
+// The recovery half of void above — puts a mistakenly-voided invoice back
+// to the status it actually had right before voiding (void_previous_status,
+// stored by POST /:id/void itself), rather than leaving void as the
+// one-way door it used to be. Deliberately its own action route, not a
+// status value PUT /:id accepts (that route's validStatuses does include
+// 'void', but restoring a specific prior status — draft vs. sent — isn't
+// something a generic PUT body can express without the caller already
+// knowing what to ask for). Falls back to 'draft' when there's no recorded
+// previous status (an invoice voided before this column existed) — the
+// safer of the two possible prior states, since it makes no claim about
+// whether the invoice was ever actually sent to the client. Clears
+// void_reason/void_previous_status back to their defaults; the original
+// void's own reason still survives permanently in the activity_log entry
+// POST /:id/void already wrote, so nothing about why it was voided is
+// lost by clearing the live column. No amount_paid concern here the way
+// void's own guard has one — void was only ever allowed on a
+// zero-payment invoice, so there's nothing to reconcile on the way back.
+router.post('/:id/recover', manage, (req, res) => {
+  const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Invoice not found' });
+  if (existing.status !== 'void') {
+    return res.status(409).json({ error: 'This invoice is not void' });
+  }
+
+  const restoredStatus = existing.void_previous_status === 'sent' ? 'sent' : 'draft';
+  db.prepare(
+    `UPDATE invoices SET status = ?, void_reason = '', void_previous_status = NULL, updated_at = datetime('now') WHERE id = ?`,
+  ).run(restoredStatus, req.params.id);
+  logActivity({
+    userName: req.user.name,
+    action: 'recovered',
+    entityType: 'invoice',
+    entityId: existing.id,
+    entityLabel: existing.void_reason ? `${existing.number} — was void: ${existing.void_reason}` : existing.number,
+  });
   res.json(getInvoiceWithItems(req.params.id));
 });
 

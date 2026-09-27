@@ -172,6 +172,9 @@ export const api = {
     remindPreview: (id, token) => request(`/invoices/${id}/remind-preview`, { token }),
     remind: (id, payload, token) => request(`/invoices/${id}/remind`, { method: 'POST', body: payload, token }),
     void: (id, reason, token) => request(`/invoices/${id}/void`, { method: 'POST', body: { reason }, token }),
+    // Undoes a mistaken void — see routes/invoices.js's own POST
+    // /:id/recover for how it picks the status to restore to.
+    recover: (id, token) => request(`/invoices/${id}/recover`, { method: 'POST', token }),
     recordPayment: (id, payload, token) =>
       request(`/invoices/${id}/payments`, { method: 'POST', body: payload, token }),
     receiptPreview: (id, paymentId, token) =>

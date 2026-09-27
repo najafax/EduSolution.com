@@ -570,6 +570,57 @@ already does for that resource.
   reports in `routes/reports.js` (both filter `status != 'void'`), the
   same way those already excluded nothing else — void is the only status
   either of them filters out.
+  **Invoices only, again: `POST /:id/recover` undoes a mistaken void.**
+  Voiding an invoice was originally a one-way door (matching quotes' own
+  void, and the "neither can be deleted" stance just below) — but an
+  accidental void is a real, reported mistake, not a hypothetical one, so
+  this route puts the invoice back rather than leaving staff stuck with a
+  permanently-cancelled document and no fix but going around the app
+  (editing the database directly). `void_previous_status` (`invoices`,
+  `db/index.js`, `ALTER TABLE`-guarded — `invoices` has carried real
+  documents since the app's first deploy, same lesson `licenses.url`
+  learned the hard way) is what makes this exact rather than a guess:
+  `POST /:id/void` now stamps the invoice's own status (`draft` or
+  `sent` — the only two states void is ever reachable from) into this
+  column in the same `UPDATE` that flips it to `void`, and
+  `POST /:id/recover` reads it straight back — a `sent` invoice recovers
+  to `sent`, not `draft`, so staff aren't left thinking they still need to
+  email a client who already received it. Falls back to `draft` only when
+  there's no recorded previous status (an invoice voided before this
+  column existed) — the safer of the two possible priors, since it makes
+  no claim about whether the client ever actually saw it. 409s if the
+  invoice isn't currently `void` (same "never show a button that would
+  just error" convention every other lifecycle guard in this app follows
+  — the frontend's own gate is simply `status === 'void'`, no separate
+  permission or amount check needed the way `canVoid` has one, since void
+  itself already guarantees `amount_paid === 0`). Clears `void_reason`
+  and `void_previous_status` back to their defaults on recovery — the
+  original reason isn't lost, it permanently survives in the
+  `activity_log` entry `POST /:id/void` already wrote (`logActivity()`'s
+  own `entityLabel` for a void is `` `${number} — ${reason}` ``), so
+  clearing the live column doesn't erase the audit trail, it just means a
+  *recovered* invoice's own detail page stops showing a reason for a void
+  that no longer applies. `POST /:id/recover` writes its own
+  `logActivity()` entry too (`action: 'recovered'`, `entityLabel`
+  carrying the original reason it recovered from, e.g. `` `INV-2026-0001
+  — was void: client paid by mistake reversal` ``), so the feed reads as
+  a real, attributed undo, not a silent reversion. `InvoiceDetail.jsx`'s
+  header gains a "Recover" button (`RefreshIcon`, lagoon-toned — this is
+  a reversible, non-destructive action, so it skips the red `danger`
+  styling `Void`'s own button uses, the same `danger: false` treatment
+  `Licenses.jsx`'s own Reactivate button already established for the
+  identical kind of "undo a status flip" action) shown only once
+  `invoice.status === 'void'`, behind the shared `useConfirm()` dialog
+  every other one-click lifecycle action in this app already uses rather
+  than a bare `window.confirm()`. `Invoices.jsx`'s list page gets the
+  identical `IconActionButton` in `rowActions()`, mirroring how `Void`
+  itself already appears in both places. `lib/api.js`'s `invoices` object
+  gained a matching `recover(id, token)` call. Quotes' own void is
+  deliberately **not** given the same treatment here — this was asked for
+  on invoices specifically, and quotes' void stays the one-way action it
+  already was; the identical `void_previous_status` + `POST /:id/recover`
+  shape could be added there later the same way if that turns out to be
+  wanted too.
 - **Neither quotes nor invoices can be deleted, in any circumstance —
   voiding, with a required reason, is the only way to cancel either.** Both
   routers used to carry a `DELETE /:id` (guarded — a quote blocked once

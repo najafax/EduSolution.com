@@ -15,8 +15,9 @@ import EmailPreviewModal from '../../components/EmailPreviewModal';
 import IconActionButton from '../../components/IconActionButton';
 import VoidReasonModal from '../../components/VoidReasonModal';
 import RecordPaymentModal from '../../components/RecordPaymentModal';
-import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, XIcon, BanknoteIcon } from '../../components/icons';
+import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, XIcon, BanknoteIcon, RefreshIcon } from '../../components/icons';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
+import { useConfirm } from '../../lib/useConfirm';
 import InvoiceForm from './InvoiceForm';
 
 // 'overdue' isn't a stored invoice status — routes/invoices.js's own
@@ -62,6 +63,7 @@ export default function Invoices() {
   const [voidError, setVoidError] = useState('');
   const [paymentTarget, setPaymentTarget] = useState(null); // the invoice being paid, or null
   const [paymentNotice, setPaymentNotice] = useState('');
+  const { confirm, confirmDialog } = useConfirm();
 
   function load() {
     // Only show the loading skeleton on the very first load — once there's
@@ -113,6 +115,25 @@ export default function Invoices() {
     } catch (err) {
       setVoidError(err.message);
       throw err;
+    }
+  }
+
+  async function handleRecover(invoice) {
+    if (
+      !(await confirm({
+        title: `Recover ${invoice.number}?`,
+        message: 'This puts the invoice back to its status right before it was voided, so it counts in financial totals and reports again.',
+        confirmLabel: 'Recover',
+        danger: false,
+      }))
+    )
+      return;
+    setError('');
+    try {
+      await api.invoices.recover(invoice.id, token);
+      load();
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -170,6 +191,15 @@ export default function Invoices() {
             onClick={() => { setVoidError(''); setVoidTarget(invoice); }}
             title="Void"
             label="Void invoice"
+          />
+        )}
+        {canManage && invoice.status === 'void' && (
+          <IconActionButton
+            icon={RefreshIcon}
+            tone="lagoon"
+            onClick={() => handleRecover(invoice)}
+            title="Recover"
+            label="Recover invoice"
           />
         )}
       </>
@@ -382,6 +412,7 @@ export default function Invoices() {
         token={token}
         onRecorded={handlePaymentRecorded}
       />
+      {confirmDialog}
     </div>
   );
 }

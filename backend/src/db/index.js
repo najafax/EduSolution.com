@@ -1015,6 +1015,23 @@ if (!invoiceColumns.has('void_reason')) {
   db.exec(`ALTER TABLE invoices ADD COLUMN void_reason TEXT NOT NULL DEFAULT '';`);
 }
 
+// `void_previous_status` — the invoice's own status right before it was
+// voided ('draft' or 'sent', the only two POST /:id/void ever accepts —
+// see that route's own guard), captured so routes/invoices.js's own
+// POST /:id/recover can put a mistakenly-voided invoice back exactly
+// where it was instead of guessing. NULL both for an invoice voided
+// before this column existed and once a recovery has cleared it back —
+// POST /:id/recover falls back to 'draft' in either case, the safer of
+// the two possible prior states since it makes no claim about whether
+// the invoice was ever actually sent. Invoices only (not quotes — this
+// column, and the recover action itself, were asked for on invoices
+// specifically; quotes' own void stays one-way for now). invoices has
+// carried real documents since the app's first deploy, same ALTER TABLE
+// treatment as every other post-launch column here.
+if (!invoiceColumns.has('void_previous_status')) {
+  db.exec(`ALTER TABLE invoices ADD COLUMN void_previous_status TEXT;`);
+}
+
 // parent_draw_id — links a type='return' row back to the specific
 // type='draw' row it's repaying, so a draw can carry its own running
 // balance (amount minus every linked return) rather than only the
