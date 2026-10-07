@@ -70,7 +70,13 @@ backend port in frontend code.
   `CREATE TABLE IF NOT EXISTS` on startup. Path is `DB_PATH` from env if
   set, else `backend/data.sqlite3` — in production this should point at a
   persistent disk mount (see `render.yaml`'s `disk`/`DB_PATH` for the
-  Render deployment) so the database survives restarts/redeploys. This is
+  Render deployment, or `deploy/digitalocean/` for the alternative
+  self-hosted-on-a-Droplet path — same `DB_PATH` convention, `/var/data`
+  instead of Render's own mount, see that directory's own `README.md` for
+  the full migration runbook) so the database survives restarts/redeploys.
+  Because `better-sqlite3` is a same-process file database with no network
+  server of its own, "the database" and "the backend process" can never be
+  hosted on different machines — moving one always means moving both. This is
   the only place schema is defined; there is no migration tool, so schema
   changes are made by editing the `CREATE TABLE` statement directly (fine
   pre-launch; revisit once there's production data). One exception: adding

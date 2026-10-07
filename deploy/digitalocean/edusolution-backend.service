@@ -1,0 +1,23 @@
+[Unit]
+Description=EduSolution.com backend (Node/Express API)
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/home/deploy/edusolution-backend/backend
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=5
+# Loads PORT/JWT_SECRET/CLIENT_ORIGIN/DB_PATH/SMTP_*/BACKUP_S3_* from .env —
+# same file the app already reads via dotenv, no systemd EnvironmentFile
+# duplication needed.
+EnvironmentFile=/home/deploy/edusolution-backend/backend/.env
+# Hardening — this process only needs to read/write its own app dir and the
+# persistent data disk; it never needs raw device/network-admin access.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/deploy/edusolution-backend/backend /var/data
+
+[Install]
+WantedBy=multi-user.target
