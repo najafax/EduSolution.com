@@ -156,6 +156,33 @@ ssh deploy@<DROPLET_IP> 'mv /tmp/snapshot.sqlite3 /var/data/data.sqlite3'
 Either way, end with the real production file sitting at
 `/var/data/data.sqlite3` on the droplet, owned by `deploy`.
 
+### ⚠️ Clean up stale WAL/SHM sidecar files after replacing the live `.sqlite3`
+
+This app runs SQLite in WAL (Write-Ahead Log) mode, which means a live
+database directory can also contain `data.sqlite3-wal` and
+`data.sqlite3-shm` files alongside the main one. If the backend service
+has *ever* been started against `/var/data/data.sqlite3` before you move
+a real snapshot into place (e.g. you started it once with a fresh/empty
+database to test the pipeline before doing the real data copy — see
+"Minimizing downtime" below for why that's actually the recommended
+order), those old sidecar files are **not** replaced by `mv`ing in a new
+main file — only the main file changes. SQLite can then layer the *old*
+WAL's stale transactions back on top of your *new* main file the next
+time it's opened, silently making the live app see the old (empty) data
+again even though the file on disk is correct. Always do this immediately
+after step 4's `mv`, **with the service stopped**:
+```bash
+rm -f /var/data/data.sqlite3-wal /var/data/data.sqlite3-shm
+```
+Verify directly against the file before restarting anything — don't trust
+a browser login alone as proof (DNS caching can also mask this same
+symptom by having you unknowingly still hit the old backend):
+```bash
+sqlite3 /var/data/data.sqlite3 "SELECT COUNT(*) FROM users;"
+```
+This should show your real user count, not `0`, before you run
+`systemctl start edusolution-backend`.
+
 ## 5. Install and start the systemd service
 
 ```bash
@@ -241,14 +268,40 @@ no lost data:
 
 ## Ongoing deploys
 
-From now on, instead of Render's `autoDeploy: true` on git push, run:
+**The frontend is unaffected by any of this and keeps auto-deploying** —
+it's still a separate Render static site with `autoDeploy: true`, so a
+frontend-only change still goes live on its own the moment it's pushed to
+`main`, exactly as before this migration.
+
+**Backend changes need one manual step now**, since the droplet has no
+auto-deploy of its own:
 ```bash
 ssh deploy@<DROPLET_IP> 'cd edusolution-backend && ./deploy/digitalocean/deploy.sh'
 ```
-This fetches `main`, reinstalls dependencies, and restarts the systemd
-service — schema changes apply themselves automatically on that restart
-(see CLAUDE.md's note on `db/index.js`'s guarded `ALTER TABLE` migrations;
-there's no separate migration step to run).
+(or `ssh deploy@<DROPLET_IP>`, then `cd edusolution-backend && ./deploy/digitalocean/deploy.sh`
+interactively — same effect). This fetches `main`, reinstalls dependencies,
+and restarts the systemd service — schema changes apply themselves
+automatically on that restart (see CLAUDE.md's note on `db/index.js`'s
+guarded `ALTER TABLE` migrations; there's no separate migration step to
+run).
+
+### One-time setup this script depends on
+
+`deploy.sh` restarts the service via `sudo systemctl restart
+edusolution-backend` — `deploy` is in the `sudo` group (from
+`provision.sh`), but *that* group membership alone still asks for a
+password on every use. A **passwordless, narrowly-scoped** sudo rule for
+just these two commands is what actually makes the unattended script work.
+Set it up once, as root:
+```bash
+echo "deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart edusolution-backend, /usr/bin/systemctl status edusolution-backend --no-pager -l" > /etc/sudoers.d/deploy-restart
+chmod 440 /etc/sudoers.d/deploy-restart
+visudo -c   # confirm it prints "parsed OK" for every file, including this one
+```
+Note the second command's args (`--no-pager -l`) are included verbatim —
+sudoers matches the *exact* command line, flags included, not just the
+command name, so this has to mirror precisely what `deploy.sh` itself
+invokes.
 
 ## Rollback
 
