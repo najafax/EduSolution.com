@@ -1,6 +1,8 @@
 const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 let transporter;
+let resendClient;
 
 function getTransporter() {
   if (transporter !== undefined) return transporter;
@@ -19,23 +21,42 @@ function getTransporter() {
   return transporter;
 }
 
+// Resend's HTTPS API is preferred over raw SMTP whenever RESEND_API_KEY is
+// set — some hosts (e.g. a DigitalOcean droplet) block outbound SMTP ports
+// by default or reactively, which an HTTPS API call sidesteps entirely,
+// since it never opens a raw SMTP connection at all. Falls back to the
+// SMTP transporter above when RESEND_API_KEY isn't set, so a deployment
+// that only has SMTP_* configured keeps working exactly as before.
+function getResendClient() {
+  if (resendClient !== undefined) return resendClient;
+  resendClient = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+  return resendClient;
+}
+
 async function sendMail({ to, subject, html, attachments }) {
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const resend = getResendClient();
+
+  if (resend) {
+    const { error } = await resend.emails.send({ from, to, subject, html, attachments });
+    if (error) {
+      const err = new Error(error.message || 'Resend failed to send the email.');
+      err.code = error.name || 'RESEND_ERROR';
+      throw err;
+    }
+    return;
+  }
+
   const t = getTransporter();
   if (!t) {
     const error = new Error(
-      'Email is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and SMTP_FROM in backend/.env.',
+      'Email is not configured. Set RESEND_API_KEY (preferred) or SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and SMTP_FROM in backend/.env.',
     );
     error.code = 'EMAIL_NOT_CONFIGURED';
     throw error;
   }
 
-  await t.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-    to,
-    subject,
-    html,
-    attachments,
-  });
+  await t.sendMail({ from, to, subject, html, attachments });
 }
 
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };

@@ -289,8 +289,11 @@ backend port in frontend code.
 
 Environment variables (see `backend/.env.example` for the full list with
 comments): `PORT`, `JWT_SECRET`, `CLIENT_ORIGIN`, `DB_PATH` (optional,
-production-only — see `db/index.js` above), `SMTP_HOST`/`PORT`/
-`USER`/`PASS`/`FROM`/`SECURE` for outgoing email, and `BACKUP_S3_BUCKET`/
+production-only — see `db/index.js` above), `RESEND_API_KEY` for outgoing
+email via Resend's HTTPS API (preferred — see `lib/mailer.js` below),
+`SMTP_HOST`/`PORT`/`USER`/`PASS`/`FROM`/`SECURE` for outgoing email via raw
+SMTP (fallback, used only when `RESEND_API_KEY` is unset — `SMTP_FROM` is
+still read as the From address either way), and `BACKUP_S3_BUCKET`/
 `ENDPOINT`/`REGION`/`ACCESS_KEY_ID`/`SECRET_ACCESS_KEY`/
 `BACKUP_RETENTION_DAILY`/`_WEEKLY` for automated backups (see
 `lib/backup.js` below). `backend/data.sqlite3`
@@ -2115,17 +2118,36 @@ already does for that resource.
   `business_settings.bank_details` left empty sees no visible change on
   its quotes either way — this only affects businesses that have actually
   filled that field in.
-- `lib/mailer.js` — `sendMail()` wraps `nodemailer` with SMTP settings from
-  env (`SMTP_HOST`/`PORT`/`USER`/`PASS`/`FROM`/`SECURE`). If `SMTP_HOST`
-  isn't set, it throws `EMAIL_NOT_CONFIGURED` rather than crashing — routes
-  catch this and return `503` with a message telling the caller which env
-  vars to set. Everything else (PDF download, payments, financials) works
-  with no SMTP configured at all. Also exports `textToHtml()` — see "Email
-  preview before sending" above — the plain-text-to-HTML conversion for a
-  user-edited email body — and its own internal `escapeHtml()`, reused by
-  `lib/licenseRenewalEmail.js` (see "Renewal confirmation email" under
-  Licenses above) to safely interpolate client/license names into a real
-  HTML template rather than plain text run through `textToHtml()`.
+- `lib/mailer.js` — `sendMail()` sends through one of two transports, picked
+  by which env vars are set. **Resend's HTTPS API** (the `resend` npm
+  package) is preferred, used whenever `RESEND_API_KEY` is set regardless
+  of whether `SMTP_*` is also present — this exists because some hosts
+  (the production deploy's own DigitalOcean droplet, specifically — see
+  `deploy/digitalocean/README.md`) block outbound SMTP ports by default or
+  reactively as an anti-abuse measure, which silently hangs every raw SMTP
+  connection attempt (the symptom was a 504 from nginx, not a clean SMTP
+  error, since the TCP handshake itself never completed — see
+  `nginx-api.conf.template`'s own `proxy_read_timeout`) — an HTTPS POST to
+  Resend's API never opens a raw SMTP connection at all, so it isn't
+  subject to that kind of port block. Falls back to raw SMTP via
+  `nodemailer` (unchanged from before Resend was added) only when
+  `RESEND_API_KEY` is unset, so a deployment that only configures `SMTP_*`
+  keeps working exactly as it always did — this is additive, not a
+  replacement. `SMTP_FROM` (falling back to `SMTP_USER`) is still the one
+  source of the From address either way, even on the Resend path — it must
+  be an address on a domain verified in Resend (e.g.
+  `noreply@edusolutionsmaldives.com`), not an arbitrary address, since
+  Resend rejects a send from an unverified domain. If neither
+  `RESEND_API_KEY` nor `SMTP_HOST` is set, it throws `EMAIL_NOT_CONFIGURED`
+  rather than crashing — routes catch this and return `503` with a message
+  telling the caller which env vars to set. Everything else (PDF download,
+  payments, financials) works with no email transport configured at all.
+  Also exports `textToHtml()` — see "Email preview before sending" above —
+  the plain-text-to-HTML conversion for a user-edited email body — and its
+  own internal `escapeHtml()`, reused by `lib/licenseRenewalEmail.js` (see
+  "Renewal confirmation email" under Licenses above) to safely interpolate
+  client/license names into a real HTML template rather than plain text
+  run through `textToHtml()`.
 - `lib/emailTemplates.js` — the default `{ subject, message }` for every
   client-facing send action; see "Email preview before sending" above. Now
   admin-editable via the Email Center (`routes/emailCenter.js`/
