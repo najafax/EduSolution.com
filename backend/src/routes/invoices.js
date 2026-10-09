@@ -27,6 +27,7 @@ function withComputed(invoice) {
     balance_due: balanceDue,
     is_overdue: invoice.status === 'sent' && balanceDue > 0 && invoice.due_date < today(),
     is_partially_paid: invoice.amount_paid > 0 && balanceDue > 0,
+    is_reminder_held: Boolean(invoice.reminder_hold_until && invoice.reminder_hold_until >= today()),
   };
 }
 
@@ -506,6 +507,58 @@ router.post('/:id/recover', manage, (req, res) => {
     entityId: existing.id,
     entityLabel: existing.void_reason ? `${existing.number} — was void: ${existing.void_reason}` : existing.number,
   });
+  res.json(getInvoiceWithItems(req.params.id));
+});
+
+// Manually pauses lib/scheduler.js's runOverdueReminders() dunning ladder
+// for this invoice until a given date — for the "client says payment is
+// already on its way" case, so staff aren't stuck choosing between a
+// week-long silent gap (the job's own last_reminder_sent_at suppression)
+// and an automated reminder firing while a real payment is genuinely in
+// transit. Deliberately a manual, staff-driven action rather than
+// something a payment-proof upload auto-triggers — an unreviewed proof
+// isn't itself trusted (see "Payment proof upload" in CLAUDE.md), so
+// requiring a human to actually set the hold keeps that same review step
+// in the loop here too. 400s on a missing/invalid/past `hold_until` date
+// and 409s on a void invoice (nothing to hold reminders on — voiding
+// already stops reminders outright, see POST /:id/remind's own guard).
+router.post('/:id/reminder-hold', manage, (req, res) => {
+  const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Invoice not found' });
+  if (existing.status === 'void') {
+    return res.status(409).json({ error: 'This invoice has been voided and never sends reminders' });
+  }
+  const holdUntil = typeof req.body?.hold_until === 'string' ? req.body.hold_until.trim() : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(holdUntil)) {
+    return res.status(400).json({ error: 'hold_until must be a valid date (YYYY-MM-DD)' });
+  }
+  if (holdUntil <= today()) {
+    return res.status(400).json({ error: 'hold_until must be a future date' });
+  }
+  const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+
+  db.prepare(`UPDATE invoices SET reminder_hold_until = ?, reminder_hold_note = ?, updated_at = datetime('now') WHERE id = ?`)
+    .run(holdUntil, note, req.params.id);
+  logActivity({
+    userName: req.user.name,
+    action: 'held reminders for',
+    entityType: 'invoice',
+    entityId: existing.id,
+    entityLabel: note ? `${existing.number} until ${holdUntil} — ${note}` : `${existing.number} until ${holdUntil}`,
+  });
+  res.json(getInvoiceWithItems(req.params.id));
+});
+
+router.delete('/:id/reminder-hold', manage, (req, res) => {
+  const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Invoice not found' });
+  if (!existing.reminder_hold_until) {
+    return res.status(409).json({ error: 'This invoice has no active reminder hold' });
+  }
+
+  db.prepare(`UPDATE invoices SET reminder_hold_until = NULL, reminder_hold_note = '', updated_at = datetime('now') WHERE id = ?`)
+    .run(req.params.id);
+  logActivity({ userName: req.user.name, action: 'cleared reminder hold for', entityType: 'invoice', entityId: existing.id, entityLabel: existing.number });
   res.json(getInvoiceWithItems(req.params.id));
 });
 

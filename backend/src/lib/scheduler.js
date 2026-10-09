@@ -66,13 +66,21 @@ async function runOverdueReminders() {
   // so the string comparison below actually reflects chronological order.
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
 
+  // reminder_hold_until (see routes/invoices.js's own POST /:id/reminder-
+  // hold) lets staff manually pause this ladder for one invoice — e.g. a
+  // client says payment is already in transit — until a given date; an
+  // invoice with an active (still-future) hold is skipped here the same
+  // way last_reminder_sent_at's own 7-day suppression already is, and
+  // picked back up automatically the day after the hold date passes, with
+  // no separate "resume" action needed.
   const candidates = db
     .prepare(
       `SELECT * FROM invoices
        WHERE status = 'sent' AND amount_paid < total AND due_date < ?
-         AND (last_reminder_sent_at IS NULL OR last_reminder_sent_at < ?)`,
+         AND (last_reminder_sent_at IS NULL OR last_reminder_sent_at < ?)
+         AND (reminder_hold_until IS NULL OR reminder_hold_until < ?)`,
     )
-    .all(today(), sevenDaysAgo);
+    .all(today(), sevenDaysAgo, today());
 
   let sent = 0;
   const reminded = [];

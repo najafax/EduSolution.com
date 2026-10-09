@@ -1114,6 +1114,30 @@ if (!dealColumns.has('converted_at')) {
   db.exec(`ALTER TABLE deals ADD COLUMN converted_at TEXT;`);
 }
 
+// `reminder_hold_until`/`reminder_hold_note` — lets staff manually pause
+// lib/scheduler.js's automated overdue-reminder dunning ladder for one
+// invoice until a given date, for the case a client says payment is
+// already on its way (e.g. "sent, takes 10 days to arrive") and doesn't
+// need to be nagged in the meantime. Deliberately a manual, staff-set
+// hold rather than something that auto-pauses just because a payment
+// proof was uploaded — see routes/invoices.js's own POST /:id/reminder-
+// hold for why (an unreviewed proof alone isn't trusted). `_until` is a
+// plain date string (YYYY-MM-DD) compared the same way `due_date`/
+// `expiry_date` already are elsewhere in this app; NULL means no hold is
+// active. `_note` is optional free-text context (e.g. "client says paid,
+// awaiting arrival") shown alongside the hold banner — defaults to ''
+// like every other optional text column in this app. Reuses the
+// already-declared invoiceColumns set from the created_by_name migration
+// above. Same guarded ALTER TABLE treatment as every other post-launch
+// invoices column — invoices has carried real documents since the app's
+// first deploy.
+if (!invoiceColumns.has('reminder_hold_until')) {
+  db.exec(`ALTER TABLE invoices ADD COLUMN reminder_hold_until TEXT;`);
+}
+if (!invoiceColumns.has('reminder_hold_note')) {
+  db.exec(`ALTER TABLE invoices ADD COLUMN reminder_hold_note TEXT NOT NULL DEFAULT '';`);
+}
+
 db.pragma('foreign_keys = ON');
 
 // Bound params rather than string-interpolated into the exec() block above,

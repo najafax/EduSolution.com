@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { timeAgo } from '../../lib/date';
+import { timeAgo, todayPlus } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import Accordion from '../../components/Accordion';
 import Modal from '../../components/Modal';
@@ -11,7 +11,7 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import VoidReasonModal from '../../components/VoidReasonModal';
 import RecordPaymentModal from '../../components/RecordPaymentModal';
-import { PencilIcon, DownloadIcon, SendIcon, BellIcon, XIcon, TrashIcon, PlusIcon, LinkIcon, CheckCircleIcon, RefreshIcon } from '../../components/icons';
+import { PencilIcon, DownloadIcon, SendIcon, BellIcon, XIcon, TrashIcon, PlusIcon, LinkIcon, CheckCircleIcon, RefreshIcon, ClockIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
 export default function InvoiceDetail() {
@@ -38,6 +38,14 @@ export default function InvoiceDetail() {
   const [rejecting, setRejecting] = useState(false);
   const [voidModalOpen, setVoidModalOpen] = useState(false);
   const [voidError, setVoidError] = useState('');
+  // Reminder-hold modal state — see routes/invoices.js's own POST/DELETE
+  // /:id/reminder-hold. holdDate/holdNote are only ever read when the
+  // modal is actually open (reset on each open, see handleOpenHold).
+  const [holdModalOpen, setHoldModalOpen] = useState(false);
+  const [holdDate, setHoldDate] = useState('');
+  const [holdNote, setHoldNote] = useState('');
+  const [holdSubmitting, setHoldSubmitting] = useState(false);
+  const [holdError, setHoldError] = useState('');
   const { confirm, confirmDialog } = useConfirm();
 
   function load() {
@@ -190,6 +198,42 @@ export default function InvoiceDetail() {
     }
   }
 
+  function handleOpenHold() {
+    setHoldError('');
+    setHoldDate(todayPlus(10));
+    setHoldNote('');
+    setHoldModalOpen(true);
+  }
+
+  async function handleSubmitHold(e) {
+    e.preventDefault();
+    setHoldError('');
+    setHoldSubmitting(true);
+    try {
+      await api.invoices.holdReminders(id, { hold_until: holdDate, note: holdNote }, token);
+      setHoldModalOpen(false);
+      setNotice('Reminders held.');
+      load();
+    } catch (err) {
+      setHoldError(err.message);
+    } finally {
+      setHoldSubmitting(false);
+    }
+  }
+
+  async function handleClearHold() {
+    if (!(await confirm({ title: 'Resume reminders now?', message: 'This clears the hold — the next automated overdue reminder will go out on its normal schedule.', confirmLabel: 'Resume reminders', danger: false })))
+      return;
+    setError('');
+    try {
+      await api.invoices.clearReminderHold(id, token);
+      setNotice('Reminder hold cleared.');
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   if (error && !data) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-red-600 dark:text-red-400 sm:px-6">{error}</div>;
   if (!data || !settingsLoaded) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
 
@@ -240,6 +284,19 @@ export default function InvoiceDetail() {
               Send reminder
             </button>
           )}
+          {canManage && invoice.status === 'sent' && invoice.balance_due > 0 && (
+            invoice.is_reminder_held ? (
+              <button onClick={handleClearHold} className="flex min-h-11 items-center gap-1.5 rounded-md border border-lagoon-300 px-3 text-sm font-medium text-lagoon-700 hover:bg-lagoon-50 disabled:opacity-60 dark:border-lagoon-700 dark:text-lagoon-400 dark:hover:bg-lagoon-950">
+                <ClockIcon width={16} height={16} />
+                Resume reminders
+              </button>
+            ) : (
+              <button onClick={handleOpenHold} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+                <ClockIcon width={16} height={16} />
+                Hold reminders
+              </button>
+            )
+          )}
           {canManage && canVoid && (
             <button onClick={() => { setVoidError(''); setVoidModalOpen(true); }} className="flex min-h-11 items-center gap-1.5 rounded-md border border-red-300 px-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950">
               <XIcon width={16} height={16} />
@@ -267,6 +324,11 @@ export default function InvoiceDetail() {
         <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
           This invoice has been voided and is excluded from financial totals and reports.
           {invoice.void_reason && <> Reason: {invoice.void_reason}</>}
+        </p>
+      )}
+      {invoice.is_reminder_held && (
+        <p className="mt-4 text-sm text-amber-600 dark:text-amber-400">
+          Reminders held until {invoice.reminder_hold_until}.{invoice.reminder_hold_note && <> {invoice.reminder_hold_note}</>}
         </p>
       )}
       {invoice.last_reminder_sent_at && (
@@ -707,6 +769,44 @@ export default function InvoiceDetail() {
         token={token}
         onRecorded={handlePaymentRecorded}
       />
+
+      <Modal open={holdModalOpen} onClose={() => setHoldModalOpen(false)} title="Hold reminders">
+        <form onSubmit={handleSubmitHold} className="space-y-4">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Pauses the automated overdue-reminder emails for this invoice until the date below — useful when a
+            client says payment is already on its way. Reminders resume automatically after that date.
+          </p>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Hold until</label>
+            <input
+              type="date"
+              required
+              value={holdDate}
+              onChange={(e) => setHoldDate(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Note (optional)</label>
+            <textarea
+              rows={2}
+              value={holdNote}
+              onChange={(e) => setHoldNote(e.target.value)}
+              placeholder="e.g. Client says payment sent, awaiting arrival"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
+          {holdError && <p className="text-sm text-red-600 dark:text-red-400">{holdError}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setHoldModalOpen(false)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-600 dark:text-slate-200">
+              Cancel
+            </button>
+            <button type="submit" disabled={holdSubmitting} className="rounded-md bg-lagoon-600 px-3 py-2 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
+              {holdSubmitting ? 'Saving…' : 'Hold reminders'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {confirmDialog}
     </div>

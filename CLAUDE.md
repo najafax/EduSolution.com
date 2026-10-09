@@ -699,6 +699,44 @@ already does for that resource.
   a transaction, never through these routers' own endpoints, so removing
   `DELETE /:id` here doesn't touch that separate, already
   super-admin-gated, type-`DELETE`-to-confirm bulk-reset tool at all.
+- **Invoices only: manually holding the automated overdue-reminder
+  ladder.** `POST /:id/reminder-hold` (`manage`) and
+  `DELETE /:id/reminder-hold` (`manage`) let staff pause
+  `lib/scheduler.js`'s `runOverdueReminders()` dunning ladder for one
+  invoice until a given date — built for the "client says a payment is
+  already on its way, don't nag them in the meantime" case. Deliberately
+  a manual, staff-driven action rather than something a payment-proof
+  upload auto-triggers (see "Payment proof upload" below) — an unreviewed
+  proof isn't itself trusted, so requiring a human to actually set the
+  hold keeps the same review judgment in the loop here too.
+  `invoices.reminder_hold_until`/`reminder_hold_note` (`db/index.js`,
+  `ALTER TABLE`-guarded — `invoices` has carried real documents since the
+  app's first deploy) store the hold; `POST` 400s on a missing/malformed/
+  past `hold_until` and 409s on a `void` invoice (voiding already stops
+  reminders outright), `DELETE` 409s if there's no active hold to clear.
+  `withComputed()`'s new `is_reminder_held` field
+  (`reminder_hold_until >= today()`) is what the frontend actually reads,
+  same don't-store-what-you-can-compute approach `is_overdue` already
+  uses — a hold is "active" through and including its own `hold_until`
+  date, resuming the day after with no separate action needed.
+  `runOverdueReminders()`'s own candidate query gained a matching
+  `AND (reminder_hold_until IS NULL OR reminder_hold_until < today)`
+  clause, right alongside its existing `last_reminder_sent_at` 7-day
+  suppression — a held invoice is simply excluded from that day's
+  candidates, the same way a recently-reminded one already is. Both
+  mutations call `logActivity()` (`'held reminders for'` /
+  `'cleared reminder hold for'`). `InvoiceDetail.jsx` gains a "Hold
+  reminders" header button (shown under the same `status === 'sent' &&
+  balance_due > 0` condition as "Send reminder" itself, since that's
+  exactly when the automated ladder could ever fire) opening a small
+  `Modal` (a date input defaulting to `todayPlus(10)` — the real-world
+  "takes about 10 days to arrive" example this was built for — plus an
+  optional note), swapping to a "Resume reminders" button (behind the
+  shared `useConfirm()` dialog, `danger: false` since clearing a hold
+  early is harmless) once `is_reminder_held` is true. A small amber
+  banner ("Reminders held until {date}. {note}") renders whenever the
+  hold is active, so any staff member opening the invoice sees why it's
+  gone quiet without having to check the activity log.
 - **Invoice/quote analytics**: `GET /invoices/analytics` and
   `GET /quotes/analytics` (both `view`-gated, each registered before its own
   `GET /:id` for the same "don't let `:id` swallow a literal path" reason

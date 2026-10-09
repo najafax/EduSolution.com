@@ -175,6 +175,11 @@ export const api = {
     // Undoes a mistaken void — see routes/invoices.js's own POST
     // /:id/recover for how it picks the status to restore to.
     recover: (id, token) => request(`/invoices/${id}/recover`, { method: 'POST', token }),
+    // Pauses/resumes lib/scheduler.js's automated overdue-reminder emails
+    // for one invoice — see routes/invoices.js's own POST/DELETE
+    // /:id/reminder-hold.
+    holdReminders: (id, payload, token) => request(`/invoices/${id}/reminder-hold`, { method: 'POST', body: payload, token }),
+    clearReminderHold: (id, token) => request(`/invoices/${id}/reminder-hold`, { method: 'DELETE', token }),
     recordPayment: (id, payload, token) =>
       request(`/invoices/${id}/payments`, { method: 'POST', body: payload, token }),
     receiptPreview: (id, paymentId, token) =>
