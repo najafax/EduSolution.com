@@ -3,7 +3,16 @@ import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { resizeImage, dataUriByteLength } from '../../lib/imageResize';
-import { ImageIcon, BuildingIcon, BankIcon, ShieldIcon, DatabaseIcon, ChevronRightIcon } from '../../components/icons';
+import {
+  ImageIcon,
+  BuildingIcon,
+  BankIcon,
+  ShieldIcon,
+  DatabaseIcon,
+  ChevronRightIcon,
+  AlertTriangleIcon,
+  CheckCircleIcon,
+} from '../../components/icons';
 import MeterBar from '../../components/MeterBar';
 
 // Five sections, same real fields the single long form always had — just
@@ -30,6 +39,28 @@ function formatBytes(bytes) {
     i += 1;
   } while (value >= 1024 && i < units.length - 1);
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
+}
+
+// How many hours ago an ISO backup timestamp was — mirrors
+// backend/telegram-bot/bot.js's own TELEGRAM_BACKUP_STALE_HOURS staleness
+// check (default 26h) so the Settings page's own "stale backup" alert
+// below agrees with what the Telegram bot would also be alerting on.
+const BACKUP_STALE_HOURS = 26;
+
+function hoursSince(isoString) {
+  if (!isoString) return null;
+  const then = new Date(isoString).getTime();
+  if (!Number.isFinite(then)) return null;
+  return (Date.now() - then) / (1000 * 60 * 60);
+}
+
+function backupAgeLabel(isoString) {
+  const hours = hoursSince(isoString);
+  if (hours == null) return 'never';
+  if (hours < 1) return 'less than an hour ago';
+  if (hours < 48) return `${Math.round(hours)} hour${Math.round(hours) === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
 export default function Settings() {
@@ -277,7 +308,6 @@ export default function Settings() {
             {SECTIONS.map(({ key, title, Icon }) => (
               <details
                 key={key}
-                open={key === 'letterheads'}
                 className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
               >
                 <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
@@ -365,22 +395,99 @@ function StorageReadout({ storage, storageError }) {
   }
 
   const dbLabel = formatBytes(storage.dbSizeBytes) || '—';
+  const walLabel = formatBytes(storage.walSizeBytes);
   const hasDisk = storage.diskFreeBytes != null && storage.diskTotalBytes > 0;
-  const usedPct = hasDisk ? ((storage.diskTotalBytes - storage.diskFreeBytes) / storage.diskTotalBytes) * 100 : 0;
+  const usedBytes = hasDisk ? storage.diskTotalBytes - storage.diskFreeBytes : 0;
+  const usedPct = hasDisk ? (usedBytes / storage.diskTotalBytes) * 100 : 0;
   const diskTone = usedPct >= 90 ? 'red' : usedPct >= 75 ? 'amber' : 'lagoon';
+
+  const backupHours = storage.backupConfigured ? hoursSince(storage.lastDailyBackupAt) : null;
+  const backupStale = storage.backupConfigured && (backupHours == null || backupHours > BACKUP_STALE_HOURS);
+
+  // Mirrors the Telegram ops bot's own alert thresholds (85%/90% disk,
+  // 26h backup staleness — see backend/telegram-bot/bot.js) so the same
+  // conditions that would page an admin on their phone also surface
+  // directly on this page, rather than only ever being visible there.
+  const alerts = [];
+  if (hasDisk && usedPct >= 90) {
+    alerts.push({ level: 'red', text: `Disk space critically low — ${usedPct.toFixed(0)}% used. Free up space soon to avoid write failures.` });
+  } else if (hasDisk && usedPct >= 75) {
+    alerts.push({ level: 'amber', text: `Disk space is getting full — ${usedPct.toFixed(0)}% used.` });
+  }
+  if (backupStale) {
+    alerts.push({
+      level: 'red',
+      text:
+        storage.lastDailyBackupAt == null
+          ? 'No backup has ever completed for this database.'
+          : `No backup has completed in over ${BACKUP_STALE_HOURS} hours (last one was ${backupAgeLabel(storage.lastDailyBackupAt)}).`,
+    });
+  }
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
       <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Storage</h3>
-      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        Database {dbLabel}
+
+      {alerts.map((a, i) => (
+        <div
+          key={i}
+          className={`mt-2 flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
+            a.level === 'red'
+              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300'
+              : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300'
+          }`}
+        >
+          <AlertTriangleIcon width={14} height={14} className="mt-0.5 shrink-0" />
+          <span>{a.text}</span>
+        </div>
+      ))}
+
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+        <div>
+          <dt className="text-slate-500 dark:text-slate-400">Database file</dt>
+          <dd className="font-medium text-slate-900 dark:text-white">{dbLabel}</dd>
+        </div>
+        {walLabel && (
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">Write-ahead log</dt>
+            <dd className="font-medium text-slate-900 dark:text-white">{walLabel}</dd>
+          </div>
+        )}
         {hasDisk && (
           <>
-            {' '}
-            · {formatBytes(storage.diskFreeBytes)} free of {formatBytes(storage.diskTotalBytes)}
+            <div>
+              <dt className="text-slate-500 dark:text-slate-400">Disk used</dt>
+              <dd className="font-medium text-slate-900 dark:text-white">
+                {formatBytes(usedBytes)} of {formatBytes(storage.diskTotalBytes)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500 dark:text-slate-400">Disk free</dt>
+              <dd className="font-medium text-slate-900 dark:text-white">{formatBytes(storage.diskFreeBytes)}</dd>
+            </div>
           </>
         )}
-      </p>
+        <div>
+          <dt className="text-slate-500 dark:text-slate-400">Backups</dt>
+          <dd className="flex items-center gap-1 font-medium text-slate-900 dark:text-white">
+            {!storage.backupConfigured ? (
+              <span className="text-slate-500 dark:text-slate-400">Not configured</span>
+            ) : (
+              <>
+                {!backupStale && <CheckCircleIcon width={13} height={13} className="shrink-0 text-emerald-600 dark:text-emerald-400" />}
+                Last daily: {backupAgeLabel(storage.lastDailyBackupAt)}
+              </>
+            )}
+          </dd>
+        </div>
+        {storage.backupConfigured && storage.lastWeeklyBackupAt && (
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">Last weekly backup</dt>
+            <dd className="font-medium text-slate-900 dark:text-white">{backupAgeLabel(storage.lastWeeklyBackupAt)}</dd>
+          </div>
+        )}
+      </dl>
+
       {hasDisk && (
         <div className="mt-3">
           <MeterBar label="Disk used" pct={usedPct} color={diskTone} />

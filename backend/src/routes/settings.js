@@ -3,6 +3,7 @@ const path = require('path');
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
+const { isConfigured: isBackupConfigured, listBackups } = require('../lib/backup');
 
 const router = Router();
 router.use(requireAuth);
@@ -58,12 +59,29 @@ router.get('/summary', requirePermission('settings', 'view'), (req, res) => {
 // frontend already treats either as optional and simply doesn't render that
 // half of the readout, same "degrade gracefully, don't 500 over a nice-to-
 // have" call this app makes elsewhere (e.g. a missing SMTP config).
-router.get('/storage', requirePermission('settings', 'view'), (req, res) => {
+// Also reports the WAL sidecar's own size (a real diagnostic signal — see
+// backend/telegram-bot/bot.js's own dbFileSizes(), which this mirrors: a WAL
+// file that's grown large and isn't shrinking usually means checkpointing
+// isn't happening) and, when BACKUP_S3_* is configured (lib/backup.js),
+// when the last daily/weekly backup actually landed — so "Data" can answer
+// "is this app actually protected right now," not just "how big is the
+// file." The S3 listing calls are the one part of this route that can be
+// slow or fail outright (a misconfigured bucket, a network blip); wrapped
+// in their own try/catch so a backup-listing failure never takes down the
+// rest of the (synchronous, local-filesystem) storage readout.
+router.get('/storage', requirePermission('settings', 'view'), async (req, res) => {
   let dbSizeBytes = null;
   try {
     dbSizeBytes = fs.statSync(db.name).size;
   } catch (err) {
     return res.status(500).json({ error: 'Could not read database file size' });
+  }
+
+  let walSizeBytes = null;
+  try {
+    walSizeBytes = fs.statSync(`${db.name}-wal`).size;
+  } catch (err) {
+    // No WAL sidecar right now (just checkpointed) — left as null.
   }
 
   let diskFreeBytes = null;
@@ -76,7 +94,29 @@ router.get('/storage', requirePermission('settings', 'view'), (req, res) => {
     // Not available on this Node version/platform — left as null.
   }
 
-  res.json({ dbSizeBytes, diskFreeBytes, diskTotalBytes });
+  const backupConfigured = isBackupConfigured();
+  let lastDailyBackupAt = null;
+  let lastWeeklyBackupAt = null;
+  if (backupConfigured) {
+    try {
+      const [daily, weekly] = await Promise.all([listBackups('backups/daily/'), listBackups('backups/weekly/')]);
+      if (daily.length) lastDailyBackupAt = daily[daily.length - 1].LastModified;
+      if (weekly.length) lastWeeklyBackupAt = weekly[weekly.length - 1].LastModified;
+    } catch (err) {
+      // S3 unreachable/misconfigured right now — leave both null rather
+      // than 500ing the whole storage readout over an optional detail.
+    }
+  }
+
+  res.json({
+    dbSizeBytes,
+    walSizeBytes,
+    diskFreeBytes,
+    diskTotalBytes,
+    backupConfigured,
+    lastDailyBackupAt,
+    lastWeeklyBackupAt,
+  });
 });
 
 router.get('/', requirePermission('settings', 'view'), (req, res) => {

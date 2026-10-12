@@ -6264,8 +6264,13 @@ presentation change on top of the same form state.
   convention `components/MobileListAccordion.jsx` already uses elsewhere),
   each collapsed to an icon chip + title + one-line `sectionSummary()` (e.g.
   "2 of 3 images attached · Modern template", "MVR · Starting balance
-  14500.00") until tapped open. "Letterheads & branding" starts open (the
-  first/most commonly-edited section); every other section starts closed.
+  14500.00") until tapped open. **Every section starts collapsed** — this
+  originally had "Letterheads & branding" open by default (the
+  first/most commonly-edited section), but that was changed to all-closed
+  at explicit follow-up request (`<details>` with no `open` attribute at
+  all, rather than conditioning it on `key`), so landing on this page
+  always shows the same five-row scannable list first regardless of which
+  section someone's about to edit.
 - **At `sm:` and up — a section rail + content panel**: a
   `grid-cols-[220px_1fr]` card with the same five sections as a left-hand
   nav list (`activeSection` state, lagoon-600 highlight on the selected
@@ -6327,6 +6332,49 @@ confirmed the accordion/rail layouts each render their own correct,
 independently-visible copy of the storage text and disk meter (counted via
 Playwright's `:visible` filter, since the other breakpoint's identical but
 CSS-hidden copy is also present in the DOM) with zero console errors.
+
+**Storage detail + alerts, a follow-up request**: `GET
+/api/settings/storage` grew three more fields — `walSizeBytes` (the SQLite
+WAL sidecar's own size, `fs.statSync(`${db.name}-wal`).size`, `null` when
+there's no WAL file right now, e.g. just checkpointed — mirrors
+`backend/telegram-bot/bot.js`'s own `dbFileSizes()` exactly, since a WAL
+file that's grown large and isn't shrinking is the same real diagnostic
+signal there), and `backupConfigured`/`lastDailyBackupAt`/
+`lastWeeklyBackupAt` (via `lib/backup.js`'s already-exported `isConfigured()`/
+`listBackups('backups/daily/' | 'backups/weekly/')` — the same functions
+`scripts/list-backups.js` and the Telegram bot's own `/backup` command
+already call, so "when did the last backup actually land" reads identically
+everywhere it's asked). The S3 listing calls are the one part of this route
+that can be slow or fail outright (a misconfigured bucket, a network
+hiccup), so they're wrapped in their own try/catch — a listing failure
+leaves both timestamps `null` rather than 500ing the whole, otherwise
+synchronous/local-filesystem, storage readout over one optional detail.
+`StorageReadout` renders this as a `dl` grid (Database file / Write-ahead
+log / Disk used / Disk free / Backups / Last weekly backup, each only shown
+when the backing value is actually present — "Backups" reads "Not
+configured" rather than a blank value when `BACKUP_S3_*` isn't set, the
+same "state the reason, don't just omit" convention this app's optional
+fields already follow elsewhere) below the existing `MeterBar`, plus — the
+"And Alert" half of the same request — explicit text alert banners above
+all of it: red at ≥90% disk used ("Free up space soon to avoid write
+failures"), amber at ≥75% (mirroring the `MeterBar`'s own existing
+amber/red tone thresholds, now stated in words too, not just color), and a
+red "No backup has completed in over 26 hours" / "No backup has ever
+completed" banner whenever backups are configured but the last daily one
+is stale or missing — the exact same 85%/90% disk and 26-hour backup-
+staleness thresholds `backend/telegram-bot/bot.js`'s own alert loop already
+polls for (`TELEGRAM_DISK_ALERT_PERCENT`/`TELEGRAM_BACKUP_STALE_HOURS`),
+so the same conditions that would page an admin on their phone are now
+also visible directly on this page, not only reachable via Telegram.
+Verified against a real local instance: `GET /api/settings/storage` now
+returns real `walSizeBytes`/`backupConfigured: false` (no `BACKUP_S3_*` set
+locally) alongside the existing fields, and a Playwright pass confirmed all
+five mobile accordion sections start collapsed (0 open on load, only the
+one clicked afterward opens), and that the "Data" section — mobile and
+desktop alike — renders the full detail grid plus a live amber "Disk space
+is getting full — 88% used" banner (this sandbox's own root disk genuinely
+sits that high, a real exercise of the threshold rather than a contrived
+one) with no layout breakage at either breakpoint.
 
 **Upload compression audited, no bugs found**: with this redesign touching
 the Settings page's own image fields, every other caller of
