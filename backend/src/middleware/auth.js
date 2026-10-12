@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { hasPermission, isUnrestrictedAdmin } = require('../lib/permissions');
-const { getActiveSession, touchSession } = require('../lib/sessions');
+const { getActiveSession, touchSessionIfStale } = require('../lib/sessions');
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -70,7 +70,7 @@ function requireAuth(req, res, next) {
     if (!session) {
       return res.status(401).json({ error: 'This session has been signed out' });
     }
-    touchSession(payload.jti);
+    touchSessionIfStale(session);
     req.sessionJti = payload.jti;
   }
 

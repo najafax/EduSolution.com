@@ -58,9 +58,34 @@ function enforceSessionLimit(userId) {
 // A token with no matching row (revoked, or never tracked — see
 // middleware/auth.js's requireAuth on why an untracked jti is treated as
 // "not session-gated" rather than rejected) never reaches this; only called
-// once per request for a token that already resolved to an active session.
+// (via touchSessionIfStale below) for a token that already resolved to an
+// active session.
 function touchSession(jti) {
   db.prepare("UPDATE sessions SET last_seen_at = datetime('now') WHERE jti = ?").run(jti);
+}
+
+// requireAuth calls this on literally every authenticated request — gating
+// nearly every route in the app — so writing unconditionally would turn
+// every read-only GET into a write transaction too (an extra WAL append and
+// lock acquisition per request, for a "last active" column the UI only ever
+// shows at minute granularity on MyAccount.jsx's own Active sessions card).
+// Throttling to once per TOUCH_THROTTLE_SECONDS costs nothing in practice —
+// `session` is already the row requireAuth just fetched via
+// getActiveSession(), so this reads no extra data — and bounds the write
+// rate per session regardless of how many requests it makes in between.
+// Comparing as same-format UTC strings (not via `new Date(sqliteString)`,
+// which V8 parses as local time for the space-separated `datetime('now')`
+// format and would drift by the server's UTC offset) mirrors
+// middleware/auth.js's own password_changed_at check for the same reason.
+const TOUCH_THROTTLE_SECONDS = 60;
+
+function touchSessionIfStale(session) {
+  const thresholdStr = new Date(Date.now() - TOUCH_THROTTLE_SECONDS * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace('T', ' ');
+  if (session.last_seen_at && session.last_seen_at >= thresholdStr) return;
+  touchSession(session.jti);
 }
 
 function getActiveSession(jti) {
@@ -85,4 +110,4 @@ function revokeOtherSessions(userId, currentJti) {
   return result.changes;
 }
 
-module.exports = { createSession, touchSession, getActiveSession, revokeOtherSessions };
+module.exports = { createSession, touchSessionIfStale, getActiveSession, revokeOtherSessions };

@@ -3416,6 +3416,39 @@ logged in on" list. Built together since the first three all touch
   behavior, so a user signing in on a 4th device understands why an older
   one disappeared from their own list rather than discovering it only as
   a mysterious logout somewhere else.
+  **Follow-up: `last_seen_at` is now throttled, not written on every
+  request.** A routine performance pass found that `requireAuth` — which
+  gates nearly every route in the app — had quietly turned every
+  authenticated *read* into a write too: the original `touchSession(jti)`
+  ran an unconditional `UPDATE sessions SET last_seen_at = datetime('now')`
+  on every single request carrying a `jti`, so loading a client list or a
+  dashboard page wrote to the database just as surely as recording a
+  payment did. `getActiveSession()`'s own row is already fetched right
+  before this write, so the fix cost nothing extra to read:
+  `lib/sessions.js`'s `touchSessionIfStale(session)` compares that row's
+  own `last_seen_at` against `TOUCH_THROTTLE_SECONDS` (60) and skips the
+  `UPDATE` entirely unless it's actually stale — same same-format-UTC-
+  string comparison convention `requireAuth`'s own `password_changed_at`
+  check already uses, for the identical reason (`new Date(sqliteString)`
+  parses the space-separated `datetime('now')` format as local time in V8).
+  `requireAuth` now calls `touchSessionIfStale(session)` instead of the old
+  unconditional `touchSession(payload.jti)` — the bare `touchSession()`
+  itself is no longer exported, since this is its one call site. This
+  bounds the write rate per session to roughly once a minute regardless of
+  request volume, with zero loss of accuracy on `MyAccount.jsx`'s own
+  "Active sessions" card, which only ever displays `last_seen_at` at
+  relative-time granularity anyway. This also directly reduces WAL growth —
+  the exact thing `GET /api/settings/storage`'s own `walSizeBytes` field and
+  the Telegram bot's `/db` command now monitor (see "Settings page
+  redesign" and "Telegram ops bot" below) — since a write-per-request was
+  one of the things keeping the WAL from shrinking between checkpoints.
+  Verified against a real local instance: logging in and immediately
+  re-requesting an authenticated route left `last_seen_at` completely
+  unchanged (still within the throttle window); manually backdating the
+  session's `last_seen_at` past 60 seconds and making one more request
+  updated it correctly; and `GET /api/auth/sessions` still reported the
+  right relative times and `isCurrent` flag throughout, confirming the
+  throttle changes nothing observable about the feature itself.
 
 ### Deals — internal profit calculator + shareholder distribution (`backend/src/`, `frontend/src/`)
 
