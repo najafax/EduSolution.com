@@ -498,3 +498,40 @@ export function PlayCircleIcon(props) {
     </svg>
   );
 }
+
+// A small storefront/office front — "Business details" on the redesigned
+// Settings page, distinct from SettingsIcon's gear (which already means
+// "app configuration" generically elsewhere) since this section is
+// specifically the business's own name/contact/registration info.
+export function BuildingIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="4" y="2.5" width="12" height="15" rx="1" />
+      <path d="M8 6.5h0M12 6.5h0M8 10h0M12 10h0M8 13.5h0M12 13.5h0" strokeLinecap="round" strokeWidth="2" />
+      <path d="M8.5 17.5v-3h3v3" />
+    </svg>
+  );
+}
+
+// A shield with a checkmark — "Security & session" on the redesigned
+// Settings page (session timeout, authorized signatory).
+export function ShieldIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 2.5 4 5v5c0 4.5 2.8 7.9 6 9 3.2-1.1 6-4.5 6-9V5Z" strokeLinejoin="round" />
+      <path d="m7.3 10 1.8 1.8L13 8.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// A stack of three discs — "Data" (historical CSV import + the storage
+// readout) on the redesigned Settings page.
+export function DatabaseIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <ellipse cx="10" cy="5" rx="6.5" ry="2.5" />
+      <path d="M3.5 5v10c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5V5" />
+      <path d="M3.5 10c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5" />
+    </svg>
+  );
+}

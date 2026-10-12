@@ -95,6 +95,10 @@ export const api = {
     // stamp images just to read a 3-character symbol.
     getSummary: (token) => request('/settings/summary', { token }),
     update: (payload, token) => request('/settings', { method: 'PUT', body: payload, token }),
+    // Database file size + (best-effort) disk free/total space, for the
+    // Settings page's "Data" section — see routes/settings.js's own note
+    // on why diskFreeBytes/diskTotalBytes can come back null.
+    getStorage: (token) => request('/settings/storage', { token }),
   },
 
   clients: {

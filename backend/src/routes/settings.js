@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
@@ -43,6 +45,38 @@ router.get('/summary', requirePermission('settings', 'view'), (req, res) => {
     .prepare('SELECT currency_symbol, business_name FROM business_settings WHERE id = 1')
     .get();
   res.json({ settings });
+});
+
+// Storage readout for the Settings page's "Data" section — the real SQLite
+// file's own size (`db.name` is better-sqlite3's own property for the path
+// it was opened with, the same `DB_PATH`-or-local-default value db/index.js
+// resolves, so this never needs its own copy of that resolution logic) plus,
+// best-effort, the free/total space on whichever disk that file actually
+// lives on. `fs.statfsSync` (Node 18.15+) isn't guaranteed on every runtime
+// this app might ever be deployed to, so a failure there is swallowed and
+// just means `diskFreeBytes`/`diskTotalBytes` come back `null` — the
+// frontend already treats either as optional and simply doesn't render that
+// half of the readout, same "degrade gracefully, don't 500 over a nice-to-
+// have" call this app makes elsewhere (e.g. a missing SMTP config).
+router.get('/storage', requirePermission('settings', 'view'), (req, res) => {
+  let dbSizeBytes = null;
+  try {
+    dbSizeBytes = fs.statSync(db.name).size;
+  } catch (err) {
+    return res.status(500).json({ error: 'Could not read database file size' });
+  }
+
+  let diskFreeBytes = null;
+  let diskTotalBytes = null;
+  try {
+    const stats = fs.statfsSync(path.dirname(db.name));
+    diskFreeBytes = stats.bavail * stats.bsize;
+    diskTotalBytes = stats.blocks * stats.bsize;
+  } catch (err) {
+    // Not available on this Node version/platform — left as null.
+  }
+
+  res.json({ dbSizeBytes, diskFreeBytes, diskTotalBytes });
 });
 
 router.get('/', requirePermission('settings', 'view'), (req, res) => {

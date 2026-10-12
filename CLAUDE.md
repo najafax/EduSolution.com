@@ -6246,6 +6246,108 @@ was pure waste. `GET /` itself is unchanged and still `SELECT *`s the full
 row for every caller that genuinely needs the images (`Settings.jsx`'s own
 edit form).
 
+### Settings page redesign — responsive sections + a storage readout
+
+`pages/business/Settings.jsx` was one long, single-column form (logo/
+signature/stamp, business details, currency/bank details, session timeout,
+signatory name, then an "Import historical data" card) — grouped into five
+named sections (`SECTIONS`: Letterheads & branding, Business details,
+Financial, Security & session, Data) and given two responsive layouts, per a
+round of mockups reviewed on the design canvas first. No field, no
+validation, and no backend write path changed — `handleSubmit` still sends
+the exact same `business_settings` shape in one `PUT /api/settings` call
+regardless of which section was last open/selected, so this is purely a
+presentation change on top of the same form state.
+
+- **Below `sm:` — collapsible section cards**: a `flex flex-col gap-3`
+  stack of native `<details>` cards (same no-JS-breakpoint-detection
+  convention `components/MobileListAccordion.jsx` already uses elsewhere),
+  each collapsed to an icon chip + title + one-line `sectionSummary()` (e.g.
+  "2 of 3 images attached · Modern template", "MVR · Starting balance
+  14500.00") until tapped open. "Letterheads & branding" starts open (the
+  first/most commonly-edited section); every other section starts closed.
+- **At `sm:` and up — a section rail + content panel**: a
+  `grid-cols-[220px_1fr]` card with the same five sections as a left-hand
+  nav list (`activeSection` state, lagoon-600 highlight on the selected
+  row) and the selected section's fields on the right, with its own small
+  heading + `sectionSummary()` subtitle repeated at the top of the panel.
+- **Both layouts are always in the DOM, toggled by Tailwind breakpoint
+  classes (`sm:hidden` / `hidden sm:grid`)** — the same "render twice, CSS
+  picks which one shows" convention `MobileListAccordion.jsx`'s own
+  desktop-table/mobile-accordion split already established app-wide, not a
+  JS-conditional unmount — so each field genuinely exists as two separate
+  controlled inputs (one per layout) bound to the same `form` state; only
+  one copy is ever visible at a given viewport width, same as a list page's
+  duplicated `<table>`/accordion rows. A single Save button (and the
+  error/success line) sits once below both layouts, not duplicated per
+  layout — editing fields across however many sections, in whichever
+  layout is visible, still submits as one `PUT` either way.
+- **PDF template** (Modern/Minimal) moved from a plain `<select>` to a
+  two-button segmented toggle (`type="button"`, lagoon-filled on the
+  selected side) to match the reviewed mockups — same `form.pdf_template`
+  value/validation underneath, just a different control.
+- Three new icons in `components/icons.jsx` for the new section chips —
+  `BuildingIcon` (Business details, distinct from `SettingsIcon`'s gear,
+  which already means "app configuration" generically elsewhere),
+  `ShieldIcon` (Security & session), `DatabaseIcon` (Data) — following the
+  file's existing 20×20/1.5px-stroke/`currentColor` convention.
+  `ImageIcon`/`BankIcon` (Letterheads, Financial) were already in the file
+  and reused as-is.
+
+**Storage readout**: the "Data" section now also shows the live database
+file size and, best-effort, disk free/total space — alongside the existing
+"Historical data" CSV-import card (still `canManageImport`-gated; the
+storage readout itself isn't, since it's informational, not a mutation).
+`GET /api/settings/storage` (`routes/settings.js`, same
+`requirePermission('settings', 'view')` gate as every other read on this
+router) reads `fs.statSync(db.name).size` for the real SQLite file's size —
+`db.name` is better-sqlite3's own property for the path it was opened with,
+the exact same `DB_PATH`-or-local-default value `db/index.js` resolves, so
+this needed no separate copy of that resolution logic — and, wrapped in its
+own try/catch, `fs.statfsSync(path.dirname(db.name))` for `diskFreeBytes`/
+`diskTotalBytes` (`bavail`/`blocks` × `bsize`). `fs.statfsSync` (Node
+18.15+) isn't guaranteed on every runtime this app might run on, so a
+failure there is swallowed — the response just carries `diskFreeBytes`/
+`diskTotalBytes: null`, and the frontend treats either as optional and
+simply skips that half of the readout rather than erroring, same
+"degrade gracefully over a nice-to-have" call this app already makes
+elsewhere (a missing SMTP config, a missing design-system attachment).
+`lib/api.js`'s `settings.getStorage(token)` calls it. `StorageReadout`
+(local to `Settings.jsx`) renders "Database {size}" (`formatBytes()`, a
+small local KB/MB/GB/TB formatter) plus, when disk figures are present, "X
+free of Y" and a `components/MeterBar.jsx` showing percent used — tone
+flips from `lagoon` to `amber` at 75% used and `red` at 90%, the same
+threshold-coloring convention `routes/reports.js`'s own disk-usage-style
+alerts elsewhere in this app already use for "getting close to a limit."
+Verified end-to-end against a real local instance (not just the build):
+`GET /api/settings/storage` hit directly returned real
+`dbSizeBytes`/`diskFreeBytes`/`diskTotalBytes` figures, and a Playwright
+pass at both a 390×844 phone viewport and a 1440×900 desktop viewport
+confirmed the accordion/rail layouts each render their own correct,
+independently-visible copy of the storage text and disk meter (counted via
+Playwright's `:visible` filter, since the other breakpoint's identical but
+CSS-hidden copy is also present in the DOM) with zero console errors.
+
+**Upload compression audited, no bugs found**: with this redesign touching
+the Settings page's own image fields, every other caller of
+`lib/imageResize.js`'s `resizeImage()` was re-checked too
+(`Settings.jsx`'s logo/signature/stamp, `Website.jsx`'s team/gallery
+photos, `MyAccount.jsx`'s avatar, `PortalInvoiceDetail.jsx`'s payment-proof
+upload) — all four correctly downscale before upload, and the one real
+sharp edge (`resizeImage()` always outputs `image/png` or `image/jpeg`,
+never the original `image/webp` a caller's own `ALLOWED_IMAGE_TYPES` might
+accept, since any non-PNG input re-encodes as JPEG) is already handled
+correctly everywhere it matters: `Settings.jsx`/`Website.jsx` pass the
+resulting data URI straight through and let the backend's own
+`IMAGE_DATA_URI_RE` parse the real mime type from the data URI prefix
+itself (never a separately-tracked client field, so there's nothing to
+desync), while `PortalInvoiceDetail.jsx` — the one caller whose backend
+route requires a separately-declared `file_type` field that must match the
+data URI's own prefix exactly — already derives it from the real output
+(`file.type === 'image/png' ? 'image/png' : 'image/jpeg'`), not the
+original file's type, which is exactly what's needed for a webp upload to
+not 400 on a type mismatch.
+
 ### Idle session timeout
 
 Separate from the JWT's fixed 7-day expiry (see `middleware/auth.js` above),
