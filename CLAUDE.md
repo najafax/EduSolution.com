@@ -8525,6 +8525,71 @@ bottom-sheet mobile form) are tracked separately and not part of this one.
   DOM-attribute check against the rendered page, not an assumption from
   reading the diff.
 
+### Redesign stage 2 — Invoices list summary strip
+
+The second approved stage from the same mockup set — a three-card "how are
+things right now" strip above `pages/business/Invoices.jsx`'s own search/
+filter row (Outstanding / Overdue / Collected), matching the
+`Desktop-Invoices.dc.html`/`Mobile-Invoices.dc.html` mockups' own summary-
+strip placement. Scoped to this one page for this stage, since it was the
+only list page the mockup set actually gave this treatment to — extending
+the same pattern to Quotes/Expenses is a natural follow-up, not assumed
+here.
+
+- **No backend change, no new permission dependency.** The obvious source
+  for these three figures is `routes/financials.js`'s `GET /summary`, but
+  that route sits behind the `financials` permission — which, per
+  "Sensitive modules" above, is off by default for a plain admin and would
+  leave most staff with `invoices:view` but no `financials` grant seeing
+  nothing here at all, a real regression for the common case rather than
+  an edge case. Instead `loadSummary()` calls `api.invoices.list(token)`
+  with no params at all — no `page`, so per the "Pagination convention"
+  the backend returns every invoice regardless of whatever the table's own
+  search/status/page state currently is — and reduces it client-side,
+  mirroring `pages/Dashboard.jsx`'s own "Needs attention" panel (which
+  already fetches a full invoice list and filters `is_overdue` in JS for
+  the identical reason: no dedicated aggregation endpoint needed for a
+  figure this cheap to derive from data already in reach). `Outstanding`
+  and `Overdue` only ever count `status === 'sent'` invoices — a draft
+  hasn't been billed yet and a void/paid invoice has nothing left owing —
+  mirroring `routes/invoices.js`'s own `is_overdue` definition exactly, so
+  the card can never disagree with the "Overdue" badge/status chip already
+  rendered on the same page. `Collected` sums `amount_paid` across every
+  non-void invoice (all-time, not scoped to the current month — there's no
+  per-invoice payment date in the list response to scope by, so the card
+  is deliberately labeled `Collected` rather than a month-qualified
+  `Collected this month` the way the mockup's own label read, to avoid
+  claiming a precision the data doesn't have). This fetch is independent
+  of the table's own paginated `load()` — it runs once per `token` and
+  again after any action that can move a balance (`handleVoid`/
+  `handleRecover`/`handlePaymentRecorded`), so the cards never lag the
+  rows below them while staying decoupled from the table's own search/
+  status/page churn.
+- **Reuses the existing `KpiCard` component and its established tone/icon
+  convention** rather than a one-off card matching the mockup's bespoke
+  (icon-free) HTML — `Financials.jsx` already renders this exact trio of
+  concepts (`ClockIcon`/neutral for Outstanding, `AlertTriangleIcon`/
+  negative-when-nonzero for Overdue, `CheckCircleIcon`/positive for
+  Paid-or-Collected), so the Invoices page's own strip matches what an
+  admin already sees on Financials rather than inventing a second visual
+  language for the same three ideas. `grid-cols-1 gap-3 sm:grid-cols-3` —
+  stacked full-width on a phone (matching `RingKpiCard`'s own responsive
+  shape, not the mockup's horizontally-scrolling row), three across from
+  `sm` up. Renders nothing at all (`{summary && (...)}`) until the fetch
+  resolves, rather than a loading skeleton for this specific strip — it's
+  supplementary context above the list, which already has its own
+  skeleton/empty states.
+- Verified against a real local instance (not just a build): backend/
+  frontend dev servers, four real invoices created through the live
+  `POST /invoices`/`POST /invoices/:id/payments` routes (one overdue, one
+  outstanding-not-yet-due, one fully paid, one draft) and a Playwright
+  pass at both a 1440×900 desktop viewport and a 390×844 phone viewport
+  confirmed the cards read the exact expected figures (Outstanding
+  2000.00; Overdue 1000.00, "1 invoice"; Collected 1000.00) with zero
+  console/page errors, and that the strip sits correctly between the
+  header and the search box at both breakpoints without disturbing the
+  FAB, bottom nav, or the existing table/mobile-accordion list below it.
+
 ### Responsive / PWA
 
 The app is a responsive installable PWA (installable on iOS/Android home

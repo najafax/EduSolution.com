@@ -15,7 +15,21 @@ import EmailPreviewModal from '../../components/EmailPreviewModal';
 import IconActionButton from '../../components/IconActionButton';
 import VoidReasonModal from '../../components/VoidReasonModal';
 import RecordPaymentModal from '../../components/RecordPaymentModal';
-import { InvoiceIcon, ReportIcon, DownloadIcon, PlusIcon, PencilIcon, SendIcon, XIcon, BanknoteIcon, RefreshIcon } from '../../components/icons';
+import KpiCard from '../../components/KpiCard';
+import {
+  InvoiceIcon,
+  ReportIcon,
+  DownloadIcon,
+  PlusIcon,
+  PencilIcon,
+  SendIcon,
+  XIcon,
+  BanknoteIcon,
+  RefreshIcon,
+  ClockIcon,
+  AlertTriangleIcon,
+  CheckCircleIcon,
+} from '../../components/icons';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { useConfirm } from '../../lib/useConfirm';
 import InvoiceForm from './InvoiceForm';
@@ -63,7 +77,47 @@ export default function Invoices() {
   const [voidError, setVoidError] = useState('');
   const [paymentTarget, setPaymentTarget] = useState(null); // the invoice being paid, or null
   const [paymentNotice, setPaymentNotice] = useState('');
+  const [summary, setSummary] = useState(null);
   const { confirm, confirmDialog } = useConfirm();
+
+  // A small "how are things right now" strip above the list — Outstanding/
+  // Overdue/Collected, computed from the invoices this user can already see
+  // under their own `invoices:view` grant. Deliberately not a call to
+  // /api/financials/summary (which would need its own, more restricted
+  // `financials` permission — see CLAUDE.md's "Sensitive modules" section —
+  // and would scope badly to this page's own filters anyway): a single,
+  // independent, unfiltered fetch (no `page`, so the backend returns every
+  // invoice regardless of what the table's own search/status/page state is
+  // currently showing), recomputed client-side the same way Dashboard.jsx's
+  // own "Needs attention" panel already filters a full invoice list for
+  // is_overdue. Outstanding/Overdue only ever count `sent` invoices — a
+  // draft hasn't been billed yet, and void/paid have nothing left owing —
+  // mirroring routes/invoices.js's own is_overdue definition exactly.
+  function loadSummary() {
+    api.invoices
+      .list(token)
+      .then(({ invoices: all }) => {
+        let outstandingTotal = 0;
+        let overdueCount = 0;
+        let overdueAmount = 0;
+        let collectedTotal = 0;
+        all.forEach((inv) => {
+          if (inv.status === 'sent') {
+            outstandingTotal += inv.balance_due;
+            if (inv.is_overdue) {
+              overdueCount += 1;
+              overdueAmount += inv.balance_due;
+            }
+          }
+          if (inv.status !== 'void') collectedTotal += inv.amount_paid;
+        });
+        setSummary({ outstandingTotal, overdueCount, overdueAmount, collectedTotal });
+      })
+      .catch(() => {});
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(loadSummary, [token]);
 
   function load() {
     // Only show the loading skeleton on the very first load — once there's
@@ -112,6 +166,7 @@ export default function Invoices() {
       await api.invoices.void(voidTarget.id, reason, token);
       setVoidTarget(null);
       load();
+      loadSummary();
     } catch (err) {
       setVoidError(err.message);
       throw err;
@@ -132,6 +187,7 @@ export default function Invoices() {
     try {
       await api.invoices.recover(invoice.id, token);
       load();
+      loadSummary();
     } catch (err) {
       setError(err.message);
     }
@@ -144,6 +200,7 @@ export default function Invoices() {
     if (autoRenewed.length > 0) notices.push(`Also renewed: ${autoRenewed.map((l) => l.name).join(', ')}.`);
     setPaymentNotice(notices.join(' '));
     load();
+    loadSummary();
   }
 
   function rowActions(invoice) {
@@ -265,6 +322,20 @@ export default function Invoices() {
           )}
         </div>
       </div>
+
+      {summary && (
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <KpiCard icon={<ClockIcon />} label="Outstanding" value={summary.outstandingTotal.toFixed(2)} tone="neutral" />
+          <KpiCard
+            icon={<AlertTriangleIcon />}
+            label="Overdue"
+            value={summary.overdueAmount.toFixed(2)}
+            sub={`${summary.overdueCount} invoice${summary.overdueCount === 1 ? '' : 's'}`}
+            tone={summary.overdueCount > 0 ? 'negative' : 'neutral'}
+          />
+          <KpiCard icon={<CheckCircleIcon />} label="Collected" value={summary.collectedTotal.toFixed(2)} tone="positive" />
+        </div>
+      )}
 
       <div className="mt-4 sm:max-w-sm">
         <SearchInput value={search} onChange={setSearch} placeholder="Search invoices…" />
