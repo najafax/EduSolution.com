@@ -1,0 +1,13 @@
+{
+  "name": "edusolution-telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for checking/updating the EduSolution.com backend droplet. Kept as its own package (separate node_modules, not a dependency of the main backend app) so this ops tool's one dependency never touches the deployed API's own dependency tree.",
+  "main": "bot.js",
+  "private": true,
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^2.1.0"
+  }
+}

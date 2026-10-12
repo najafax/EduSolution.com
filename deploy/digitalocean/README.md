@@ -303,6 +303,23 @@ sudoers matches the *exact* command line, flags included, not just the
 command name, so this has to mirror precisely what `deploy.sh` itself
 invokes.
 
+**If you operate this droplet logged in as `root` directly** rather than as
+the `deploy` user (some base images don't ship `sudo` at all — confirmed on
+this project's own production droplet: `root@...# sudo ...` → `sudo:
+command not found`, even though `root` never needed `sudo` to begin with),
+none of the above applies — `deploy.sh` detects it's already root and skips
+`sudo` entirely, so there's no sudoers rule to set up in that case.
+
+## Telegram ops bot (optional)
+
+A Telegram bot for checking on and updating this exact droplet from your
+phone — `/status`, `/today`'s business numbers, `/logs`, `/restart`,
+`/deploy` — plus proactive alerts when the backend/nginx go down, disk
+fills up, or the TLS cert is close to expiring. See
+`backend/telegram-bot/README.md` for the full setup; its own systemd unit
+(`telegram-bot.service`) lives alongside `edusolution-backend.service` in
+this directory.
+
 ## Rollback
 
 Since Render's service and disk are untouched until you explicitly shut

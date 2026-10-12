@@ -1,0 +1,23 @@
+[Unit]
+Description=EduSolution.com Telegram ops bot (status checks, deploy, restart)
+After=network.target edusolution-backend.service
+
+[Service]
+Type=simple
+# Runs as root, not the `deploy` user edusolution-backend.service uses —
+# this bot shells out to `systemctl restart`/`journalctl`, which need
+# privileged access, and this droplet doesn't have `sudo` installed (see
+# backend/telegram-bot/README.md's own note on this). If your droplet does
+# have `sudo` configured for the `deploy` user, you can run this as `deploy`
+# instead and prefix the two privileged commands in bot.js with `sudo`.
+User=root
+WorkingDirectory=/home/deploy/edusolution-backend/backend/telegram-bot
+ExecStart=/usr/bin/node bot.js
+Restart=on-failure
+RestartSec=5
+# bot.js reads backend/.env itself (via an explicit dotenv path, not cwd),
+# so it doesn't need its own EnvironmentFile — TELEGRAM_* vars just need to
+# be added to that same backend/.env (see backend/telegram-bot/README.md).
+
+[Install]
+WantedBy=multi-user.target

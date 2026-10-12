@@ -8886,3 +8886,112 @@ screens), configured via `vite-plugin-pwa` in `vite.config.js`:
    (`/reset-password?token=...`) opens `ResetPassword`, which submits the
    new password + token to `api.resetPassword` and redirects to `/login`
    with a success banner.
+
+### Telegram ops bot (`backend/telegram-bot/`)
+
+A Telegram bot for checking on and updating the production droplet from a
+phone — `/status`, `/today`'s business numbers, `/logs`, `/restart`,
+`/deploy` — plus proactive alerts when the backend/nginx go down, disk
+fills up, or the TLS cert is close to expiring. This is ops tooling, not
+part of the deployed app itself — it runs as its own systemd service on
+the droplet (`deploy/digitalocean/telegram-bot.service`, alongside
+`edusolution-backend.service`), reusing the backend's own `.env` and, for
+business-data commands, its own lib/route modules directly
+(`computeSummary`/`computeDailyEarnings`/a raw `quote_requests` count
+query) — the same "shell/ops access on the box is already a higher trust
+level than anything the in-app permission system controls" precedent
+`scripts/create-user.js` already relies on, so there's no staff account,
+login, or HTTP round-trip to the API sitting right next to it for these
+commands to go through.
+
+- **Access is a fixed allowlist, not a login.** `TELEGRAM_ALLOWED_USER_IDS`
+  (comma-separated numeric Telegram user ids, added to `backend/.env`
+  alongside `TELEGRAM_BOT_TOKEN`) is checked once as global middleware,
+  registered before every command handler ("registration order wins" is
+  how this library's middleware chain works) — a message or button tap
+  from anyone not on the list is silently dropped, with no reply at all,
+  so a stranger who finds the bot (or its token leaks) learns nothing
+  about what it does. The bot refuses to start at all if either env var is
+  unset, rather than starting up unreachable or unrestricted.
+- **Built on `node-telegram-bot-api@2`, the from-scratch "v2" rewrite, not
+  the older/more commonly-referenced 0.x line** — deliberately: 0.x is
+  still widely used and documented online, but it's built on the
+  long-deprecated `request` HTTP library and ships with known-vulnerable
+  transitive dependencies (`form-data`/`qs`/`tough-cookie`, `npm audit`
+  flags two as critical) with no fix available short of this same major
+  upgrade. v2 is a genuine rewrite (different API entirely — `Bot`/`Context`
+  classes, koa-style middleware, `bot.command()`/`bot.on()`/`bot.use()`,
+  `ctx.reply()`) with **zero runtime dependencies** (confirmed via a real
+  `npm install` + `npm audit`: 1 package added, 0 vulnerabilities) and
+  active maintenance (published within the last month as of when this was
+  built). Its own README states plainly there's no v1→v2 compatibility, so
+  don't reach for 0.x-shaped code (callback-style `bot.onText(regex, cb)`,
+  `bot.sendMessage(chatId, text, opts)`) if extending this file — the real
+  API was confirmed directly from the package's own shipped `.d.ts` type
+  declarations (`dist/core/bot.d.ts`/`context.d.ts`), not assumed from
+  memory, specifically because a "v2 rewrite" warranted not trusting
+  pattern-matching against the more commonly-seen 0.x shape.
+- **Commands are read-only except `/restart` and `/deploy`**, both of which
+  show a confirm/cancel inline keyboard before doing anything — `/status`
+  (backend + nginx state/uptime, disk, TLS cert days left, public API
+  reachability, run in parallel via `Promise.all`), `/today` (bank
+  balance, today's payments/expenses/net via
+  `lib/dailyEarningsReport.js`'s `computeDailyEarnings(todayStr())` — note
+  this is the actual current day, not the "yesterday" framing that
+  function's own cron-job caller uses, since an on-demand phone check
+  wants today's figures — plus overdue invoices and pending quote
+  requests), `/backup` (last daily/weekly S3 backup time, via
+  `lib/backup.js`'s own `listBackups()`/`isConfigured()` — the exact
+  functions `scripts/list-backups.js` already uses), and `/logs [n]` (last
+  n lines of `journalctl -u edusolution-backend`, default 50, capped at
+  300, chunked across multiple Telegram messages if the output exceeds
+  Telegram's 4096-char limit). `/deploy` runs the same steps
+  `deploy/digitalocean/deploy.sh` does by hand (`git fetch`/`checkout
+  main`/`merge --ff-only`, `npm install --omit=dev`, service restart) and
+  **stops and reports the exact failure at the first step that doesn't
+  succeed** — a merge that isn't a clean fast-forward is reported for a
+  human to resolve, never force-reset or auto-merged, matching this
+  session's own git-safety conventions.
+- **Alerts are state-transition-based, not re-sent every poll.** A
+  `setInterval` (default every 5 minutes, `TELEGRAM_ALERT_INTERVAL_MINUTES`)
+  runs the same checks `/status` does and keeps a small in-memory flag per
+  check; it only broadcasts (to every id on the allowlist) the instant a
+  flag flips — backend/nginx/public-API down→up transitions each get both
+  a "something's wrong" and a "it's back" message, while disk-usage and
+  cert-expiry are threshold-crossing alerts (fire once on crossing
+  `TELEGRAM_DISK_ALERT_PERCENT`/under `TELEGRAM_CERT_ALERT_DAYS`, reset
+  once back under/over) — so an ongoing, already-known problem doesn't
+  re-page everyone every single tick.
+- **A real, confirmed bug this surfaced**: `deploy/digitalocean/deploy.sh`
+  and the README's own documented setup both assumed the backend is
+  managed via the non-root `deploy` user with a passwordless sudoers rule
+  for exactly two `systemctl` commands — but this project's own production
+  droplet turned out to have no `sudo` binary installed at all (`root@...#
+  sudo systemctl status ...` → `sudo: command not found`), discovered
+  while troubleshooting an unrelated login outage earlier in this project's
+  history. Since the operator was already running everything as `root`
+  directly, this never actually blocked anything real — but it meant
+  `deploy.sh` itself (and this bot's own `/restart`/`/deploy`, had they
+  shelled out to `sudo systemctl ...` the way the original script did)
+  would fail the moment anyone tried running it as documented. Fixed in
+  `deploy.sh` with a small `sudo_if_needed()` helper (calls the command
+  directly when already root, falls back to `sudo` only when present and
+  not root, errors clearly otherwise) — and the bot's own commands never
+  use `sudo` at all, since `telegram-bot.service` runs as `root` by design
+  (see its own unit file comment). The README's sudoers section gained a
+  one-line callout for the as-root case so a future reader doesn't set up
+  a sudoers rule that's moot for how this droplet actually runs.
+- `backend/telegram-bot/` is its own small package (own `package.json`,
+  own `node_modules` — gitignored by the existing blanket `node_modules/`
+  rule in `backend/.gitignore`, which matches at any depth) rather than a
+  dependency of the main backend app, so this one ops tool's dependency
+  never touches the deployed API's own `package.json`/lock file. It
+  reuses `backend/.env` directly (`dotenv.config({ path: ... })` pointed
+  explicitly at `../env` relative to its own `__dirname`, not relying on
+  `cwd`) rather than inventing a second env file, so there's one source of
+  configuration truth on the droplet; `quiet: true` is passed to suppress
+  `dotenv@17`'s own promotional "tip" line in what would otherwise be this
+  bot's own `/logs`-adjacent startup output (confirmed via that package's
+  own shipped source — a real, if slightly odd, upstream feature rotating
+  through sponsor-style tips on every load, not a sign of a compromised
+  dependency, which was worth directly verifying before trusting it).
