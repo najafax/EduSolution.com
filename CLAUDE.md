@@ -9097,3 +9097,73 @@ commands to go through.
   own shipped source — a real, if slightly odd, upstream feature rotating
   through sponsor-style tips on every load, not a sign of a compromised
   dependency, which was worth directly verifying before trusting it).
+- **Full monitoring: database, memory, crash-loop, and backup-freshness
+  checks**, added once a real incident (the public API flapping unreachable
+  in ~5-minute windows, recurring every 15–25 minutes right after a
+  `/deploy`) made clear the original five checks (backend/nginx/API-up,
+  disk, TLS cert) couldn't actually explain *why* — none of them touch
+  memory, the database, or whether the backend was silently crash-looping
+  underneath an always-green `systemctl is-active`.
+  `dbHealthCheck()` runs a plain `db.prepare('SELECT 1').get()` against the
+  exact same SQLite connection the backend process itself reads/writes
+  (this bot already `require()`s `db/index.js` directly, see above) — a
+  locked or corrupted file hangs/fails this the same way it'd hang a real
+  API request, so it's a genuine proxy for "can the backend actually serve
+  a request right now," not just "is the process running," and it's cheap
+  enough to run on every `/status` and every alert poll. The real,
+  thorough check — `PRAGMA integrity_check`, which walks every page of the
+  file and briefly locks it — deliberately stays **out** of the polling
+  loop and only ever runs on demand, via the new `/db` command, alongside
+  the database/WAL file's own sizes (`db.name`/`` `${db.name}-wal` ``,
+  `fs.statSync`) and how long since the last daily backup.
+  `memoryInfo()` reads `/proc/meminfo` directly (not a parsed `free` shell
+  call — one less output-format assumption to break across distros) and
+  uses `MemAvailable`, not `MemFree` — the modern, accurate "how much
+  could actually be used right now" figure that already accounts for
+  reclaimable cache/buffers the way `MemFree` doesn't, so it won't
+  false-positive on a box that's just using free RAM for disk cache the
+  way Linux always does. This is the single most useful new signal for
+  the "unreachable for a few minutes, then recovers on its own" failure
+  mode specifically — that pattern matches memory pressure (swap
+  thrashing, or the kernel briefly starving the process) far better than
+  a clean crash would, and a small droplet can hit it well before disk or
+  CPU would ever flag anything.
+  **Crash-loop detection** reads systemd's own `NRestarts` property for
+  the unit (`backendRestartCount()`) on every poll and alerts the instant
+  it ticks up *between two polls the bot was actually running for* —
+  catching a crash that `Restart=on-failure` silently recovered from
+  before the 5-minute `healthCheck()` poll ever caught the service
+  "down." The one real wrinkle: `NRestarts` also increments on a
+  *deliberate* restart (`/restart`, or `/deploy`'s own trailing restart),
+  so `doRestart()` resyncs `alertState.lastRestartCount` to the
+  post-restart value immediately after confirming the service is back up
+  — without that, every operator-triggered restart would read as an
+  unexplained crash on the very next poll. `alertState` itself had to
+  move earlier in the file (declared once, right above `doRestart()`) so
+  both the command handlers and the background poll loop share the same
+  object instead of two independently-initialized copies silently
+  drifting apart.
+  **Backup freshness** (`latestDailyBackupAgeHours()`, reusing the exact
+  `listBackups()`/`isConfigured()` functions `/backup` and
+  `scripts/list-backups.js` already call) alerts once no daily backup has
+  landed in `TELEGRAM_BACKUP_STALE_HOURS` (default 26 — an hour of slack
+  past the 24h cron cadence, not a flat 24, so a backup that's merely
+  running a little late doesn't false-positive) — returns `null` (not `0`,
+  not `Infinity`) when backups aren't configured at all, so this check is
+  silently skipped entirely for a deployment that's never set
+  `BACKUP_S3_BUCKET`, matching `/backup`'s own "aren't configured" message
+  rather than ever reporting a false staleness alarm.
+  All four join the existing five in `runAlertChecks()`'s same
+  state-transition-only broadcast pattern (alert once on the bad edge,
+  alert once on the recovery edge, never every single tick an ongoing
+  problem is still ongoing) — `/status` also grew a `*Database*`/
+  `*Memory*` line each, computed the same cheap way. Verified end-to-end
+  against the real local dev database (never production): `dbHealthCheck()`/
+  `PRAGMA integrity_check`/file-size reads all confirmed correct
+  (`ok`, `0ms`, a real non-zero WAL sidecar size caught mid-test, proving
+  WAL mode is genuinely active rather than assumed) and `memoryInfo()`
+  parsed `/proc/meminfo` correctly in this sandbox; the full bot module
+  was also booted directly (fake Telegram token, so it hangs trying to
+  poll rather than exiting cleanly — expected) and confirmed it reaches
+  its own startup log with no syntax or top-level runtime errors across
+  every new function definition and the moved `alertState` declaration.

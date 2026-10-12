@@ -79,8 +79,16 @@ unreachable/unrestricted).
 
 ## Commands
 
-- `/status` — backend + nginx state/uptime, disk usage, TLS cert days left,
-  public API reachability — the one-shot "is everything okay" check.
+- `/status` — backend + nginx state/uptime, database connectivity, memory
+  usage, disk usage, TLS cert days left, public API reachability — the
+  one-shot "is everything okay" check.
+- `/db` — a deeper, on-demand database check: connectivity (same cheap
+  `SELECT 1` `/status` uses), a full `PRAGMA integrity_check` (the real,
+  thorough check — walks the whole file, so this stays out of the regular
+  polling loop and is only ever run when you ask for it), the database
+  file's own size and its WAL sidecar's size (a WAL file that's grown large
+  and isn't shrinking can mean checkpointing isn't happening), and how long
+  since the last daily backup.
 - `/today` — bank balance, today's payments/expenses/net, overdue invoices,
   pending quote requests.
 - `/backup` — when the last daily/weekly S3 backup ran.
@@ -105,9 +113,26 @@ ongoing problem doesn't re-alert you every 5 minutes:
   message once it's back).
 - The public API (`https://api.edusolutionsmaldives.com/...`) stops
   responding (and recovers).
+- The database stops answering a plain `SELECT 1` (and recovers) — this is
+  checked against the exact same SQLite connection the backend process
+  itself uses, so it's a real proxy for "can the app actually serve a
+  request right now," not just "is the process running."
+- Memory usage crosses `TELEGRAM_MEMORY_ALERT_PERCENT` (default 90%) — the
+  single most useful signal for a "goes unreachable for a few minutes,
+  then recovers on its own" pattern, since that usually means memory
+  pressure (swap thrashing, or the kernel briefly starving the process)
+  rather than a clean crash.
+- `edusolution-backend` restarts when the bot didn't ask it to (i.e. not
+  via `/restart`/`/deploy`) — systemd's own restart counter ticking up on
+  its own means the process crashed and `Restart=on-failure` silently
+  brought it back before any poll ever caught it "down." Flagged as a
+  possible crash loop, with a pointer to `/logs`.
 - Disk usage on `/` crosses `TELEGRAM_DISK_ALERT_PERCENT` (default 85%).
 - The TLS cert has fewer than `TELEGRAM_CERT_ALERT_DAYS` (default 14) days
   left.
+- No daily backup has landed in `TELEGRAM_BACKUP_STALE_HOURS` (default 26)
+  hours — only checked at all when `BACKUP_S3_BUCKET` is actually
+  configured; silently skipped otherwise, same as `/backup` itself.
 
 ## Updating the bot itself
 

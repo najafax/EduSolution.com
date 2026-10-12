@@ -22,6 +22,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true });
 
+const fs = require('fs');
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const https = require('https');
@@ -44,6 +45,18 @@ const CERT_PATH =
 const ALERT_INTERVAL_MINUTES = Number(process.env.TELEGRAM_ALERT_INTERVAL_MINUTES) || 5;
 const DISK_ALERT_PERCENT = Number(process.env.TELEGRAM_DISK_ALERT_PERCENT) || 85;
 const CERT_ALERT_DAYS = Number(process.env.TELEGRAM_CERT_ALERT_DAYS) || 14;
+// A small droplet can intermittently choke under memory pressure well
+// before disk/CPU would ever flag it — this is the single most useful new
+// signal for the "API goes unreachable for a few minutes, then recovers on
+// its own" failure mode, since that pattern matches memory pressure (swap
+// thrashing, or the kernel briefly starving the process) far better than a
+// clean crash would.
+const MEMORY_ALERT_PERCENT = Number(process.env.TELEGRAM_MEMORY_ALERT_PERCENT) || 90;
+// The daily backup cron (lib/backup.js) runs at 03:00 server time — 26h
+// (not a flat 24h) gives an hour of slack before this is treated as
+// "actually missed," so a backup that's merely running a little late on a
+// slow day doesn't false-positive.
+const BACKUP_STALE_HOURS = Number(process.env.TELEGRAM_BACKUP_STALE_HOURS) || 26;
 
 if (!BOT_TOKEN) {
   console.error('TELEGRAM_BOT_TOKEN is not set in backend/.env — see backend/telegram-bot/README.md');
@@ -169,6 +182,120 @@ async function certDaysLeft() {
   return Math.floor((expiry.getTime() - Date.now()) / 86400000);
 }
 
+// A cheap, cheap-to-run-every-poll liveness check against the exact same
+// SQLite connection the backend process itself reads/writes (this bot
+// requires db/index.js directly, see the top of this file) — a locked or
+// corrupted database file would hang/fail this the same way it'd hang a
+// real API request, so this is a genuine proxy for "can the backend
+// actually serve a request right now," not just "is the process running."
+// Deliberately NOT a PRAGMA integrity_check here — that walks the whole
+// file and briefly locks it, fine for an on-demand /db check but too
+// expensive/intrusive to run unconditionally every ALERT_INTERVAL_MINUTES.
+function dbHealthCheck() {
+  const start = Date.now();
+  try {
+    db.prepare('SELECT 1').get();
+    return { ok: true, ms: Date.now() - start };
+  } catch (err) {
+    return { ok: false, ms: Date.now() - start, error: err.message };
+  }
+}
+
+// The real, thorough check — walks every page of the database file. Only
+// ever called on demand (the /db command), never from the polling loop.
+function dbIntegrityCheck() {
+  try {
+    const rows = db.prepare('PRAGMA integrity_check').all();
+    const results = rows.map((r) => r.integrity_check);
+    return { ok: results.length === 1 && results[0] === 'ok', results };
+  } catch (err) {
+    return { ok: false, results: [err.message] };
+  }
+}
+
+// `db.name` is better-sqlite3's own property for the path it was opened
+// with — the exact same DB_PATH-or-local-default value db/index.js
+// resolves, so no separate path-resolution copy is needed here. The `-wal`
+// sibling only exists while SQLite is in WAL mode with pending,
+// not-yet-checkpointed writes — a healthy app's WAL file should stay
+// small/absent most of the time, so a large one can mean checkpointing
+// isn't happening (e.g. a long-held read transaction somewhere).
+function dbFileSizes() {
+  let mainBytes = null;
+  let walBytes = null;
+  try {
+    mainBytes = fs.statSync(db.name).size;
+  } catch (err) {
+    // leave null — reported as n/a
+  }
+  try {
+    walBytes = fs.statSync(`${db.name}-wal`).size;
+  } catch (err) {
+    // no WAL file present — nothing pending, or not in WAL mode; not an error
+  }
+  return { mainBytes, walBytes };
+}
+
+function formatBytes(bytes) {
+  if (bytes == null) return 'n/a';
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes;
+  let i = -1;
+  do {
+    value /= 1024;
+    i += 1;
+  } while (value >= 1024 && i < units.length - 1);
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
+}
+
+// /proc/meminfo over a parsed `free` call — one less shell-output-format
+// assumption to break across distros/locales. MemAvailable (not MemFree) is
+// the modern, accurate "how much could actually be used right now" figure
+// — it already accounts for reclaimable cache/buffers the way MemFree
+// doesn't, so it won't false-positive on a box that's just using free RAM
+// for disk cache the way Linux always does.
+function memoryInfo() {
+  try {
+    const raw = fs.readFileSync('/proc/meminfo', 'utf8');
+    const get = (key) => {
+      const match = raw.match(new RegExp(`^${key}:\\s+(\\d+)`, 'm'));
+      return match ? Number(match[1]) * 1024 : null; // kB -> bytes
+    };
+    const total = get('MemTotal');
+    const available = get('MemAvailable');
+    if (total == null || available == null) return null;
+    return { usedPct: Math.round(((total - available) / total) * 100), totalBytes: total, availBytes: available };
+  } catch (err) {
+    return null; // e.g. not running on Linux — just omit this line
+  }
+}
+
+// systemd's own restart counter for the unit — bumped on every restart,
+// deliberate (a manual /restart or /deploy) or not (a crash that
+// Restart=on-failure brought back up before any poll ever caught it
+// "down"). doRestart()/doDeploy() below resync alertState.lastRestartCount
+// immediately after a deliberate restart specifically so this doesn't
+// false-positive on the action the operator just asked for.
+async function backendRestartCount() {
+  const { ok, output } = await runCmd(`systemctl show ${SERVICE_NAME} -p NRestarts --value`);
+  if (!ok) return null;
+  const n = parseInt(output, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
+// Hours since the most recent daily backup object actually landed in the
+// bucket — null (not 0, not Infinity) when backups aren't configured at
+// all, so callers can tell "nothing to report" apart from "it's been 0
+// hours."
+async function latestDailyBackupAgeHours() {
+  if (!backupsConfigured()) return null;
+  const daily = await listBackups('backups/daily/');
+  if (!daily.length) return null;
+  const latest = daily[daily.length - 1];
+  return (Date.now() - latest.LastModified.getTime()) / 3600000;
+}
+
 function healthCheck() {
   return new Promise((resolve) => {
     const start = Date.now();
@@ -193,18 +320,49 @@ async function buildStatusReport() {
     diskLine('/'),
     diskLine('/var/data'),
   ]);
+  const dbHealth = dbHealthCheck();
+  const mem = memoryInfo();
 
   const healthLine = health.ok ? `✅ reachable (HTTP ${health.status}, ${health.ms}ms)` : '❌ unreachable';
+  const dbLine = dbHealth.ok ? `✅ ok (${dbHealth.ms}ms)` : `❌ ${dbHealth.error}`;
+  const memLine = mem ? `${mem.usedPct}% used${mem.usedPct >= MEMORY_ALERT_PERCENT ? ' ⚠️' : ''}` : 'n/a';
   const certLine = cert === null ? 'n/a' : cert < 0 ? `⚠️ EXPIRED ${Math.abs(cert)}d ago` : `${cert}d left`;
 
   return [
     `*${SERVICE_NAME}*: ${backend.active === 'active' ? '✅' : '❌'} ${backend.label}`,
     `*nginx*: ${nginx.active === 'active' ? '✅' : '❌'} ${nginx.label}`,
     `*Public API*: ${healthLine}`,
+    `*Database*: ${dbLine}`,
+    `*Memory*: ${memLine}`,
     `*TLS cert*: ${certLine}`,
     `*Disk /*: ${typeof rootDisk === 'string' ? rootDisk : rootDisk.line}`,
     `*Disk /var/data*: ${typeof dataDisk === 'string' ? dataDisk : dataDisk.line}`,
   ].join('\n');
+}
+
+// On-demand deep check — the thorough PRAGMA integrity_check (see
+// dbIntegrityCheck's own note on why that stays out of the polling loop),
+// file/WAL sizes, and backup freshness all in one place, for "something
+// seems off with the database specifically" rather than the general
+// /status sweep.
+async function buildDbReport() {
+  const health = dbHealthCheck();
+  const { mainBytes, walBytes } = dbFileSizes();
+  const integrity = dbIntegrityCheck();
+  const backupAgeHours = await latestDailyBackupAgeHours();
+
+  const lines = [
+    `*Connectivity*: ${health.ok ? `✅ ok (${health.ms}ms)` : `❌ ${health.error}`}`,
+    `*Integrity check*: ${integrity.ok ? '✅ ok' : `❌ ${integrity.results.join('; ')}`}`,
+    `*File size*: ${formatBytes(mainBytes)}`,
+  ];
+  if (walBytes != null) lines.push(`*WAL size*: ${formatBytes(walBytes)}`);
+  lines.push(
+    backupAgeHours == null
+      ? '*Last backup*: n/a (not configured)'
+      : `*Last backup*: ${backupAgeHours < 1 ? '<1h' : `${Math.round(backupAgeHours)}h`} ago`,
+  );
+  return lines.join('\n');
 }
 
 async function buildTodayReport() {
@@ -242,12 +400,17 @@ async function buildBackupReport() {
 const HELP_TEXT = [
   '*EduSolution ops bot*',
   '',
-  '/status — backend, nginx, disk, TLS cert, public API reachability',
+  '/status — backend, nginx, database, memory, disk, TLS cert, public API reachability',
+  '/db — deep database check: connectivity, integrity, file/WAL size, backup freshness',
   '/today — bank balance, today’s earnings, overdue invoices, pending quote requests',
   '/backup — last daily/weekly backup time',
   '/logs [n] — last n lines of backend logs (default 50, max 300)',
   '/restart — restart the backend service (asks to confirm)',
   '/deploy — pull latest main + restart (asks to confirm)',
+  '',
+  'Alerts fire automatically (no command needed) for: backend/nginx/API/',
+  'database down, memory ≥90%, disk ≥85%, TLS cert <14d, an unexplained',
+  'backend restart (crash loop), and a missed daily backup.',
 ].join('\n');
 
 const CONFIRM_KEYBOARD = (confirmData, confirmLabel) => ({
@@ -257,11 +420,29 @@ const CONFIRM_KEYBOARD = (confirmData, confirmLabel) => ({
   ]],
 });
 
+// Shared with the background alert loop below (declared here, ahead of
+// doRestart()/doDeploy(), since both need to resync lastRestartCount right
+// after a deliberate restart — otherwise the very next poll would read the
+// bump from this intentional restart as an unexplained crash).
+const alertState = {
+  backendDown: false,
+  nginxDown: false,
+  healthDown: false,
+  dbDown: false,
+  diskAlerted: false,
+  certAlerted: false,
+  memoryAlerted: false,
+  backupStaleAlerted: false,
+  lastRestartCount: null,
+};
+
 async function doRestart(chatId) {
   await bot.api.sendMessage({ chat_id: chatId, text: `Restarting ${SERVICE_NAME}…` });
   await runCmd(`systemctl restart ${SERVICE_NAME}`);
   await new Promise((r) => setTimeout(r, 2000));
   const state = await serviceState(SERVICE_NAME);
+  const restartCount = await backendRestartCount();
+  if (restartCount !== null) alertState.lastRestartCount = restartCount;
   await bot.api.sendMessage({ chat_id: chatId, text: `${state.active === 'active' ? '✅' : '❌'} ${state.label}` });
 }
 
@@ -313,6 +494,8 @@ bot.command('today', async (ctx) => ctx.reply(await buildTodayReport(), { parse_
 
 bot.command('backup', async (ctx) => ctx.reply(await buildBackupReport(), { parse_mode: 'Markdown' }));
 
+bot.command('db', async (ctx) => ctx.reply(await buildDbReport(), { parse_mode: 'Markdown' }));
+
 bot.command('logs', async (ctx) => {
   const n = Math.min(Number(ctx.match) || 50, 300);
   const { output } = await runCmd(`journalctl -u ${SERVICE_NAME} -n ${n} --no-pager`);
@@ -349,16 +532,21 @@ bot.on('callback_query', async (ctx) => {
 // a "the backend just died" event) — each check only broadcasts on a state
 // *transition* (good→bad, or bad→good for the up/down checks), so a
 // problem that's still ongoing doesn't re-alert every single tick.
-const alertState = { backendDown: false, nginxDown: false, healthDown: false, diskAlerted: false, certAlerted: false };
+// (alertState itself is declared above, near doRestart() — both it and the
+// restart-deploy actions need to share the same object.)
 
 async function runAlertChecks() {
-  const [backend, nginx, health, cert, rootDisk] = await Promise.all([
+  const [backend, nginx, health, cert, rootDisk, restartCount, backupAgeHours] = await Promise.all([
     serviceState(SERVICE_NAME),
     serviceState('nginx'),
     healthCheck(),
     certDaysLeft(),
     diskLine('/'),
+    backendRestartCount(),
+    latestDailyBackupAgeHours(),
   ]);
+  const dbHealth = dbHealthCheck();
+  const mem = memoryInfo();
 
   const backendDown = backend.active !== 'active';
   if (backendDown !== alertState.backendDown) {
@@ -378,6 +566,12 @@ async function runAlertChecks() {
     await broadcast(healthDown ? `\u{1F6A8} Public API (${API_DOMAIN}) is unreachable.` : '✅ Public API is reachable again.');
   }
 
+  const dbDown = !dbHealth.ok;
+  if (dbDown !== alertState.dbDown) {
+    alertState.dbDown = dbDown;
+    await broadcast(dbDown ? `\u{1F6A8} *Database* query failed: ${dbHealth.error}` : '✅ Database is responding again.');
+  }
+
   if (typeof rootDisk !== 'string') {
     if (rootDisk.pct >= DISK_ALERT_PERCENT && !alertState.diskAlerted) {
       alertState.diskAlerted = true;
@@ -393,6 +587,37 @@ async function runAlertChecks() {
       await broadcast(`⚠️ TLS cert for ${API_DOMAIN} expires in ${cert} day${cert === 1 ? '' : 's'}.`);
     } else if (cert >= CERT_ALERT_DAYS) {
       alertState.certAlerted = false;
+    }
+  }
+
+  if (mem) {
+    if (mem.usedPct >= MEMORY_ALERT_PERCENT && !alertState.memoryAlerted) {
+      alertState.memoryAlerted = true;
+      await broadcast(`⚠️ Memory usage is at ${mem.usedPct}% — this can cause exactly the "unreachable for a few minutes" pattern.`);
+    } else if (mem.usedPct < MEMORY_ALERT_PERCENT) {
+      alertState.memoryAlerted = false;
+    }
+  }
+
+  // Only ever compares against a count seen *while this bot was running* —
+  // the first poll after a bot (re)start just records a baseline rather
+  // than alerting, since there's no way to know whether an already-elevated
+  // count reflects crashes from before the bot was watching.
+  if (restartCount !== null) {
+    if (alertState.lastRestartCount !== null && restartCount > alertState.lastRestartCount) {
+      await broadcast(
+        `\u{1F6A8} *${SERVICE_NAME}* restarted unexpectedly (restart count ${alertState.lastRestartCount} → ${restartCount}) — it may be crash-looping. Check /logs.`,
+      );
+    }
+    alertState.lastRestartCount = restartCount;
+  }
+
+  if (backupAgeHours !== null) {
+    if (backupAgeHours >= BACKUP_STALE_HOURS && !alertState.backupStaleAlerted) {
+      alertState.backupStaleAlerted = true;
+      await broadcast(`⚠️ No daily backup in ${Math.round(backupAgeHours)}h (expected one roughly every 24h).`);
+    } else if (backupAgeHours < BACKUP_STALE_HOURS) {
+      alertState.backupStaleAlerted = false;
     }
   }
 }
