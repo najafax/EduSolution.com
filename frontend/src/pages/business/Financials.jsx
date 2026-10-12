@@ -215,7 +215,7 @@ export default function Financials() {
 
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Financials</h1>
+      <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Financials</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">A live view of what's owed, what's been paid, and where you stand.</p>
 
       <div className="mt-4">
@@ -231,7 +231,7 @@ export default function Financials() {
       </div>
 
       {summary.totalInvoiced > 0 && (
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <MeterBar
             label="Collection rate"
             pct={collectedPct}

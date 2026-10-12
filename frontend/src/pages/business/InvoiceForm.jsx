@@ -155,7 +155,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
   }
 
   const formEl = (
-      <form onSubmit={handleSubmit} className={embedded ? 'flex flex-col gap-3' : 'mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900'}>
+      <form onSubmit={handleSubmit} className={embedded ? 'flex flex-col gap-3' : 'mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900'}>
         <div className="grid grid-cols-2 gap-3">
           <label className="block col-span-2">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client</span>
@@ -308,7 +308,7 @@ export default function InvoiceForm({ embedded = false, idOverride, onSuccess, o
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{isEditing ? 'Edit invoice' : 'New invoice'}</h1>
+      <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">{isEditing ? 'Edit invoice' : 'New invoice'}</h1>
       {formEl}
     </div>
   );

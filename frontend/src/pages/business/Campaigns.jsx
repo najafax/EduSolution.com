@@ -212,7 +212,7 @@ export default function Campaigns() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Campaigns</h1>
+          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Campaigns</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Send a newsletter or promotional email to your clients.</p>
         </div>
         {canManage && (
@@ -246,7 +246,7 @@ export default function Campaigns() {
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {!error && loading ? (
           <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
         ) : !error && (!data || data.campaigns.length === 0) ? (

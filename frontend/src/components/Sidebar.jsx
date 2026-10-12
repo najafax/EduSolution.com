@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
 import ThemeToggle from './ThemeToggle';
-import { BUSINESS_LINKS } from './Navbar';
+import { BUSINESS_LINKS, GROUP_ORDER } from './Navbar';
 import {
   HomeIcon,
   UsersIcon,
@@ -116,6 +116,14 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
   const visibleLinks = BUSINESS_LINKS.filter(
     (link) => !link.module || can(link.module, 'view'),
   );
+  // Grouped by Navbar.jsx's own `group` field (see that file's note) —
+  // a group is only rendered at all once it actually has a visible link,
+  // so a staff account missing every module in e.g. "Finance" never sees
+  // an empty section header for it.
+  const groupedLinks = GROUP_ORDER.map((group) => ({
+    group,
+    links: visibleLinks.filter((link) => link.group === group),
+  })).filter((g) => g.links.length > 0);
 
   function isActive(to) {
     return location.pathname === to || location.pathname.startsWith(`${to}/`);
@@ -201,24 +209,29 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
           </div>
         )}
 
-        <nav className="nav-links-scroll flex flex-1 flex-col gap-0.5 overflow-y-auto">
-          {visibleLinks.map((link) => {
-            const Icon = LINK_ICONS[link.to] || HomeIcon;
-            const active = isActive(link.to);
-            return (
-              <Link
-                key={link.to}
-                to={link.to}
-                onClick={handleLinkClick}
-                className={`flex min-h-9 shrink-0 items-center gap-2.5 rounded-lg px-3 text-[13.5px] font-medium ${
-                  active ? 'bg-lagoon-600 text-white' : 'text-lagoon-100/80 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <Icon width={17} height={17} className="shrink-0" />
-                {link.label}
-              </Link>
-            );
-          })}
+        <nav className="nav-links-scroll flex flex-1 flex-col gap-3 overflow-y-auto">
+          {groupedLinks.map(({ group, links }) => (
+            <div key={group} className="flex flex-col gap-0.5">
+              <p className="mb-0.5 px-3 text-[10px] font-bold uppercase tracking-wider text-lagoon-300/70">{group}</p>
+              {links.map((link) => {
+                const Icon = LINK_ICONS[link.to] || HomeIcon;
+                const active = isActive(link.to);
+                return (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    onClick={handleLinkClick}
+                    className={`flex min-h-9 shrink-0 items-center gap-2.5 rounded-lg px-3 text-[13.5px] font-medium ${
+                      active ? 'bg-lagoon-600 text-white' : 'text-lagoon-100/80 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <Icon width={17} height={17} className="shrink-0" />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Account row, drawer mode only — see this file's own top-of-file

@@ -471,7 +471,7 @@ export default function Licenses() {
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading || !settingsLoaded ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={['w-32', 'w-28', 'w-16', 'w-24', 'w-20', 'w-24', 'w-20', 'w-32']} />

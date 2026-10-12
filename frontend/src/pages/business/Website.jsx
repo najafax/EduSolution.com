@@ -248,7 +248,7 @@ function PostsSection({ token, canManage }) {
         </form>
       </Modal>
 
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={4} cols={canManage ? ['w-64', 'w-28', 'w-24', 'w-16'] : ['w-64', 'w-28', 'w-24']} />
@@ -461,7 +461,7 @@ function TestimonialsSection({ token, canManage }) {
         </form>
       </Modal>
 
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={4} cols={canManage ? ['w-64', 'w-32', 'w-24', 'w-16'] : ['w-64', 'w-32', 'w-24']} />
@@ -674,7 +674,7 @@ function ServicesSection({ token, canManage }) {
         </form>
       </Modal>
 
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={3} cols={canManage ? ['w-48', 'w-64', 'w-20', 'w-16'] : ['w-48', 'w-64', 'w-20']} />
@@ -867,7 +867,7 @@ function TeamSection({ token, canManage }) {
         </form>
       </Modal>
 
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={3} cols={canManage ? ['w-16', 'w-40', 'w-32', 'w-16'] : ['w-16', 'w-40', 'w-32']} />
@@ -1086,7 +1086,7 @@ function GallerySection({ token, canManage }) {
           ))}
         </div>
       ) : gallery.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <EmptyState
             icon={<ImageIcon />}
             title="No gallery images yet."
@@ -1291,7 +1291,7 @@ function VideosSection({ token, canManage }) {
           ))}
         </div>
       ) : videos.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <EmptyState
             icon={<VideoIcon />}
             title="No videos yet."
@@ -1346,7 +1346,7 @@ export default function Website() {
   return (
     <div className="px-4 py-10 pb-24 sm:px-6 lg:px-8">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Website content</h1>
+        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Website content</h1>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           What you publish here appears on the public marketing site — edusolutionsmaldives.com.
         </p>

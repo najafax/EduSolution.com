@@ -39,9 +39,9 @@ export default function PortalLicenseDetail() {
         Back to licenses
       </Link>
 
-      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{license.name}</h1>
+          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">{license.name}</h1>
           <StatusBadge status={license.display_status} />
         </div>
 

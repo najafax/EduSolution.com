@@ -90,7 +90,7 @@ export default function PortalQuotes() {
   return (
     <div className="px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quotes</h1>
+        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Quotes</h1>
         <button
           onClick={openRequestForm}
           className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
@@ -159,7 +159,7 @@ export default function PortalQuotes() {
         <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">No quotes match "{search}".</p>
       ) : (
         <>
-          <div className="mt-2 hidden overflow-x-auto rounded-lg border border-slate-200 bg-white sm:block dark:border-slate-700 dark:bg-slate-900">
+          <div className="mt-2 hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white sm:block dark:border-slate-700 dark:bg-slate-900">
             <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
               <thead>
                 <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">

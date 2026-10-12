@@ -450,7 +450,7 @@ export default function ProfitDistribution() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Profit Distribution</h1>
+          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Profit Distribution</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Revenue received minus what it cost to buy USD for a supplier — the rest split among shareholders by
             ownership. Recording the real USD purchase happens on the{' '}
@@ -894,7 +894,7 @@ export default function ProfitDistribution() {
         )}
       </Modal>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading || !settingsLoaded ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={4} cols={canManage ? ['w-48', 'w-20', 'w-20', 'w-20', 'w-20', 'w-16'] : ['w-48', 'w-20', 'w-20', 'w-20', 'w-20']} />

@@ -122,7 +122,7 @@ export default function QuoteRequests() {
 
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quote requests</h1>
+      <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Quote requests</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Requests clients have submitted from their portal.</p>
 
       <div className="mt-4">
@@ -131,7 +131,7 @@ export default function QuoteRequests() {
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={['w-32', 'w-64', 'w-24', 'w-24', 'w-24']} />

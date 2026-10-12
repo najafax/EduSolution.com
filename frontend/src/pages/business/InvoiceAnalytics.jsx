@@ -68,7 +68,7 @@ export default function InvoiceAnalytics() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Invoice analytics</h1>
+          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Invoice analytics</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Billing and collections by year, going back to your earliest invoice.</p>
         </div>
         <Link
@@ -91,7 +91,7 @@ export default function InvoiceAnalytics() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 dark:border-slate-700 dark:bg-slate-900">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Invoices issued &amp; payments received by year</h2>
           <div className="mt-4">
             <YearlyBarChart
@@ -103,7 +103,7 @@ export default function InvoiceAnalytics() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Status breakdown</h2>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Current invoices, by status.</p>
           <div className="mt-4">
@@ -133,7 +133,7 @@ export default function InvoiceAnalytics() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Year by year</h2>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -200,7 +200,7 @@ export default function InvoiceAnalytics() {
       </div>
 
       {data.topClients.length > 0 && (
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Top clients by invoiced amount</h2>
           </div>

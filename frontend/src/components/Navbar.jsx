@@ -12,29 +12,41 @@ import { SearchIcon, XIcon, MenuIcon } from './icons';
 // permissions (Dashboard). Everything else is filtered by that module's
 // view permission so a restricted user never sees a link leading to a 403
 // — enforcement itself still happens server-side; this is just UX.
+//
+// `group` (part of the mobile-redesign nav pass) sorts these 21 links into
+// 5 labeled sections for Sidebar.jsx to render under — before this, every
+// link rendered in one flat, unbroken list regardless of how many a given
+// user could see, which made the nav hard to scan once more than a
+// handful of modules were granted. GROUP_ORDER below is the only place
+// that orders the sections themselves; a link's position within
+// BUSINESS_LINKS still decides its order inside its own group. This is a
+// presentation-only change — the `module`/permission filtering, the set of
+// routes, and every link's own `to`/`label` are unchanged.
+export const GROUP_ORDER = ['Overview', 'Sales & clients', 'Finance', 'Operations', 'Admin'];
+
 export const BUSINESS_LINKS = [
-  { to: '/dashboard', label: 'Dashboard', module: null },
-  { to: '/clients', label: 'Clients', module: 'clients' },
-  { to: '/campaigns', label: 'Campaigns', module: 'campaigns' },
-  { to: '/products', label: 'Products', module: 'products' },
-  { to: '/quotes', label: 'Quotes', module: 'quotes' },
-  { to: '/quote-requests', label: 'Quote requests', module: 'quotes' },
-  { to: '/invoices', label: 'Invoices', module: 'invoices' },
-  { to: '/recurring-invoices', label: 'Recurring', module: 'recurring_invoices' },
-  { to: '/licenses', label: 'Licenses', module: 'licenses' },
-  { to: '/expenses', label: 'Expenses', module: 'expenses' },
-  { to: '/capital-contributions', label: 'Capital', module: 'financials' },
-  { to: '/owner-draws', label: 'Owner draws', module: 'financials' },
-  { to: '/financials', label: 'Financials', module: 'financials' },
-  { to: '/shareholders', label: 'Shareholders', module: 'financials' },
-  { to: '/profit-distribution', label: 'Profit Distribution', module: 'financials' },
-  { to: '/supplier-costs', label: 'Supplier Costs', module: 'financials' },
-  { to: '/reports', label: 'Reports', module: 'financials' },
-  { to: '/activity', label: 'Activity', module: 'activity' },
-  { to: '/users', label: 'Users', module: 'users' },
-  { to: '/email-center', label: 'Email center', module: 'email_center' },
-  { to: '/website-content', label: 'Website content', module: 'website' },
-  { to: '/settings', label: 'Settings', module: 'settings' },
+  { to: '/dashboard', label: 'Dashboard', module: null, group: 'Overview' },
+  { to: '/clients', label: 'Clients', module: 'clients', group: 'Sales & clients' },
+  { to: '/campaigns', label: 'Campaigns', module: 'campaigns', group: 'Sales & clients' },
+  { to: '/products', label: 'Products', module: 'products', group: 'Sales & clients' },
+  { to: '/quotes', label: 'Quotes', module: 'quotes', group: 'Sales & clients' },
+  { to: '/quote-requests', label: 'Quote requests', module: 'quotes', group: 'Sales & clients' },
+  { to: '/invoices', label: 'Invoices', module: 'invoices', group: 'Sales & clients' },
+  { to: '/recurring-invoices', label: 'Recurring', module: 'recurring_invoices', group: 'Sales & clients' },
+  { to: '/licenses', label: 'Licenses', module: 'licenses', group: 'Operations' },
+  { to: '/expenses', label: 'Expenses', module: 'expenses', group: 'Finance' },
+  { to: '/capital-contributions', label: 'Capital', module: 'financials', group: 'Finance' },
+  { to: '/owner-draws', label: 'Owner draws', module: 'financials', group: 'Finance' },
+  { to: '/financials', label: 'Financials', module: 'financials', group: 'Finance' },
+  { to: '/shareholders', label: 'Shareholders', module: 'financials', group: 'Finance' },
+  { to: '/profit-distribution', label: 'Profit Distribution', module: 'financials', group: 'Finance' },
+  { to: '/supplier-costs', label: 'Supplier Costs', module: 'financials', group: 'Finance' },
+  { to: '/reports', label: 'Reports', module: 'financials', group: 'Finance' },
+  { to: '/activity', label: 'Activity', module: 'activity', group: 'Operations' },
+  { to: '/users', label: 'Users', module: 'users', group: 'Admin' },
+  { to: '/email-center', label: 'Email center', module: 'email_center', group: 'Admin' },
+  { to: '/website-content', label: 'Website content', module: 'website', group: 'Admin' },
+  { to: '/settings', label: 'Settings', module: 'settings', group: 'Admin' },
 ];
 
 export default function Navbar() {

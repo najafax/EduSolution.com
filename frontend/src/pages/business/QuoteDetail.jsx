@@ -109,7 +109,7 @@ export default function QuoteDetail() {
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{quote.number}</h1>
+          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">{quote.number}</h1>
           <div className="mt-1">
             <StatusBadge status={quote.status} />
           </div>
@@ -172,7 +172,7 @@ export default function QuoteDetail() {
       )}
 
       {showConvert && !quote.converted_invoice_id && (
-        <form onSubmit={handleConvert} className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <form onSubmit={handleConvert} className="mt-4 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Invoice due date</span>
             <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">

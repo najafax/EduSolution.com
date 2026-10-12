@@ -43,12 +43,12 @@ export default function Settings() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Business settings</h1>
+      <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Business settings</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
         This information appears on every quote, invoice, and receipt PDF.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <fieldset disabled={!canManageSettings} className="contents">
           <ImageField
             label="Logo"
@@ -157,7 +157,7 @@ export default function Settings() {
       </form>
 
       {canManageImport && (
-        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Historical data</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Bring in existing clients, expenses, or invoices (with payment history) from a CSV file.

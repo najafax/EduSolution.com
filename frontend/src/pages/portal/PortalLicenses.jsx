@@ -32,7 +32,7 @@ export default function PortalLicenses() {
 
   return (
     <div className="px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Licenses</h1>
+      <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Licenses</h1>
 
       {licenses && licenses.length > 0 && (
         <div className="mt-4 max-w-sm">
@@ -52,7 +52,7 @@ export default function PortalLicenses() {
         <p className="mt-10 text-center text-sm text-slate-500 dark:text-slate-400">No licenses match "{search}".</p>
       ) : (
         <>
-          <div className="mt-6 hidden overflow-x-auto rounded-lg border border-slate-200 bg-white sm:block dark:border-slate-700 dark:bg-slate-900">
+          <div className="mt-6 hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white sm:block dark:border-slate-700 dark:bg-slate-900">
             <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
               <thead>
                 <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">

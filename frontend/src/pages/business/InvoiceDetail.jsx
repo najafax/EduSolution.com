@@ -252,7 +252,7 @@ export default function InvoiceDetail() {
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{invoice.number}</h1>
+          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">{invoice.number}</h1>
           <div className="mt-1">
             <StatusBadge status={invoice.is_overdue ? 'overdue' : invoice.status} />
           </div>

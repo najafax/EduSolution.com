@@ -94,7 +94,7 @@ export default function SupplierCosts() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Supplier Costs</h1>
+        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Supplier Costs</h1>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           Automatically calculated from what's actually been sold — every invoice line item's quantity × its
           product's own cost price (USD), rolled up by month and year. Not a manual entry tool: to actually record a
@@ -185,7 +185,7 @@ export default function SupplierCosts() {
         )}
       </Modal>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">By month</h2>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Trailing 12 months, oldest first.</p>
@@ -257,7 +257,7 @@ export default function SupplierCosts() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Year by year</h2>
         </div>

@@ -141,7 +141,7 @@ export default function CapitalContributions() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Capital contributions</h1>
+          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Capital contributions</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Money an owner or partner has put into the business — separate from client revenue and expenses.
           </p>
@@ -262,7 +262,7 @@ export default function CapitalContributions() {
         </form>
       </Modal>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={canManage ? ['w-24', 'w-32', 'w-40', 'w-20', 'w-16'] : ['w-24', 'w-32', 'w-40', 'w-20']} />

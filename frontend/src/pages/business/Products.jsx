@@ -323,7 +323,7 @@ export default function Products() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Products</h1>
+        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Products</h1>
         {canManage && (
           <div className="flex flex-wrap gap-2">
             <button
@@ -455,7 +455,7 @@ export default function Products() {
         </form>
       </Modal>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading || !settingsLoaded ? (
           <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
         ) : products.length === 0 ? (

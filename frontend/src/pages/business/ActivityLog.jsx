@@ -20,7 +20,7 @@ export default function ActivityLog() {
 
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Activity log</h1>
+      <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Activity log</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
         A running record of who created, updated, sent, or deleted things across clients, quotes, invoices,
         expenses, and recurring invoices.
@@ -28,7 +28,7 @@ export default function ActivityLog() {
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
         ) : !data || data.entries.length === 0 ? (

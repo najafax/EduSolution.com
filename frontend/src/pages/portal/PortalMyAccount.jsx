@@ -41,9 +41,9 @@ export default function PortalMyAccount() {
 
   return (
     <div className="px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My account</h1>
+      <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">My account</h1>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Account</h2>
         <dl className="mt-3 space-y-1 text-sm">
           <div className="flex justify-between">
@@ -57,7 +57,7 @@ export default function PortalMyAccount() {
         </dl>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handleSubmit} className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Change password</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">

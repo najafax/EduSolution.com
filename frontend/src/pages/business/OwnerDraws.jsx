@@ -381,7 +381,7 @@ export default function OwnerDraws() {
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Owner draws</h1>
+          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Owner draws</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Money an owner or partner has taken out of the business, and any of it paid back.
           </p>
@@ -431,7 +431,7 @@ export default function OwnerDraws() {
           returned money — with a single owner this would just repeat the
           "Outstanding balance" KPI card above under a different name. */}
       {summary && summary.byName.length > 1 && (
-        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Outstanding by owner</p>
           <div className="mt-2 flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
             {summary.byName.map((n) => (
@@ -600,7 +600,7 @@ export default function OwnerDraws() {
         </form>
       </Modal>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={canManage ? ['w-24', 'w-20', 'w-32', 'w-40', 'w-20', 'w-20', 'w-24'] : ['w-24', 'w-20', 'w-32', 'w-40', 'w-20', 'w-20']} />

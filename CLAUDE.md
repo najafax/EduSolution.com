@@ -8443,6 +8443,88 @@ proved out, rather than staying a one-off.
   password), and `SendIcon` (Email to client/receipt — a paper plane,
   distinct from `BellIcon`'s reminder-nudge meaning).
 
+### Professional redesign pass — grouped navigation, unified radius/type scale
+
+A full front-end visual audit (every page, form, list and the nav itself),
+done against real mockups presented for approval first, before any code
+changed — the approved direction's first implementation stage. Scoped
+deliberately: this stage is pure presentation (Tailwind classes and one
+render-grouping change), with zero changes to routes, permissions, API
+calls, or business logic — later stages (list-page summary strips, a
+primary-action-plus-overflow-menu row-action pattern, a full-screen
+bottom-sheet mobile form) are tracked separately and not part of this one.
+
+- **Grouped navigation**: `BUSINESS_LINKS` (`components/Navbar.jsx`) — the
+  single source of truth for every nav link, already shared by
+  `Sidebar.jsx`'s persistent desktop panel and mobile/tablet drawer,
+  `CommandPalette.jsx`'s nav search results, and (referenced only in a
+  comment) the marketing site's own separate link list — gained a `group`
+  field per entry, and a new exported `GROUP_ORDER` constant
+  (`['Overview', 'Sales & clients', 'Finance', 'Operations', 'Admin']`)
+  naming the 5 sections in display order. This exists because the list had
+  grown to 21 flat, unbroken links (Clients, Campaigns, Products, Quotes,
+  Quote requests, Invoices, Recurring, Licenses, Expenses, Capital,
+  Owner draws, Financials, Shareholders, Profit Distribution, Supplier
+  Costs, Reports, Activity, Users, Email center, Website content,
+  Settings) with nothing sorting them — a real, user-visible scanability
+  problem for any account holding more than a handful of module grants,
+  not a cosmetic nitpick. `Sidebar.jsx` now derives `groupedLinks` from
+  `visibleLinks` (itself unchanged — still `BUSINESS_LINKS.filter(link =>
+  !link.module || can(link.module, 'view'))`, same permission gate as
+  always) by mapping `GROUP_ORDER` to `{ group, links }` pairs and
+  dropping any group with zero visible links — so a staff account with no
+  grants anywhere in, say, "Finance" never sees an empty "FINANCE" header
+  for a section it can't open anything in. Each group renders as a small
+  uppercase `text-[10px] font-bold tracking-wider text-lagoon-300/70`
+  label above its own links, in both the persistent desktop sidebar and
+  the mobile/tablet drawer (the same component, so neither can drift from
+  the other). `CommandPalette.jsx`'s own nav search is unaffected — it
+  already searched the flat `BUSINESS_LINKS` array by label text, which
+  the new `group` field doesn't change the shape of.
+- **One corner-radius scale for every card-like container, app-wide**:
+  every list/table/empty-state container across the entire frontend
+  (business pages, the client portal, public quote/invoice views, Email
+  Center, My Account — 44 files) shared one exact, repeated class string,
+  `rounded-lg border border-slate-200 bg-white` (`rounded-lg` = 8px) —
+  while `KpiCard.jsx`/`MobileListAccordion.jsx`'s own cards already used
+  `rounded-2xl` (16px). Two real, independently-evolved card languages
+  sitting side by side on the same screens read as mismatched, not as two
+  deliberate choices — bumped the first group to `rounded-2xl` too (one
+  mechanical, verified string replacement across every match — `shadow-sm`
+  and the `dark:` pair on each were left untouched, only the radius
+  changed), so every floating surface in the app now shares the same,
+  more premium-reading corner radius.
+- **Sora display type on every page's own `<h1>`, not just Dashboard's
+  greeting**: `index.css`'s own comment on `--font-display` already says
+  Sora is meant for "page titles / KPI figures / the dashboard greeting,"
+  but in practice only the Dashboard greeting actually used it — every
+  other page's title (`<h1 className="text-2xl font-bold ...">Invoices
+  </h1>`, repeated verbatim across 37 files) used the plain system body
+  face instead, reading as under-branded next to Dashboard's own
+  `font-display` treatment. Changed to `font-display text-2xl
+  font-extrabold text-slate-900 dark:text-white` on every one of those
+  37 — same mechanical, exact-string-match replacement approach as the
+  radius change above, so it reached every page's title in one pass with
+  no risk of missing one or drifting the wording/weight between pages.
+  Deliberately scoped to the literal standalone `className="text-2xl
+  font-bold text-slate-900 dark:text-white"` match only — the marketing
+  site, the public quote/invoice views' own heading treatment, and the
+  client-portal detail pages' headings use a different class shape and
+  were left alone in this pass (not an oversight; each is a visually
+  separate surface from the staff app this stage was scoped to).
+- **Verified against a real, running local instance, not just a
+  production build** — `npm run build` (both `frontend`/`backend`) was
+  clean first, then a fresh local dev DB + a real test admin account +
+  both dev servers running together, driven with Playwright against the
+  pre-installed Chromium: confirmed the sidebar/drawer render all 5 group
+  labels in the right order with zero console/page errors at a 1440×900
+  desktop viewport and a 390×844 phone viewport alike, that the mobile
+  hamburger drawer shows the identical grouped nav as the persistent
+  desktop sidebar, and that the new `rounded-2xl`/`font-display` classes
+  actually landed on a live Invoices page (not just in source) — a quick
+  DOM-attribute check against the rendered page, not an assumption from
+  reading the diff.
+
 ### Responsive / PWA
 
 The app is a responsive installable PWA (installable on iOS/Android home
