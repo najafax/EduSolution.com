@@ -18,6 +18,16 @@ EnvironmentFile=/home/deploy/edusolution-backend/backend/.env
 NoNewPrivileges=true
 ProtectSystem=strict
 ReadWritePaths=/home/deploy/edusolution-backend/backend /var/data
+# lib/backup.js's createSnapshot() writes its VACUUM INTO temp file to
+# os.tmpdir() (/tmp) before gzipping/uploading it — without this, /tmp sits
+# outside ReadWritePaths above and ProtectSystem=strict makes it read-only,
+# so every cron-triggered backup silently fails with "unable to open
+# database" while a manual, non-systemd-managed run (no sandboxing at all)
+# keeps working and masks the problem. PrivateTmp=true is the standard
+# complement to ProtectSystem=strict — it gives this service its own
+# isolated, writable /tmp namespace rather than widening ReadWritePaths to
+# the real, shared /tmp.
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

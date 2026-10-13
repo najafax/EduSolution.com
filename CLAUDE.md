@@ -2571,6 +2571,42 @@ already does for that resource.
   `restore.js` always downloads to a separate file and refuses to write
   directly over the live `DB_PATH` — swapping a restored file in is a
   deliberate manual step (stop the backend, replace the file, restart).
+  **Real incident: six straight nights of silently failed backups,
+  masked by manual testing always succeeding.** `createSnapshot()`
+  writes its `VACUUM INTO` temp file to `os.tmpdir()` (`/tmp`) — fine on
+  Render, and fine when run by hand (`npm run backup` from an
+  interactive shell has no sandboxing at all) — but on the DigitalOcean
+  droplet (see `deploy/digitalocean/edusolution-backend.service`'s own
+  `ProtectSystem=strict`/`ReadWritePaths` hardening), `/tmp` was never
+  added to `ReadWritePaths` and the unit had no `PrivateTmp=true`
+  either, so under systemd's sandboxing `/tmp` is mounted **read-only**
+  for this service specifically. Every cron-triggered `0 3 * * *`
+  backup failed with `SqliteError: unable to open database:
+  /tmp/edusolution-backup-....sqlite3` at `createSnapshot`, every
+  single night for six nights straight (confirmed via
+  `journalctl -u edusolution-backend`, one identical failure at
+  `03:00:00` each night) — not intermittent, 100% broken under the
+  live systemd unit the whole time. `/backup`'s own staleness alert
+  (`TELEGRAM_BACKUP_STALE_HOURS`, see `backend/telegram-bot/bot.js`
+  above) should have caught this on night two, but the Telegram channel
+  was already noisy with the unrelated public-API-health false-alarm
+  flapping (see that section's own "Follow-up" note) at the time, so it
+  went unnoticed until manually checked days later. The red herring that
+  delayed diagnosis: `npm run backup` run by hand on the droplet (as
+  `root`, outside systemd entirely) succeeded immediately and cleanly —
+  which looked like it ruled out the backup code, S3 credentials, and
+  disk space all at once, when it had actually never exercised the real
+  failure mode (systemd's sandboxed `/tmp`) at all. Fixed with
+  `PrivateTmp=true` on the systemd unit — the standard hardening
+  complement to `ProtectSystem=strict`, giving the service its own
+  isolated, writable `/tmp` namespace rather than widening
+  `ReadWritePaths` to the real, shared `/tmp` — no application code
+  change needed, since `os.tmpdir()` resolves to the service's own
+  private `/tmp` transparently once that's set. Applying this on the
+  live droplet needs the usual systemd-unit-change steps (re-copy the
+  updated unit file to `/etc/systemd/system/`, `daemon-reload`,
+  restart) — a plain code deploy alone does **not** pick this up, since
+  the unit file isn't read by the Node process itself.
 - `backend/scripts/fix-license-renewal-dates.js` (`npm run fix-license-renewals`,
   `--apply` to write — dry-run by default) — a one-off correction for data
   written by the old, pre-fix `renewLicense()` (see "The core action" above),
