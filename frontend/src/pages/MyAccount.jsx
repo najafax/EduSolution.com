@@ -245,7 +245,7 @@ export default function MyAccount() {
               className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-slate-100 dark:ring-slate-800"
             />
           ) : (
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-lagoon-600 text-lg font-bold text-white">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-900 dark:bg-lagoon-600 text-lg font-bold text-white">
               {initialsFor(user)}
             </span>
           )}

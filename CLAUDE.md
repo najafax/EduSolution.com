@@ -9068,6 +9068,22 @@ bordered cards wherever they conflict.
   (the "don't recompute totals on the frontend" rule).
 - Header: `Navbar`/`TopBar` titles use the Bricolage display face.
 
+### Studio palette, app-wide (`frontend/src/index.css`)
+
+The `lagoon` colour scale keeps its name (every existing class resolves to
+it) but now holds the Studio palette: 50-500 are the accent teal (#0a8a94
+at 500), 600-700 the AA-contrast teal for links/active text, and 800-950 the
+Studio ink family (#10131a at 950) used by dark panels. `--color-ink` is
+#10131a. Solid primary fills (buttons, avatars, selected chips, the
+create button, gradients) are `bg-slate-900` in light mode and
+`dark:bg-lagoon-600` in dark mode; teal is the accent only (links, focus,
+status tints, chart series). Applies to the staff app, login, the public
+site and the client portal. Chart hexes moved from #0e7c86 to #0a8a94; PWA
+`theme_color`/`theme-color` is ink. **Deliberately untouched**: the
+quote/invoice/receipt/report PDFs (`lib/pdf.js` `COLORS`) still print the
+original #0e7c86 brand colour — they are client-facing documents; change
+them only on request.
+
 ### Responsive / PWA
 
 The app is a responsive installable PWA (installable on iOS/Android home

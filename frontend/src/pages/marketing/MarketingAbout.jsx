@@ -48,7 +48,7 @@ export default function MarketingAbout() {
                 {m.photo ? (
                   <img src={m.photo} alt="" className="h-20 w-20 rounded-full object-cover" />
                 ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-lagoon-600">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-900 dark:bg-lagoon-600">
                     <span className="font-display text-xl font-bold text-white">{m.name.slice(0, 2).toUpperCase()}</span>
                   </div>
                 )}

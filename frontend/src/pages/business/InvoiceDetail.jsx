@@ -342,7 +342,7 @@ export default function InvoiceDetail() {
           via the "Details" card below, this just surfaces it before the
           fold on a phone, with a paid-vs-total progress bar the desktop
           layout has no equivalent for. */}
-      <div className="mt-6 rounded-2xl bg-gradient-to-br from-lagoon-600 to-lagoon-700 p-5 text-white shadow-lg shadow-lagoon-900/20 sm:hidden">
+      <div className="mt-6 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-white shadow-lg shadow-lagoon-900/20 sm:hidden">
         <p className="text-[11px] font-bold uppercase tracking-wide text-lagoon-100">Total due</p>
         <p className="font-display text-3xl font-extrabold tabular-nums">{symbol}{invoice.total.toFixed(2)}</p>
         <div className="mt-3.5 h-1.5 overflow-hidden rounded-full bg-white/25">

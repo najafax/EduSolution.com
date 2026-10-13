@@ -7,7 +7,7 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import YearlyBarChart from '../../components/YearlyBarChart';
 import { ExpenseIcon, TrendUpIcon, RefreshIcon, BankIcon, ReportIcon } from '../../components/icons';
 
-const TOTAL_COLOR = '#0e7c86';
+const TOTAL_COLOR = '#0a8a94';
 const EXCHANGE_COLOR = '#f59e0b';
 const YEARLY_SERIES = [
   { key: 'total', label: 'Total expenses', color: TOTAL_COLOR },
@@ -17,7 +17,7 @@ const YEARLY_SERIES = [
 // One color per category, cycled if the fixed CATEGORIES list (see
 // routes/expenses.js) ever grows past this — same reserved-palette
 // approach KpiCard's `tone`s use, just per-category instead of per-metric.
-const CATEGORY_COLORS = ['#0e7c86', '#059669', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d', '#475569', '#ea580c'];
+const CATEGORY_COLORS = ['#0a8a94', '#059669', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d', '#475569', '#ea580c'];
 
 export default function ExpenseAnalytics() {
   const { token, can } = useAuth();

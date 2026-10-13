@@ -137,7 +137,7 @@ export default function Navbar() {
                 {user.avatarImage ? (
                   <img src={user.avatarImage} alt="" className="h-8 w-8 rounded-full object-cover" />
                 ) : (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 dark:bg-lagoon-600 text-xs font-bold text-white">
                     {initials}
                   </span>
                 )}

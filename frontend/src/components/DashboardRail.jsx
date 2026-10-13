@@ -28,7 +28,7 @@ export default function DashboardRail({ user, shortcuts, attentionItems }) {
         {user?.avatarImage ? (
           <img src={user.avatarImage} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
         ) : (
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lagoon-600 text-sm font-bold text-white">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 dark:bg-lagoon-600 text-sm font-bold text-white">
             {initials}
           </span>
         )}

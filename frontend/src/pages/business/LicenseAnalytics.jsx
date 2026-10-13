@@ -8,7 +8,7 @@ import YearlyBarChart from '../../components/YearlyBarChart';
 import BreakdownBars from '../../components/BreakdownBars';
 import { LicenseIcon, TrendUpIcon, AlertTriangleIcon, CheckCircleIcon, ClockIcon } from '../../components/icons';
 
-const NEW_COLOR = '#0e7c86';
+const NEW_COLOR = '#0a8a94';
 const RENEWAL_COLOR = '#059669';
 const YEARLY_SERIES = [
   { key: 'newLicenses', label: 'New licenses', color: NEW_COLOR },
@@ -99,7 +99,7 @@ export default function LicenseAnalytics() {
             <BreakdownBars
               emptyMessage="No licenses yet."
               rows={[
-                { key: 'monthly', label: 'Monthly', color: '#0e7c86', value: data.byBillingCycle.monthly || 0 },
+                { key: 'monthly', label: 'Monthly', color: '#0a8a94', value: data.byBillingCycle.monthly || 0 },
                 { key: 'yearly', label: 'Yearly', color: '#059669', value: data.byBillingCycle.yearly || 0 },
               ]}
             />

@@ -48,7 +48,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center gap-4">
             <a
               href="#contact"
-              className="min-h-11 rounded-lg bg-lagoon-600 px-6 py-3 text-sm font-bold text-white hover:bg-lagoon-500"
+              className="min-h-11 rounded-lg bg-slate-900 dark:bg-lagoon-600 px-6 py-3 text-sm font-bold text-white hover:bg-lagoon-500"
             >
               Talk to our team
             </a>
@@ -99,7 +99,7 @@ export default function Home() {
         <h2 className="font-display max-w-lg text-3xl font-bold text-slate-900 dark:text-white">Two ways we help</h2>
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
           <div className="rounded-2xl bg-slate-50 p-7 dark:bg-slate-900">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lagoon-600">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
               <GraduationCapIcon width={22} height={22} className="text-white" />
             </div>
             <h3 className="font-display mt-4 text-lg font-bold text-slate-900 dark:text-white">EduPage for Schools</h3>
@@ -108,7 +108,7 @@ export default function Home() {
             </p>
           </div>
           <div className="rounded-2xl bg-slate-50 p-7 dark:bg-slate-900">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lagoon-600">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
               <ProductIcon width={22} height={22} className="text-white" />
             </div>
             <h3 className="font-display mt-4 text-lg font-bold text-slate-900 dark:text-white">Edu Solutions Business Suite</h3>
@@ -118,7 +118,7 @@ export default function Home() {
             </p>
           </div>
           <div className="rounded-2xl bg-slate-50 p-7 dark:bg-slate-900">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lagoon-600">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
               <CheckCircleIcon width={22} height={22} className="text-white" />
             </div>
             <h3 className="font-display mt-4 text-lg font-bold text-slate-900 dark:text-white">Support &amp; Onboarding</h3>
@@ -164,7 +164,7 @@ export default function Home() {
             <div className="mt-8 grid gap-5 sm:grid-cols-3">
               {posts.map((post) => (
                 <div key={post.id} className="overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-slate-900">
-                  <div className="h-24 bg-gradient-to-br from-lagoon-500 to-lagoon-700" />
+                  <div className="h-24 bg-gradient-to-br from-lagoon-500 to-lagoon-800" />
                   <div className="p-5">
                     {post.category && (
                       <span className="font-display text-xs font-bold uppercase tracking-wide text-lagoon-600 dark:text-lagoon-400">

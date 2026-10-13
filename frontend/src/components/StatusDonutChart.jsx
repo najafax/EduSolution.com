@@ -16,7 +16,7 @@
 // ring.
 const STATUS_META = [
   { key: 'paid', label: 'Paid', color: '#059669' },
-  { key: 'sent', label: 'Sent', color: '#0e7c86' },
+  { key: 'sent', label: 'Sent', color: '#0a8a94' },
   { key: 'draft', label: 'Draft', color: '#94a3b8' },
   { key: 'void', label: 'Void', color: '#dc2626' },
 ];

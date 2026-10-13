@@ -35,7 +35,7 @@ export default defineConfig({
         display: 'standalone',
         display_override: ['fullscreen', 'standalone'],
         background_color: '#ffffff',
-        theme_color: '#0e7c86',
+        theme_color: '#10131a',
         icons: [
           {
             src: '/pwa-192x192.png',

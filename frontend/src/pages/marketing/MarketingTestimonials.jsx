@@ -36,7 +36,7 @@ export default function MarketingTestimonials() {
             {testimonials.map((t) => (
               <div key={t.id} className="flex flex-col gap-4 rounded-2xl bg-slate-50 p-7 dark:bg-slate-900">
                 {t.category && (
-                  <span className="font-display w-fit rounded-full bg-lagoon-600 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+                  <span className="font-display w-fit rounded-full bg-slate-900 dark:bg-lagoon-600 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
                     {t.category}
                   </span>
                 )}

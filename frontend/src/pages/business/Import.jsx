@@ -330,7 +330,7 @@ export default function Import() {
             onClick={() => handleTypeChange(t.value)}
             className={`min-h-11 rounded-md px-4 text-sm font-medium ${
               type === t.value
-                ? 'bg-lagoon-600 text-white'
+                ? 'bg-slate-900 dark:bg-lagoon-600 text-white'
                 : 'border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800'
             }`}
           >

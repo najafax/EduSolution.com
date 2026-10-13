@@ -375,7 +375,7 @@ export default function PortalInvoiceDetail() {
             <button
               type="submit"
               disabled={uploading}
-              className="mt-3 flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+              className="mt-3 flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 dark:bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
             >
               <UploadIcon width={16} height={16} />
               {uploading ? 'Uploading…' : 'Upload proof'}

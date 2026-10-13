@@ -93,7 +93,7 @@ export default function PortalQuotes() {
         <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Quotes</h1>
         <button
           onClick={openRequestForm}
-          className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+          className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 dark:bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
         >
           <PlusIcon width={16} height={16} />
           Request a quote
@@ -259,7 +259,7 @@ export default function PortalQuotes() {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+              className="min-h-11 rounded-md bg-slate-900 dark:bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
             >
               {submitting ? 'Sending…' : 'Send request'}
             </button>

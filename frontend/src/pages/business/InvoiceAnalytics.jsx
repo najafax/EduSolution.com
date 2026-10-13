@@ -9,7 +9,7 @@ import BreakdownBars from '../../components/BreakdownBars';
 import { InvoiceIcon, TrendUpIcon, AlertTriangleIcon, CheckCircleIcon, ClockIcon } from '../../components/icons';
 import { money } from '../../lib/money';
 
-const ISSUED_COLOR = '#0e7c86';
+const ISSUED_COLOR = '#0a8a94';
 const PAYMENTS_COLOR = '#059669';
 const YEARLY_SERIES = [
   { key: 'issued', label: 'Invoices issued', color: ISSUED_COLOR },
@@ -23,7 +23,7 @@ const YEARLY_SERIES = [
 // page's other panel (the yearly chart) already needs the generic one.
 const STATUS_ROWS = [
   { key: 'draft', label: 'Draft', color: '#94a3b8' },
-  { key: 'sent', label: 'Sent', color: '#0e7c86' },
+  { key: 'sent', label: 'Sent', color: '#0a8a94' },
   { key: 'paid', label: 'Paid', color: '#059669' },
   { key: 'void', label: 'Void', color: '#dc2626' },
 ];

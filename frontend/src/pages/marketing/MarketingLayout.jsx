@@ -103,7 +103,7 @@ function MobileMenu({ open, onClose, token }) {
           <Link
             to={token ? '/dashboard' : '/login'}
             onClick={onClose}
-            className="flex min-h-11 items-center justify-center rounded-md bg-lagoon-600 px-4 text-sm font-semibold text-white hover:bg-lagoon-500"
+            className="flex min-h-11 items-center justify-center rounded-md bg-slate-900 dark:bg-lagoon-600 px-4 text-sm font-semibold text-white hover:bg-lagoon-500"
           >
             {token ? 'Dashboard' : 'Login'}
           </Link>

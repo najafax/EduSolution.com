@@ -81,7 +81,7 @@ export default function PortalResetPassword() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-1 min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-semibold text-white hover:bg-lagoon-500 disabled:opacity-60"
+          className="mt-1 min-h-11 rounded-md bg-slate-900 dark:bg-lagoon-600 px-4 text-sm font-semibold text-white hover:bg-lagoon-500 disabled:opacity-60"
         >
           {submitting ? 'Updating…' : 'Update password'}
         </button>

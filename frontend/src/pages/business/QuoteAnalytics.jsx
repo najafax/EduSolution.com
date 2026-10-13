@@ -9,7 +9,7 @@ import BreakdownBars from '../../components/BreakdownBars';
 import { QuoteIcon, TrendUpIcon, AlertTriangleIcon, CheckCircleIcon } from '../../components/icons';
 import { money } from '../../lib/money';
 
-const CREATED_COLOR = '#0e7c86';
+const CREATED_COLOR = '#0a8a94';
 const ACCEPTED_COLOR = '#059669';
 const YEARLY_SERIES = [
   { key: 'created', label: 'Quotes created', color: CREATED_COLOR },
@@ -19,7 +19,7 @@ const YEARLY_SERIES = [
 // Same status colors as pages/business/Quotes.jsx's own ACCENT map / StatusBadge.
 const STATUS_ROWS = [
   { key: 'draft', label: 'Draft', color: '#94a3b8' },
-  { key: 'sent', label: 'Sent', color: '#0e7c86' },
+  { key: 'sent', label: 'Sent', color: '#0a8a94' },
   { key: 'accepted', label: 'Accepted', color: '#059669' },
   { key: 'declined', label: 'Declined', color: '#dc2626' },
   { key: 'expired', label: 'Expired', color: '#d97706' },

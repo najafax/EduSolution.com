@@ -45,7 +45,7 @@ export default function MarketingContact() {
                 href={`tel:${phone}`}
                 className="flex flex-col items-center gap-3 rounded-2xl bg-slate-50 p-8 text-center transition-colors hover:bg-lagoon-50 dark:bg-slate-900 dark:hover:bg-lagoon-950/40"
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lagoon-600">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8">
                     <path
                       d="M4.5 4h3.2l1.6 4.4-2 1.6a12.5 12.5 0 0 0 5.7 5.7l1.6-2 4.4 1.6v3.2c0 1-.9 1.8-1.9 1.6-8-.8-13.9-6.7-14.7-14.7C2.7 4.9 3.5 4 4.5 4Z"
@@ -62,7 +62,7 @@ export default function MarketingContact() {
                 href={`mailto:${email}`}
                 className="flex flex-col items-center gap-3 rounded-2xl bg-slate-50 p-8 text-center transition-colors hover:bg-lagoon-50 dark:bg-slate-900 dark:hover:bg-lagoon-950/40"
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lagoon-600">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8">
                     <rect x="3" y="5" width="18" height="14" rx="2" />
                     <path d="M3.5 6.5 12 13l8.5-6.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -74,7 +74,7 @@ export default function MarketingContact() {
             )}
             {address && (
               <div className="flex flex-col items-center gap-3 rounded-2xl bg-slate-50 p-8 text-center dark:bg-slate-900">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lagoon-600">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8">
                     <path d="M12 21s7-6.3 7-11.5A7 7 0 0 0 5 9.5C5 14.7 12 21 12 21Z" strokeLinejoin="round" />
                     <circle cx="12" cy="9.5" r="2.5" />

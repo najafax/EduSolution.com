@@ -175,7 +175,7 @@ export default function Settings() {
                     onClick={() => setForm((f) => ({ ...f, pdf_template: value }))}
                     className={`min-h-11 border-slate-300 px-4 text-sm font-medium transition dark:border-slate-600 ${i === 0 ? 'border-r' : ''} ${
                       form.pdf_template === value
-                        ? 'bg-lagoon-600 text-white'
+                        ? 'bg-slate-900 dark:bg-lagoon-600 text-white'
                         : 'bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -337,7 +337,7 @@ export default function Settings() {
                   onClick={() => setActiveSection(key)}
                   className={`flex min-h-11 items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition ${
                     activeSection === key
-                      ? 'bg-lagoon-600 text-white'
+                      ? 'bg-slate-900 dark:bg-lagoon-600 text-white'
                       : 'text-slate-600 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-700/60'
                   }`}
                 >

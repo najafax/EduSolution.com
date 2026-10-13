@@ -17,17 +17,24 @@
    text (see CLAUDE.md's PWA section for why webfonts aren't loaded from a
    CDN here). */
 @theme {
-  --color-lagoon-50: #edf8f7;
-  --color-lagoon-100: #d2eeec;
-  --color-lagoon-200: #a6ddda;
-  --color-lagoon-300: #74c6c2;
-  --color-lagoon-400: #3fa9a6;
-  --color-lagoon-500: #1d8d8c;
-  --color-lagoon-600: #0e7c86;
-  --color-lagoon-700: #0b5a62;
-  --color-lagoon-800: #0a464c;
-  --color-lagoon-900: #0a3539;
-  --color-lagoon-950: #06282b;
+  /* Studio palette. The scale keeps its `lagoon` name so every existing
+     class resolves to it, but the ends are re-pointed: 50-500 are the
+     accent teal (soft fills, focus rings, status tints), 600-700 are the
+     AA-contrast teal used for links and active text, and 800-950 are the
+     Studio ink family (near-black blue) that dark panels and solid fills
+     use. Solid primary buttons and avatars are ink (bg-slate-900), not
+     teal; teal is the accent only. */
+  --color-lagoon-50: #e8f5f5;
+  --color-lagoon-100: #cfeaeb;
+  --color-lagoon-200: #a2d5d8;
+  --color-lagoon-300: #6fbcc1;
+  --color-lagoon-400: #3aa1a8;
+  --color-lagoon-500: #0a8a94;
+  --color-lagoon-600: #08717a;
+  --color-lagoon-700: #065a62;
+  --color-lagoon-800: #232a3a;
+  --color-lagoon-900: #1a2030;
+  --color-lagoon-950: #10131a;
 
   /* Studio redesign (stage 1): Bricolage Grotesque replaces Sora as the
      display face (self-hosted, latin subset, one variable file covering
@@ -45,7 +52,7 @@
      same "grey with a hue bias toward the accent reads as chosen" idea the
      shadow tint above already applies. Used sparingly, opt-in per element
      (text-ink), not a replacement for slate-900 app-wide. */
-  --color-ink: #10262a;
+  --color-ink: #10131a;
 
   /* Refined shadow scale — overrides Tailwind's default shadow-* utilities
      app-wide with no per-file changes needed, the same "one token, cascades

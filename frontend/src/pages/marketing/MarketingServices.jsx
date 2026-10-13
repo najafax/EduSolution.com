@@ -47,7 +47,7 @@ export default function MarketingServices() {
         <div className="rounded-3xl bg-slate-50 p-9 dark:bg-slate-900">
           <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-start">
             <div className="max-w-md">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-lagoon-600">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
                 <GraduationCapIcon width={24} height={24} className="text-white" />
               </div>
               <h2 className="font-display mt-4 text-2xl font-bold text-slate-900 dark:text-white">EduPage for Schools</h2>

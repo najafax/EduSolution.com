@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 // same brand colors used for status elsewhere in the app (lagoon = brand,
 // emerald = money received), so the chart reads consistently with the rest
 // of the UI rather than introducing a new arbitrary palette.
-const INVOICED_COLOR = '#0e7c86';
+const INVOICED_COLOR = '#0a8a94';
 const PAID_COLOR = '#059669';
 
 const WIDTH = 600;

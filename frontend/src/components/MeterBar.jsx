@@ -1,7 +1,7 @@
 // Meter contract (see dataviz skill): fill carries the value, the unfilled
 // track is a lighter step of the same ramp — never a neutral gray track
 // under a colored fill — so the bar reads as one state, not two.
-const FILL = { lagoon: 'bg-lagoon-600', emerald: 'bg-emerald-600', amber: 'bg-amber-500', red: 'bg-red-600' };
+const FILL = { lagoon: 'bg-slate-900 dark:bg-lagoon-600', emerald: 'bg-emerald-600', amber: 'bg-amber-500', red: 'bg-red-600' };
 const TRACK = {
   lagoon: 'bg-lagoon-100 dark:bg-lagoon-950',
   emerald: 'bg-emerald-100 dark:bg-emerald-950',
