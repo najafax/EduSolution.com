@@ -26,6 +26,7 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const https = require('https');
+const http = require('http');
 const { Bot } = require('node-telegram-bot-api');
 const { run: runBot } = require('node-telegram-bot-api/node');
 
@@ -40,6 +41,9 @@ const ALLOWED_IDS = new Set(
 );
 const API_DOMAIN = process.env.TELEGRAM_API_DOMAIN || 'api.edusolutionsmaldives.com';
 const SERVICE_NAME = process.env.TELEGRAM_BACKEND_SERVICE || 'edusolution-backend';
+// Same default src/index.js itself falls back to — the backend's own loopback
+// port behind nginx (see localHealthCheck() below).
+const BACKEND_PORT = process.env.PORT || 4000;
 const CERT_PATH =
   process.env.TELEGRAM_CERT_PATH || `/etc/letsencrypt/live/${API_DOMAIN}/fullchain.pem`;
 const ALERT_INTERVAL_MINUTES = Number(process.env.TELEGRAM_ALERT_INTERVAL_MINUTES) || 5;
@@ -352,6 +356,36 @@ async function healthCheckWithRetry() {
   return result;
 }
 
+// Bypasses DNS + the public round trip entirely, hitting the backend
+// directly over loopback — this is what a real incident showed healthCheck()
+// alone can't tell apart: a string of "unreachable" alerts recurred even
+// after the retry above, each time with the backend/nginx/DB all reporting
+// healthy the whole way through, and nginx's own access log showed a real
+// external visitor using the app with clean 200s within a minute of one of
+// the alerts. The public path was the one flaking (DNS resolving back to
+// this same droplet's own IP in a way that can hairpin unreliably on some
+// cloud networks), not the backend itself — so a check that only ever asks
+// "did the public internet round trip succeed" can't distinguish a real
+// outage from that self-referential quirk. This one answers the question
+// that actually matters for alerting: is the Node process itself responding
+// at all. See runAlertChecks()'s own use of this alongside the public
+// check for how the two combine into "urgent" vs. "probably just network
+// noise."
+function localHealthCheck() {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const req = http.get(`http://127.0.0.1:${BACKEND_PORT}/api/auth/me`, { timeout: 5000 }, (res) => {
+      res.resume();
+      resolve({ ok: true, status: res.statusCode, ms: Date.now() - start });
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ ok: false, status: null, ms: Date.now() - start });
+    });
+    req.on('error', () => resolve({ ok: false, status: null, ms: Date.now() - start }));
+  });
+}
+
 async function buildStatusReport() {
   const [backend, nginx, health, cert, rootDisk, dataDisk] = await Promise.all([
     serviceState(SERVICE_NAME),
@@ -469,6 +503,7 @@ const alertState = {
   backendDown: false,
   nginxDown: false,
   healthDown: false,
+  publicOnlyDown: false,
   dbDown: false,
   diskAlerted: false,
   certAlerted: false,
@@ -577,10 +612,11 @@ bot.on('callback_query', async (ctx) => {
 // restart-deploy actions need to share the same object.)
 
 async function runAlertChecks() {
-  const [backend, nginx, health, cert, rootDisk, restartCount, backupAgeHours] = await Promise.all([
+  const [backend, nginx, health, localHealth, cert, rootDisk, restartCount, backupAgeHours] = await Promise.all([
     serviceState(SERVICE_NAME),
     serviceState('nginx'),
     healthCheckWithRetry(),
+    localHealthCheck(),
     certDaysLeft(),
     diskLine('/'),
     backendRestartCount(),
@@ -601,10 +637,34 @@ async function runAlertChecks() {
     await broadcast(nginxDown ? `\u{1F6A8} *nginx* is ${nginx.active}.` : `✅ *nginx* is back up.`);
   }
 
-  const healthDown = !health.ok;
+  // Only treat this as a real, page-worthy outage when the backend fails
+  // *both* ways — the public round trip (DNS + TLS + the real internet path,
+  // already retried in healthCheckWithRetry()) and a direct loopback request
+  // that bypasses all of that. A real incident showed the public-only path
+  // can fail for several retries straight while the backend/nginx/DB stay
+  // healthy the whole time and a genuine external visitor uses the app with
+  // clean 200s in the same window — see localHealthCheck()'s own note. That
+  // combination means the process itself was never unreachable; only the
+  // self-referential public check was.
+  const healthDown = !health.ok && !localHealth.ok;
   if (healthDown !== alertState.healthDown) {
     alertState.healthDown = healthDown;
     await broadcast(healthDown ? `\u{1F6A8} Public API (${API_DOMAIN}) is unreachable.` : '✅ Public API is reachable again.');
+  }
+
+  // The public path failing while the backend answers fine locally isn't
+  // urgent — nothing a real visitor would necessarily notice — but it's
+  // still worth a quiet note rather than silently swallowing it, in case
+  // it's ever an early sign of a genuine DNS/registrar problem rather than
+  // this check's own hairpin quirk.
+  const publicOnlyDown = !health.ok && localHealth.ok;
+  if (publicOnlyDown !== alertState.publicOnlyDown) {
+    alertState.publicOnlyDown = publicOnlyDown;
+    await broadcast(
+      publicOnlyDown
+        ? `⚠️ Public API (${API_DOMAIN}) failed from outside, but the backend is responding fine locally — likely a transient network/DNS blip, not paging as urgent.`
+        : '✅ Public API path recovered.',
+    );
   }
 
   const dbDown = !dbHealth.ok;

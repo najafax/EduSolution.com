@@ -9314,3 +9314,42 @@ commands to go through.
   single-shot `healthCheck()` — a human reading `/status` can just run it
   again, and seeing the real, un-retried result in that moment is more
   useful than a dashboard quietly retrying behind their back.
+  **Second follow-up: the retry wasn't enough — the public check needed a
+  second, independent signal to cross-check against.** The exact same
+  flapping recurred even with the retry in place: `/status` again showed
+  the backend/nginx/database all healthy the whole time, and this time
+  `dig api.edusolutionsmaldives.com` plus `grep`ing nginx's own access log
+  nailed the actual mechanism down rather than just ruling things out —
+  the domain is a plain, unproxied A record (no Cloudflare/CDN in front)
+  resolving straight to the droplet's own public IP, and that exact IP was
+  the one showing up in nginx's access log making the periodic
+  `/api/auth/me` requests, confirming `healthCheck()` is a genuine hairpin
+  round trip: the droplet asking the public internet to route a request
+  back to itself. nginx's access log for the actual incident window (once
+  the Telegram-displayed local time, UTC+5, was converted to the droplet's
+  own UTC log timestamps) showed the self-check's own request simply
+  missing for several minutes — then, barely a minute later, a real
+  external visitor (a genuine phone, logging in and pulling the dashboard/
+  invoices/clients) sailed through with clean 200s the entire time. A
+  retry alone can't fix a check whose own premise is unreliable in a way
+  that has nothing to do with whether the app is actually reachable — it
+  just delays the same false alarm by a few seconds.
+  `localHealthCheck()` is the fix: a direct loopback request to
+  `http://127.0.0.1:${BACKEND_PORT}/api/auth/me` (`BACKEND_PORT` mirrors
+  `src/index.js`'s own `PORT` fallback), bypassing DNS, TLS, and the public
+  round trip entirely — it only answers "is the Node process itself
+  responding," which is the thing actually worth paging someone about.
+  `runAlertChecks()` now computes both `health` (the public,
+  already-retried check) and `localHealth` (this one) and only flips
+  `alertState.healthDown` — the urgent 🚨 alert — when **both** fail
+  together; a public-only failure no longer pages anyone, since that
+  combination is exactly the self-referential artifact this incident
+  demonstrated, not a real outage. It isn't silently dropped, though —
+  `alertState.publicOnlyDown` is a second, independent state-transition
+  flag that fires its own quieter ⚠️ note ("failed from outside, but the
+  backend is responding fine locally") so a genuinely different failure
+  mode — DNS/registrar misconfiguration while the app itself hums along
+  fine, a real scenario the local-only check can't rule out — still
+  surfaces, just without the same urgency as a confirmed full outage.
+  `/status`'s own on-demand report is untouched, still showing just the
+  public check's result for a human glancing at it.
