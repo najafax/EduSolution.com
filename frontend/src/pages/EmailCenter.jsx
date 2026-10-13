@@ -54,7 +54,7 @@ function TemplateCard({ template, token, onChanged, canManage }) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div className="rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{template.label}</h3>
         {template.isCustom && (
@@ -147,7 +147,7 @@ function SentLog({ token }) {
   }, [token, page]);
 
   return (
-    <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div className="mt-6 overflow-hidden rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
       {error && <p className="p-6 text-sm text-red-600 dark:text-red-400">{error}</p>}
       {!error && loading ? (
         <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading…</p>

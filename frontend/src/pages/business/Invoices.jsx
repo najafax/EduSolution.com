@@ -12,7 +12,9 @@ import EmptyState from '../../components/EmptyState';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
+import PageMenu from '../../components/PageMenu';
 import IconActionButton from '../../components/IconActionButton';
+import RowActions from '../../components/RowActions';
 import VoidReasonModal from '../../components/VoidReasonModal';
 import RecordPaymentModal from '../../components/RecordPaymentModal';
 import KpiCard from '../../components/KpiCard';
@@ -77,6 +79,8 @@ export default function Invoices() {
   const [voidError, setVoidError] = useState('');
   const [paymentTarget, setPaymentTarget] = useState(null); // the invoice being paid, or null
   const [paymentNotice, setPaymentNotice] = useState('');
+  // Desktop (xl:) split view: the row whose details/actions show in the side panel.
+  const [selectedId, setSelectedId] = useState(null);
   const [summary, setSummary] = useState(null);
   const { confirm, confirmDialog } = useConfirm();
 
@@ -290,27 +294,7 @@ export default function Invoices() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Invoices</h1>
         <div className="flex flex-wrap gap-2">
-          <Link
-            to="/invoices/analytics"
-            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            <ReportIcon width={16} height={16} />
-            Analytics
-          </Link>
-          <button
-            onClick={handleExportCsv}
-            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            <DownloadIcon width={16} height={16} />
-            Export CSV
-          </button>
-          <button
-            onClick={handleExportXlsx}
-            className="hidden min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:flex"
-          >
-            <DownloadIcon width={16} height={16} />
-            Export Excel
-          </button>
+          <PageMenu items={[{ label: 'Analytics', icon: ReportIcon, to: '/invoices/analytics' }, { label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
           {canManage && (
             <button
               onClick={() => setShowNewForm(true)}
@@ -324,7 +308,7 @@ export default function Invoices() {
       </div>
 
       {summary && (
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="-mx-4 mt-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden [&>*]:min-w-[11rem] [&>*]:snap-start sm:[&>*]:min-w-0">
           <KpiCard icon={<ClockIcon />} label="Outstanding" value={summary.outstandingTotal.toFixed(2)} tone="neutral" />
           <KpiCard
             icon={<AlertTriangleIcon />}
@@ -348,7 +332,12 @@ export default function Invoices() {
       {paymentNotice && <p className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">{paymentNotice}</p>}
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      {/* Studio stage 3: at xl: and up the list and the selected invoice sit
+          side by side, so a row's details and every action are one click away
+          without leaving the list. Below xl: the layout is unchanged (the
+          panel is hidden; rows keep their own primary action + menu). */}
+      <div className="mt-6 xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start xl:gap-4">
+      <div className="rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={['w-28', 'w-32', 'w-24', 'w-20', 'w-20', 'w-20', 'w-32']} />
@@ -372,12 +361,17 @@ export default function Invoices() {
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3 text-right">Total</th>
                     <th className="px-4 py-3 text-right">Balance due</th>
-                    <th className="px-4 py-3" />
+                    <th className="px-4 py-3 xl:hidden" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <tr
+                      key={invoice.id}
+                      onClick={() => setSelectedId(invoice.id)}
+                      aria-selected={selectedId === invoice.id}
+                      className={`cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 ${selectedId === invoice.id ? 'bg-lagoon-50/60 dark:bg-lagoon-950/40' : ''}`}
+                    >
                       <td className="whitespace-nowrap px-4 py-3">
                         <Link to={`/invoices/${invoice.id}`} className="font-medium text-lagoon-600 hover:text-lagoon-500">
                           {invoice.number}
@@ -390,8 +384,8 @@ export default function Invoices() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{invoice.total.toFixed(2)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{invoice.balance_due.toFixed(2)}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex justify-end gap-1.5">{rowActions(invoice)}</div>
+                      <td className="whitespace-nowrap px-4 py-3 xl:hidden" onClick={(e) => e.stopPropagation()}>
+                        <RowActions>{rowActions(invoice)}</RowActions>
                       </td>
                     </tr>
                   ))}
@@ -433,12 +427,46 @@ export default function Invoices() {
                     <dt className="text-slate-500 dark:text-slate-400">Balance due</dt>
                     <dd className="text-slate-900 dark:text-white">{invoice.balance_due.toFixed(2)}</dd>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(invoice)}</div>
+                  <div className="pt-1"><RowActions fill>{rowActions(invoice)}</RowActions></div>
                 </MobileListAccordion>
               ))}
             </div>
           </>
         )}
+      </div>
+
+      <aside className="sticky top-20 hidden rounded-3xl bg-white p-5 shadow-sm xl:block dark:border dark:border-slate-700 dark:bg-slate-900" aria-label="Selected invoice">
+        {(() => {
+          const sel = invoices.find((i) => i.id === selectedId);
+          if (!sel) {
+            return <p className="text-sm text-slate-500 dark:text-slate-400">Select an invoice to see its details and actions here.</p>;
+          }
+          const pct = sel.total > 0 ? Math.min(100, Math.round(((sel.total - sel.balance_due) / sel.total) * 100)) : 0;
+          return (
+            <div className="flex flex-col gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{sel.number}</p>
+                <p className="mt-1 font-semibold text-slate-900 dark:text-white">{sel.client_name}</p>
+                <div className="mt-2"><StatusBadge status={sel.is_overdue ? 'overdue' : sel.status} /></div>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Balance due</p>
+                <p className="font-display text-3xl font-extrabold tabular-nums text-slate-900 dark:text-white">{sel.balance_due.toFixed(2)}</p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Paid {(sel.total - sel.balance_due).toFixed(2)} of {sel.total.toFixed(2)} · Due {sel.due_date}
+                </p>
+              </div>
+              <RowActions expanded>{rowActions(sel)}</RowActions>
+              <Link to={`/invoices/${sel.id}`} className="text-sm font-semibold text-lagoon-700 hover:text-lagoon-600 dark:text-lagoon-300">
+                Open full page →
+              </Link>
+            </div>
+          );
+        })()}
+      </aside>
       </div>
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}

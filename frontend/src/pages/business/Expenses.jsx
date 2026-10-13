@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -16,6 +16,7 @@ import SearchableSelect from '../../components/SearchableSelect';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
+import PageMenu from '../../components/PageMenu';
 import IconActionButton from '../../components/IconActionButton';
 import ImportResultsTable from '../../components/ImportResultsTable';
 import { ExpenseIcon, DownloadIcon, UploadIcon, PlusIcon, PencilIcon, TrashIcon, ReportIcon } from '../../components/icons';
@@ -382,27 +383,7 @@ export default function Expenses() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Expenses</h1>
         <div className="flex flex-wrap gap-2">
-          <Link
-            to="/expenses/analytics"
-            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            <ReportIcon width={16} height={16} />
-            Analytics
-          </Link>
-          <button
-            onClick={handleExportCsv}
-            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            <DownloadIcon width={16} height={16} />
-            Export CSV
-          </button>
-          <button
-            onClick={handleExportXlsx}
-            className="hidden min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:flex"
-          >
-            <DownloadIcon width={16} height={16} />
-            Export Excel
-          </button>
+          <PageMenu items={[{ label: 'Analytics', icon: ReportIcon, to: '/expenses/analytics' }, { label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
           {canManage && (
             <button
               onClick={() => setShowImport(true)}
@@ -592,7 +573,7 @@ export default function Expenses() {
         </form>
       </Modal>
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={canManage ? ['w-24', 'w-24', 'w-28', 'w-40', 'w-20', 'w-16'] : ['w-24', 'w-24', 'w-28', 'w-40', 'w-20']} />
@@ -732,7 +713,7 @@ export default function Expenses() {
                   </MobileListAccordion>
                 ))}
               </div>
-              <div className="mt-2.5 flex justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-white">
+              <div className="mt-2.5 flex justify-between rounded-3xl bg-white dark:border px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-white">
                 <span>Total</span>
                 <span>{total.toFixed(2)}</span>
               </div>

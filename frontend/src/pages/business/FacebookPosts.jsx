@@ -10,6 +10,7 @@ import EmptyState from '../../components/EmptyState';
 import StatusBadge from '../../components/StatusBadge';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
+import RowActions from '../../components/RowActions';
 import { FacebookIcon, PlusIcon, PencilIcon, SendIcon, TrashIcon } from '../../components/icons';
 
 // Weekly AI-drafted Facebook Page post ideas, seeded from this app's own
@@ -189,7 +190,7 @@ export default function FacebookPosts() {
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={4} cols={canManage ? ['w-80', 'w-20', 'w-32', 'w-32', 'w-28'] : ['w-80', 'w-20', 'w-32', 'w-32']} />
@@ -237,7 +238,7 @@ export default function FacebookPosts() {
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">{relativeTime(post.created_at)}</td>
                       {canManage && (
                         <td className="px-4 py-3">
-                          <div className="flex justify-end gap-1.5">{rowActions(post)}</div>
+                          <RowActions>{rowActions(post)}</RowActions>
                         </td>
                       )}
                     </tr>
@@ -272,7 +273,7 @@ export default function FacebookPosts() {
                       </>
                     )}
                   </dl>
-                  {canManage && post.status === 'draft' && <div className="mt-2 flex flex-wrap gap-1.5 pt-1">{rowActions(post)}</div>}
+                  {canManage && post.status === 'draft' && <div className="mt-2 pt-1"><RowActions fill>{rowActions(post)}</RowActions></div>}
                 </MobileListAccordion>
               ))}
             </div>

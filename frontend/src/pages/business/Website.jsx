@@ -248,7 +248,7 @@ function PostsSection({ token, canManage }) {
         </form>
       </Modal>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={4} cols={canManage ? ['w-64', 'w-28', 'w-24', 'w-16'] : ['w-64', 'w-28', 'w-24']} />
@@ -461,7 +461,7 @@ function TestimonialsSection({ token, canManage }) {
         </form>
       </Modal>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={4} cols={canManage ? ['w-64', 'w-32', 'w-24', 'w-16'] : ['w-64', 'w-32', 'w-24']} />
@@ -674,7 +674,7 @@ function ServicesSection({ token, canManage }) {
         </form>
       </Modal>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={3} cols={canManage ? ['w-48', 'w-64', 'w-20', 'w-16'] : ['w-48', 'w-64', 'w-20']} />
@@ -867,7 +867,7 @@ function TeamSection({ token, canManage }) {
         </form>
       </Modal>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={3} cols={canManage ? ['w-16', 'w-40', 'w-32', 'w-16'] : ['w-16', 'w-40', 'w-32']} />
@@ -1086,7 +1086,7 @@ function GallerySection({ token, canManage }) {
           ))}
         </div>
       ) : gallery.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <EmptyState
             icon={<ImageIcon />}
             title="No gallery images yet."
@@ -1291,7 +1291,7 @@ function VideosSection({ token, canManage }) {
           ))}
         </div>
       ) : videos.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <EmptyState
             icon={<VideoIcon />}
             title="No videos yet."

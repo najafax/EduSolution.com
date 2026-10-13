@@ -83,7 +83,7 @@ function LoginForm() {
     'mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3.5 py-2 text-base shadow-sm transition-shadow focus:border-lagoon-500 focus:shadow-[0_0_0_3px_rgba(14,124,134,0.15)] focus:outline-none dark:border-slate-600 dark:bg-slate-950 dark:text-white dark:focus:shadow-[0_0_0_3px_rgba(63,169,166,0.2)]';
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-xl sm:p-9 dark:border-slate-700 dark:bg-slate-900">
+    <div className="rounded-3xl bg-white dark:border p-7 shadow-xl sm:p-9 dark:border-slate-700 dark:bg-slate-900">
       <h2 className="text-xl font-bold text-ink dark:text-white">Log in</h2>
 
       {notice && (

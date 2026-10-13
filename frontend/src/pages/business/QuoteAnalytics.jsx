@@ -94,7 +94,7 @@ export default function QuoteAnalytics() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-3xl bg-white dark:border p-5 shadow-sm lg:col-span-2 dark:border-slate-700 dark:bg-slate-900">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Quotes created &amp; accepted by year</h2>
           <div className="mt-4">
             <YearlyBarChart
@@ -106,7 +106,7 @@ export default function QuoteAnalytics() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Status breakdown</h2>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Current quotes, by status.</p>
           <div className="mt-4">
@@ -136,7 +136,7 @@ export default function QuoteAnalytics() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Year by year</h2>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -203,7 +203,7 @@ export default function QuoteAnalytics() {
       </div>
 
       {data.topClients.length > 0 && (
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Top clients by quoted amount</h2>
           </div>

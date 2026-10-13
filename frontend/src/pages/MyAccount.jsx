@@ -235,7 +235,7 @@ export default function MyAccount() {
         permissions.
       </p>
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Photo</h2>
         <div className="mt-3 flex items-center gap-4">
           {user?.avatarImage ? (
@@ -281,7 +281,7 @@ export default function MyAccount() {
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">JPEG, PNG, or WEBP, up to 3MB.</p>
       </div>
 
-      <form onSubmit={handleProfileSubmit} className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handleProfileSubmit} className="mt-4 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Profile</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">
@@ -316,7 +316,7 @@ export default function MyAccount() {
         </button>
       </form>
 
-      <form onSubmit={handlePasswordSubmit} className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handlePasswordSubmit} className="mt-4 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Change password</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">
@@ -354,7 +354,7 @@ export default function MyAccount() {
         </button>
       </form>
 
-      <form onSubmit={handlePrefsSubmit} className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handlePrefsSubmit} className="mt-4 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</h2>
         <label className="mt-3 flex min-h-11 items-center gap-2">
           <input
@@ -420,7 +420,7 @@ export default function MyAccount() {
         </button>
       </form>
 
-      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-4 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Active sessions</h2>
           {otherSessionsCount > 0 && (

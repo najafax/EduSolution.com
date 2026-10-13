@@ -16,7 +16,9 @@ import KpiCard from '../../components/KpiCard';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
+import PageMenu from '../../components/PageMenu';
 import IconActionButton from '../../components/IconActionButton';
+import RowActions from '../../components/RowActions';
 import { BankIcon, TrendDownIcon, TrendUpIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, RefreshIcon, HistoryIcon } from '../../components/icons';
 
 // Money an owner/partner takes OUT of the business, with an explicit way to
@@ -387,20 +389,7 @@ export default function OwnerDraws() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={handleExportCsv}
-            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            <DownloadIcon width={16} height={16} />
-            Export CSV
-          </button>
-          <button
-            onClick={handleExportXlsx}
-            className="hidden min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:flex"
-          >
-            <DownloadIcon width={16} height={16} />
-            Export Excel
-          </button>
+          <PageMenu items={[{ label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
           {canManage && (
             <button
               onClick={startCreate}
@@ -431,7 +420,7 @@ export default function OwnerDraws() {
           returned money — with a single owner this would just repeat the
           "Outstanding balance" KPI card above under a different name. */}
       {summary && summary.byName.length > 1 && (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="mt-4 rounded-3xl bg-white dark:border p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Outstanding by owner</p>
           <div className="mt-2 flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
             {summary.byName.map((n) => (
@@ -600,7 +589,7 @@ export default function OwnerDraws() {
         </form>
       </Modal>
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={canManage ? ['w-24', 'w-20', 'w-32', 'w-40', 'w-20', 'w-20', 'w-24'] : ['w-24', 'w-20', 'w-32', 'w-40', 'w-20', 'w-20']} />
@@ -669,7 +658,7 @@ export default function OwnerDraws() {
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
-                          <div className="flex justify-end gap-1.5">{rowActions(d)}</div>
+                          <RowActions>{rowActions(d)}</RowActions>
                         </td>
                       )}
                     </tr>
@@ -725,7 +714,7 @@ export default function OwnerDraws() {
                         <dd className="text-slate-900 dark:text-white">{d.notes}</dd>
                       </div>
                     )}
-                    {canManage && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(d)}</div>}
+                    {canManage && <div className="pt-1"><RowActions fill>{rowActions(d)}</RowActions></div>}
                   </MobileListAccordion>
                 ))}
               </div>

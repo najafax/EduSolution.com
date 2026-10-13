@@ -13,7 +13,9 @@ import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
+import PageMenu from '../../components/PageMenu';
 import IconActionButton from '../../components/IconActionButton';
+import RowActions from '../../components/RowActions';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import CampaignComposeModal from '../../components/CampaignComposeModal';
 import { UsersIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, SendIcon, MegaphoneIcon } from '../../components/icons';
@@ -194,20 +196,7 @@ export default function Clients() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Clients</h1>
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={handleExportCsv}
-            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            <DownloadIcon width={16} height={16} />
-            Export CSV
-          </button>
-          <button
-            onClick={handleExportXlsx}
-            className="hidden min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:flex"
-          >
-            <DownloadIcon width={16} height={16} />
-            Export Excel
-          </button>
+          <PageMenu items={[{ label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
           {canManage && (
             <button
               onClick={startCreate}
@@ -259,7 +248,7 @@ export default function Clients() {
         </form>
       </Modal>
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={canManage || canSendCampaigns ? ['w-32', 'w-40', 'w-24', 'w-32', 'w-16'] : ['w-32', 'w-40', 'w-24', 'w-32']} />
@@ -300,7 +289,7 @@ export default function Clients() {
                       </td>
                       {(canManage || canSendCampaigns) && (
                         <td className="whitespace-nowrap px-4 py-3">
-                          <div className="flex justify-end gap-1.5">{rowActions(client)}</div>
+                          <RowActions>{rowActions(client)}</RowActions>
                         </td>
                       )}
                     </tr>
@@ -332,7 +321,7 @@ export default function Clients() {
                     <dt className="shrink-0 text-slate-500 dark:text-slate-400">Address</dt>
                     <dd className="text-right text-slate-900 dark:text-white">{client.address || '—'}</dd>
                   </div>
-                  {(canManage || canSendCampaigns) && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(client)}</div>}
+                  {(canManage || canSendCampaigns) && <div className="pt-1"><RowActions fill>{rowActions(client)}</RowActions></div>}
                 </MobileListAccordion>
               ))}
             </div>

@@ -159,7 +159,7 @@ export default function PortalQuotes() {
         <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">No quotes match "{search}".</p>
       ) : (
         <>
-          <div className="mt-2 hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white sm:block dark:border-slate-700 dark:bg-slate-900">
+          <div className="mt-2 hidden overflow-x-auto rounded-3xl bg-white dark:border sm:block dark:border-slate-700 dark:bg-slate-900">
             <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
               <thead>
                 <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
@@ -196,7 +196,7 @@ export default function PortalQuotes() {
               <Link
                 key={quote.id}
                 to={`/portal/quotes/${quote.id}`}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-lagoon-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+                className="flex items-center justify-between gap-3 rounded-3xl bg-white dark:border p-4 shadow-sm transition hover:border-lagoon-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
               >
                 <div className="min-w-0">
                   <p className="font-medium text-slate-900 dark:text-white">{quote.number}</p>

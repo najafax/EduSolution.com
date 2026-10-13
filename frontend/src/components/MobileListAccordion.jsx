@@ -38,7 +38,7 @@
 // entirely while <details>/<summary> still handle the open/close behavior.
 export default function MobileListAccordion({ summary, children, name, accent }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="relative overflow-hidden rounded-3xl bg-white dark:border shadow-sm dark:border-slate-800 dark:bg-slate-900">
       {accent && <span className={`absolute inset-y-0 left-0 w-1 ${accent}`} aria-hidden="true" />}
       <details name={name} className="group">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 py-3 pl-5 pr-4 [&::-webkit-details-marker]:hidden">

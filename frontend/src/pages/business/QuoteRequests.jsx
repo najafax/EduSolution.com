@@ -11,6 +11,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
+import RowActions from '../../components/RowActions';
 import { InboxIcon, CheckCircleIcon, XIcon } from '../../components/icons';
 
 const STATUS_OPTIONS = [
@@ -131,7 +132,7 @@ export default function QuoteRequests() {
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={['w-32', 'w-64', 'w-24', 'w-24', 'w-24']} />
@@ -167,7 +168,7 @@ export default function QuoteRequests() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{request.created_at.slice(0, 10)}</td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex justify-end gap-1.5">{rowActions(request)}</div>
+                        <RowActions>{rowActions(request)}</RowActions>
                       </td>
                     </tr>
                   ))}
@@ -204,7 +205,7 @@ export default function QuoteRequests() {
                       <dd className="text-right text-slate-900 dark:text-white">{request.decision_note}</dd>
                     </div>
                   )}
-                  <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(request)}</div>
+                  <div className="pt-1"><RowActions fill>{rowActions(request)}</RowActions></div>
                 </MobileListAccordion>
               ))}
             </div>

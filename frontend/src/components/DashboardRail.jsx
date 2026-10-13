@@ -22,7 +22,7 @@ export default function DashboardRail({ user, shortcuts, attentionItems }) {
     .toUpperCase();
 
   return (
-    <div className="flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div className="flex flex-col gap-5 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       {/* Profile card */}
       <Link to="/account" className="flex items-center gap-3 rounded-xl p-1 hover:bg-slate-50 dark:hover:bg-slate-800">
         {user?.avatarImage ? (

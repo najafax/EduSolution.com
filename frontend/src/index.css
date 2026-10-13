@@ -194,3 +194,26 @@ button:not(:disabled):active,
     animation: none;
   }
 }
+
+/* Studio stage 4: on phones a Modal is a bottom sheet (components/Modal.jsx)
+   whose body scrolls under a fixed header. The Save/Cancel row of a form
+   inside it — recognised as a form's last child that contains the submit
+   button, so it needs no per-page change — stays pinned to the bottom of
+   the sheet while the fields scroll. From `sm` up the modal is a centred
+   card as before and this does not apply. */
+@media (max-width: 639px) {
+  .modal-body form > :last-child:has(button[type="submit"]) {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin-inline: -1.25rem;
+    margin-bottom: -1.25rem;
+    padding: 0.75rem 1.25rem max(0.75rem, env(safe-area-inset-bottom));
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+  }
+  .dark .modal-body form > :last-child:has(button[type="submit"]) {
+    background: #0f172a;
+    border-top-color: #1e293b;
+  }
+}

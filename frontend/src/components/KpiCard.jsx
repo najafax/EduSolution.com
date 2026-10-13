@@ -13,7 +13,7 @@ const TONES = {
 export default function KpiCard({ icon, label, value, sub, tone = 'neutral', className = '' }) {
   const t = TONES[tone] || TONES.neutral;
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 ${className}`}>
+    <div className={`rounded-3xl bg-white dark:border p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 ${className}`}>
       <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${t.icon}`}>{icon}</span>
       <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
       <p className={`mt-0.5 font-display text-xl font-extrabold tabular-nums ${t.value}`}>{value}</p>

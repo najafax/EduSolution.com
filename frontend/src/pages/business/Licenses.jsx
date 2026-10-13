@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { todayStr, advanceExpiryStr, timeAgo } from '../../lib/date';
@@ -16,7 +16,9 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import KpiCard from '../../components/KpiCard';
+import PageMenu from '../../components/PageMenu';
 import IconActionButton from '../../components/IconActionButton';
+import RowActions from '../../components/RowActions';
 import {
   LicenseIcon,
   CheckCircleIcon,
@@ -420,27 +422,7 @@ export default function Licenses() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            to="/licenses/analytics"
-            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            <ReportIcon width={16} height={16} />
-            Analytics
-          </Link>
-          <button
-            onClick={handleExportCsv}
-            className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            <DownloadIcon width={16} height={16} />
-            Export CSV
-          </button>
-          <button
-            onClick={handleExportXlsx}
-            className="hidden min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:flex"
-          >
-            <DownloadIcon width={16} height={16} />
-            Export Excel
-          </button>
+          <PageMenu items={[{ label: 'Analytics', icon: ReportIcon, to: '/licenses/analytics' }, { label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
           {canManage && (
             <button
               onClick={startCreate}
@@ -471,7 +453,7 @@ export default function Licenses() {
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading || !settingsLoaded ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={['w-32', 'w-28', 'w-16', 'w-24', 'w-20', 'w-24', 'w-20', 'w-32']} />
@@ -543,7 +525,7 @@ export default function Licenses() {
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
-                          <div className="flex justify-end gap-1.5">{rowActions(l)}</div>
+                          <RowActions>{rowActions(l)}</RowActions>
                         </td>
                       )}
                     </tr>
@@ -608,7 +590,7 @@ export default function Licenses() {
                       </dd>
                     </div>
                   )}
-                  {canManage && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(l)}</div>}
+                  {canManage && <div className="pt-1"><RowActions fill>{rowActions(l)}</RowActions></div>}
                 </MobileListAccordion>
               ))}
             </div>

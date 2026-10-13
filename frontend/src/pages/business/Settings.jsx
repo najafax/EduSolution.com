@@ -308,7 +308,7 @@ export default function Settings() {
             {SECTIONS.map(({ key, title, Icon }) => (
               <details
                 key={key}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                className="group overflow-hidden rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900"
               >
                 <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-lagoon-50 text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-300">
@@ -328,7 +328,7 @@ export default function Settings() {
           </div>
 
           {/* Desktop — section rail + content panel */}
-          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:grid sm:grid-cols-[220px_1fr]">
+          <div className="hidden overflow-hidden rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:grid sm:grid-cols-[220px_1fr]">
             <nav className="flex flex-col gap-0.5 border-r border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
               {SECTIONS.map(({ key, title, Icon }) => (
                 <button

@@ -101,7 +101,7 @@ export default function Reports() {
         Download a PDF report for any date range — sales, tax, profit &amp; loss, expenses, and bank balance.
       </p>
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-wrap items-end gap-4">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">From</span>
@@ -145,7 +145,7 @@ export default function Reports() {
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {REPORT_TYPES.map((report) => (
-          <div key={report.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div key={report.key} className="rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div className="flex items-start gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400">
                 <ReportIcon />

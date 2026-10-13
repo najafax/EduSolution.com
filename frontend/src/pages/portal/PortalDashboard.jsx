@@ -69,7 +69,7 @@ export default function PortalDashboard() {
           <Link
             key={to}
             to={to}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-lagoon-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+            className="rounded-3xl bg-white dark:border p-5 shadow-sm transition hover:border-lagoon-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400">
               <Icon width={18} height={18} />

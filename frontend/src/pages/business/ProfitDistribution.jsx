@@ -15,6 +15,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
+import RowActions from '../../components/RowActions';
 import { BankIcon, PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XIcon, UsersIcon, RefreshIcon } from '../../components/icons';
 
 // Internal profit calculator — revenue received (MVR) minus what it cost to
@@ -894,7 +895,7 @@ export default function ProfitDistribution() {
         )}
       </Modal>
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading || !settingsLoaded ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={4} cols={canManage ? ['w-48', 'w-20', 'w-20', 'w-20', 'w-20', 'w-16'] : ['w-48', 'w-20', 'w-20', 'w-20', 'w-20']} />
@@ -946,7 +947,7 @@ export default function ProfitDistribution() {
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
-                          <div className="flex justify-end gap-1.5">{rowActions(deal)}</div>
+                          <RowActions>{rowActions(deal)}</RowActions>
                         </td>
                       )}
                     </tr>
@@ -990,7 +991,7 @@ export default function ProfitDistribution() {
                     <dt className="text-slate-500 dark:text-slate-400">Cost</dt>
                     <dd className="text-slate-900 dark:text-white">{deal.cost_mvr ? `${symbol}${deal.cost_mvr.toFixed(2)}` : '—'}</dd>
                   </div>
-                  {canManage && <div className="flex flex-wrap gap-1.5 pt-1">{rowActions(deal)}</div>}
+                  {canManage && <div className="pt-1"><RowActions fill>{rowActions(deal)}</RowActions></div>}
                 </MobileListAccordion>
               ))}
             </div>

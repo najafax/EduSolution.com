@@ -44,7 +44,7 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center sm:overflow-y-auto sm:px-4 sm:py-4"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) onClose?.();
           }}
@@ -54,26 +54,26 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
           transition={{ duration: 0.15 }}
         >
           <motion.div
-            className={`w-full ${maxWidthClass} rounded-lg bg-white p-5 shadow-xl dark:bg-slate-900`}
-            initial={{ opacity: 0, scale: 0.96, y: 8 }}
+            className={`modal-panel flex max-h-[92dvh] w-full flex-col rounded-t-[28px] bg-white shadow-xl sm:max-h-none sm:rounded-3xl dark:bg-slate-900 ${maxWidthClass}`}
+            initial={{ opacity: 0, scale: 0.98, y: 24 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
+            exit={{ opacity: 0, scale: 0.98, y: 24 }}
             transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-semibold text-slate-900 dark:text-white">{title}</h2>
+            <div className="flex shrink-0 items-center justify-between gap-4 px-5 pb-1 pt-5">
+              <h2 className="font-display text-lg font-extrabold text-slate-900 dark:text-white">{title}</h2>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
-            <div className="mt-3">{children}</div>
+            <div className="modal-body min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-2" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>{children}</div>
           </motion.div>
         </motion.div>
       )}

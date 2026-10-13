@@ -231,7 +231,7 @@ export default function Financials() {
       </div>
 
       {summary.totalInvoiced > 0 && (
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="mt-6 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <MeterBar
             label="Collection rate"
             pct={collectedPct}

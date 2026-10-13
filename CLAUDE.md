@@ -9029,6 +9029,45 @@ only the shortcuts row).
 - Recent payments is an always-open card, receipt number still downloads
   the PDF via `api.invoices.openReceiptPdf`.
 
+### Redesign stages 5-6 — Studio lists and forms (`frontend/src/`)
+
+Stages 3 and 4 of the Studio redesign (presentation only; every route, API
+call, permission gate, and business rule is unchanged). Supersedes earlier
+notes on icon-only row actions, header button rows, centered modals, and
+bordered cards wherever they conflict.
+
+- **Cards**: every `rounded-2xl border border-slate-200 bg-white` container
+  (79 sites, incl. `Accordion`/`MobileListAccordion`/`KpiCard` wrappers) is
+  now `rounded-3xl bg-white dark:border ...` — borderless on the `canvas`
+  ground in light mode, outlined in dark mode.
+- **`components/RowActions.jsx`**: wraps a page's existing fragment of
+  conditional `IconActionButton`s (read via their props only — it decides
+  nothing about who may do what) and renders ONE labelled primary button plus
+  a "more" menu (portal popover from `sm`, `BottomSheet` on phones). Primary
+  = first child whose title is in `PRIMARY_TITLES` (Record payment, Renew,
+  Create quote…, Email to client, Edit, …), else the first. `expanded`
+  renders every action as a labelled button (desktop detail panel); `fill`
+  makes the primary stretch (mobile accordion bodies). Applied to Invoices,
+  Quotes, Quote requests, Clients, Licenses, Owner draws, Profit
+  Distribution, Facebook posts. Pages with just Edit/Delete icons keep them.
+- **`components/PageMenu.jsx`** (+ exported `MoreMenu`): Analytics / Export
+  CSV / Export Excel header buttons collapse into one "more" button on
+  Invoices, Quotes, Licenses, Expenses, Clients, Capital contributions,
+  Owner draws; the exports still pass the page's current filters.
+- **Invoices split view** (`xl:` and up): list left, selected-invoice panel
+  right (balance, progress, every action via `RowActions expanded`, link to
+  the full page); the per-row actions column is hidden at `xl:` since the
+  panel carries them. Below `xl:` rows keep primary action + menu. The
+  summary cards are a swipeable row on phones.
+- **`Modal.jsx`**: below `sm` it is a bottom sheet (`92dvh` max, rounded
+  top, fixed header, scrolling `.modal-body`); from `sm` up it is the
+  centred card. `index.css` pins a form's last child that contains the
+  submit button (Save/Cancel) to the bottom of the sheet on phones — no
+  per-form change. The invoice/quote forms do NOT show a running total in
+  that bar: totals stay computed only by `lib/totals.js` on the server
+  (the "don't recompute totals on the frontend" rule).
+- Header: `Navbar`/`TopBar` titles use the Bricolage display face.
+
 ### Responsive / PWA
 
 The app is a responsive installable PWA (installable on iOS/Android home

@@ -220,7 +220,7 @@ export default function Shareholders() {
         </form>
       </Modal>
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={3} cols={canManage ? ['w-40', 'w-56', 'w-16', 'w-20', 'w-16'] : ['w-40', 'w-56', 'w-16', 'w-20']} />

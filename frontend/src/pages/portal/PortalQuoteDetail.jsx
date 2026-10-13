@@ -70,7 +70,7 @@ export default function PortalQuoteDetail() {
         Back to quotes
       </Link>
 
-      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-4 rounded-3xl bg-white dark:border p-6 shadow-sm sm:p-8 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{settings?.business_name}</p>
