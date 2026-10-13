@@ -9001,6 +9001,34 @@ desktop `Sidebar` wherever they conflict with this section.
   pattern, split-view lists, full-screen form sheets, and the "Record
   payment" shortcut in Create (needs an invoice picker) — later stages.
 
+### Redesign stage 4 — Studio dashboard (`frontend/src/pages/Dashboard.jsx`)
+
+Stage 2 of the Studio redesign; presentation only. It **supersedes** the
+"Dashboard redesign — ring KPIs + widget rail" and "Dashboard scoped to the
+current year" layout notes wherever they conflict. Data flow is unchanged:
+one `GET /api/dashboard/overview`, the same year-scoped `financials`
+figures, the same per-section permission gates, the same `settingsLoaded`
+paint gate and `canViewFinancials` fallback (a user without it still sees
+only the shortcuts row).
+
+- **Order (phone-first)**: Needs attention → Bank balance hero + "This
+  year" paid/outstanding/overdue → Recent payments → collapsible Revenue,
+  Invoices by status, This year at a glance (now `defaultOpen={false}`; at
+  `sm:` and up `Accordion` forces bodies visible anyway) → shortcuts.
+- `components/AttentionCarousel.jsx` (below `xl:` only — the rail still owns
+  this list at `xl:`): tinted snap-scrolling card per overdue invoice /
+  expiring license, from the same `attentionItems`; a calm "All caught up"
+  card when empty.
+- `components/BalanceHero.jsx`: dark ink card with the bank balance and a
+  sparkline of `monthlyTrend[].paid` (context only, own min/max).
+- `components/StatBars.jsx`: one card of labelled figures with a bar each,
+  every bar a share of `totalInvoiced` (same denominator the ring cards
+  used, so rows stay comparable). Replaces three of the four ring cards.
+- **Removed**: `components/RingKpiCard.jsx` (no remaining callers) and the
+  Dashboard's `attentionAccordion()`.
+- Recent payments is an always-open card, receipt number still downloads
+  the PDF via `api.invoices.openReceiptPdf`.
+
 ### Responsive / PWA
 
 The app is a responsive installable PWA (installable on iOS/Android home

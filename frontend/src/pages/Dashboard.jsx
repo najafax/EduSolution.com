@@ -5,7 +5,9 @@ import { api } from '../lib/api';
 import { useDashboardShortcuts } from '../lib/useDashboardShortcuts';
 import RevenueTrendChart from '../components/RevenueTrendChart';
 import StatusDonutChart from '../components/StatusDonutChart';
-import RingKpiCard from '../components/RingKpiCard';
+import BalanceHero from '../components/BalanceHero';
+import StatBars from '../components/StatBars';
+import AttentionCarousel from '../components/AttentionCarousel';
 import KpiCard from '../components/KpiCard';
 import DashboardRail from '../components/DashboardRail';
 import Accordion from '../components/Accordion';
@@ -16,7 +18,6 @@ import {
   LicenseIcon,
   BankIcon,
   CheckCircleIcon,
-  ClockIcon,
   UsersIcon,
   ProductIcon,
   QuoteIcon,
@@ -280,52 +281,6 @@ export default function Dashboard() {
     );
   }
 
-  function attentionAccordion() {
-    return (
-      <Accordion title={`Needs attention${attentionItems.length > 0 ? ` (${attentionItems.length})` : ''}`}>
-        {attentionItems.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Nothing needs your attention right now.</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {overdueInvoices.map((inv) => (
-              <Link
-                key={`inv-${inv.id}`}
-                to={`/invoices/${inv.id}`}
-                className="flex items-center justify-between gap-3 rounded-lg bg-red-50 px-3 py-2 text-sm hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/70"
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <AlertTriangleIcon width={16} height={16} className="shrink-0 text-red-600 dark:text-red-400" />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-900 dark:text-white">{inv.client_name}</p>
-                    <p className="text-xs text-red-600 dark:text-red-400">{inv.number} · overdue since {inv.due_date}</p>
-                  </div>
-                </div>
-                <span className="shrink-0 font-semibold text-red-600 dark:text-red-400">{money(symbol, inv.balance_due)}</span>
-              </Link>
-            ))}
-            {expiringLicenses.map((lic) => (
-              <Link
-                key={`lic-${lic.id}`}
-                to="/licenses"
-                className="flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-sm hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-950/70"
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <LicenseIcon width={16} height={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-900 dark:text-white">
-                      {lic.name} · {lic.client_name}
-                    </p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400">Expires {lic.expiry_date}</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </Accordion>
-    );
-  }
-
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8">
       <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{greeting()}</p>
@@ -352,101 +307,112 @@ export default function Dashboard() {
         <div className="mt-8 flex flex-col gap-6 xl:flex-row xl:items-start">
           {/* Main column */}
           <div className="min-w-0 flex-1">
-            {/* Four ring-gauge KPI cards — the "vibrant stats" half of the
-                combined dashboard direction. Every ring reads as a share of
-                totalInvoiced (see ringPct above), so the four are directly
-                comparable rather than four unrelated percentages; Bank
-                balance is the one "filled" (solid lagoon) card, reserving
-                that treatment for the single number this app can most
-                vouch for (see routes/financials.js's own bankBalance note),
-                the other three sit on plain white/surface cards with a
-                colored ring instead. */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <RingKpiCard
-                filled
-                icon={<BankIcon width={17} height={17} />}
+            {/* Studio stage 2 order, built for a phone first: what needs a
+                human (overdue invoices, expiring licenses) comes before any
+                figure, then the one number this app can most vouch for (bank
+                balance), then this year's paid/outstanding/overdue as a single
+                comparable list, then recent payments. The detail panels
+                (revenue chart, status split, year at a glance) follow as
+                collapsible cards. All of it reads the same single
+                /dashboard/overview response as before — no new requests —
+                and every section keeps its existing permission gate. At
+                `xl:` the rail carries Needs attention instead, so the
+                carousel is hidden there (never both). */}
+            {canSeeAttentionPanel && (
+              <div className="xl:hidden">
+                <AttentionCarousel items={attentionItems} />
+              </div>
+            )}
+
+            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <BalanceHero
+                icon={<BankIcon width={15} height={15} />}
                 label="Bank balance"
                 value={money(symbol, summary.bankBalance)}
                 sub={`${summary.clientCount} active client${summary.clientCount === 1 ? '' : 's'}`}
-                percent={ringPct(Math.max(0, summary.bankBalance))}
+                trend={summary.monthlyTrend}
+                trendLabel="Collected, last 6 months"
               />
-              <RingKpiCard
-                tone="positive"
-                icon={<CheckCircleIcon width={17} height={17} />}
-                label="Paid"
-                value={money(symbol, summary.totalPaid)}
-                sub={`of ${money(symbol, summary.totalInvoiced)} invoiced`}
-                percent={ringPct(summary.totalPaid)}
-              />
-              <RingKpiCard
-                tone="warning"
-                icon={<ClockIcon width={17} height={17} />}
-                label="Outstanding"
-                value={money(symbol, summary.totalOutstanding)}
-                sub="Awaiting payment"
-                percent={ringPct(summary.totalOutstanding)}
-              />
-              <RingKpiCard
-                tone="negative"
-                icon={<AlertTriangleIcon width={17} height={17} />}
-                label="Overdue"
-                value={money(symbol, summary.overdueAmount)}
-                sub={`${summary.overdueCount} invoice${summary.overdueCount === 1 ? '' : 's'}`}
-                percent={ringPct(summary.overdueAmount)}
+              <StatBars
+                title={`This year · ${money(symbol, summary.totalInvoiced)} invoiced`}
+                items={[
+                  {
+                    key: 'paid',
+                    label: 'Paid',
+                    value: money(symbol, summary.totalPaid),
+                    percent: ringPct(summary.totalPaid),
+                    tone: 'positive',
+                  },
+                  {
+                    key: 'outstanding',
+                    label: 'Outstanding',
+                    value: money(symbol, summary.totalOutstanding),
+                    sub: 'Awaiting payment',
+                    percent: ringPct(summary.totalOutstanding),
+                    tone: 'warning',
+                  },
+                  {
+                    key: 'overdue',
+                    label: 'Overdue',
+                    value: money(symbol, summary.overdueAmount),
+                    sub: `${summary.overdueCount} invoice${summary.overdueCount === 1 ? '' : 's'}`,
+                    percent: ringPct(summary.overdueAmount),
+                    tone: 'negative',
+                  },
+                ]}
               />
             </div>
 
+            <section className="mt-6 rounded-[28px] bg-white p-2 shadow-sm dark:bg-slate-900">
+              <h2 className="px-4 pb-1 pt-3 font-display text-base font-extrabold text-slate-900 dark:text-white">Recent payments</h2>
+              {summary.recentPayments.length === 0 ? (
+                <p className="px-4 pb-4 text-sm text-slate-500 dark:text-slate-400">No payments recorded yet.</p>
+              ) : (
+                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {summary.recentPayments.slice(0, 5).map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-900 dark:text-white">{p.client_name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadReceipt(p.invoice_id, p.id)}
+                            className="min-h-6 font-medium text-lagoon-700 hover:text-lagoon-600 dark:text-lagoon-300"
+                          >
+                            {p.receipt_number}
+                          </button>
+                          {' · '}
+                          {p.paid_at}
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-display font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                        +{money(symbol, p.amount)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
             <div className="mt-6">
-              <Accordion title="Revenue, last 6 months">
+              <Accordion title="Revenue, last 6 months" defaultOpen={false}>
                 <RevenueTrendChart data={summary.monthlyTrend} currencySymbol={symbol} />
               </Accordion>
             </div>
 
             <div className="mt-6">
-              <Accordion title="Invoices by status">
+              <Accordion title="Invoices by status" defaultOpen={false}>
                 <StatusDonutChart counts={summary.invoiceCounts} />
               </Accordion>
             </div>
 
             {canSeeYearOverview && (
               <div className="mt-6">
-                <Accordion title={`This year at a glance (${CURRENT_YEAR})`}>{yearOverviewSection()}</Accordion>
+                <Accordion title={`This year at a glance (${CURRENT_YEAR})`} defaultOpen={false}>
+                  {yearOverviewSection()}
+                </Accordion>
               </div>
             )}
-
-            {/* Needs attention — full-detail Accordion below `xl:` (no rail
-                at that width), the same data condensed into DashboardRail's
-                own list at `xl:` and up. Never both at once. */}
-            {canSeeAttentionPanel && <div className="mt-6 xl:hidden">{attentionAccordion()}</div>}
-
-            <div className="mt-6">
-              <Accordion title="Recent payments">
-                {summary.recentPayments.length === 0 ? (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">No payments recorded yet.</p>
-                ) : (
-                  <div className="-mx-6 divide-y divide-slate-100 dark:divide-slate-800">
-                    {summary.recentPayments.slice(0, 5).map((p) => (
-                      <div key={p.id} className="flex flex-col gap-1 px-6 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadReceipt(p.invoice_id, p.id)}
-                            className="font-medium text-lagoon-600 hover:text-lagoon-500"
-                          >
-                            {p.receipt_number}
-                          </button>
-                          <span className="ml-2 text-slate-500 dark:text-slate-400">{p.client_name}</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <span className="text-slate-500 dark:text-slate-400">{p.paid_at}</span>
-                          <span className="font-medium text-slate-900 dark:text-white">{money(symbol, p.amount)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Accordion>
-            </div>
 
             {/* Shortcut pills — every breakpoint below `xl:` (no rail
                 there); collapsed at `xl:` and up since the rail's own
