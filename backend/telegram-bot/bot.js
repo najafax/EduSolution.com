@@ -311,6 +311,47 @@ function healthCheck() {
   });
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// healthCheck() above goes over the PUBLIC path — DNS resolution + TLS
+// handshake + the full internet round trip from the droplet's own outbound
+// connection, not just "is the Node process listening" — so a single call
+// conflates two different failure modes: the backend actually being down,
+// versus one transient hiccup anywhere along that path (a slow DNS
+// response, a momentary routing blip) that has nothing to do with the
+// app's own health and clears on its own within seconds. A real incident
+// traced this exactly: a string of "unreachable"/"reachable again" alerts
+// recurring every 10-90 minutes across a whole morning, every single one
+// reported as a clean multiple of the 5-minute poll interval (never 3 or
+// 7 minutes) — and `journalctl -u edusolution-backend` showed zero restarts
+// anywhere in that window (nginx and the backend had both been "active"
+// the entire time, confirmed via /status's own uptime). Nothing was
+// actually down; a single flaky public-path round trip was enough to flip
+// the alert state and broadcast every time.
+// HEALTH_CHECK_ATTEMPTS/_RETRY_DELAY_MS only guard the *background alert
+// loop* below — /status's own on-demand healthCheck() call stays a plain
+// single attempt, since a human reading /status can just re-run it, and
+// showing the real-time, un-retried result there is more informative than
+// quietly retrying behind their back.
+const HEALTH_CHECK_ATTEMPTS = 3;
+const HEALTH_CHECK_RETRY_DELAY_MS = 5000;
+
+async function healthCheckWithRetry() {
+  let result;
+  for (let attempt = 1; attempt <= HEALTH_CHECK_ATTEMPTS; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    result = await healthCheck();
+    if (result.ok) return result;
+    if (attempt < HEALTH_CHECK_ATTEMPTS) {
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(HEALTH_CHECK_RETRY_DELAY_MS);
+    }
+  }
+  return result;
+}
+
 async function buildStatusReport() {
   const [backend, nginx, health, cert, rootDisk, dataDisk] = await Promise.all([
     serviceState(SERVICE_NAME),
@@ -539,7 +580,7 @@ async function runAlertChecks() {
   const [backend, nginx, health, cert, rootDisk, restartCount, backupAgeHours] = await Promise.all([
     serviceState(SERVICE_NAME),
     serviceState('nginx'),
-    healthCheck(),
+    healthCheckWithRetry(),
     certDaysLeft(),
     diskLine('/'),
     backendRestartCount(),

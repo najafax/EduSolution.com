@@ -9248,3 +9248,33 @@ commands to go through.
   poll rather than exiting cleanly — expected) and confirmed it reaches
   its own startup log with no syntax or top-level runtime errors across
   every new function definition and the moved `alertState` declaration.
+  **Follow-up: the "Public API unreachable" alert itself was the false
+  alarm, not the backend.** A real incident the morning after this
+  monitoring shipped produced a long string of "unreachable"/"reachable
+  again" pairs from the bot — recurring every 10-90 minutes across several
+  hours, every single one lasting a clean multiple of the 5-minute poll
+  interval (never 3 or 7 minutes, always 5 or 10) — which pointed at the
+  *check itself* before the diagnosis ever got to the app: `/status` at
+  the time showed the backend `active` for 14h33m straight (spanning the
+  entire flapping window with zero restarts) and `journalctl -u
+  edusolution-backend` showed no `Main process exited`/crash entries
+  anywhere in that range either — every logged restart that day was a
+  clean `Stopped`/`Started` pair hours outside the incident window, not a
+  crash loop. Nothing was actually down. `healthCheck()` hits
+  `https://api.edusolutionsmaldives.com/api/auth/me` — the full public
+  path (DNS resolution + TLS handshake + the real internet round trip
+  from the droplet's own outbound connection), not just "is Node
+  listening" — as a single, un-retried attempt with a 10s timeout; one
+  slow DNS response or momentary routing blip anywhere along that path is
+  enough to flip `alertState.healthDown` and broadcast, even though the
+  backend itself never stopped serving requests. `healthCheckWithRetry()`
+  (3 attempts, `HEALTH_CHECK_RETRY_DELAY_MS` = 5s between them) is what
+  `runAlertChecks()` now calls instead of the bare `healthCheck()` — a
+  transient blip that clears within one or two retries never reaches a
+  broadcast at all, while a genuine outage (the backend actually down,
+  DNS actually broken, nginx actually not listening) still fails every
+  attempt and alerts exactly as before, just a few seconds later than it
+  used to. `/status`'s own on-demand call stays the original plain
+  single-shot `healthCheck()` — a human reading `/status` can just run it
+  again, and seeing the real, un-retried result in that moment is more
+  useful than a dashboard quietly retrying behind their back.
