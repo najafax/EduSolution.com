@@ -5986,6 +5986,158 @@ that shortcut.
   (a toast, then reloading the campaign history feed), so these two don't
   need their own success-notice plumbing.
 
+### Facebook Page posting — AI-drafted weekly posts, staff-approved before anything publishes
+
+A weekly "what should we post on Facebook this week" draft, built from the
+explicit request "a bot that can create and weekly posts in the Facebook
+page." Three decisions were confirmed up front (`AskUserQuestion`) before
+building this: the draft content is a mix — AI-written, optionally seeded
+from this app's own CMS content rather than written from nothing every
+time; the workflow is draft-then-approve, never auto-publish, mirroring
+every other "generate a draft, a human decides" convention already in this
+app (`generateDueRecurringInvoices()`'s own draft invoices, quote
+requests); and this lives as a new module inside EduSolution.com itself
+rather than a separate standalone service, so it inherits the existing
+permission system, activity log, and UI conventions for free rather than
+needing its own auth/hosting story.
+
+- **There is no auto-publish path anywhere in this feature.** The weekly
+  cron job only ever inserts a `status: 'draft'` row — the *only* code
+  path that ever calls `lib/facebook.js`'s `publishPost()` (the one
+  function that actually reaches Facebook's Graph API) is
+  `routes/facebookPosts.js`'s `POST /:id/publish`, which requires an
+  explicit staff click on the Facebook Posts page after reviewing (and
+  optionally editing) the draft. This mirrors the "review before send"
+  contract `EmailPreviewModal.jsx` already establishes for every other
+  client-facing send in this app, just for a one-to-many public post
+  instead of a one-to-one email — there's no admin-editable template
+  system here the way `lib/emailTemplates.js` provides for emails, since
+  a Facebook post isn't a recurring transactional message with
+  `{{placeholder}}`s, it's fresh copy generated anew each time.
+- `facebook_posts` (`db/index.js`, brand-new table, plain `CREATE TABLE IF
+  NOT EXISTS`) holds `content` (the post text), `source_note` (a short
+  human-readable summary of what the draft was seeded from, shown so
+  staff understand why the AI wrote what it wrote), `status`
+  (`draft` | `posted` — there's no `discarded` status stored; discarding a
+  draft is a real `DELETE`, not a status flip, since an unused draft has
+  no reason to linger as a row once rejected), `fb_post_id`/`posted_at`
+  (set only on an actual successful Graph API publish), and
+  `generated_by_name` (`'Automated'` for the weekly cron job, the real
+  staff name for an on-demand `POST /generate` — same attribution
+  convention every other automated job in `lib/scheduler.js` already
+  uses to distinguish a human action from an unattended one).
+- `lib/facebook.js` is a thin Graph API wrapper — `isConfigured()`/
+  `publishPost(message)`, mirroring `lib/mailer.js`'s own
+  `EMAIL_NOT_CONFIGURED` pattern exactly: `FACEBOOK_PAGE_ACCESS_TOKEN`/
+  `FACEBOOK_PAGE_ID` unset means every other part of this feature
+  (drafting, editing, listing) still works, only the actual publish step
+  503s with a clear "not configured" message until both are set. Posts
+  plain text to `POST https://graph.facebook.com/v21.0/{page-id}/feed`
+  via Node's native `fetch` (no new HTTP dependency needed) — no image/
+  link attachment in this first version, text-only, matching what the
+  weekly draft itself produces.
+- `lib/facebookPostDraft.js`'s `generateDraftPost()` is the actual AI call
+  — `@anthropic-ai/sdk`, defaulting to `claude-opus-5-5` per this app's
+  own policy for picking a model (never downgraded on its own initiative).
+  `gatherContentSeed()` pulls a handful of the business's own already-
+  public content — the most recent published `website_posts`, visible
+  `website_services`, and published `website_testimonials` (the exact
+  same tables `routes/public.js`'s `GET /site` already serves to the real
+  marketing site, see "Public marketing website + content manager" below)
+  — capped at 3 rows per source, and hands it to the model as a seed so
+  the post reads like it's actually about this specific Maldives EduPage/
+  business-software distributor rather than generic filler. When the CMS
+  has nothing fresh on file (a business that's never used the Website
+  Content CMS, or has nothing currently published/visible), the model is
+  told so directly and writes a general, warm post about Edu Solutions
+  instead — this feature works correctly with or without CMS content, it
+  just produces a more specific post when there's something real to draw
+  from. `isConfigured()` here checks `ANTHROPIC_API_KEY` specifically
+  (distinct from `lib/facebook.js`'s own `isConfigured()`, which checks
+  the Facebook credentials) — a business can have AI drafting configured
+  with no Facebook token yet (drafts pile up for later) or vice versa
+  (Facebook configured but no AI key, so `POST /generate` 503s until one
+  is added) — the two are independent integrations with no shared
+  configuration.
+- `routes/facebookPosts.js` (mounted `/api/facebook-posts`) is gated on
+  its own `facebook` module (`lib/permissions.js`'s `MODULES`) rather than
+  reusing an existing one — unlike `routes/reports.js`/
+  `routes/capitalContributions.js`/`routes/quoteRequests.js`, which reuse
+  `financials`/`expenses`/`quotes` because the sensitivity level already
+  matched something else in the app, this feature has no comparable
+  existing module to borrow from (it's neither financial data nor a sales
+  document), so it gets its own grantable slot. `GET /` is always
+  paginated (`PAGE_SIZE = 20`, newest first) — same convention
+  `routes/campaigns.js`'s own history feed already follows (a
+  chronological log, not a pickable list, so no opt-in `?page=` needed).
+  `POST /generate` (`manage`) is the on-demand version of the weekly cron
+  job — same `generateDraftPost()` call, just attributed to whoever
+  clicked the button instead of `'Automated'`. `PUT /:id` (`manage`) edits
+  a draft's content — 409s once `status !== 'draft'`, the same "once
+  it's real, it's locked" precedent a sent/paid invoice already
+  establishes, since a posted record is historical from here on and
+  editing it would desync the stored content from what Facebook actually
+  received. `POST /:id/publish` (`manage`) is the one real action — 409s
+  if not a draft, 503s if Facebook isn't configured, and on success
+  stamps `fb_post_id`/`posted_at` and flips `status` to `posted`.
+  `DELETE /:id` (`manage`) discards a draft — 409s on an already-`posted`
+  row (a real, published post stays a permanent record; discarding only
+  ever applies to something that never went out). Every mutation calls
+  `logActivity()`.
+- `lib/scheduler.js`'s `generateWeeklyFacebookDraft()` is the unattended
+  job — registered at `'30 9 * * 1'` (Monday 09:30 server time, staggered
+  30 minutes after the monthly report's own 09:00 slot purely so their
+  console output can't interleave on the one day a month they'd otherwise
+  both fire). Skips entirely (no error, just a log line) if
+  `ANTHROPIC_API_KEY` isn't set — same "not configured, not an error"
+  convention every other optional integration in this app follows. Calls
+  the exact same `generateDraftPost()` function `POST /generate` does, so
+  a cron-generated draft and an on-demand one are produced identically;
+  only the `generated_by_name` attribution differs.
+- `pages/business/FacebookPosts.jsx` (route `/facebook-posts`,
+  `Navbar.jsx` link right after Website content, same `Admin` group,
+  gated on the new `facebook` module) is the standard paginated-list shape
+  `Campaigns.jsx`/`pages/EmailCenter.jsx`'s own sent log already use — a
+  "Generate draft" header button (`manage`-gated), the standard
+  desktop-table + `MobileListAccordion` mobile split (`StatusBadge` gained
+  a `posted` entry, reusing the same emerald "this is live" meaning
+  `published`/`active`/`paid` already carry), and per-row actions (Edit/
+  Publish/Discard, `IconActionButton`s) shown only while `status ===
+  'draft'` — a posted row shows no actions at all, same "never show a
+  button that would just 409" convention this app follows everywhere
+  else. Clicking "Publish" opens the shared `useConfirm()` dialog (stating
+  plainly that this posts to the real Facebook Page immediately, visible
+  to its followers) before the actual `POST /:id/publish` call — there's
+  no separate preview-then-send modal the way `EmailPreviewModal.jsx`
+  provides for emails, since the draft's own content *is* the editable
+  review step (via the inline "Edit" modal), not a template being filled
+  in fresh each time. `lib/api.js`'s `facebookPosts` object holds
+  `list`/`generate`/`update`/`publish`/`remove`. A new `FacebookIcon`
+  (`components/icons.jsx`, the classic rounded-square "f" mark) backs the
+  nav link/empty-state/`Sidebar.jsx`'s `LINK_ICONS` map, deliberately
+  distinct from `MegaphoneIcon` (campaigns go out by email to clients;
+  this is specifically the business's own Facebook Page).
+- **Env vars** (`backend/.env.example`): `FACEBOOK_PAGE_ACCESS_TOKEN`/
+  `FACEBOOK_PAGE_ID` (a long-lived Page access token — create one via a
+  Meta Business Suite System User so it doesn't expire like a short-lived
+  user token — and the numeric Page id to post to) and `ANTHROPIC_API_KEY`.
+  All three are optional at the env-var level; the feature degrades
+  gracefully (clear 503s on the two actions that need them) with either
+  or both unset, verified directly against a real running backend with no
+  credentials configured at all: `GET /`, `PUT /:id`, and `DELETE /:id`
+  all work normally with neither credential set, `POST /generate` 503s
+  with the AI-not-configured message, and `POST /:id/publish` 503s with
+  the Facebook-not-configured message on a manually-seeded draft row —
+  and, once a draft existed, `PUT /:id`/`DELETE /:id` correctly wrote
+  `activity_log` entries and a staff account with no `facebook` grant was
+  correctly rejected with a 403 on every route.
+- The user still needs to separately obtain a Facebook Page access token
+  and an Anthropic API key themselves (neither can be obtained on their
+  behalf) and add both to the droplet's `backend/.env` before the two
+  AI-drafting/publish actions will actually work in production — every
+  other part of this feature (the page, the list, editing, the permission
+  grant) is usable immediately with no credentials at all.
+
 ### Public marketing website + content manager
 
 A real public marketing site for Edu Solutions itself — `/`, `/services`,

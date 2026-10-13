@@ -30,6 +30,7 @@ const websiteRoutes = require('./routes/website');
 const shareholdersRoutes = require('./routes/shareholders');
 const dealsRoutes = require('./routes/deals');
 const supplierCostsRoutes = require('./routes/supplierCosts');
+const facebookPostsRoutes = require('./routes/facebookPosts');
 const { startScheduler } = require('./lib/scheduler');
 
 const app = express();
@@ -84,6 +85,7 @@ app.use('/api/website', websiteRoutes);
 app.use('/api/shareholders', shareholdersRoutes);
 app.use('/api/deals', dealsRoutes);
 app.use('/api/supplier-costs', supplierCostsRoutes);
+app.use('/api/facebook-posts', facebookPostsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

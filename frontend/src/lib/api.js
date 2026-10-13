@@ -399,6 +399,14 @@ export const api = {
     failures: (id, token) => request(`/campaigns/${id}/failures`, { token }),
   },
 
+  facebookPosts: {
+    list: (token, page = 1) => request(`/facebook-posts?page=${page}`, { token }),
+    generate: (token) => request('/facebook-posts/generate', { method: 'POST', token }),
+    update: (id, payload, token) => request(`/facebook-posts/${id}`, { method: 'PUT', body: payload, token }),
+    publish: (id, token) => request(`/facebook-posts/${id}/publish`, { method: 'POST', token }),
+    remove: (id, token) => request(`/facebook-posts/${id}`, { method: 'DELETE', token }),
+  },
+
   users: {
     list: (token, { q, page } = {}) => request(`/users${qs({ q, page })}`, { token }),
     get: (id, token) => request(`/users/${id}`, { token }),

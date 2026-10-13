@@ -585,6 +585,32 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- Facebook Page post drafts (see routes/facebookPosts.js and
+  -- lib/facebookPostDraft.js) — AI-drafted, seeded from this app's own
+  -- website_posts/website_testimonials/website_services content (see
+  -- lib/facebookPostDraft.js), generated either on demand or by a weekly
+  -- cron job (lib/scheduler.js), but never auto-published: status only
+  -- ever moves to 'posted' once a staff member clicks "Publish" on
+  -- POST /:id/publish, mirroring every other "draft, then a human decides"
+  -- convention in this app (quote requests, recurring-invoice generation).
+  -- fb_post_id/posted_at are set only on an actual successful Graph API
+  -- publish. generated_by_name is 'Automated' for a cron-generated draft,
+  -- the real staff name for an on-demand POST /generate — same convention
+  -- lib/scheduler.js's other automated jobs already use for attribution.
+  -- Brand-new table, no production data yet, so a plain CREATE TABLE IF
+  -- NOT EXISTS is enough.
+  CREATE TABLE IF NOT EXISTS facebook_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT NOT NULL,
+    source_note TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft',
+    fb_post_id TEXT,
+    posted_at TEXT,
+    generated_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_requests_client ON quote_requests(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_request_items_request ON quote_request_items(quote_request_id);
@@ -607,6 +633,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_website_services_visible ON website_services(visible);
   CREATE INDEX IF NOT EXISTS idx_website_team_visible ON website_team_members(visible);
   CREATE INDEX IF NOT EXISTS idx_website_gallery_visible ON website_gallery(visible);
+  CREATE INDEX IF NOT EXISTS idx_facebook_posts_status ON facebook_posts(status, created_at);
   CREATE INDEX IF NOT EXISTS idx_website_videos_visible ON website_videos(visible);
 
   -- A single internal profit calculation: money received (MVR) for a job or

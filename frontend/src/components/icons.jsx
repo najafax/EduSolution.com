@@ -535,3 +535,19 @@ export function DatabaseIcon(props) {
     </svg>
   );
 }
+
+// A rounded square with the classic lowercase "f" — the Facebook Posts nav
+// link/page, distinct from MegaphoneIcon's generic "broadcast" meaning
+// (campaigns go out by email to clients; this is specifically the
+// business's own Facebook Page).
+export function FacebookIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="2.5" width="15" height="15" rx="3" />
+      <path
+        d="M11.8 17v-5.3h1.8l.3-2.1h-2.1V8.1c0-.6.2-1 1.1-1h1.1V5.2c-.2 0-.9-.1-1.7-.1-1.7 0-2.9 1-2.9 2.9v1.6H7.6v2.1h1.8V17"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

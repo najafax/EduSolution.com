@@ -21,6 +21,7 @@ const MODULES = [
   'campaigns',
   'email_center',
   'website',
+  'facebook',
 ];
 
 // A stricter tier within MODULES: even a plain, *unrestricted* `admin`

@@ -29,6 +29,11 @@ const COLORS = {
   // visible" meaning 'active'/'paid' already carry; 'draft' above already
   // covers the not-yet-visible state.
   published: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
+  // Facebook posts only (pages/business/FacebookPosts.jsx) — 'posted'
+  // reuses the same emerald "this is real and live" meaning as
+  // 'published'/'active'/'paid' above; 'draft' above already covers the
+  // not-yet-published state.
+  posted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
 };
 
 export default function StatusBadge({ status }) {

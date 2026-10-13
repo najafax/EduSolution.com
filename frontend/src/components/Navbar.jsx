@@ -46,6 +46,7 @@ export const BUSINESS_LINKS = [
   { to: '/users', label: 'Users', module: 'users', group: 'Admin' },
   { to: '/email-center', label: 'Email center', module: 'email_center', group: 'Admin' },
   { to: '/website-content', label: 'Website content', module: 'website', group: 'Admin' },
+  { to: '/facebook-posts', label: 'Facebook posts', module: 'facebook', group: 'Admin' },
   { to: '/settings', label: 'Settings', module: 'settings', group: 'Admin' },
 ];
 

@@ -10,6 +10,7 @@ const { runBackup } = require('./backup');
 const { logEmail } = require('./emailLog');
 const { licenseRemindEmail, overdueReminderEmail } = require('./emailTemplates');
 const { runDailyEarningsReport } = require('./dailyEarningsReport');
+const { isConfigured: isFacebookDraftingConfigured, generateDraftPost: generateFacebookDraftPost } = require('./facebookPostDraft');
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -291,6 +292,33 @@ async function runMonthlyReport() {
   return { sent, skipped: false };
 }
 
+// Weekly Facebook Page post draft — generates one AI-drafted post (see
+// lib/facebookPostDraft.js, optionally seeded from this app's own website
+// CMS content) and saves it as a 'draft' row in facebook_posts for a staff
+// member to review on the Facebook Posts page. Deliberately never
+// auto-publishes — the actual Graph API publish only ever happens from
+// routes/facebookPosts.js's POST /:id/publish, a real human clicking
+// "Publish" after reviewing/editing the draft, same "draft, then a human
+// decides" shape generateDueRecurringInvoices() above already follows for
+// recurring invoices (generated as drafts, never auto-sent). Skips
+// entirely (no email, no error) if ANTHROPIC_API_KEY isn't set — same
+// "not configured, not an error" convention every other optional
+// integration in this app follows.
+async function generateWeeklyFacebookDraft() {
+  if (!isFacebookDraftingConfigured()) {
+    console.log('[facebook] ANTHROPIC_API_KEY not configured, skipping weekly draft');
+    return { skipped: true };
+  }
+
+  const draft = await generateFacebookDraftPost();
+  const result = db
+    .prepare(`INSERT INTO facebook_posts (content, source_note, status, generated_by_name) VALUES (?, ?, 'draft', 'Automated')`)
+    .run(draft.content, draft.sourceNote);
+
+  console.log(`[facebook] Generated weekly draft post #${result.lastInsertRowid}`);
+  return { skipped: false, id: result.lastInsertRowid };
+}
+
 // `quotes.status` includes 'expired' as a valid, filterable value (see
 // routes/quotes.js's PUT /:id validStatuses and Quotes.jsx's own
 // STATUS_OPTIONS), but nothing else in the app ever sets it — there's no
@@ -451,6 +479,14 @@ function startScheduler() {
   cron.schedule('0 9 1 * *', () => {
     runMonthlyReport().catch((err) => console.error('[monthly-report] job failed:', err));
   });
+  // Weekly, Monday at 09:30 server time — staggered off the monthly-report
+  // job's own 09:00 slot purely so console/log output can't interleave on
+  // the one day a month they'd otherwise both fire. Generates a draft only
+  // — see generateWeeklyFacebookDraft()'s own note on why this never
+  // auto-publishes.
+  cron.schedule('30 9 * * 1', () => {
+    generateWeeklyFacebookDraft().catch((err) => console.error('[facebook] weekly draft job failed:', err));
+  });
 }
 
 module.exports = {
@@ -461,5 +497,6 @@ module.exports = {
   expireOverdueQuotes,
   runMonthlyReport,
   runDailyEarningsReport,
+  generateWeeklyFacebookDraft,
   runBackup,
 };

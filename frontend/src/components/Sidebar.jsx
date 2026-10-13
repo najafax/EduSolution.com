@@ -24,6 +24,7 @@ import {
   LogoutIcon,
   GlobeIcon,
   TrendDownIcon,
+  FacebookIcon,
 } from './icons';
 
 // One icon per BUSINESS_LINKS entry (see Navbar.jsx) — a few modules
@@ -53,6 +54,7 @@ const LINK_ICONS = {
   '/users': UsersIcon,
   '/email-center': SendIcon,
   '/website-content': GlobeIcon,
+  '/facebook-posts': FacebookIcon,
   '/settings': SettingsIcon,
 };
 
