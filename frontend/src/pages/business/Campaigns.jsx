@@ -235,7 +235,7 @@ export default function Campaigns() {
             </button>
             <button
               onClick={() => setCompose({})}
-              className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+              className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
             >
               <PlusIcon width={16} height={16} />
               New campaign
@@ -339,7 +339,7 @@ export default function Campaigns() {
                 <button
                   type="button"
                   onClick={resendToFailed}
-                  className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+                  className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
                 >
                   Resend to these {failures.length} recipient{failures.length === 1 ? '' : 's'}
                 </button>

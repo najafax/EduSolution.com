@@ -307,7 +307,7 @@ export default function CampaignComposeModal({
             type="button"
             onClick={handleSend}
             disabled={!canSend}
-            className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+            className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
           >
             {sending ? 'Sending…' : `Send${recipientCount > 1 ? ` to ${recipientCount}` : ''}`}
           </button>

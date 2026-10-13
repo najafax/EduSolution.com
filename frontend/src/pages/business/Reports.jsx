@@ -159,7 +159,7 @@ export default function Reports() {
               type="button"
               onClick={() => handleDownload(report)}
               disabled={busyKey === report.key}
-              className="mt-4 min-h-11 w-full rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+              className="mt-4 min-h-11 w-full rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
             >
               {busyKey === report.key ? 'Generating…' : 'Download PDF'}
             </button>

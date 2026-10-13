@@ -393,7 +393,7 @@ export default function OwnerDraws() {
           {canManage && (
             <button
               onClick={startCreate}
-              className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+              className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
             >
               <PlusIcon width={16} height={16} />
               New record
@@ -574,7 +574,7 @@ export default function OwnerDraws() {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+              className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
             >
               {submitting ? 'Saving…' : 'Save'}
             </button>
@@ -816,7 +816,7 @@ export default function OwnerDraws() {
                   <button
                     type="submit"
                     disabled={returnSubmitting}
-                    className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+                    className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
                   >
                     {returnSubmitting ? 'Recording…' : 'Record return'}
                   </button>

@@ -66,7 +66,7 @@ function PrimaryButton({ el, fill }) {
       } ${
         danger
           ? 'bg-red-600 text-white hover:bg-red-500'
-          : 'bg-slate-900 text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500'
+          : 'bg-slate-900 text-white hover:bg-slate-700 dark:bg-slate-900 dark:hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500'
       }`}
     >
       {Icon && <Icon width={16} height={16} className={spinning ? 'animate-spin' : ''} />}

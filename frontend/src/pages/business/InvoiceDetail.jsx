@@ -273,7 +273,7 @@ export default function InvoiceDetail() {
             Copy public link
           </button>
           {canManage && invoice.status !== 'void' && (
-            <button onClick={() => setEmailModal({ type: 'send' })} className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
+            <button onClick={() => setEmailModal({ type: 'send' })} className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60">
               <SendIcon width={16} height={16} />
               Email to client
             </button>
@@ -478,7 +478,7 @@ export default function InvoiceDetail() {
             invoice.balance_due > 0 && (
               <button
                 onClick={() => setShowPayment(true)}
-                className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500"
+                className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
               >
                 <PlusIcon width={16} height={16} />
                 Record payment
@@ -801,7 +801,7 @@ export default function InvoiceDetail() {
             <button type="button" onClick={() => setHoldModalOpen(false)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-600 dark:text-slate-200">
               Cancel
             </button>
-            <button type="submit" disabled={holdSubmitting} className="rounded-md bg-lagoon-600 px-3 py-2 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
+            <button type="submit" disabled={holdSubmitting} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60">
               {holdSubmitting ? 'Saving…' : 'Hold reminders'}
             </button>
           </div>

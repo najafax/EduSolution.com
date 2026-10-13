@@ -111,7 +111,7 @@ function FormActions({ submitting, onCancel }) {
       <button
         type="submit"
         disabled={submitting}
-        className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+        className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
       >
         {submitting ? 'Saving…' : 'Save'}
       </button>
@@ -203,7 +203,7 @@ function PostsSection({ token, canManage }) {
         <div className="mb-4 flex justify-end">
           <button
             onClick={startCreate}
-            className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+            className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
           >
             <PlusIcon width={16} height={16} />
             New post
@@ -403,7 +403,7 @@ function TestimonialsSection({ token, canManage }) {
         <div className="mb-4 flex justify-end">
           <button
             onClick={startCreate}
-            className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+            className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
           >
             <PlusIcon width={16} height={16} />
             New testimonial
@@ -618,7 +618,7 @@ function ServicesSection({ token, canManage }) {
         <div className="mb-4 flex justify-end">
           <button
             onClick={startCreate}
-            className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+            className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
           >
             <PlusIcon width={16} height={16} />
             New service
@@ -836,7 +836,7 @@ function TeamSection({ token, canManage }) {
         <div className="mb-4 flex justify-end">
           <button
             onClick={startCreate}
-            className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+            className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
           >
             <PlusIcon width={16} height={16} />
             New team member
@@ -1043,7 +1043,7 @@ function GallerySection({ token, canManage }) {
         <div className="mb-4 flex justify-end">
           <button
             onClick={startCreate}
-            className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+            className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
           >
             <PlusIcon width={16} height={16} />
             New image
@@ -1211,7 +1211,7 @@ function VideosSection({ token, canManage }) {
         <div className="mb-4 flex justify-end">
           <button
             onClick={startCreate}
-            className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500"
+            className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
           >
             <PlusIcon width={16} height={16} />
             New video

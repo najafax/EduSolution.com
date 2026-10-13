@@ -130,7 +130,7 @@ export default function QuoteDetail() {
             Copy public link
           </button>
           {canManage && (
-            <button onClick={() => setShowSendPreview(true)} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md bg-lagoon-600 px-3 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
+            <button onClick={() => setShowSendPreview(true)} disabled={busy} className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60">
               <SendIcon width={16} height={16} />
               Email to client
             </button>
@@ -195,7 +195,7 @@ export default function QuoteDetail() {
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
-          <button type="submit" disabled={busy} className="min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60">
+          <button type="submit" disabled={busy} className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60">
             Create invoice
           </button>
         </form>

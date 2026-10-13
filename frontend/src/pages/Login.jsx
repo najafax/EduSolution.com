@@ -135,7 +135,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-1 min-h-11 rounded-lg bg-lagoon-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-lagoon-600/25 transition-shadow hover:bg-lagoon-500 hover:shadow-xl hover:shadow-lagoon-600/30 disabled:opacity-60 disabled:shadow-none"
+          className="mt-1 min-h-11 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-lagoon-600/25 transition-shadow hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 hover:shadow-xl hover:shadow-lagoon-600/30 disabled:opacity-60 disabled:shadow-none"
         >
           {submitting ? 'Logging in…' : 'Log in'}
         </button>

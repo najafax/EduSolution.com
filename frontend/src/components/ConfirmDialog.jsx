@@ -58,7 +58,7 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, canc
                 onClick={onConfirm}
                 disabled={busy}
                 className={`min-h-11 flex-1 rounded-md px-4 text-sm font-medium text-white disabled:opacity-60 ${
-                  danger ? 'bg-red-600 hover:bg-red-500' : 'bg-lagoon-600 hover:bg-lagoon-500'
+                  danger ? 'bg-red-600 hover:bg-red-500' : 'bg-slate-900 hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500'
                 }`}
               >
                 {busy ? 'Working…' : confirmLabel}

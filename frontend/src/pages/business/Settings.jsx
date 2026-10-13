@@ -365,7 +365,7 @@ export default function Settings() {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-11 self-start rounded-md bg-lagoon-600 px-5 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+              className="min-h-11 self-start rounded-md bg-slate-900 px-5 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
             >
               {submitting ? 'Saving…' : 'Save'}
             </button>

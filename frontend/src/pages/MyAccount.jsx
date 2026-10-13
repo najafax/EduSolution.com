@@ -310,7 +310,7 @@ export default function MyAccount() {
         <button
           type="submit"
           disabled={profileSubmitting}
-          className="mt-3 min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+          className="mt-3 min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
         >
           {profileSubmitting ? 'Saving…' : 'Save profile'}
         </button>
@@ -348,7 +348,7 @@ export default function MyAccount() {
         <button
           type="submit"
           disabled={passwordSubmitting}
-          className="mt-3 min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+          className="mt-3 min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
         >
           {passwordSubmitting ? 'Saving…' : 'Change password'}
         </button>
@@ -414,7 +414,7 @@ export default function MyAccount() {
         <button
           type="submit"
           disabled={prefsSubmitting}
-          className="mt-3 min-h-11 rounded-md bg-lagoon-600 px-4 text-sm font-medium text-white hover:bg-lagoon-500 disabled:opacity-60"
+          className="mt-3 min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
         >
           {prefsSubmitting ? 'Saving…' : 'Save preferences'}
         </button>
