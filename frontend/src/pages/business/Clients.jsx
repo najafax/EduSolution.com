@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -87,6 +88,18 @@ export default function Clients() {
     setEditingId(null);
     setShowForm(true);
   }
+
+  // The bottom bar's Create sheet (components/BottomNav.jsx) links here with
+  // ?new=1 to open the New form straight away; clear the param so a refresh
+  // or Back doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      if (canManage) startCreate();
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function startEdit(client) {
     setForm({

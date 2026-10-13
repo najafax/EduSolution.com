@@ -72,7 +72,9 @@ export default function Navbar() {
   // drawer to open — the public quote/invoice/MOD-report links, Login,
   // etc. should still go "back" the normal way).
   const openMenu = useCallback(() => setMenuOpen(true), []);
-  useEdgeSwipeOpen({ enabled: Boolean(user) && !menuOpen, onOpen: openMenu });
+  // Phones no longer have this drawer (bottom bar's More tab replaced it), so
+  // the gesture only applies from `sm` up, where the hamburger still exists.
+  useEdgeSwipeOpen({ enabled: Boolean(user) && !menuOpen, onOpen: openMenu, minWidthPx: 640 });
 
   const initials = (user?.name || user?.email || '?')
     .trim()
@@ -84,7 +86,7 @@ export default function Navbar() {
 
   return (
     <header
-      className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10 xl:hidden dark:border-slate-800 dark:bg-slate-950/80"
+      className="sticky top-0 z-10 bg-canvas/90 backdrop-blur xl:hidden dark:bg-slate-950/80"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <nav className="flex w-full items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4">
@@ -104,11 +106,11 @@ export default function Navbar() {
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-label={menuOpen ? 'Close menu' : 'Open menu'}
                 aria-expanded={menuOpen}
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-700 dark:text-slate-300"
+                className="hidden min-h-11 min-w-11 items-center justify-center rounded-md text-slate-700 sm:flex dark:text-slate-300"
               >
                 {menuOpen ? <XIcon width={22} height={22} /> : <MenuIcon width={22} height={22} />}
               </button>
-              <Link to="/" className="flex shrink-0 items-center gap-1.5 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
+              <Link to="/" className="flex shrink-0 items-center gap-1.5 font-display text-base font-extrabold text-slate-900 sm:text-lg dark:text-white">
                 <img src="/logo-symbol.png" alt="" className="h-6 w-6 sm:h-7 sm:w-7" />
                 Edu Solutions
               </Link>

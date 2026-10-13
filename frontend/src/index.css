@@ -29,7 +29,15 @@
   --color-lagoon-900: #0a3539;
   --color-lagoon-950: #06282b;
 
-  --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
+  /* Studio redesign (stage 1): Bricolage Grotesque replaces Sora as the
+     display face (self-hosted, latin subset, one variable file covering
+     the 700-800 weights used for titles/figures). Sora's @font-face rules
+     below stay in place so nothing referencing them breaks, but
+     `font-display` now resolves to Bricolage first. `canvas` is the page
+     ground — a cool light grey that lets white cards read as raised
+     without needing a border on every one of them. */
+  --font-display: 'Bricolage Grotesque', 'Sora', ui-sans-serif, system-ui, sans-serif;
+  --color-canvas: #e9ecf1;
 
   /* A brand-tinted near-black for the highest-emphasis display text (page
      H1s, hero figures) — a deliberate, chosen neutral rather than the
@@ -69,6 +77,14 @@
   font-weight: 800;
   font-display: swap;
   src: url('/fonts/sora-800.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 700 800;
+  font-display: swap;
+  src: url('/fonts/bricolage-latin.woff2') format('woff2');
 }
 
 body {

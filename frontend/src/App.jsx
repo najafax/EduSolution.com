@@ -28,6 +28,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const PublicQuote = lazy(() => import('./pages/PublicQuote'));
 const PublicInvoice = lazy(() => import('./pages/PublicInvoice'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const More = lazy(() => import('./pages/More'));
 const Clients = lazy(() => import('./pages/business/Clients'));
 const Products = lazy(() => import('./pages/business/Products'));
 const Expenses = lazy(() => import('./pages/business/Expenses'));
@@ -101,7 +102,7 @@ export default function App() {
   const isMarketingRoute = MARKETING_ROUTES.has(location.pathname);
 
   return (
-    <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 xl:flex-row">
+    <div className="flex min-h-screen flex-col bg-canvas dark:bg-slate-950 xl:flex-row">
       {/* Sidebar (xl: and up, nav links only) pairs with TopBar (search/
           notifications/theme/account, xl: and up); Navbar (below xl,
           everything in one header) is the mutually-exclusive alternative
@@ -138,7 +139,7 @@ export default function App() {
             (sm:hidden) and fixed, so logged-in pages still need the bottom
             padding on phones or the tab bar covers Footer/the page's last
             content — see BottomNav.jsx. */}
-        <div className={`flex flex-1 flex-col ${user && !isPortalRoute && !isMarketingRoute ? 'pb-16 sm:pb-0' : ''}`}>
+        <div className={`flex flex-1 flex-col ${user && !isPortalRoute && !isMarketingRoute ? 'pb-28 sm:pb-0' : ''}`}>
           <div className="flex-1">
             {/* Keyed by pathname so a crash on one page doesn't linger once
                 the user navigates elsewhere — remounting clears the
@@ -186,6 +187,7 @@ export default function App() {
                 <Route path="/i/:token" element={<PublicInvoice />} />
                 <Route path="/portal/*" element={<PortalApp />} />
                 <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+                <Route path="/more" element={<Protected><More /></Protected>} />
 
                 <Route path="/clients" element={<Protected><Clients /></Protected>} />
                 <Route path="/campaigns" element={<Protected><Campaigns /></Protected>} />

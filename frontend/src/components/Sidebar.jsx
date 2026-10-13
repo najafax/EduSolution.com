@@ -32,7 +32,7 @@ import {
 // the app (Capital/Users both reuse UsersIcon, matching Financials.jsx's
 // own precedent of using UsersIcon for the Capital Contributions KPI
 // card) rather than inventing a new glyph for every single link.
-const LINK_ICONS = {
+export const LINK_ICONS = {
   '/dashboard': HomeIcon,
   '/clients': UsersIcon,
   '/campaigns': MegaphoneIcon,
@@ -162,11 +162,11 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
         />
       )}
       <aside
-        className={`${mobileOpen ? 'fixed inset-y-0 left-0 z-40 flex w-72 flex-col' : 'hidden'} shrink-0 bg-lagoon-950 px-3 py-5 shadow-2xl xl:sticky xl:top-0 xl:z-auto xl:flex xl:h-screen xl:w-60 xl:flex-col xl:shadow-none`}
+        className={`${mobileOpen ? 'fixed inset-y-0 left-0 z-40 flex w-72 flex-col' : 'hidden'} shrink-0 bg-white px-3 py-5 shadow-2xl dark:bg-lagoon-950 xl:sticky xl:top-0 xl:z-auto xl:flex xl:h-screen xl:w-60 xl:flex-col xl:border-r xl:border-slate-200 xl:shadow-none dark:xl:border-transparent`}
         style={{ paddingTop: 'calc(1.25rem + env(safe-area-inset-top))' }}
       >
         <div className="mb-5 flex shrink-0 items-center justify-between px-2">
-          <Link to="/" onClick={handleLinkClick} className="flex items-center gap-1.5 text-base font-semibold text-white">
+          <Link to="/" onClick={handleLinkClick} className="flex items-center gap-1.5 font-display text-base font-extrabold text-slate-900 dark:text-white">
             <img src="/logo-symbol.png" alt="" className="h-6 w-6" />
             Edu Solutions
           </Link>
@@ -178,7 +178,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
               type="button"
               onClick={onMobileClose}
               aria-label="Close menu"
-              className="flex h-9 w-9 items-center justify-center rounded-md text-lagoon-200 hover:bg-white/10 hover:text-white xl:hidden"
+              className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-lagoon-200 dark:hover:bg-white/10 dark:hover:text-white xl:hidden"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
@@ -206,7 +206,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
             classes (its `className` prop only reaches the outer wrapper,
             not the nested <input>). */}
         {mobileOpen && (
-          <div className="mb-3 hidden shrink-0 px-1 sm:block [&_input]:!border-lagoon-200 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:!shadow-sm [&_input::placeholder]:!text-slate-400">
+          <div className="mb-3 hidden shrink-0 px-1 sm:block dark:[&_input]:!border-lagoon-200 dark:[&_input]:!bg-white dark:[&_input]:!text-slate-900 dark:[&_input]:!shadow-sm dark:[&_input::placeholder]:!text-slate-400">
             <GlobalSearch className="w-full" onNavigate={handleLinkClick} />
           </div>
         )}
@@ -214,7 +214,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
         <nav className="nav-links-scroll flex flex-1 flex-col gap-3 overflow-y-auto">
           {groupedLinks.map(({ group, links }) => (
             <div key={group} className="flex flex-col gap-0.5">
-              <p className="mb-0.5 px-3 text-[10px] font-bold uppercase tracking-wider text-lagoon-300/70">{group}</p>
+              <p className="mb-0.5 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-lagoon-300/70">{group}</p>
               {links.map((link) => {
                 const Icon = LINK_ICONS[link.to] || HomeIcon;
                 const active = isActive(link.to);
@@ -224,7 +224,9 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
                     to={link.to}
                     onClick={handleLinkClick}
                     className={`flex min-h-9 shrink-0 items-center gap-2.5 rounded-lg px-3 text-[13.5px] font-medium ${
-                      active ? 'bg-lagoon-600 text-white' : 'text-lagoon-100/80 hover:bg-white/5 hover:text-white'
+                      active
+                        ? 'bg-slate-900 text-white dark:bg-lagoon-600'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-lagoon-100/80 dark:hover:bg-white/5 dark:hover:text-white'
                     }`}
                   >
                     <Icon width={17} height={17} className="shrink-0" />
@@ -240,11 +242,11 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
             note: the persistent desktop instance no longer carries the
             avatar/theme/logout cluster at all, it lives in TopBar.jsx now. */}
         {mobileOpen && (
-          <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-1 pt-3">
+          <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 px-1 pt-3 dark:border-white/10">
             <Link
               to="/account"
               onClick={handleLinkClick}
-              className="flex min-w-0 items-center gap-2 rounded-lg py-1 hover:bg-white/5"
+              className="flex min-w-0 items-center gap-2 rounded-lg py-1 hover:bg-slate-100 dark:hover:bg-white/5"
             >
               {user.avatarImage ? (
                 <img src={user.avatarImage} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
@@ -253,16 +255,16 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
                   {initials}
                 </span>
               )}
-              <span className="min-w-0 truncate text-xs font-medium text-white">{user.name}</span>
+              <span className="min-w-0 truncate text-xs font-medium text-slate-900 dark:text-white">{user.name}</span>
             </Link>
             <div className="flex shrink-0 items-center gap-0.5">
-              <ThemeToggle className="!min-h-9 !min-w-9 !text-lagoon-200 hover:!bg-white/10 hover:!text-white" />
+              <ThemeToggle className="!min-h-9 !min-w-9" />
               <button
                 type="button"
                 onClick={handleLogout}
                 aria-label="Log out"
                 title="Log out"
-                className="flex h-9 w-9 items-center justify-center rounded-md text-lagoon-200 hover:bg-white/10 hover:text-white"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-lagoon-200 dark:hover:bg-white/10 dark:hover:text-white"
               >
                 <LogoutIcon width={17} height={17} />
               </button>

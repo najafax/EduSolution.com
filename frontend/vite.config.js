@@ -16,6 +16,7 @@ export default defineConfig({
         'apple-touch-icon.png',
         'fonts/sora-700.woff2',
         'fonts/sora-800.woff2',
+        'fonts/bricolage-latin.woff2',
       ],
       manifest: {
         name: 'Edu Solutions',

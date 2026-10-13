@@ -8961,6 +8961,46 @@ here.
   header and the search box at both breakpoints without disturbing the
   FAB, bottom nav, or the existing table/mobile-accordion list below it.
 
+### Redesign stage 3 — Studio shell (`frontend/src/`)
+
+Stage 1 of the approved "Studio" direction (a presentation-only change:
+no route, API, permission, or business-logic change). It **supersedes** the
+earlier notes about the six-tab `BottomNav`, the draggable
+`FloatingActionButton`, the phone hamburger drawer, and the always-dark
+desktop `Sidebar` wherever they conflict with this section.
+
+- **Bottom bar (phones, `sm:hidden`)**: `components/BottomNav.jsx` is a
+  floating rounded pill with four destinations — Home, Sales (Invoices, or
+  Quotes if that is all the user can view; also active on quote requests/
+  recurring), Clients, More — and a raised centre **+** that opens a
+  `BottomSheet` Create list (New invoice, New quote, Add client, Record
+  expense). Tabs filter on `can(module, 'view')`, Create items on
+  `can(module, 'manage')`; with no manage grant the + is not rendered.
+  Create links go to `/invoices/new`, `/quotes/new`, and `/clients?new=1` /
+  `/expenses?new=1` — `Clients.jsx`/`Expenses.jsx` read that param once,
+  open their New form if `canManage`, then clear it.
+- **More** (`pages/More.jsx`, route `/more`): search, account row, every
+  `BUSINESS_LINKS` entry except Dashboard grouped by `GROUP_ORDER` under the
+  same view-permission / `superAdminOnly` filter as `Sidebar.jsx`, plus
+  theme toggle and log out. `Sidebar.jsx` now exports `LINK_ICONS` for it.
+- **FAB retired**: `FloatingActionButton.jsx` is a no-op component (its ~20
+  call sites remain, to keep this stage a shell-only diff; every one of
+  those pages already has a "New X" header button). Delete the call sites
+  in a later mechanical cleanup.
+- **Navbar**: the hamburger and left-edge swipe now apply from `sm` up only
+  (`useEdgeSwipeOpen` gained `minWidthPx`); phones reach the full nav via
+  More. Header/TopBar use the `canvas` ground instead of a bordered white bar.
+- **Sidebar**: light surface with a near-black active pill in light mode;
+  the previous dark lagoon panel is kept in dark mode (`dark:` variants).
+  Same links, groups, and permission filtering.
+- **Tokens/type**: `--color-canvas` (#e9ecf1) is the app ground (`App.jsx`
+  root); `--font-display` is now self-hosted Bricolage Grotesque
+  (`public/fonts/bricolage-latin.woff2`, one variable file, latin subset,
+  precached via `vite.config.js`) with Sora as fallback.
+- **Not in this stage**: card/list restyling, per-row primary-action
+  pattern, split-view lists, full-screen form sheets, and the "Record
+  payment" shortcut in Create (needs an invoice picker) — later stages.
+
 ### Responsive / PWA
 
 The app is a responsive installable PWA (installable on iOS/Android home

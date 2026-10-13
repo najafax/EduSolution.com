@@ -40,7 +40,9 @@ const XL_BREAKPOINT_PX = 1280;
 // index.css, which helps the same gesture in some browsers/versions but is
 // also not a complete fix on its own — there is no combination of web APIs
 // that reliably wins against it on every platform.
-export function useEdgeSwipeOpen({ enabled, onOpen, breakpointPx = XL_BREAKPOINT_PX }) {
+// `minWidthPx` is the opposite bound: below it the gesture is left alone
+// (Navbar.jsx uses it because phones no longer have this drawer at all).
+export function useEdgeSwipeOpen({ enabled, onOpen, breakpointPx = XL_BREAKPOINT_PX, minWidthPx = 0 }) {
   const stateRef = useRef({ tracking: false, startX: 0, startY: 0 });
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function useEdgeSwipeOpen({ enabled, onOpen, breakpointPx = XL_BREAKPOINT
 
     function handleTouchStart(e) {
       const touch = e.touches[0];
-      if (!touch || touch.clientX > EDGE_ZONE_PX || window.innerWidth >= breakpointPx) return;
+      if (!touch || touch.clientX > EDGE_ZONE_PX || window.innerWidth >= breakpointPx || window.innerWidth < minWidthPx) return;
       stateRef.current = { tracking: true, startX: touch.clientX, startY: touch.clientY };
     }
 
@@ -95,5 +97,5 @@ export function useEdgeSwipeOpen({ enabled, onOpen, breakpointPx = XL_BREAKPOINT
       document.removeEventListener('touchend', handleTouchEnd);
       document.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [enabled, onOpen, breakpointPx]);
+  }, [enabled, onOpen, breakpointPx, minWidthPx]);
 }

@@ -39,7 +39,7 @@ export default function TopBar() {
 
   return (
     <header
-      className="sticky top-0 z-10 hidden border-b border-slate-200 bg-white/80 backdrop-blur xl:flex dark:border-slate-800 dark:bg-slate-950/80"
+      className="sticky top-0 z-10 hidden bg-canvas/90 backdrop-blur xl:flex dark:bg-slate-950/80"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <div className="flex w-full items-center justify-between gap-4 px-6 py-3">

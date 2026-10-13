@@ -135,6 +135,16 @@ export function MenuIcon(props) {
   );
 }
 
+// Four rounded squares — the bottom bar's "More" destination
+// (components/BottomNav.jsx, pages/More.jsx).
+export function GridIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3.5 3.5h5v5h-5zM11.5 3.5h5v5h-5zM3.5 11.5h5v5h-5zM11.5 11.5h5v5h-5z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function ChevronRightIcon(props) {
   return (
     <svg {...base} {...props}>
