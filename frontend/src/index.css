@@ -325,7 +325,7 @@ button:not(:disabled):active,
    --------------------------------------------------------------------- */
 html:not(.dark) .modal-panel,
 html:not(.dark) .sheet-panel {
-  background-color: rgb(255 255 255 / 0.62) !important;
+  background-color: rgb(255 255 255 / 0.78) !important;
   background-image:
     radial-gradient(70% 40% at 0% 0%, rgb(10 138 148 / 0.28), transparent 70%),
     radial-gradient(60% 40% at 100% 20%, rgb(56 189 248 / 0.25), transparent 70%),

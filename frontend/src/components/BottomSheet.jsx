@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 // A generic mobile action-list popup — slides up from the bottom instead of
 // Modal.jsx's centered card, since that's the native mobile-app convention
@@ -29,7 +30,10 @@ export default function BottomSheet({ open, onClose, title, children }) {
 
   if (!open) return null;
 
-  return (
+  // Portaled to <body>: an ancestor with backdrop-filter (the glass cards)
+  // becomes the containing block for position:fixed, which trapped the sheet
+  // inside the card it was opened from.
+  return createPortal(
     <div
       className="fixed inset-0 z-40 flex items-end bg-slate-900/50"
       onMouseDown={(e) => {
@@ -45,6 +49,7 @@ export default function BottomSheet({ open, onClose, title, children }) {
         )}
         <div className="px-2 pb-3 pt-2">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
