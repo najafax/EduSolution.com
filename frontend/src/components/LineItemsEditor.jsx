@@ -76,7 +76,7 @@ function ProductPicker({ products, currencySymbol, onPick, placeholder }) {
         className="min-h-11 w-full min-w-56 rounded-md border border-slate-300 px-3 py-2 text-base text-slate-700 focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
       />
       {open && (
-        <ul className="absolute z-10 mt-1 max-h-60 w-full min-w-56 overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+        <ul className="modal-panel absolute z-10 mt-1 max-h-60 w-full min-w-56 overflow-auto rounded-2xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
           {filtered.length === 0 ? (
             <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">No matches.</li>
           ) : (

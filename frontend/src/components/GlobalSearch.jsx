@@ -74,7 +74,7 @@ export default function GlobalSearch({ onNavigate, className = 'max-w-xs', autoF
       )}
 
       {open && query.trim() && (
-        <div className="absolute left-0 right-0 z-20 mt-1 max-h-96 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+        <div className="modal-panel absolute left-0 right-0 z-20 mt-1 max-h-96 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
           {!hasResults ? (
             <p className="p-4 text-sm text-slate-500 dark:text-slate-400">No results for "{query}".</p>
           ) : (

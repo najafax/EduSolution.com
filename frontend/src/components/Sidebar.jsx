@@ -162,7 +162,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
         />
       )}
       <aside
-        className={`${mobileOpen ? 'fixed inset-y-0 left-0 z-40 flex w-72 flex-col' : 'hidden'} shrink-0 bg-white px-3 py-5 shadow-2xl dark:bg-lagoon-950 xl:sticky xl:top-0 xl:z-auto xl:flex xl:h-screen xl:w-60 xl:flex-col xl:border-r xl:border-slate-200 xl:shadow-none dark:xl:border-transparent`}
+        className={`${mobileOpen ? 'sheet-panel fixed inset-y-0 left-0 z-40 flex w-72 flex-col' : 'hidden'} shrink-0 bg-white px-3 py-5 shadow-2xl dark:bg-lagoon-950 xl:sticky xl:top-0 xl:z-auto xl:flex xl:h-screen xl:w-60 xl:flex-col xl:border-r xl:border-slate-200 xl:shadow-none dark:xl:border-transparent`}
         style={{ paddingTop: 'calc(1.25rem + env(safe-area-inset-top))' }}
       >
         <div className="mb-5 flex shrink-0 items-center justify-between px-2">
