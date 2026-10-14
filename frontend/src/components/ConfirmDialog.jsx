@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 
 // The one confirmation popup every destructive action in the app renders —
@@ -22,7 +23,8 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, canc
     };
   }, [open, onCancel]);
 
-  return (
+  // Portaled to <body> so a backdrop-filter ancestor (glass cards) cannot trap it.
+  return createPortal(
     // MotionConfig lives here (not at the app root) so this file's own
     // static `motion/react` import is the only thing that pulls the
     // library in — ConfirmDialog.jsx is only ever reached via a lazily-
@@ -76,6 +78,7 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, canc
         </motion.div>
       )}
     </AnimatePresence>
-    </MotionConfig>
+    </MotionConfig>,
+    document.body,
   );
 }

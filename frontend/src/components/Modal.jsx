@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 
 // Shared popup styling for "New X" (and reused "Edit X") entry forms —
@@ -30,7 +31,8 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
     };
   }, [open, onClose]);
 
-  return (
+  // Portaled to <body> so a backdrop-filter ancestor (glass cards) cannot trap it.
+  return createPortal(
     // MotionConfig lives here (not at the app root) so this file's own
     // static `motion/react` import is the only thing that pulls the
     // library in — Modal.jsx is only ever reached via a lazily-loaded
@@ -78,6 +80,7 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
         </motion.div>
       )}
     </AnimatePresence>
-    </MotionConfig>
+    </MotionConfig>,
+    document.body,
   );
 }
