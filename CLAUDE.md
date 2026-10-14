@@ -9638,3 +9638,13 @@ borderless canvas header with an ink Login button, borderless white
 `rounded-3xl` cards (`dark:border` in dark mode), `rounded-xl` ink CTAs, ink
 (`lagoon-950`) closing bands, tighter display headings. Presentation only —
 routes, CMS content, dark mode and the mobile drawer/edge swipe are unchanged.
+
+### Settings page layout (matches the Security Ops app)
+
+`pages/business/Settings.jsx` now follows the security-ops settings pattern.
+From `md` up: a column of collapsible section cards (open state persisted in
+`localStorage` key `settings:open`) with a sticky "jump to" list at `xl:`.
+Below `md`: a grouped menu (General / Finance / System) where tapping an item
+opens that one section with a back link. Same fields, validation and single
+`PUT /api/settings` Save as before; Save shows on desktop and inside a phone
+section only.

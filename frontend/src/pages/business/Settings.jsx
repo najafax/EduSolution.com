@@ -10,6 +10,7 @@ import {
   ShieldIcon,
   DatabaseIcon,
   ChevronRightIcon,
+  SettingsIcon,
   AlertTriangleIcon,
   CheckCircleIcon,
 } from '../../components/icons';
@@ -20,12 +21,14 @@ import MeterBar from '../../components/MeterBar';
 // desktop section-rail + content panel), per the three mockup directions
 // reviewed on the design canvas. Both layouts read from this one list so
 // they can never drift on which sections exist or what order they're in.
+const GROUPS = ['General', 'Finance', 'System'];
+const OPEN_KEY = 'settings:open';
 const SECTIONS = [
-  { key: 'letterheads', title: 'Letterheads & branding', Icon: ImageIcon },
-  { key: 'business', title: 'Business details', Icon: BuildingIcon },
-  { key: 'financial', title: 'Financial', Icon: BankIcon },
-  { key: 'security', title: 'Security & session', Icon: ShieldIcon },
-  { key: 'data', title: 'Data', Icon: DatabaseIcon },
+  { key: 'letterheads', group: 'General', title: 'Letterheads & branding', Icon: ImageIcon },
+  { key: 'business', group: 'General', title: 'Business details', Icon: BuildingIcon },
+  { key: 'financial', group: 'Finance', title: 'Financial', Icon: BankIcon },
+  { key: 'security', group: 'System', title: 'Security & session', Icon: ShieldIcon },
+  { key: 'data', group: 'System', title: 'Data', Icon: DatabaseIcon },
 ];
 
 function formatBytes(bytes) {
@@ -63,6 +66,28 @@ function backupAgeLabel(isoString) {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
+function useIsDesktop() {
+  const query = '(min-width: 768px)';
+  const [match, setMatch] = useState(() => (typeof window === 'undefined' ? true : window.matchMedia(query).matches));
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const on = () => setMatch(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return match;
+}
+
+function loadOpen() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(OPEN_KEY) ?? 'null');
+    if (Array.isArray(raw)) return raw.filter((x) => SECTIONS.some((sec) => sec.key === x));
+  } catch {
+    /* storage unavailable: use the default */
+  }
+  return ['letterheads'];
+}
+
 export default function Settings() {
   const { token, can } = useAuth();
   const canManageSettings = can('settings', 'manage');
@@ -71,7 +96,9 @@ export default function Settings() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [activeSection, setActiveSection] = useState('letterheads');
+  const isDesktop = useIsDesktop();
+  const [open, setOpen] = useState(loadOpen);
+  const [active, setActive] = useState(null); // phone: the one section being edited
 
   // Independent of the settings form itself — a failed/slow storage read
   // should never block the rest of the page, so it gets its own state and
@@ -294,83 +321,161 @@ export default function Settings() {
     }
   }
 
+  function setOpenPersist(next) {
+    setOpen(next);
+    try {
+      localStorage.setItem(OPEN_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  }
+  const toggleSection = (key) => setOpenPersist(open.includes(key) ? open.filter((x) => x !== key) : [...open, key]);
+  function jumpTo(key) {
+    if (!open.includes(key)) setOpenPersist([...open, key]);
+    setTimeout(() => document.getElementById(`settings-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+  function choose(key) {
+    setActive(key);
+    window.scrollTo({ top: 0 });
+  }
+  const activeDef = SECTIONS.find((sec) => sec.key === active) || null;
+  const showSave = canManageSettings && (isDesktop || activeDef);
+
+  const feedback = (
+    <div className="mt-4 flex flex-col gap-3">
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {success && <p className="text-sm text-emerald-600 dark:text-emerald-400">Saved.</p>}
+      {showSave && (
+        <button
+          type="submit"
+          disabled={submitting}
+          className="min-h-11 self-start rounded-md bg-slate-900 px-5 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
+        >
+          {submitting ? 'Saving…' : 'Save'}
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 sm:max-w-4xl sm:px-6">
-      <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Business settings</h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        This information appears on every quote, invoice, and receipt PDF.
-      </p>
-
-      <form onSubmit={handleSubmit} className="mt-4">
+    <div className="px-4 py-6 sm:px-6 lg:px-8">
+      <form onSubmit={handleSubmit}>
         <fieldset disabled={!canManageSettings} className="contents">
-          {/* Mobile — collapsible section cards */}
-          <div className="flex flex-col gap-3 sm:hidden">
-            {SECTIONS.map(({ key, title, Icon }) => (
-              <details
-                key={key}
-                className="group overflow-hidden rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900"
+          {!isDesktop && activeDef ? (
+            // Phone: one section at a time, with a back link to the menu.
+            <div>
+              <button
+                type="button"
+                onClick={() => choose(null)}
+                className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-lagoon-700 dark:text-lagoon-400"
               >
-                <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-lagoon-50 text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-300">
-                    <Icon width={17} height={17} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-slate-900 dark:text-white">{title}</span>
-                    <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{sectionSummary(key)}</span>
-                  </span>
-                  <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-90" />
-                </summary>
-                <div className="flex flex-col gap-3 border-t border-slate-200 px-4 pb-4 pt-3 dark:border-slate-700">
-                  {renderSectionFields(key)}
-                </div>
-              </details>
-            ))}
-          </div>
-
-          {/* Desktop — section rail + content panel */}
-          <div className="hidden overflow-hidden rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:grid sm:grid-cols-[220px_1fr]">
-            <nav className="flex flex-col gap-0.5 border-r border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
-              {SECTIONS.map(({ key, title, Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setActiveSection(key)}
-                  className={`flex min-h-11 items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition ${
-                    activeSection === key
-                      ? 'bg-slate-900 dark:bg-lagoon-600 text-white'
-                      : 'text-slate-600 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-700/60'
-                  }`}
-                >
-                  <Icon width={16} height={16} />
-                  {title}
-                </button>
-              ))}
-            </nav>
-            <div className="flex flex-col gap-4 p-6">
-              <div>
-                <h2 className="font-display text-base font-bold text-slate-900 dark:text-white">
-                  {SECTIONS.find((s) => s.key === activeSection)?.title}
-                </h2>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{sectionSummary(activeSection)}</p>
+                <ChevronRightIcon className="h-4 w-4 rotate-180" /> Settings
+              </button>
+              <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">{activeDef.title}</h1>
+              <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">{sectionSummary(activeDef.key)}</p>
+              <div className="flex flex-col gap-3 rounded-3xl bg-white p-4 shadow-sm dark:border dark:border-slate-700 dark:bg-slate-900">
+                {renderSectionFields(activeDef.key)}
               </div>
-              {renderSectionFields(activeSection)}
             </div>
-          </div>
-        </fieldset>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 pb-4">
+                <SettingsIcon className="h-7 w-7 text-lagoon-600" />
+                <div>
+                  <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Business settings</h1>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {isDesktop ? 'Open a section to change it. This appears on every quote, invoice and receipt PDF.' : 'Manage your business details and PDFs.'}
+                  </p>
+                </div>
+              </div>
 
-        <div className="mt-4 flex flex-col gap-3">
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-          {success && <p className="text-sm text-emerald-600 dark:text-emerald-400">Saved.</p>}
-          {canManageSettings && (
-            <button
-              type="submit"
-              disabled={submitting}
-              className="min-h-11 self-start rounded-md bg-slate-900 px-5 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
-            >
-              {submitting ? 'Saving…' : 'Save'}
-            </button>
+              {isDesktop ? (
+                <div className="flex items-start gap-8">
+                  <div className="min-w-0 flex-1 space-y-4">
+                    {SECTIONS.map(({ key, title, Icon }) => {
+                      const isOpen = open.includes(key);
+                      return (
+                        <section
+                          key={key}
+                          id={`settings-${key}`}
+                          className="scroll-mt-24 overflow-hidden rounded-3xl bg-white shadow-sm dark:border dark:border-slate-700 dark:bg-slate-900"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleSection(key)}
+                            aria-expanded={isOpen}
+                            className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                          >
+                            <span className="flex items-center gap-3">
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-lagoon-50 text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-300">
+                                <Icon width={18} height={18} />
+                              </span>
+                              <span>
+                                <span className="block font-semibold text-slate-900 dark:text-white">{title}</span>
+                                <span className="block text-xs text-slate-500 dark:text-slate-400">{sectionSummary(key)}</span>
+                              </span>
+                            </span>
+                            <ChevronRightIcon className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                          </button>
+                          {isOpen && (
+                            <div className="flex flex-col gap-3 border-t border-slate-100 px-5 pb-5 pt-4 dark:border-slate-700">
+                              {renderSectionFields(key)}
+                            </div>
+                          )}
+                        </section>
+                      );
+                    })}
+                  </div>
+                  <nav
+                    aria-label="Jump to a section"
+                    className="sticky top-24 hidden w-52 shrink-0 border-l-2 border-slate-200 pl-4 dark:border-slate-700 xl:block"
+                  >
+                    {SECTIONS.map(({ key, title }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => jumpTo(key)}
+                        className={`block w-full py-1.5 text-left text-sm hover:text-slate-900 dark:hover:text-white ${
+                          open.includes(key) ? 'font-medium text-lagoon-700 dark:text-lagoon-400' : 'text-slate-500 dark:text-slate-400'
+                        }`}
+                      >
+                        {title}
+                      </button>
+                    ))}
+                  </nav>
+                </div>
+              ) : (
+                <div>
+                  {GROUPS.map((g) => (
+                    <div key={g} className="mb-5">
+                      <p className="mb-1.5 px-1 text-[11px] font-bold uppercase tracking-widest text-slate-400">{g}</p>
+                      <div className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white shadow-sm dark:divide-slate-700 dark:border dark:border-slate-700 dark:bg-slate-900">
+                        {SECTIONS.filter((sec) => sec.group === g).map(({ key, title, Icon }) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => choose(key)}
+                            className="flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-slate-50 dark:active:bg-slate-800"
+                          >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-lagoon-50 text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-300">
+                              <Icon width={17} height={17} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-medium text-slate-900 dark:text-white">{title}</span>
+                              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{sectionSummary(key)}</span>
+                            </span>
+                            <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
-        </div>
+        </fieldset>
+        {feedback}
       </form>
     </div>
   );
