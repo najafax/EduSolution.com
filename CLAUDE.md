@@ -9079,10 +9079,11 @@ create button, gradients) are `bg-slate-900` in light mode and
 `dark:bg-lagoon-600` in dark mode; teal is the accent only (links, focus,
 status tints, chart series). Applies to the staff app, login, the public
 site and the client portal. Chart hexes moved from #0e7c86 to #0a8a94; PWA
-`theme_color`/`theme-color` is ink. **Deliberately untouched**: the
-quote/invoice/receipt/report PDFs (`lib/pdf.js` `COLORS`) still print the
-original #0e7c86 brand colour — they are client-facing documents; change
-them only on request.
+`theme_color`/`theme-color` is ink. **PDFs and the licence-renewal email were
+recoloured on request**: `lib/pdf.js` `COLORS.brand` is ink #10131a and
+`headerFill` is #e9ecf1 (the quote/invoice/receipt/report PDFs all share them),
+and `lib/licenseRenewalEmail.js` uses an ink header/button with #08717a for the
+link. The older #0e7c86 brand colour no longer appears in client documents.
 
 ### Responsive / PWA
 
