@@ -13,12 +13,12 @@ const PAGE_BOTTOM = 770;
 // of this same COLORS object, all five report PDFs too — kept the old
 // indigo brand color after every other surface in the app had moved on.
 const COLORS = {
-  brand: '#0e7c86',
+  brand: '#10131a',
   heading: '#0f172a',
   body: '#334155',
   muted: '#94a3b8',
   border: '#e2e8f0',
-  headerFill: '#edf8f7',
+  headerFill: '#e9ecf1',
   rowAlt: '#f8fafc',
   positive: '#059669',
   negative: '#dc2626',

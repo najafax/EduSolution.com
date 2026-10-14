@@ -16,9 +16,11 @@ const { escapeHtml } = require('./mailer');
 // ignores `background-image` (older Outlook desktop) still shows the
 // brand teal, just flat instead of gradient. Uses this app's own `lagoon`
 // palette (see frontend/src/index.css) rather than inventing new colors.
-const LAGOON_600 = '#0e7c86';
-const LAGOON_400 = '#3fa9a6';
-const LAGOON_700 = '#0b5a62';
+// Studio palette: ink for the header/button fills, teal only for the link accent.
+const LAGOON_600 = '#10131a';
+const LAGOON_400 = '#232a3a';
+const LAGOON_700 = '#10131a';
+const LINK_TEAL = '#08717a';
 
 function detailRow(label, value, { last = false, bold = false, color = '#0f172a' } = {}) {
   const border = last ? '' : 'border-bottom:1px solid #e2e8f0;';
@@ -42,7 +44,7 @@ function renderLicenseRenewalEmail({ license, client, settings }) {
   ];
   if (license.url) {
     const safeUrl = escapeHtml(license.url);
-    rows.push(detailRow('Access link', `<a href="${safeUrl}" style="color:${LAGOON_600};">${safeUrl}</a>`));
+    rows.push(detailRow('Access link', `<a href="${safeUrl}" style="color:${LINK_TEAL};">${safeUrl}</a>`));
   }
   rows.push(detailRow('New expiry date', escapeHtml(license.expiry_date), { last: true, bold: true, color: '#059669' }));
 
