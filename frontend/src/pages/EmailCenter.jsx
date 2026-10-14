@@ -54,15 +54,28 @@ function TemplateCard({ template, token, onChanged, canManage }) {
   }
 
   return (
-    <div className="rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{template.label}</h3>
+    <details className="group rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 [&::-webkit-details-marker]:hidden">
+        <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-white">{template.label}</h3>
         {template.isCustom && (
           <span className="rounded-full bg-lagoon-100 px-2 py-0.5 text-xs font-medium text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
             Customized
           </span>
         )}
-      </div>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="shrink-0 text-slate-400 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        >
+          <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </summary>
+      <div className="px-5 pb-5">
 
       <label className="mt-3 block">
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Subject</span>
@@ -127,7 +140,8 @@ function TemplateCard({ template, token, onChanged, canManage }) {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </details>
   );
 }
 
