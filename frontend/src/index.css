@@ -365,10 +365,10 @@ html:not(.dark) :is(.modal-panel, .sheet-panel, .app-glass) :is(input, select, t
 }
 
 /* =====================================================================
-   Liquid glass — light mode (style "C"). Gradient fill, a lit top-left
-   edge fading to a dim bottom-right one, a soft inner glow and a tinted
-   shadow. Loaded last so it wins over the earlier glass rules; dark mode
-   is untouched.
+   Frosted glass — light mode (style "B"). Calm and readable: a fairly
+   opaque white fill, a strong blur, a crisp white edge and soft neutral
+   shadows, so it reads as frosted paper over the water wash. Loaded last
+   so it wins over the earlier glass rules; dark mode is untouched.
    ===================================================================== */
 html:not(.dark) .app-water {
   background-image:
@@ -388,58 +388,54 @@ html:not(.dark) .water-tint {
 
 html:not(.dark) .app-glass :is(.rounded-3xl, .rounded-2xl).bg-white,
 html:not(.dark) .glass {
-  background-color: transparent !important;
-  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.22) 55%, rgb(255 255 255 / 0.34)) !important;
-  border: 1px solid rgb(255 255 255 / 0.55) !important;
-  box-shadow:
-    inset 1px 1px 0 rgb(255 255 255 / 0.95),
-    inset -1px -1px 0 rgb(255 255 255 / 0.35),
-    inset 0 0 18px rgb(255 255 255 / 0.25),
-    0 14px 34px rgb(15 80 110 / 0.16) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.04);
-  backdrop-filter: blur(20px) saturate(180%) brightness(1.04);
+  background-color: rgb(255 255 255 / 0.58) !important;
+  background-image: none !important;
+  border: 1px solid rgb(255 255 255 / 0.85) !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 12px 32px rgb(15 23 42 / 0.10) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
 }
 
 /* Floating panels (dialogs, sheets, notifications, popovers) sit over page
-   text, so they get a denser version of the same glass. */
+   text, so the same frost is denser. */
 html:not(.dark) .modal-panel,
 html:not(.dark) .sheet-panel,
 html:not(.dark) .glass.glass-strong {
-  background-color: transparent !important;
-  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.97), rgb(255 255 255 / 0.9) 55%, rgb(255 255 255 / 0.95)) !important;
-  border: 1px solid rgb(255 255 255 / 0.7) !important;
-  box-shadow:
-    inset 1px 1px 0 #fff,
-    inset -1px -1px 0 rgb(255 255 255 / 0.45),
-    inset 0 0 22px rgb(255 255 255 / 0.3),
-    0 24px 60px rgb(15 80 110 / 0.28) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(1.04);
-  backdrop-filter: blur(28px) saturate(180%) brightness(1.04);
+  background-color: rgb(255 255 255 / 0.88) !important;
+  background-image: none !important;
+  border: 1px solid rgb(255 255 255 / 0.9) !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 24px 60px rgb(15 23 42 / 0.20) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
 }
 
-/* Chrome: sidebar / footer take a lighter pass of the same glass. */
+/* Chrome: sidebar / footer. */
 html:not(.dark) .app-glass > aside:not([class*="fixed"]),
 html:not(.dark) .app-glass footer {
-  background-color: transparent !important;
-  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.2)) !important;
-  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.6) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
+  background-color: rgb(255 255 255 / 0.45) !important;
+  background-image: none !important;
+  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.7) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
 }
 
-/* Fields: lit inner edge, soft inset depth, clear teal focus. */
+/* Fields: near-opaque white, a fine slate edge, a clear teal focus ring. */
 html:not(.dark) :is(.modal-panel, .sheet-panel, .app-glass)
   :is(input:where(:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="hidden"], [type="color"])), select, textarea, .border-slate-300) {
-  background-color: rgb(255 255 255 / 0.55);
-  border: 1px solid rgb(255 255 255 / 0.85);
-  box-shadow: inset 0 1px 3px rgb(15 23 42 / 0.08), inset 0 0 0 1px rgb(148 163 184 / 0.28);
+  background-color: rgb(255 255 255 / 0.7);
+  border: 1px solid rgb(148 163 184 / 0.35);
+  box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.05);
 }
 html:not(.dark) :is(.modal-panel, .sheet-panel, .app-glass)
   :is(input, select, textarea, .border-slate-300):is(:focus, :focus-within) {
-  background-color: rgb(255 255 255 / 0.85);
-  border-color: rgb(255 255 255);
-  box-shadow: inset 0 1px 3px rgb(15 23 42 / 0.06), 0 0 0 3px rgb(10 138 148 / 0.28);
+  background-color: rgb(255 255 255 / 0.95);
+  border-color: rgb(10 138 148);
+  box-shadow: 0 0 0 3px rgb(10 138 148 / 0.22);
 }
 html:not(.dark) :is(.modal-panel, .sheet-panel, .app-glass) .border-slate-300 :is(input, select) {
   border: 0 !important; background: transparent !important; box-shadow: none !important;
 }
+
+/* Notifications / popovers hold dense text over page content: keep them
+   essentially solid so nothing ghosts through. */
+html:not(.dark) .glass.glass-strong { background-color: rgb(255 255 255 / 0.96) !important; }
