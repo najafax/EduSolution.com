@@ -34,7 +34,7 @@ export default defineConfig({
         // supported or the OS declines it, rather than replacing it outright.
         display: 'standalone',
         display_override: ['fullscreen', 'standalone'],
-        background_color: '#ffffff',
+        background_color: '#e9ecf1',
         theme_color: '#10131a',
         icons: [
           {
