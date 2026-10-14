@@ -760,6 +760,11 @@ setInterval(() => {
 }, ALERT_INTERVAL_MINUTES * 60000);
 
 console.log(`Telegram ops bot starting, alerting every ${ALERT_INTERVAL_MINUTES}m.`);
+// Exit straight away on SIGTERM/SIGINT. Without this the process waited out its
+// in-flight long-poll, so every `systemctl restart telegram-bot` took ~90s and
+// ended in systemd's SIGKILL ("State 'stop-sigterm' timed out").
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => process.exit(0));
+
 runBot(bot).catch((err) => {
   console.error('bot stopped:', err);
   process.exit(1);
