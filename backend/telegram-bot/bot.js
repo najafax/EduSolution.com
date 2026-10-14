@@ -22,6 +22,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true });
 
+const os = require('os');
 const fs = require('fs');
 const { exec } = require('child_process');
 const { promisify } = require('util');
@@ -309,9 +310,9 @@ function healthCheck() {
     });
     req.on('timeout', () => {
       req.destroy();
-      resolve({ ok: false, status: null, ms: Date.now() - start });
+      resolve({ ok: false, status: null, ms: Date.now() - start, err: 'timeout' });
     });
-    req.on('error', () => resolve({ ok: false, status: null, ms: Date.now() - start }));
+    req.on('error', (e) => resolve({ ok: false, status: null, ms: Date.now() - start, err: e.code || e.message }));
   });
 }
 
@@ -380,9 +381,9 @@ function localHealthCheck() {
     });
     req.on('timeout', () => {
       req.destroy();
-      resolve({ ok: false, status: null, ms: Date.now() - start });
+      resolve({ ok: false, status: null, ms: Date.now() - start, err: 'timeout' });
     });
-    req.on('error', () => resolve({ ok: false, status: null, ms: Date.now() - start }));
+    req.on('error', (e) => resolve({ ok: false, status: null, ms: Date.now() - start, err: e.code || e.message }));
   });
 }
 
@@ -646,10 +647,32 @@ async function runAlertChecks() {
   // clean 200s in the same window — see localHealthCheck()'s own note. That
   // combination means the process itself was never unreachable; only the
   // self-referential public check was.
-  const healthDown = !health.ok && !localHealth.ok;
+  // The local probe above ran once at t=0 while the public check retried for
+  // ~40s, so re-probe loopback now (3 tries) before deciding the process is
+  // really down — a single early blip must not combine with a longer public
+  // failure into a page.
+  let localFinal = localHealth;
+  for (let i = 0; !health.ok && !localFinal.ok && i < 3; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await sleep(3000);
+    // eslint-disable-next-line no-await-in-loop
+    localFinal = await localHealthCheck();
+  }
+  const healthDown = !health.ok && !localFinal.ok;
   if (healthDown !== alertState.healthDown) {
     alertState.healthDown = healthDown;
-    await broadcast(healthDown ? `\u{1F6A8} Public API (${API_DOMAIN}) is unreachable.` : '✅ Public API is reachable again.');
+    if (healthDown) {
+      const load = os.loadavg().map((x) => x.toFixed(2)).join(' ');
+      const { output: tail } = await runCmd(`journalctl -u ${SERVICE_NAME} -n 8 --no-pager -o cat`);
+      await broadcast(
+        `\u{1F6A8} Public API (${API_DOMAIN}) is unreachable.\n` +
+          `public: ${health.err || health.status} after ${health.ms}ms; local: ${localFinal.err || localFinal.status} after ${localFinal.ms}ms\n` +
+          `load: ${load}; mem used: ${mem ? mem.usedPct + '%' : '?'}; restarts: ${restartCount}\n` +
+          'last log lines:\n```\n' + String(tail).slice(-900).replace(/`/g, "'") + '\n```',
+      );
+    } else {
+      await broadcast('✅ Public API is reachable again.');
+    }
   }
 
   // The public path failing while the backend answers fine locally isn't
