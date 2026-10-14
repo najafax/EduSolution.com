@@ -48,7 +48,7 @@ function NeedHelp() {
         <HelpCircleIcon width={18} height={18} />
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border border-slate-200 bg-white p-4 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900">
+        <div className="absolute right-0 z-20 mt-2 w-64 modal-panel rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900">
           <p className="font-semibold text-slate-900 dark:text-white">Need help?</p>
           <p className="mt-1 text-slate-500 dark:text-slate-400">
             {settings.business_name ? `Get in touch with ${settings.business_name}:` : 'Get in touch with us:'}
@@ -92,7 +92,7 @@ export default function PortalLayout({ children }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950">
+    <div className="flex min-h-screen flex-col bg-transparent dark:bg-slate-950">
       <header className="border-b border-slate-200 dark:border-slate-800">
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-6">
