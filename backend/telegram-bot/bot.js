@@ -42,6 +42,7 @@ const ALLOWED_IDS = new Set(
 );
 const API_DOMAIN = process.env.TELEGRAM_API_DOMAIN || 'api.edusolutionsmaldives.com';
 const SERVICE_NAME = process.env.TELEGRAM_BACKEND_SERVICE || 'edusolution-backend';
+const BOT_SERVICE = process.env.TELEGRAM_BOT_SERVICE || 'telegram-bot';
 // Same default src/index.js itself falls back to — the backend's own loopback
 // port behind nginx (see localHealthCheck() below).
 const BACKEND_PORT = process.env.PORT || 4000;
@@ -546,6 +547,14 @@ async function doDeploy(chatId) {
   }
   await bot.api.sendMessage({ chat_id: chatId, text: 'Deployed. Restarting…' });
   await doRestart(chatId);
+  // The backend restart above never reloads this bot's own code, so a deployed
+  // bot.js change did nothing until someone restarted the bot by hand. Restart
+  // it last, via a detached systemd timer so the restart outlives this process.
+  const self = await runCmd(`systemd-run --on-active=3 --unit=telegram-bot-self-restart systemctl restart ${BOT_SERVICE}`);
+  await bot.api.sendMessage({
+    chat_id: chatId,
+    text: self.ok ? 'Restarting the bot itself in a few seconds…' : `⚠️ Could not schedule a bot restart: ${self.output}\nRun: systemctl restart ${BOT_SERVICE}`,
+  });
 }
 
 // --- Auth gate, registered first so no command handler below it ever runs
