@@ -247,3 +247,18 @@ button:not(:disabled):active,
   border-color: rgb(255 255 255 / 0.1) !important;
   box-shadow: 0 8px 30px rgb(0 0 0 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.08) !important;
 }
+
+.water-tint {
+  background:
+    radial-gradient(70% 50% at 10% 0%, rgb(10 138 148 / 0.35), transparent 70%),
+    radial-gradient(60% 50% at 100% 60%, rgb(56 189 248 / 0.3), transparent 70%),
+    radial-gradient(70% 50% at 20% 100%, rgb(45 212 191 / 0.28), transparent 70%);
+}
+
+/* Denser glass for floating panels that sit over page text. */
+.glass.glass-strong {
+  background-color: rgb(255 255 255 / 0.9) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+}
+.dark .glass.glass-strong { background-color: rgb(15 23 42 / 0.88) !important; }
