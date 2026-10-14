@@ -401,7 +401,8 @@ export const api = {
 
   facebookPosts: {
     list: (token, page = 1) => request(`/facebook-posts?page=${page}`, { token }),
-    generate: (token) => request('/facebook-posts/generate', { method: 'POST', token }),
+    options: (token) => request('/facebook-posts/options', { token }),
+    generate: (token, payload = {}) => request('/facebook-posts/generate', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/facebook-posts/${id}`, { method: 'PUT', body: payload, token }),
     publish: (id, token) => request(`/facebook-posts/${id}/publish`, { method: 'POST', token }),
     remove: (id, token) => request(`/facebook-posts/${id}`, { method: 'DELETE', token }),

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { resizeImage, dataUriByteLength } from '../../lib/imageResize';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -40,8 +41,16 @@ export default function FacebookPosts() {
   const [error, setError] = useState('');
   const [generating, setGenerating] = useState(false);
 
+  // Choices next to "Generate draft": left on Auto, the server rotates through
+  // post types and tutorials itself (see lib/facebookPostDraft.js).
+  const [options, setOptions] = useState({ postTypes: [], videos: [] });
+  const [postType, setPostType] = useState('');
+  const [videoId, setVideoId] = useState('');
+
   const [editTarget, setEditTarget] = useState(null); // the post row being edited, or null
   const [editContent, setEditContent] = useState('');
+  // undefined = leave the picture as it is, null = remove it, string = new picture
+  const [editImage, setEditImage] = useState(undefined);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -59,11 +68,22 @@ export default function FacebookPosts() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [token, page]);
 
+  useEffect(() => {
+    if (!canManage) return;
+    api.facebookPosts
+      .options(token)
+      .then(setOptions)
+      .catch(() => {});
+  }, [token, canManage]);
+
   async function handleGenerate() {
     setError('');
     setGenerating(true);
     try {
-      await api.facebookPosts.generate(token);
+      await api.facebookPosts.generate(token, {
+        postType: postType || undefined,
+        videoId: postType === 'tutorial' && videoId ? Number(videoId) : undefined,
+      });
       toast('Draft generated.', { type: 'success' });
       setPage(1);
       load();
@@ -77,7 +97,29 @@ export default function FacebookPosts() {
   function openEdit(post) {
     setEditTarget(post);
     setEditContent(post.content);
+    setEditImage(undefined);
     setEditError('');
+  }
+
+  async function handlePickImage(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setEditError('');
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setEditError('The picture must be a PNG, JPEG or WEBP image.');
+      return;
+    }
+    try {
+      const dataUri = await resizeImage(file, { maxDimension: 1600 });
+      if (dataUriByteLength(dataUri) > 3 * 1024 * 1024) {
+        setEditError('That picture is still too large after resizing — please use a smaller one.');
+        return;
+      }
+      setEditImage(dataUri);
+    } catch (err) {
+      setEditError(err.message || 'Could not read the selected picture.');
+    }
   }
 
   async function handleSaveEdit(e) {
@@ -89,7 +131,9 @@ export default function FacebookPosts() {
     setEditSubmitting(true);
     setEditError('');
     try {
-      await api.facebookPosts.update(editTarget.id, { content: editContent.trim() }, token);
+      const payload = { content: editContent.trim() };
+      if (editImage !== undefined) payload.image = editImage;
+      await api.facebookPosts.update(editTarget.id, payload, token);
       setEditTarget(null);
       load();
     } catch (err) {
@@ -103,7 +147,9 @@ export default function FacebookPosts() {
     if (
       !(await confirm({
         title: 'Publish to Facebook?',
-        message: 'This will post the content below to your Facebook Page right now, visible to everyone who follows it.',
+        message: post.image
+          ? 'This will post the text and picture to your Facebook Page right now, visible to everyone who follows it.'
+          : 'This will post the text to your Facebook Page right now, visible to everyone who follows it. (No picture is attached.)',
         confirmLabel: 'Publish',
         danger: false,
       }))
@@ -188,6 +234,50 @@ export default function FacebookPosts() {
         )}
       </div>
 
+      {canManage && options.postTypes.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-end gap-3 rounded-2xl bg-white p-3 shadow-sm dark:border dark:border-slate-700 dark:bg-slate-900">
+          <label className="block w-full sm:w-auto">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Post type</span>
+            <select
+              value={postType}
+              onChange={(e) => {
+                setPostType(e.target.value);
+                setVideoId('');
+              }}
+              className="mt-1 block min-h-11 w-full rounded-md border border-slate-300 px-3 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white sm:w-auto"
+            >
+              <option value="">Automatic (rotates)</option>
+              {options.postTypes.map((t) => (
+                <option key={t.value} value={t.value} disabled={!t.available}>
+                  {t.label}
+                  {t.available ? '' : ' — nothing to use yet'}
+                </option>
+              ))}
+            </select>
+          </label>
+          {postType === 'tutorial' && (
+            <label className="block w-full min-w-0 sm:w-auto">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Tutorial</span>
+              <select
+                value={videoId}
+                onChange={(e) => setVideoId(e.target.value)}
+                className="mt-1 block min-h-11 w-full max-w-full rounded-md border border-slate-300 px-3 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white sm:w-auto"
+              >
+                <option value="">Next in rotation</option>
+                {options.videos.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <p className="min-w-0 flex-1 basis-56 text-xs text-slate-500 dark:text-slate-400">
+            Tutorial posts attach the tutorial's thumbnail as the picture. You can replace or remove it when you edit the draft.
+          </p>
+        </div>
+      )}
+
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -226,9 +316,20 @@ export default function FacebookPosts() {
                   {data.posts.map((post) => (
                     <tr key={post.id}>
                       <td className="max-w-md px-4 py-3">
-                        <p className="line-clamp-2 text-slate-900 dark:text-white">{post.content}</p>
+                        <div className="flex items-start gap-3">
+                          {post.image && (
+                            <img src={post.image} alt="" className="h-14 w-14 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-700" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="line-clamp-2 text-slate-900 dark:text-white">{post.content}</p>
+                            {post.source_note && <p className="mt-0.5 truncate text-xs text-slate-400 dark:text-slate-500">{post.source_note}</p>}
+                          </div>
+                        </div>
                         {post.status === 'posted' && post.fb_post_id && (
-                          <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Posted {relativeTime(post.posted_at)}</p>
+                          <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                            Posted {relativeTime(post.posted_at)}
+                            {post.has_image ? ' · with picture' : ''}
+                          </p>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -261,6 +362,8 @@ export default function FacebookPosts() {
                     </div>
                   }
                 >
+                  {post.image && <img src={post.image} alt="" className="mb-2 max-h-48 w-full rounded-xl border border-slate-200 object-cover dark:border-slate-700" />}
+                  {post.source_note && <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">{post.source_note}</p>}
                   <dl className="grid grid-cols-2 gap-2 text-sm">
                     <dt className="text-slate-500 dark:text-slate-400">Generated by</dt>
                     <dd className="text-right text-slate-900 dark:text-white">{post.generated_by_name || '—'}</dd>
@@ -291,6 +394,39 @@ export default function FacebookPosts() {
             rows={8}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-900 focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
           />
+          {(() => {
+            const shown = editImage === undefined ? editTarget?.image : editImage;
+            return (
+              <div>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Picture</span>
+                {shown ? (
+                  <div className="mt-1 flex items-center gap-3">
+                    <img src={shown} alt="" className="h-24 w-24 rounded-md border border-slate-200 object-cover dark:border-slate-700" />
+                    <div className="flex flex-wrap gap-2">
+                      <label className="flex min-h-11 cursor-pointer items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+                        Replace
+                        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handlePickImage} className="sr-only" />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setEditImage(null)}
+                        className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handlePickImage}
+                    className="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:min-h-11 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-medium file:text-slate-700 dark:text-slate-400 dark:file:bg-slate-800 dark:file:text-slate-200"
+                  />
+                )}
+              </div>
+            );
+          })()}
           {editError && <p className="text-sm text-red-600 dark:text-red-400">{editError}</p>}
           <div className="flex justify-end gap-2">
             <button

@@ -10,7 +10,7 @@ const { runBackup } = require('./backup');
 const { logEmail } = require('./emailLog');
 const { licenseRemindEmail, overdueReminderEmail } = require('./emailTemplates');
 const { runDailyEarningsReport } = require('./dailyEarningsReport');
-const { isConfigured: isFacebookDraftingConfigured, generateDraftPost: generateFacebookDraftPost } = require('./facebookPostDraft');
+const { isConfigured: isFacebookDraftingConfigured, createDraft: createFacebookDraft } = require('./facebookPostDraft');
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -310,13 +310,9 @@ async function generateWeeklyFacebookDraft() {
     return { skipped: true };
   }
 
-  const draft = await generateFacebookDraftPost();
-  const result = db
-    .prepare(`INSERT INTO facebook_posts (content, source_note, status, generated_by_name) VALUES (?, ?, 'draft', 'Automated')`)
-    .run(draft.content, draft.sourceNote);
-
-  console.log(`[facebook] Generated weekly draft post #${result.lastInsertRowid}`);
-  return { skipped: false, id: result.lastInsertRowid };
+  const post = await createFacebookDraft({}, 'Automated');
+  console.log(`[facebook] Generated weekly draft post #${post.id} (${post.post_type})`);
+  return { skipped: false, id: post.id };
 }
 
 // `quotes.status` includes 'expired' as a valid, filterable value (see

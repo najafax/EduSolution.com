@@ -873,6 +873,24 @@ if (!licenseColumns.has('url')) {
   db.exec(`ALTER TABLE licenses ADD COLUMN url TEXT NOT NULL DEFAULT '';`);
 }
 
+// Facebook post variety + pictures (see lib/facebookPostDraft.js): `post_type`
+// (which rotating angle a draft was written from), `video_id` (the tutorial
+// it spotlights, so the next draft picks a different one) and `image_data`
+// (a base64 data URI attached to the post, same inline-image approach every
+// other image in this app uses). facebook_posts already holds real,
+// published rows in production, so these are guarded ALTER TABLEs, not
+// edits to the CREATE TABLE statement.
+const facebookPostColumns = new Set(db.prepare('PRAGMA table_info(facebook_posts)').all().map((c) => c.name));
+if (!facebookPostColumns.has('post_type')) {
+  db.exec(`ALTER TABLE facebook_posts ADD COLUMN post_type TEXT NOT NULL DEFAULT '';`);
+}
+if (!facebookPostColumns.has('video_id')) {
+  db.exec(`ALTER TABLE facebook_posts ADD COLUMN video_id INTEGER;`);
+}
+if (!facebookPostColumns.has('image_data')) {
+  db.exec(`ALTER TABLE facebook_posts ADD COLUMN image_data TEXT;`);
+}
+
 // Same pattern once more: last_renewal_confirmation_sent_at (routes/
 // licenses.js's POST /:id/renewal-confirm) stamped the moment a renewal
 // confirmation email actually goes out, so Licenses.jsx can hide that

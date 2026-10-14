@@ -2,7 +2,7 @@ const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
-const { generateDraftPost } = require('../lib/facebookPostDraft');
+const { createDraft, listOptions } = require('../lib/facebookPostDraft');
 const facebook = require('../lib/facebook');
 
 // Weekly Facebook Page post drafts — AI-drafted (optionally seeded from this
@@ -19,41 +19,56 @@ const view = requirePermission('facebook', 'view');
 const manage = requirePermission('facebook', 'manage');
 
 const PAGE_SIZE = 20;
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+const IMAGE_DATA_URI_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 
 // Always paginated, newest first — same convention as routes/campaigns.js's
 // own history feed (a chronological log of drafts/posts, not a pickable
 // list, so it doesn't need the business list routes' opt-in ?page=
 // convention).
+// Pictures are base64 data URIs and can be large, so only a draft (the thing
+// being reviewed) carries its image in the list response; a posted row just
+// says whether it had one.
+function shapePost(row) {
+  const { image_data: imageData, ...rest } = row;
+  return { ...rest, has_image: Boolean(imageData), image: row.status === 'draft' ? imageData || null : null };
+}
+
 router.get('/', view, (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const offset = (page - 1) * PAGE_SIZE;
   const { total } = db.prepare('SELECT COUNT(*) AS total FROM facebook_posts').get();
   const posts = db
     .prepare('SELECT * FROM facebook_posts ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?')
-    .all(PAGE_SIZE, offset);
+    .all(PAGE_SIZE, offset)
+    .map(shapePost);
   res.json({ posts, page, pageSize: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) });
+});
+
+// The choices offered next to "Generate draft": post types (and whether each
+// has anything to write about yet) and the tutorials that can be spotlighted.
+router.get('/options', view, (req, res) => {
+  res.json(listOptions());
 });
 
 // On-demand draft generation — the same function the weekly cron job
 // (lib/scheduler.js's generateWeeklyFacebookDraft()) calls, just attributed
 // to the staff member who clicked the button instead of 'Automated'.
 router.post('/generate', manage, async (req, res) => {
-  let draft;
+  const postType = typeof req.body?.postType === 'string' && req.body.postType ? req.body.postType : undefined;
+  const videoId = req.body?.videoId ? Number(req.body.videoId) : undefined;
+  if (req.body?.videoId && !Number.isInteger(videoId)) return res.status(400).json({ error: 'Invalid tutorial.' });
+
+  let post;
   try {
-    draft = await generateDraftPost();
+    post = await createDraft({ postType, videoId }, req.user.name);
   } catch (err) {
     if (err.code === 'AI_NOT_CONFIGURED') return res.status(503).json({ error: err.message });
+    if (err.code === 'BAD_OPTION') return res.status(400).json({ error: err.message });
     console.error('[facebook] draft generation failed:', err);
     return res.status(500).json({ error: 'Failed to generate a draft — please try again.' });
   }
 
-  const result = db
-    .prepare(
-      `INSERT INTO facebook_posts (content, source_note, status, generated_by_name) VALUES (?, ?, 'draft', ?)`,
-    )
-    .run(draft.content, draft.sourceNote, req.user.name);
-
-  const post = db.prepare('SELECT * FROM facebook_posts WHERE id = ?').get(result.lastInsertRowid);
   logActivity({
     userName: req.user.name,
     action: 'generated a Facebook post draft',
@@ -61,7 +76,7 @@ router.post('/generate', manage, async (req, res) => {
     entityId: post.id,
     entityLabel: post.content.slice(0, 60),
   });
-  res.status(201).json({ post });
+  res.status(201).json({ post: shapePost(post) });
 });
 
 // Editing is only meaningful while a draft hasn't gone out yet — a posted
@@ -78,7 +93,28 @@ router.put('/:id', manage, (req, res) => {
   const content = (req.body?.content || '').trim();
   if (!content) return res.status(400).json({ error: 'content is required' });
 
-  db.prepare(`UPDATE facebook_posts SET content = ?, updated_at = datetime('now') WHERE id = ?`).run(content, req.params.id);
+  // `image` left out = keep the current picture; null = remove it; a data URI
+  // = replace it. Same decoded-size check every other image upload here uses.
+  let imageData = existing.image_data;
+  if (req.body && 'image' in req.body) {
+    const image = req.body.image;
+    if (image === null) {
+      imageData = null;
+    } else {
+      const match = typeof image === 'string' ? IMAGE_DATA_URI_RE.exec(image) : null;
+      if (!match) return res.status(400).json({ error: 'The picture must be a PNG, JPEG or WEBP image.' });
+      if (Math.ceil((match[2].length * 3) / 4) > MAX_IMAGE_BYTES) {
+        return res.status(400).json({ error: 'The picture is too large (3MB maximum).' });
+      }
+      imageData = image;
+    }
+  }
+
+  db.prepare(`UPDATE facebook_posts SET content = ?, image_data = ?, updated_at = datetime('now') WHERE id = ?`).run(
+    content,
+    imageData,
+    req.params.id,
+  );
 
   const post = db.prepare('SELECT * FROM facebook_posts WHERE id = ?').get(req.params.id);
   logActivity({
@@ -88,7 +124,7 @@ router.put('/:id', manage, (req, res) => {
     entityId: post.id,
     entityLabel: post.content.slice(0, 60),
   });
-  res.json({ post });
+  res.json({ post: shapePost(post) });
 });
 
 // The one real action — actually publishes to the configured Facebook
@@ -106,7 +142,9 @@ router.post('/:id/publish', manage, async (req, res) => {
 
   let fbPostId;
   try {
-    fbPostId = await facebook.publishPost(existing.content);
+    fbPostId = existing.image_data
+      ? await facebook.publishPhoto(existing.content, existing.image_data)
+      : await facebook.publishPost(existing.content);
   } catch (err) {
     if (err.code === 'FACEBOOK_NOT_CONFIGURED') return res.status(503).json({ error: err.message });
     console.error('[facebook] publish failed:', err);
@@ -125,7 +163,7 @@ router.post('/:id/publish', manage, async (req, res) => {
     entityId: post.id,
     entityLabel: post.content.slice(0, 60),
   });
-  res.json({ post });
+  res.json({ post: shapePost(post) });
 });
 
 // Discarding a draft the review step rejected — a posted record stays

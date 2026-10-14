@@ -46,4 +46,49 @@ async function publishPost(message) {
   return data.id;
 }
 
-module.exports = { isConfigured, publishPost };
+// Publishes a photo post: the image is uploaded to the Page's /photos edge
+// with `message` as its caption, which Facebook shows as a normal picture
+// post in the feed. `imageDataUri` is the stored base64 data URI. Returns the
+// post id (`post_id` when Facebook gives one, else the photo id) — same
+// FACEBOOK_NOT_CONFIGURED / FACEBOOK_API_ERROR shapes as publishPost().
+async function publishPhoto(message, imageDataUri) {
+  if (!isConfigured()) {
+    const error = new Error(
+      'Facebook is not configured. Set FACEBOOK_PAGE_ACCESS_TOKEN and FACEBOOK_PAGE_ID in backend/.env.',
+    );
+    error.code = 'FACEBOOK_NOT_CONFIGURED';
+    throw error;
+  }
+
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/s.exec(imageDataUri || '');
+  if (!match) {
+    const error = new Error('The attached picture is not a valid image.');
+    error.code = 'FACEBOOK_API_ERROR';
+    throw error;
+  }
+  const mime = match[1];
+  const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+  const buffer = Buffer.from(match[2], 'base64');
+
+  const form = new FormData();
+  form.append('caption', message);
+  form.append('access_token', PAGE_ACCESS_TOKEN);
+  form.append('source', new Blob([buffer], { type: mime }), `post.${ext}`);
+
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${PAGE_ID}/photos`, {
+    method: 'POST',
+    body: form,
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const apiMessage = data?.error?.message || `Facebook API request failed with status ${res.status}`;
+    const error = new Error(apiMessage);
+    error.code = 'FACEBOOK_API_ERROR';
+    throw error;
+  }
+
+  return data.post_id || data.id;
+}
+
+module.exports = { isConfigured, publishPost, publishPhoto };
