@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import BottomSheet from './BottomSheet';
 import { useToggleLink } from '../lib/useToggleLink';
+import { useSwipeToMore } from '../lib/useSwipeToMore';
 import { HomeIcon, InvoiceIcon, UsersIcon, GridIcon, PlusIcon, QuoteIcon, ExpenseIcon, ChevronRightIcon } from './icons';
 
 // Studio redesign (stage 1): four destinations plus one create button, as a
@@ -33,6 +34,7 @@ export default function BottomNav() {
   const navigate = useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
   const toggleMore = useToggleLink('/more');
+  useSwipeToMore({ enabled: true });
 
   const path = location.pathname;
   const startsWith = (to) => path === to || path.startsWith(`${to}/`);
