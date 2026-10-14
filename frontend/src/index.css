@@ -363,15 +363,3 @@ html:not(.dark) :is(.modal-panel, .sheet-panel, .app-glass) :is(input, select, t
 .modal-panel label {
   font-weight: 600;
 }
-
-/* Everywhere: marketing site, client portal and auth pages sit on the same
-   water background, so any layout that paints its own solid light ground
-   lets it through (dark mode keeps its own ground). */
-html:not(.dark) .app-glass .bg-canvas,
-html:not(.dark) .app-glass .bg-white\/70 { background-color: transparent; }
-html:not(.dark) .app-glass header.sticky {
-  background-color: rgb(255 255 255 / 0.28) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  backdrop-filter: blur(16px) saturate(180%);
-  border-bottom: 1px solid rgb(255 255 255 / 0.5);
-}
