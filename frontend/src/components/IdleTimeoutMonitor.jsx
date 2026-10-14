@@ -94,7 +94,7 @@ export default function IdleTimeoutMonitor() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-slate-900">
+      <div className="modal-panel w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Still there?</h2>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
           You'll be logged out in <span className="font-semibold text-slate-900 dark:text-white">{warningSecondsLeft}</span>{' '}

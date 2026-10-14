@@ -180,7 +180,7 @@ export function MoreMenu({ items, large = false }) {
             ref={popRef}
             role="menu"
             style={{ position: 'fixed', zIndex: 60, ...pos }}
-            className="w-56 rounded-2xl bg-white p-1.5 shadow-xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10"
+            className="modal-panel w-56 rounded-2xl bg-white p-1.5 shadow-xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10"
           >
             {items.map((el, i) => (
               <MenuItem key={el.key ?? i} el={el} onDone={() => setOpen(false)} />
