@@ -21,7 +21,7 @@ export default function FontSizeControl() {
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Text size">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-label="Text size">
         {FONT_SIZE_PRESETS.map((p) => {
           const active = p.pct === pct;
           return (

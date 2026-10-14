@@ -3,11 +3,13 @@
 // localStorage (a device preference, like the theme) and applied before first
 // paint by a small script in index.html, so there is no flash of the wrong size.
 export const FONT_SIZE_KEY = 'edusolution_font_size';
-export const FONT_SIZE_MIN = 80;
+export const FONT_SIZE_MIN = 60;
 export const FONT_SIZE_MAX = 140;
 export const FONT_SIZE_DEFAULT = 100;
 
 export const FONT_SIZE_PRESETS = [
+  { label: 'Tiny', pct: 70 },
+  { label: 'Extra small', pct: 80 },
   { label: 'Small', pct: 90 },
   { label: 'Default', pct: 100 },
   { label: 'Large', pct: 112 },
