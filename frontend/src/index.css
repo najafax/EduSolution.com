@@ -219,6 +219,12 @@ button:not(:disabled):active,
     background: #fff;
     border-top: 1px solid #e2e8f0;
   }
+  html:not(.dark) .modal-body form > :last-child:has(button[type="submit"]) {
+    background: rgb(255 255 255 / 0.35);
+    border-top-color: rgb(255 255 255 / 0.7);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
   .dark .modal-body form > :last-child:has(button[type="submit"]) {
     background: #0f172a;
     border-top-color: #1e293b;
@@ -309,3 +315,51 @@ button:not(:disabled):active,
   border-color: rgb(255 255 255 / 0.08) !important;
 }
 .app-glass header { background-color: transparent !important; }
+
+/* ---------------------------------------------------------------------
+   Forms — water/glass treatment and one consistent field style (light
+   mode; dark mode keeps its existing look). Covers pop-up forms (Modal,
+   BottomSheet) and routed form pages (.app-glass). One radius, one height,
+   one border/focus ring, one label weight for every field, whatever
+   classes each page happened to give it.
+   --------------------------------------------------------------------- */
+html:not(.dark) .modal-panel,
+html:not(.dark) .sheet-panel {
+  background-color: rgb(255 255 255 / 0.62) !important;
+  background-image:
+    radial-gradient(70% 40% at 0% 0%, rgb(10 138 148 / 0.28), transparent 70%),
+    radial-gradient(60% 40% at 100% 20%, rgb(56 189 248 / 0.25), transparent 70%),
+    radial-gradient(70% 45% at 30% 100%, rgb(45 212 191 / 0.24), transparent 70%);
+  border: 1px solid rgb(255 255 255 / 0.8);
+  box-shadow: 0 24px 70px rgb(10 138 148 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.9) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+  backdrop-filter: blur(26px) saturate(190%);
+}
+html:not(.dark) .modal-panel ~ *,
+html:not(.dark) .sheet-panel ~ * { backdrop-filter: none; }
+
+html:not(.dark) :is(.modal-panel, .sheet-panel, .app-glass)
+  :is(input:where(:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="hidden"], [type="color"])), select, textarea, .border-slate-300) {
+  border-radius: 0.875rem;
+  border: 1px solid rgb(148 163 184 / 0.45);
+  background-color: rgb(255 255 255 / 0.55);
+  box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.05);
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+html:not(.dark) :is(.modal-panel, .sheet-panel, .app-glass)
+  :is(input, select, textarea, .border-slate-300):is(:focus, :focus-within) {
+  outline: none;
+  border-color: rgb(10 138 148);
+  background-color: rgb(255 255 255 / 0.85);
+  box-shadow: 0 0 0 3px rgb(10 138 148 / 0.22);
+}
+/* A wrapper holding an input shouldn't double its border. */
+html:not(.dark) :is(.modal-panel, .sheet-panel, .app-glass) .border-slate-300 :is(input, select) {
+  border: 0; background: transparent; box-shadow: none;
+}
+html:not(.dark) :is(.modal-panel, .sheet-panel, .app-glass) :is(input, select, textarea)::placeholder { color: rgb(100 116 139 / 0.8); }
+/* Labels: one weight/size everywhere. */
+:is(.modal-panel, .sheet-panel, .app-glass) form label,
+.modal-panel label {
+  font-weight: 600;
+}
