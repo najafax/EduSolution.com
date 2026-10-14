@@ -228,14 +228,15 @@ export default function MyAccount() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+    <div className="water-bg min-h-screen">
+    <div className="mx-auto max-w-2xl px-4 py-6 pb-28 sm:px-6">
       <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">My account</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         {roleLabel(user?.role)} account. Contact an admin to change your role or module
         permissions.
       </p>
 
-      <div className="mt-6 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 glass rounded-3xl p-5">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Photo</h2>
         <div className="mt-3 flex items-center gap-4">
           {user?.avatarImage ? (
@@ -281,7 +282,7 @@ export default function MyAccount() {
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">JPEG, PNG, or WEBP, up to 3MB.</p>
       </div>
 
-      <form onSubmit={handleProfileSubmit} className="mt-4 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handleProfileSubmit} className="mt-4 glass rounded-3xl p-5">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Profile</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">
@@ -316,7 +317,7 @@ export default function MyAccount() {
         </button>
       </form>
 
-      <form onSubmit={handlePasswordSubmit} className="mt-4 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handlePasswordSubmit} className="mt-4 glass rounded-3xl p-5">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Change password</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">
@@ -354,7 +355,7 @@ export default function MyAccount() {
         </button>
       </form>
 
-      <form onSubmit={handlePrefsSubmit} className="mt-4 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <form onSubmit={handlePrefsSubmit} className="mt-4 glass rounded-3xl p-5">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</h2>
         <label className="mt-3 flex min-h-11 items-center gap-2">
           <input
@@ -420,7 +421,7 @@ export default function MyAccount() {
         </button>
       </form>
 
-      <div className="mt-4 rounded-3xl bg-white dark:border p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-4 glass rounded-3xl p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Active sessions</h2>
           {otherSessionsCount > 0 && (
@@ -484,6 +485,7 @@ export default function MyAccount() {
       </div>
 
       {confirmDialog}
+    </div>
     </div>
   );
 }

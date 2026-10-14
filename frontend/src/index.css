@@ -224,3 +224,26 @@ button:not(:disabled):active,
     border-top-color: #1e293b;
   }
 }
+
+/* Water / frosted-glass surfaces (More + My account pages). */
+.water-bg {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(60% 40% at 15% 8%, rgb(10 138 148 / 0.45), transparent 70%),
+    radial-gradient(55% 40% at 90% 30%, rgb(56 189 248 / 0.4), transparent 70%),
+    radial-gradient(60% 45% at 20% 70%, rgb(45 212 191 / 0.35), transparent 70%),
+    radial-gradient(60% 45% at 85% 95%, rgb(99 102 241 / 0.3), transparent 70%);
+}
+.glass {
+  background-color: rgb(255 255 255 / 0.35) !important;
+  border: 1px solid rgb(255 255 255 / 0.55) !important;
+  box-shadow: 0 8px 30px rgb(10 138 148 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.6) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
+}
+.dark .glass {
+  background-color: rgb(15 23 42 / 0.4) !important;
+  border-color: rgb(255 255 255 / 0.1) !important;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.08) !important;
+}
