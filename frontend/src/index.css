@@ -450,3 +450,19 @@ html:not(.dark) .glass.glass-strong { background-color: rgb(255 255 255 / 0.96) 
     font-size: max(16px, 1rem) !important;
   }
 }
+
+/* Full-screen installed app (iOS "black-translucent" status bar): the page
+   now draws under the status bar, whose text is always white. Dark mode is
+   dark there already; in light mode a short ink fade behind the status bar
+   keeps the clock/battery readable. Zero height in a normal browser tab. */
+html { background-color: #e9ecf1; }
+html.dark { background-color: #020617; }
+html:not(.dark) body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: calc(env(safe-area-inset-top, 0px) + 6px);
+  background: linear-gradient(to bottom, rgb(16 19 26 / 0.88), rgb(16 19 26 / 0.55) 55%, rgb(16 19 26 / 0));
+  pointer-events: none;
+  z-index: 70;
+}
