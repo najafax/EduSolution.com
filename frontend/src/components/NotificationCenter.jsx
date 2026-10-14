@@ -1,14 +1,35 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationsContext';
-import { AlertTriangleIcon, LicenseIcon, InboxIcon, BellIcon } from './icons';
+import { AlertTriangleIcon, LicenseIcon, InboxIcon, BellIcon, ChevronRightIcon } from './icons';
 
 // How many items each category shows before "+more" — a display concern
 // local to this component, not imported from Dashboard.jsx's own identical
 // NEEDS_ATTENTION_LIMIT (same acceptable-duplication call this app already
 // makes for EXPIRY_WARNING_DAYS between routes/licenses.js and
 // lib/scheduler.js).
-const LIMIT_PER_TYPE = 5;
+const LIMIT_PER_TYPE = 4;
+
+const TONES = {
+  red: 'bg-red-500/15 text-red-700 dark:bg-red-400/15 dark:text-red-300',
+  amber: 'bg-amber-500/20 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300',
+  lagoon: 'bg-lagoon-500/15 text-lagoon-700 dark:bg-lagoon-400/15 dark:text-lagoon-300',
+};
+
+function shortDate(iso) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Whole days from a to b (both YYYY-MM-DD).
+function daysBetween(a, b) {
+  return Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+}
+
 
 // A live, permission-gated view of what needs attention right now —
 // overdue invoices and licenses expiring soon (the same two categories
@@ -68,6 +89,54 @@ export default function NotificationCenter({ className = '', align = 'right' }) 
     navigate(path);
   }
 
+  const sections = [
+    {
+      key: 'inv',
+      title: 'Overdue invoices',
+      tone: 'red',
+      Icon: AlertTriangleIcon,
+      all: '/invoices',
+      rows: overdueInvoices.map((inv) => ({
+        id: inv.id,
+        title: inv.client_name,
+        sub: `${inv.number} · due ${shortDate(inv.due_date)}`,
+        badge: `${daysBetween(inv.due_date, todayIso())}d late`,
+        to: `/invoices/${inv.id}`,
+      })),
+    },
+    {
+      key: 'lic',
+      title: 'Expiring licenses',
+      tone: 'amber',
+      Icon: LicenseIcon,
+      all: '/licenses',
+      rows: expiringLicenses.map((lic) => {
+        const left = daysBetween(todayIso(), lic.expiry_date);
+        return {
+          id: lic.id,
+          title: lic.name,
+          sub: `${lic.client_name} · ${shortDate(lic.expiry_date)}`,
+          badge: left < 0 ? 'Expired' : left === 0 ? 'Today' : `${left}d left`,
+          to: '/licenses',
+        };
+      }),
+    },
+    {
+      key: 'qr',
+      title: 'Quote requests',
+      tone: 'lagoon',
+      Icon: InboxIcon,
+      all: '/quote-requests',
+      rows: pendingRequests.map((r) => ({
+        id: r.id,
+        title: r.client_name,
+        sub: r.description || `${r.items.length} item${r.items.length === 1 ? '' : 's'} requested`,
+        badge: 'New',
+        to: '/quote-requests',
+      })),
+    },
+  ].filter((sec) => sec.rows.length > 0);
+
   return (
     <div ref={boxRef} className="relative">
       <button
@@ -88,107 +157,80 @@ export default function NotificationCenter({ className = '', align = 'right' }) 
 
       {open && (
         <div
-          className={`absolute z-20 mt-2 max-h-96 w-80 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900 ${
-            align === 'left' ? 'left-0' : 'right-0'
+          className={`water-tint glass glass-strong fixed inset-x-3 top-16 z-40 max-h-[75vh] overflow-y-auto rounded-3xl sm:absolute sm:inset-x-auto sm:top-auto sm:mt-2 sm:w-96 ${
+            align === 'left' ? 'sm:left-0' : 'sm:right-0'
           }`}
         >
-          <p className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 dark:border-slate-800 dark:text-white">
-            Notifications
-          </p>
+          <div className="flex items-center justify-between px-5 pb-2 pt-4">
+            <div>
+              <p className="font-display text-lg font-extrabold text-slate-900 dark:text-white">Notifications</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {total === 0 ? 'Nothing needs attention' : `${total} thing${total === 1 ? '' : 's'} need attention`}
+              </p>
+            </div>
+            {total > 0 && (
+              <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-red-500 px-2 text-sm font-bold text-white shadow-lg shadow-red-500/30">
+                {total}
+              </span>
+            )}
+          </div>
+
           {total === 0 ? (
-            <p className="p-4 text-sm text-slate-500 dark:text-slate-400">You're all caught up.</p>
+            <div className="flex flex-col items-center px-6 pb-8 pt-4 text-center">
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/50 text-lagoon-600 shadow-inner dark:bg-white/10 dark:text-lagoon-300">
+                <BellIcon width={26} height={26} />
+              </span>
+              <p className="mt-3 font-semibold text-slate-900 dark:text-white">You're all caught up</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">New overdue items will show up here.</p>
+            </div>
           ) : (
-            <div className="py-1">
-              {overdueInvoices.length > 0 && (
-                <div>
-                  <p className="px-4 pt-2 text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">Overdue invoices</p>
-                  {overdueInvoices.slice(0, LIMIT_PER_TYPE).map((inv) => (
+            <div className="space-y-4 px-3 pb-3">
+              {sections.map(({ key, title, tone, Icon, all, rows }) => (
+                <section key={key}>
+                  <div className="flex items-center justify-between px-2 pb-1.5">
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                      {title} · {rows.length}
+                    </h3>
                     <button
-                      key={`inv-${inv.id}`}
                       type="button"
-                      onClick={() => go(`/invoices/${inv.id}`)}
-                      className="flex w-full items-start gap-2 px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                      onClick={() => go(all)}
+                      className="text-xs font-semibold text-lagoon-700 hover:underline dark:text-lagoon-300"
                     >
-                      <AlertTriangleIcon width={16} height={16} className="mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium text-slate-900 dark:text-white">{inv.client_name}</span>
-                        <span className="block text-xs text-red-600 dark:text-red-400">
-                          {inv.number} · overdue since {inv.due_date}
-                        </span>
-                      </span>
+                      View all
                     </button>
-                  ))}
-                  {overdueInvoices.length > LIMIT_PER_TYPE && (
+                  </div>
+                  <ul className="space-y-1.5">
+                    {rows.slice(0, LIMIT_PER_TYPE).map((row) => (
+                      <li key={`${key}-${row.id}`}>
+                        <button
+                          type="button"
+                          onClick={() => go(row.to)}
+                          className="flex w-full items-center gap-3 rounded-2xl border border-white/50 bg-white/40 p-2.5 text-left backdrop-blur transition active:scale-[0.98] hover:bg-white/60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                        >
+                          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${TONES[tone]}`}>
+                            <Icon width={18} height={18} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-slate-900 dark:text-white">{row.title}</span>
+                            <span className="block truncate text-xs text-slate-600 dark:text-slate-400">{row.sub}</span>
+                          </span>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${TONES[tone]}`}>{row.badge}</span>
+                          <ChevronRightIcon width={14} height={14} className="shrink-0 text-slate-400" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {rows.length > LIMIT_PER_TYPE && (
                     <button
                       type="button"
-                      onClick={() => go('/invoices')}
-                      className="block w-full px-4 py-1.5 text-left text-xs font-medium text-lagoon-600 hover:underline dark:text-lagoon-400"
+                      onClick={() => go(all)}
+                      className="mt-1.5 w-full rounded-xl py-1.5 text-xs font-semibold text-lagoon-700 hover:bg-white/40 dark:text-lagoon-300 dark:hover:bg-white/10"
                     >
-                      +{overdueInvoices.length - LIMIT_PER_TYPE} more
-                    </button>
-                  )}
-                </div>
-              )}
-              {expiringLicenses.length > 0 && (
-                <div>
-                  <p className="px-4 pt-2 text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">Expiring licenses</p>
-                  {expiringLicenses.slice(0, LIMIT_PER_TYPE).map((lic) => (
-                    <button
-                      key={`lic-${lic.id}`}
-                      type="button"
-                      onClick={() => go('/licenses')}
-                      className="flex w-full items-start gap-2 px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <LicenseIcon width={16} height={16} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium text-slate-900 dark:text-white">
-                          {lic.name} · {lic.client_name}
-                        </span>
-                        <span className="block text-xs text-amber-600 dark:text-amber-400">Expires {lic.expiry_date}</span>
-                      </span>
-                    </button>
-                  ))}
-                  {expiringLicenses.length > LIMIT_PER_TYPE && (
-                    <button
-                      type="button"
-                      onClick={() => go('/licenses')}
-                      className="block w-full px-4 py-1.5 text-left text-xs font-medium text-lagoon-600 hover:underline dark:text-lagoon-400"
-                    >
-                      +{expiringLicenses.length - LIMIT_PER_TYPE} more
+                      +{rows.length - LIMIT_PER_TYPE} more
                     </button>
                   )}
-                </div>
-              )}
-              {pendingRequests.length > 0 && (
-                <div className="pb-2">
-                  <p className="px-4 pt-2 text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">Pending quote requests</p>
-                  {pendingRequests.slice(0, LIMIT_PER_TYPE).map((r) => (
-                    <button
-                      key={`qr-${r.id}`}
-                      type="button"
-                      onClick={() => go('/quote-requests')}
-                      className="flex w-full items-start gap-2 px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <InboxIcon width={16} height={16} className="mt-0.5 shrink-0 text-lagoon-600 dark:text-lagoon-400" />
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium text-slate-900 dark:text-white">{r.client_name}</span>
-                        <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
-                          {r.description || `${r.items.length} item${r.items.length === 1 ? '' : 's'} requested`}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                  {pendingRequests.length > LIMIT_PER_TYPE && (
-                    <button
-                      type="button"
-                      onClick={() => go('/quote-requests')}
-                      className="block w-full px-4 py-1.5 text-left text-xs font-medium text-lagoon-600 hover:underline dark:text-lagoon-400"
-                    >
-                      +{pendingRequests.length - LIMIT_PER_TYPE} more
-                    </button>
-                  )}
-                </div>
-              )}
+                </section>
+              ))}
             </div>
           )}
         </div>
