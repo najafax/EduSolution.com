@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { roleLabel } from '../lib/roles';
 import { useConfirm } from '../lib/useConfirm';
 import { resizeImage, dataUriByteLength } from '../lib/imageResize';
+import FontSizeControl from '../components/FontSizeControl';
 
 // Client-side gate before ever attempting the upload — mirrors
 // PortalInvoiceDetail.jsx's own PROOF_MAX_BYTES precedent, giving an
@@ -354,6 +355,16 @@ export default function MyAccount() {
           {passwordSubmitting ? 'Saving…' : 'Change password'}
         </button>
       </form>
+
+      <section className="mt-4 glass rounded-3xl p-5">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Text size</h2>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+          Make everything bigger or smaller. This applies to this device only.
+        </p>
+        <div className="mt-4">
+          <FontSizeControl />
+        </div>
+      </section>
 
       <form onSubmit={handlePrefsSubmit} className="mt-4 glass rounded-3xl p-5">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</h2>

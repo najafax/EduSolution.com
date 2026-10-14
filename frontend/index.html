@@ -27,6 +27,9 @@
         var stored = localStorage.getItem('edusolution_theme');
         var isDark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         if (isDark) document.documentElement.classList.add('dark');
+        // Text size (Account > Text size) — set before paint to avoid a jump.
+        var size = parseInt(localStorage.getItem('edusolution_font_size'), 10);
+        if (size >= 60 && size <= 140 && size !== 100) document.documentElement.style.fontSize = size + '%';
       })();
     </script>
   </head>
