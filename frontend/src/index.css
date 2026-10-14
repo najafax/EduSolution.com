@@ -439,3 +439,14 @@ html:not(.dark) :is(.modal-panel, .sheet-panel, .app-glass) .border-slate-300 :i
 /* Notifications / popovers hold dense text over page content: keep them
    essentially solid so nothing ghosts through. */
 html:not(.dark) .glass.glass-strong { background-color: rgb(255 255 255 / 0.96) !important; }
+
+/* iOS Safari zooms the page when a focused field's font-size is under 16px.
+   The Text size setting can drop rem-based sizes below that (90% => 14.4px),
+   so on touch devices form fields never go under 16px, whatever the setting. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"]),
+  select,
+  textarea {
+    font-size: max(16px, 1rem) !important;
+  }
+}
