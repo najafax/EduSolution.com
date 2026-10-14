@@ -6117,6 +6117,54 @@ needing its own auth/hosting story.
   nav link/empty-state/`Sidebar.jsx`'s `LINK_ICONS` map, deliberately
   distinct from `MegaphoneIcon` (campaigns go out by email to clients;
   this is specifically the business's own Facebook Page).
+- **Variety + pictures (follow-up)**: every "Generate draft" used to produce
+  the same post — `lib/facebookPostDraft.js` seeded the model with the
+  newest 3 news/services/testimonials every time and asked it to write about
+  "the most interesting" one, with no memory of earlier drafts. It now
+  rotates through six post types (`POST_TYPES`: `tutorial` spotlight, EduPage
+  `feature_tip`, `testimonial`, `business_tip`, `engage_question`,
+  `announcement`) following the `ROTATION` list — tutorials appear several
+  times per cycle because they are the one type that comes with a real EduPage
+  picture — skipping any type with nothing to write about (no published
+  testimonials/news, no visible videos). The next type is chosen by how many
+  typed drafts exist (`post_type != ''`), so it keeps cycling even across
+  restarts. Every prompt also carries the last 8 posts' text with an
+  instruction not to repeat their topics/openings/wording, and non-tutorial
+  types pick a random topic from a list rather than the same one each time.
+  **Tutorial posts** (`website_videos`, see "Video tutorials" above) pick the
+  visible video with a Google Drive link that has been featured least
+  (`facebook_posts.video_id` count, then oldest `last_featured`), write about
+  it from its title/description only, append `Watch the tutorial:
+  ${FACEBOOK_LINK_BASE || https://www.edusolutionsmaldives.com}/tutorials`
+  in code (never trusting the model to write a URL), and download its Drive
+  thumbnail (`https://drive.google.com/thumbnail?id=…&sz=w1200`) server-side
+  into `facebook_posts.image_data` as a base64 data URI. A video that isn't
+  shared "Anyone with the link" returns an HTML sign-in page rather than an
+  image — that is detected by content-type and the draft is still created,
+  with the source note saying the picture could not be fetched. The site is a
+  single-page app with no per-page `<meta>` tags, so Facebook cannot build a
+  link card from it; the picture is attached directly instead.
+  `post_type`/`video_id`/`image_data` are guarded `ALTER TABLE`s (the table
+  already held a real published post). `createDraft(options, generatedByName)`
+  is shared by `POST /generate` and the weekly cron job. `POST /generate`
+  accepts optional `{ postType, videoId }` (400 with a readable message for an
+  unknown type, a type with no content, or an unusable video); `GET /options`
+  feeds the dropdowns; `PUT /:id` accepts an optional `image` (omit = keep,
+  `null` = remove, data URI = replace; PNG/JPEG/WEBP, 3MB decoded).
+  `lib/facebook.js`'s `publishPhoto()` uploads the picture with the text as its
+  caption to `/{page-id}/photos` (multipart `source`) instead of `/feed`; a
+  post with no picture still uses `publishPost()`. List responses include a
+  draft's `image` but only `has_image` for posted rows, so history pages stay
+  small. `FacebookPosts.jsx` gained a Post type / Tutorial selector (default
+  Automatic), a thumbnail and source note per row, and a Picture block
+  (Replace/Remove) in the edit modal; the publish confirmation says whether a
+  picture is attached. Verified against a scratch database with a mock
+  Anthropic server and stubbed Drive/Graph responses: ten automatic drafts
+  cycled types and tutorials as designed, hidden and non-Drive videos were
+  skipped, the private video produced a draft without a picture, a picture
+  post went to `/photos` as multipart and a text post to `/feed`, an old-schema
+  database kept its existing post through the migration, and desktop + phone
+  pages rendered with no console errors.
 - **Env vars** (`backend/.env.example`): `FACEBOOK_PAGE_ACCESS_TOKEN`/
   `FACEBOOK_PAGE_ID` (a long-lived Page access token — create one via a
   Meta Business Suite System User so it doesn't expire like a short-lived
