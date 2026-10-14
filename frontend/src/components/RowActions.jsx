@@ -170,7 +170,7 @@ export function MoreMenu({ items, large = false }) {
         aria-label="More actions"
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`inline-flex ${large ? 'h-11 w-11' : 'h-10 w-10'} shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800`}
+        className={`inline-flex ${large ? 'h-11 w-11' : 'h-10 w-10'} shrink-0 items-center justify-center rounded-xl border border-slate-400/70 bg-white/70 text-slate-800 shadow-sm hover:bg-white dark:border-slate-700 dark:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800`}
       >
         <MoreIcon />
       </button>
