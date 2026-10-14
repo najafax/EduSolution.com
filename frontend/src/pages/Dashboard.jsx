@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
-import { useDashboardShortcuts } from '../lib/useDashboardShortcuts';
 import RevenueTrendChart from '../components/RevenueTrendChart';
 import StatusDonutChart from '../components/StatusDonutChart';
 import BalanceHero from '../components/BalanceHero';
@@ -11,8 +10,6 @@ import AttentionCarousel from '../components/AttentionCarousel';
 import KpiCard from '../components/KpiCard';
 import DashboardRail from '../components/DashboardRail';
 import Accordion from '../components/Accordion';
-import Modal from '../components/Modal';
-import DashboardShortcutsEditor from '../components/DashboardShortcutsEditor';
 import {
   AlertTriangleIcon,
   LicenseIcon,
@@ -54,10 +51,7 @@ const SHORTCUTS = [
   { to: '/settings', label: 'Settings', module: 'settings', icon: SettingsIcon },
 ];
 
-// How many shortcuts fit comfortably in the right rail's narrow column
-// before it starts to feel cramped — the full permitted set still renders
-// in the pill row below (every breakpoint) and the "Customize shortcuts"
-// modal (see useDashboardShortcuts), this just caps the rail's own list.
+// How many shortcuts fit comfortably in the right rail's narrow column.
 const RAIL_SHORTCUT_LIMIT = 6;
 
 export default function Dashboard() {
@@ -66,7 +60,6 @@ export default function Dashboard() {
   const [settings, setSettings] = useState(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [error, setError] = useState('');
-  const [customizing, setCustomizing] = useState(false);
   const [overdueInvoices, setOverdueInvoices] = useState([]);
   const [expiringLicenses, setExpiringLicenses] = useState([]);
   const [quoteAnalytics, setQuoteAnalytics] = useState(null);
@@ -116,8 +109,6 @@ export default function Dashboard() {
 
   const symbol = settings?.currency_symbol || '$';
   const permittedShortcuts = SHORTCUTS.filter((s) => can(s.module, 'view'));
-  const { visible: visibleShortcuts, orderedAvailable, hiddenSet, toggleHidden, moveUp, moveDown, reset } =
-    useDashboardShortcuts(permittedShortcuts);
 
   const firstName = user?.name?.split(' ')[0];
 
@@ -158,40 +149,6 @@ export default function Dashboard() {
     } catch (err) {
       setError(err.message);
     }
-  }
-
-  function shortcutsRow() {
-    return (
-      <div className="mt-6">
-        {permittedShortcuts.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setCustomizing(true)}
-            className="mb-2 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-          >
-            Customize shortcuts
-          </button>
-        )}
-        <div className="flex flex-wrap gap-2">
-          {visibleShortcuts.map((s) => (
-            <Link
-              key={s.to}
-              to={s.to}
-              className="flex min-h-11 items-center rounded-full border border-slate-300 px-5 text-sm font-medium text-slate-700 shadow-sm transition-shadow hover:shadow-md dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              {s.label}
-            </Link>
-          ))}
-          {visibleShortcuts.length === 0 && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {permittedShortcuts.length === 0
-                ? 'Nothing to show yet — ask an admin to grant you access to what you need.'
-                : 'All shortcuts are hidden.'}
-            </p>
-          )}
-        </div>
-      </div>
-    );
   }
 
   // "This year at a glance" — six KpiCards drawing on each module's own
@@ -300,7 +257,11 @@ export default function Dashboard() {
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       {!canViewFinancials ? (
-        <div className="mt-8">{shortcutsRow()}</div>
+        <p className="mt-8 text-sm text-slate-500 dark:text-slate-400">
+          {permittedShortcuts.length === 0
+            ? 'Nothing to show yet — ask an admin to grant you access to what you need.'
+            : 'Use the menu to open the pages you have access to.'}
+        </p>
       ) : !summary || !settingsLoaded ? (
         <p className="mt-8 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
       ) : (
@@ -413,11 +374,6 @@ export default function Dashboard() {
                 </Accordion>
               </div>
             )}
-
-            {/* Shortcut pills — every breakpoint below `xl:` (no rail
-                there); collapsed at `xl:` and up since the rail's own
-                "Shortcuts" list already covers the common case there. */}
-            <div className="xl:hidden">{shortcutsRow()}</div>
           </div>
 
           {/* Right rail — profile card, shortcuts, needs attention. Desktop
@@ -433,17 +389,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      <Modal open={customizing} onClose={() => setCustomizing(false)} title="Customize shortcuts">
-        <DashboardShortcutsEditor
-          items={orderedAvailable}
-          hiddenSet={hiddenSet}
-          onToggle={toggleHidden}
-          onMoveUp={moveUp}
-          onMoveDown={moveDown}
-          onReset={reset}
-        />
-      </Modal>
     </div>
   );
 }
