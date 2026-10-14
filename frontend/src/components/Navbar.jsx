@@ -5,6 +5,7 @@ import GlobalSearch from './GlobalSearch';
 import Sidebar from './Sidebar';
 import ThemeToggle from './ThemeToggle';
 import NotificationCenter from './NotificationCenter';
+import { useToggleLink } from '../lib/useToggleLink';
 import { useEdgeSwipeOpen } from '../lib/useEdgeSwipeOpen';
 import { SearchIcon, XIcon, MenuIcon } from './icons';
 
@@ -53,6 +54,7 @@ export const BUSINESS_LINKS = [
 export default function Navbar() {
   const { user } = useAuth();
   const location = useLocation();
+  const toggleAccount = useToggleLink('/account');
   const [menuOpen, setMenuOpen] = useState(false);
   const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
 
@@ -131,6 +133,7 @@ export default function Navbar() {
               <ThemeToggle />
               <Link
                 to="/account"
+                onClick={toggleAccount}
                 aria-label="My account"
                 className="ml-0.5 flex shrink-0 items-center justify-center rounded-full"
               >

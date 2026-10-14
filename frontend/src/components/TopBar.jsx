@@ -4,6 +4,7 @@ import GlobalSearch from './GlobalSearch';
 import ThemeToggle from './ThemeToggle';
 import NotificationCenter from './NotificationCenter';
 import { LogoutIcon } from './icons';
+import { useToggleLink } from '../lib/useToggleLink';
 
 // The desktop (`xl:` and up) counterpart to Navbar.jsx's mobile/tablet
 // header — Sidebar.jsx carries the wordmark and nav links at this
@@ -21,6 +22,7 @@ import { LogoutIcon } from './icons';
 export default function TopBar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toggleAccount = useToggleLink('/account');
 
   if (!user) return null;
 
@@ -49,6 +51,7 @@ export default function TopBar() {
           <ThemeToggle />
           <Link
             to="/account"
+            onClick={toggleAccount}
             className="ml-1 flex min-w-0 shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-3 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             {user.avatarImage ? (

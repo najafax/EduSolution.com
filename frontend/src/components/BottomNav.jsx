@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import BottomSheet from './BottomSheet';
+import { useToggleLink } from '../lib/useToggleLink';
 import { HomeIcon, InvoiceIcon, UsersIcon, GridIcon, PlusIcon, QuoteIcon, ExpenseIcon, ChevronRightIcon } from './icons';
 
 // Studio redesign (stage 1): four destinations plus one create button, as a
@@ -31,6 +32,7 @@ export default function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
+  const toggleMore = useToggleLink('/more');
 
   const path = location.pathname;
   const startsWith = (to) => path === to || path.startsWith(`${to}/`);
@@ -52,15 +54,17 @@ export default function BottomNav() {
   const right = tabs.slice(2);
 
   function renderTab({ key, to, label, Icon, active }) {
+    const onClick = key === 'more' ? toggleMore : undefined;
     return (
       <Link
         key={key}
         to={to}
+        onClick={onClick}
         aria-current={active ? 'page' : undefined}
         className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-semibold ${
           active
-            ? 'bg-lagoon-50 text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-300'
-            : 'text-slate-500 dark:text-slate-400'
+            ? 'bg-white/50 text-lagoon-700 shadow-inner backdrop-blur dark:bg-white/10 dark:text-lagoon-300'
+            : 'text-slate-700 dark:text-slate-300'
         }`}
       >
         <Icon width={21} height={21} />
@@ -73,7 +77,7 @@ export default function BottomNav() {
     <>
       <nav
         aria-label="Main"
-        className="fixed inset-x-3 z-30 flex items-center gap-1 rounded-[28px] bg-white p-1.5 shadow-xl shadow-slate-900/20 sm:hidden dark:bg-slate-900 dark:shadow-black/50"
+        className="fixed inset-x-3 z-30 flex items-center gap-1 rounded-[28px] border border-white/40 bg-white/25 p-1.5 shadow-xl shadow-slate-900/10 ring-1 ring-white/30 backdrop-blur-xl backdrop-saturate-200 sm:hidden dark:border-white/10 dark:bg-slate-900/30 dark:ring-white/5 dark:shadow-black/40"
         style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
       >
         {left.map(renderTab)}
