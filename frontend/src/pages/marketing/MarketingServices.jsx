@@ -33,10 +33,10 @@ export default function MarketingServices() {
   return (
     <MarketingLayout>
       <div className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <span className="font-display inline-flex items-center gap-2 rounded-full bg-lagoon-50 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
+        <span className="font-display inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
           What we offer
         </span>
-        <h1 className="font-display mt-5 text-4xl font-extrabold text-slate-900 dark:text-white">Everything we offer, in one place</h1>
+        <h1 className="font-display mt-5 text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Everything we offer, in one place</h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-slate-600 dark:text-slate-400">
           Two platforms, one local partner — EduPage for schools, and our own Business Suite for quotes, invoicing and
           payments.
@@ -44,7 +44,7 @@ export default function MarketingServices() {
       </div>
 
       <div className="mx-auto max-w-5xl px-4 pb-6 sm:px-6 lg:px-8">
-        <div className="rounded-3xl bg-slate-50 p-9 dark:bg-slate-900">
+        <div className="rounded-3xl bg-white p-9 dark:bg-slate-900">
           <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-start">
             <div className="max-w-md">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
@@ -121,7 +121,7 @@ export default function MarketingServices() {
             {services.map((s) => {
               const Icon = SERVICE_ICONS[s.icon] || ProductIcon;
               return (
-                <div key={s.id} className="rounded-2xl border border-slate-200 p-6 dark:border-slate-800">
+                <div key={s.id} className="rounded-3xl bg-white p-6 dark:border dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-lagoon-50 dark:bg-lagoon-950">
                     <Icon width={20} height={20} className="text-lagoon-600 dark:text-lagoon-400" />
                   </div>
@@ -137,7 +137,7 @@ export default function MarketingServices() {
       <div className="bg-lagoon-950 px-4 py-16 text-center sm:px-6 lg:px-8">
         <h2 className="font-display mx-auto max-w-lg text-3xl font-bold text-white">Not sure which platform fits?</h2>
         <p className="mx-auto mt-3 max-w-md text-slate-300">Tell us a little about your school or business and we'll point you to the right one.</p>
-        <a href="/#contact" className="mt-6 inline-block min-h-11 rounded-lg bg-white px-6 py-3 text-sm font-bold text-lagoon-900 hover:bg-lagoon-50">
+        <a href="/#contact" className="mt-6 inline-block min-h-11 rounded-xl bg-white px-6 py-3 text-sm font-bold text-lagoon-900 hover:bg-lagoon-50">
           Book a walkthrough
         </a>
       </div>

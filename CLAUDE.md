@@ -9628,3 +9628,12 @@ commands to go through.
   surfaces, just without the same urgency as a confirmed full outage.
   `/status`'s own on-demand report is untouched, still showing just the
   public check's result for a human glancing at it.
+
+### Studio redesign — public marketing website (`frontend/src/pages/marketing/`)
+
+The marketing site (`/`, `/services`, `/tutorials`, `/testimonials`, `/news`,
+`/about`, `/contact`) follows the Studio look: `bg-canvas` ground, sticky
+borderless canvas header with an ink Login button, borderless white
+`rounded-3xl` cards (`dark:border` in dark mode), `rounded-xl` ink CTAs, ink
+(`lagoon-950`) closing bands, tighter display headings. Presentation only —
+routes, CMS content, dark mode and the mobile drawer/edge swipe are unchanged.

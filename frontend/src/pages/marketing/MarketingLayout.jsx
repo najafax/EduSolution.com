@@ -61,7 +61,7 @@ function MobileMenu({ open, onClose, token }) {
     <>
       <div className="fixed inset-0 z-30 bg-slate-900/50 sm:hidden" onClick={onClose} aria-hidden="true" />
       <aside
-        className="fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-white px-3 py-5 shadow-2xl dark:bg-slate-950 sm:hidden"
+        className="fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-canvas px-3 py-5 shadow-2xl dark:bg-slate-950 sm:hidden"
         style={{ paddingTop: 'calc(1.25rem + env(safe-area-inset-top))' }}
       >
         <div className="mb-5 flex shrink-0 items-center justify-between px-2">
@@ -89,7 +89,7 @@ function MobileMenu({ open, onClose, token }) {
               className={({ isActive }) =>
                 `flex min-h-11 shrink-0 items-center rounded-lg px-3 font-display text-sm font-semibold ${
                   isActive
-                    ? 'bg-lagoon-50 text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400'
+                    ? 'bg-white text-lagoon-600 dark:bg-lagoon-950 dark:text-lagoon-400'
                     : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
                 }`
               }
@@ -126,8 +126,8 @@ export default function MarketingLayout({ children }) {
   useEdgeSwipeOpen({ enabled: !menuOpen, onOpen: () => setMenuOpen(true), breakpointPx: 640 });
 
   return (
-    <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950">
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+    <div className="flex min-h-screen flex-col bg-canvas dark:bg-slate-950">
+      <header className="sticky top-0 z-20 bg-canvas/85 backdrop-blur dark:border-b dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Top-left: hamburger (below sm: only — the full link row takes
               over at sm: and up), then the wordmark, mirroring the internal
@@ -171,7 +171,7 @@ export default function MarketingLayout({ children }) {
             <ThemeToggle />
             <Link
               to={token ? '/dashboard' : '/login'}
-              className="flex min-h-9 items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="flex min-h-9 items-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-lagoon-800 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
             >
               {token ? 'Dashboard' : 'Login'}
             </Link>
