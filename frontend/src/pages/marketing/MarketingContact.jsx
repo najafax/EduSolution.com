@@ -20,10 +20,10 @@ export default function MarketingContact() {
   return (
     <MarketingLayout>
       <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <span className="font-display inline-flex items-center gap-2 rounded-full bg-lagoon-50 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
+        <span className="font-display inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
           Contact us
         </span>
-        <h1 className="font-display mt-5 text-4xl font-extrabold text-slate-900 dark:text-white">Let's talk</h1>
+        <h1 className="font-display mt-5 text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Let's talk</h1>
         <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">
           Reach out and we'll help you find the right fit — EduPage, the Business Suite, or both.
         </p>
@@ -33,7 +33,7 @@ export default function MarketingContact() {
         {settings === null ? (
           <div className="grid gap-4 sm:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-32 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900" />
+              <div key={i} className="h-32 animate-pulse rounded-3xl bg-white/70 dark:bg-slate-900" />
             ))}
           </div>
         ) : !hasAnyDetail ? (
@@ -43,7 +43,7 @@ export default function MarketingContact() {
             {phone && (
               <a
                 href={`tel:${phone}`}
-                className="flex flex-col items-center gap-3 rounded-2xl bg-slate-50 p-8 text-center transition-colors hover:bg-lagoon-50 dark:bg-slate-900 dark:hover:bg-lagoon-950/40"
+                className="flex flex-col items-center gap-3 rounded-3xl bg-white p-8 text-center transition-colors hover:-translate-y-0.5 dark:bg-slate-900 dark:hover:bg-slate-800"
               >
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8">
@@ -60,7 +60,7 @@ export default function MarketingContact() {
             {email && (
               <a
                 href={`mailto:${email}`}
-                className="flex flex-col items-center gap-3 rounded-2xl bg-slate-50 p-8 text-center transition-colors hover:bg-lagoon-50 dark:bg-slate-900 dark:hover:bg-lagoon-950/40"
+                className="flex flex-col items-center gap-3 rounded-3xl bg-white p-8 text-center transition-colors hover:-translate-y-0.5 dark:bg-slate-900 dark:hover:bg-slate-800"
               >
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8">
@@ -73,7 +73,7 @@ export default function MarketingContact() {
               </a>
             )}
             {address && (
-              <div className="flex flex-col items-center gap-3 rounded-2xl bg-slate-50 p-8 text-center dark:bg-slate-900">
+              <div className="flex flex-col items-center gap-3 rounded-3xl bg-white p-8 text-center dark:bg-slate-900">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 dark:bg-lagoon-600">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8">
                     <path d="M12 21s7-6.3 7-11.5A7 7 0 0 0 5 9.5C5 14.7 12 21 12 21Z" strokeLinejoin="round" />

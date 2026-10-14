@@ -15,10 +15,10 @@ export default function MarketingTestimonials() {
   return (
     <MarketingLayout>
       <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <span className="font-display inline-flex items-center gap-2 rounded-full bg-lagoon-50 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
+        <span className="font-display inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
           Testimonials
         </span>
-        <h1 className="font-display mt-5 text-4xl font-extrabold text-slate-900 dark:text-white">What partners across the Maldives say</h1>
+        <h1 className="font-display mt-5 text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">What partners across the Maldives say</h1>
         <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">A few words from the schools and businesses we work with every day.</p>
       </div>
 
@@ -26,7 +26,7 @@ export default function MarketingTestimonials() {
         {testimonials === null ? (
           <div className="grid gap-5 sm:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-44 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900" />
+              <div key={i} className="h-44 animate-pulse rounded-3xl bg-white/70 dark:bg-slate-900" />
             ))}
           </div>
         ) : testimonials.length === 0 ? (
@@ -34,7 +34,7 @@ export default function MarketingTestimonials() {
         ) : (
           <div className="grid gap-5 sm:grid-cols-3">
             {testimonials.map((t) => (
-              <div key={t.id} className="flex flex-col gap-4 rounded-2xl bg-slate-50 p-7 dark:bg-slate-900">
+              <div key={t.id} className="flex flex-col gap-4 rounded-3xl bg-white p-7 dark:bg-slate-900">
                 {t.category && (
                   <span className="font-display w-fit rounded-full bg-slate-900 dark:bg-lagoon-600 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
                     {t.category}
@@ -57,7 +57,7 @@ export default function MarketingTestimonials() {
         <p className="mx-auto mt-3 max-w-md text-slate-300">
           Book a short walkthrough and we'll show you exactly how EduPage or the Business Suite would fit your team.
         </p>
-        <a href="/#contact" className="mt-6 inline-block min-h-11 rounded-lg bg-white px-6 py-3 text-sm font-bold text-lagoon-900 hover:bg-lagoon-50">
+        <a href="/#contact" className="mt-6 inline-block min-h-11 rounded-xl bg-white px-6 py-3 text-sm font-bold text-lagoon-900 hover:bg-lagoon-50">
           Book a walkthrough
         </a>
       </div>

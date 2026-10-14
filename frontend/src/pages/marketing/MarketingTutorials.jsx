@@ -16,10 +16,10 @@ export default function MarketingTutorials() {
   return (
     <MarketingLayout>
       <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <span className="font-display inline-flex items-center gap-2 rounded-full bg-lagoon-50 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
+        <span className="font-display inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
           Tutorials
         </span>
-        <h1 className="font-display mt-5 text-4xl font-extrabold text-slate-900 dark:text-white">Watch &amp; learn</h1>
+        <h1 className="font-display mt-5 text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Watch &amp; learn</h1>
         <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">
           Walkthroughs for EduPage — tap a video to open it.
         </p>
@@ -29,7 +29,7 @@ export default function MarketingTutorials() {
         {videos === null ? (
           <div className="grid gap-5 sm:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="aspect-video animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900" />
+              <div key={i} className="aspect-video animate-pulse rounded-3xl bg-white/70 dark:bg-slate-900" />
             ))}
           </div>
         ) : videos.length === 0 ? (

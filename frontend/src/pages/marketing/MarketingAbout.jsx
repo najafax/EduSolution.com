@@ -22,10 +22,10 @@ export default function MarketingAbout() {
   return (
     <MarketingLayout>
       <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <span className="font-display inline-flex items-center gap-2 rounded-full bg-lagoon-50 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
+        <span className="font-display inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400">
           About us
         </span>
-        <h1 className="font-display mt-5 text-4xl font-extrabold text-slate-900 dark:text-white">The people behind Edu Solutions</h1>
+        <h1 className="font-display mt-5 text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">The people behind Edu Solutions</h1>
         <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">
           Based in the Maldives, supporting the schools and businesses we work with in person.
         </p>
@@ -36,7 +36,7 @@ export default function MarketingAbout() {
         {team === null ? (
           <div className="grid gap-5 sm:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900" />
+              <div key={i} className="h-48 animate-pulse rounded-3xl bg-white/70 dark:bg-slate-900" />
             ))}
           </div>
         ) : team.length === 0 ? (
@@ -44,7 +44,7 @@ export default function MarketingAbout() {
         ) : (
           <div className="grid gap-5 sm:grid-cols-3">
             {team.map((m) => (
-              <div key={m.id} className="flex flex-col items-center gap-3 rounded-2xl bg-slate-50 p-7 text-center dark:bg-slate-900">
+              <div key={m.id} className="flex flex-col items-center gap-3 rounded-3xl bg-white p-7 text-center dark:bg-slate-900">
                 {m.photo ? (
                   <img src={m.photo} alt="" className="h-20 w-20 rounded-full object-cover" />
                 ) : (
@@ -68,7 +68,7 @@ export default function MarketingAbout() {
           <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Gallery</h2>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {gallery.map((item) => (
-              <div key={item.id} className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+              <div key={item.id} className="overflow-hidden rounded-3xl bg-white dark:border dark:border-slate-800">
                 <img src={item.image} alt={item.caption} className="aspect-square w-full object-cover" />
                 {item.caption && <p className="truncate px-2 py-1.5 text-xs text-slate-600 dark:text-slate-400">{item.caption}</p>}
               </div>
@@ -82,7 +82,7 @@ export default function MarketingAbout() {
         <p className="mx-auto mt-3 max-w-md text-slate-300">
           Book a short walkthrough and we'll show you exactly how EduPage or the Business Suite would fit your team.
         </p>
-        <a href="/#contact" className="mt-6 inline-block min-h-11 rounded-lg bg-white px-6 py-3 text-sm font-bold text-lagoon-900 hover:bg-lagoon-50">
+        <a href="/#contact" className="mt-6 inline-block min-h-11 rounded-xl bg-white px-6 py-3 text-sm font-bold text-lagoon-900 hover:bg-lagoon-50">
           Book a walkthrough
         </a>
       </div>
