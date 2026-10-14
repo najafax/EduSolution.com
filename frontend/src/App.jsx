@@ -102,7 +102,11 @@ export default function App() {
   const isMarketingRoute = MARKETING_ROUTES.has(location.pathname);
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas dark:bg-slate-950 xl:flex-row">
+    <div
+      className={`flex min-h-screen flex-col bg-canvas dark:bg-slate-950 xl:flex-row ${
+        !isPortalRoute && !isMarketingRoute ? 'app-water app-glass' : ''
+      }`}
+    >
       {/* Sidebar (xl: and up, nav links only) pairs with TopBar (search/
           notifications/theme/account, xl: and up); Navbar (below xl,
           everything in one header) is the mutually-exclusive alternative

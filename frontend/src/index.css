@@ -262,3 +262,50 @@ button:not(:disabled):active,
   backdrop-filter: blur(28px) saturate(180%);
 }
 .dark .glass.glass-strong { background-color: rgb(15 23 42 / 0.88) !important; }
+
+/* App-wide water effect for the staff app (App.jsx adds .app-water .app-glass
+   on every route except the marketing site and client portal). Cards keep
+   their markup; any white rounded card inside becomes frosted glass. */
+.app-water {
+  background-image:
+    radial-gradient(60% 45% at 5% 0%, rgb(10 138 148 / 0.75), transparent 70%),
+    radial-gradient(55% 45% at 100% 25%, rgb(56 189 248 / 0.65), transparent 70%),
+    radial-gradient(60% 50% at 0% 60%, rgb(99 102 241 / 0.40), transparent 70%),
+    radial-gradient(65% 50% at 85% 100%, rgb(45 212 191 / 0.60), transparent 70%),
+    linear-gradient(180deg, rgb(186 230 253 / 0.55), rgb(167 243 208 / 0.45));
+  background-attachment: fixed;
+}
+.dark .app-water {
+  background-image:
+    radial-gradient(60% 45% at 5% 0%, rgb(10 138 148 / 0.55), transparent 70%),
+    radial-gradient(55% 45% at 100% 25%, rgb(56 189 248 / 0.35), transparent 70%),
+    radial-gradient(60% 50% at 0% 60%, rgb(99 102 241 / 0.30), transparent 70%),
+    radial-gradient(65% 50% at 85% 100%, rgb(45 212 191 / 0.30), transparent 70%);
+}
+.app-glass :is(.rounded-3xl, .rounded-2xl).bg-white {
+  background-color: rgb(255 255 255 / 0.22) !important;
+  border: 1px solid rgb(255 255 255 / 0.7) !important;
+  box-shadow: 0 10px 34px rgb(10 138 148 / 0.20), inset 0 1px 0 rgb(255 255 255 / 0.8), inset 0 -1px 0 rgb(255 255 255 / 0.25) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(200%);
+  backdrop-filter: blur(16px) saturate(200%);
+}
+.dark .app-glass :is(.rounded-3xl, .rounded-2xl).bg-white {
+  background-color: rgb(15 23 42 / 0.35) !important;
+  border-color: rgb(255 255 255 / 0.14) !important;
+  box-shadow: 0 10px 34px rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.12) !important;
+}
+
+/* Chrome (sidebar, top bar, footer) joins the water effect. */
+.app-glass > aside:not([class*="fixed"]),
+.app-glass footer {
+  background-color: rgb(255 255 255 / 0.25) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(200%);
+  backdrop-filter: blur(16px) saturate(170%);
+  border-color: rgb(255 255 255 / 0.55) !important;
+}
+.dark .app-glass > aside:not([class*="fixed"]),
+.dark .app-glass footer {
+  background-color: rgb(15 23 42 / 0.45) !important;
+  border-color: rgb(255 255 255 / 0.08) !important;
+}
+.app-glass header { background-color: transparent !important; }

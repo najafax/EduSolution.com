@@ -1,7 +1,6 @@
 import { useTheme } from '../context/ThemeContext';
 
-const MODES = ['light', 'dark', 'system'];
-const LABELS = { light: 'Light', dark: 'Dark', system: 'System' };
+const LABELS = { light: 'Light', dark: 'Dark' };
 
 function SunIcon() {
   return (
@@ -20,27 +19,18 @@ function MoonIcon() {
   );
 }
 
-function SystemIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="3" y="4" width="18" height="12" rx="2" />
-      <path d="M8 20h8M12 16v4" strokeLinecap="round" />
-    </svg>
-  );
-}
+const ICONS = { light: SunIcon, dark: MoonIcon };
 
-const ICONS = { light: SunIcon, dark: MoonIcon, system: SystemIcon };
-
-// Cycles light -> dark -> system on each click, showing the current mode's
-// icon. A single click target (rather than a 3-way segmented control) to
-// keep it compact in the navbar next to GlobalSearch/the nav links.
+// Two-way light/dark switch. A stored legacy 'system' choice is shown as
+// whichever theme it currently resolves to, and the next click sets an
+// explicit light or dark.
 export default function ThemeToggle({ className = '' }) {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+  const theme = resolvedTheme;
   const Icon = ICONS[theme];
 
   function cycle() {
-    const next = MODES[(MODES.indexOf(theme) + 1) % MODES.length];
-    setTheme(next);
+    setTheme(theme === 'dark' ? 'light' : 'dark');
   }
 
   return (
