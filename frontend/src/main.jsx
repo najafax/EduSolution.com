@@ -7,6 +7,9 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
+import { applyFontSize, getFontSize } from './lib/fontSize.js'
+
+applyFontSize(getFontSize());
 
 // Every routed page is its own lazily-loaded chunk with a content hash in
 // its filename (see App.jsx's "Route-level code-splitting" note) — great

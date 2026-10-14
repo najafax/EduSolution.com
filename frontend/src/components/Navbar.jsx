@@ -103,7 +103,7 @@ export default function Navbar() {
                 the full nav below that breakpoint; `BottomNav.jsx`'s own tab
                 bar only carries the five primary shortcuts, not a mirror of
                 this trigger. */}
-            <div className="flex items-center gap-1">
+            <div className="flex min-w-0 items-center gap-1">
               <button
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-label={menuOpen ? 'Close menu' : 'Open menu'}
@@ -112,15 +112,15 @@ export default function Navbar() {
               >
                 {menuOpen ? <XIcon width={22} height={22} /> : <MenuIcon width={22} height={22} />}
               </button>
-              <Link to="/" className="flex shrink-0 items-center gap-1.5 font-display text-base font-extrabold text-slate-900 sm:text-lg dark:text-white">
-                <img src="/logo-symbol.png" alt="" className="h-6 w-6 sm:h-7 sm:w-7" />
-                Edu Solutions
+              <Link to="/" className="flex min-w-0 items-center gap-1.5 font-display text-base font-extrabold text-slate-900 sm:text-lg dark:text-white">
+                <img src="/logo-symbol.png" alt="" className="h-6 w-6 shrink-0 sm:h-7 sm:w-7" />
+                <span className="truncate">Edu Solutions</span>
               </Link>
             </div>
 
             {/* Top-right corner: search/notifications/theme, then the
                 account avatar last so it sits in the very corner. */}
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               <button
                 onClick={() => setPhoneSearchOpen((v) => !v)}
                 aria-label={phoneSearchOpen ? 'Close search' : 'Search'}
