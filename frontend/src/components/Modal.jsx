@@ -44,7 +44,7 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center sm:overflow-y-auto sm:px-4 sm:py-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/20 backdrop-blur-sm sm:items-center sm:overflow-y-auto sm:px-4 sm:py-4"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) onClose?.();
           }}

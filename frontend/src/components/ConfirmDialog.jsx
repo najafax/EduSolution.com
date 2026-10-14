@@ -44,7 +44,7 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, canc
           transition={{ duration: 0.15 }}
         >
           <motion.div
-            className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-slate-900"
+            className="modal-panel w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-900"
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}

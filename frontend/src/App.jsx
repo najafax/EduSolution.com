@@ -104,7 +104,7 @@ export default function App() {
   return (
     <div
       className={`flex min-h-screen flex-col bg-canvas dark:bg-slate-950 xl:flex-row ${
-        !isPortalRoute && !isMarketingRoute ? 'app-water app-glass' : ''
+        'app-water app-glass'
       }`}
     >
       {/* Sidebar (xl: and up, nav links only) pairs with TopBar (search/
