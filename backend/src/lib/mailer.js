@@ -33,12 +33,22 @@ function getResendClient() {
   return resendClient;
 }
 
+// Where client replies land. The From address (SMTP_FROM) is often a
+// send-only address, so replies are routed to a real inbox via Reply-To.
+// Override with MAIL_REPLY_TO; set it to an empty value to disable.
+const DEFAULT_REPLY_TO = 'info@edusolutionsmv.com';
+function replyToAddress() {
+  const v = process.env.MAIL_REPLY_TO;
+  return v === undefined ? DEFAULT_REPLY_TO : v.trim() || undefined;
+}
+
 async function sendMail({ to, subject, html, attachments }) {
   const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const replyTo = replyToAddress();
   const resend = getResendClient();
 
   if (resend) {
-    const { error } = await resend.emails.send({ from, to, subject, html, attachments });
+    const { error } = await resend.emails.send({ from, to, subject, html, attachments, ...(replyTo && { replyTo }) });
     if (error) {
       const err = new Error(error.message || 'Resend failed to send the email.');
       err.code = error.name || 'RESEND_ERROR';
@@ -56,7 +66,7 @@ async function sendMail({ to, subject, html, attachments }) {
     throw error;
   }
 
-  await t.sendMail({ from, to, subject, html, attachments });
+  await t.sendMail({ from, to, subject, html, attachments, ...(replyTo && { replyTo }) });
 }
 
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
