@@ -217,8 +217,7 @@ export default function FacebookPosts() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
-        title="Facebook posts"
-        subtitle={<>AI-drafted post ideas for your Facebook Page, generated weekly — review, edit, and publish whichever ones you like.</>}
+        title="Facebook posts" 
         actions={
           <>
 {canManage && (
@@ -273,9 +272,6 @@ export default function FacebookPosts() {
               </select>
             </label>
           )}
-          <p className="min-w-0 flex-1 basis-56 text-xs text-slate-500 dark:text-slate-400">
-            Tutorial posts attach the tutorial's thumbnail as the picture. You can replace or remove it when you edit the draft.
-          </p>
         </div>
       )}
 

@@ -416,8 +416,7 @@ export default function Licenses() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
-        title="Licenses"
-        subtitle={<>Track active client licenses, renew them once paid, and stay ahead of expiries.</>}
+        title="Licenses" 
         actions={
           <>
 

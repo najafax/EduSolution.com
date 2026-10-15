@@ -122,8 +122,7 @@ export default function Shareholders() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
-        title="Shareholders"
-        subtitle={<>Who gets the automated daily earnings report — sent every morning, only on a day a payment was actually received.</>}
+        title="Shareholders" 
         actions={
           <>
 

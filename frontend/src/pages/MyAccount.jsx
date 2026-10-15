@@ -232,10 +232,6 @@ export default function MyAccount() {
     <div className="water-bg min-h-screen">
     <div className="mx-auto max-w-2xl px-4 py-6 pb-28 sm:px-6">
       <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">My account</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        {roleLabel(user?.role)} account. Contact an admin to change your role or module
-        permissions.
-      </p>
 
       <div className="mt-6 glass rounded-3xl p-5">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Photo</h2>

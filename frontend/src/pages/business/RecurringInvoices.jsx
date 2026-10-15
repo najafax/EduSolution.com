@@ -175,12 +175,7 @@ export default function RecurringInvoices() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
-        title="Recurring invoices"
-        subtitle={<>Each template automatically creates a draft invoice on its next run date — review and send it from the{' '}
-        <Link to="/invoices" className="text-lagoon-600 hover:text-lagoon-500">
-          Invoices
-        </Link>{' '}
-        page like any other.</>}
+        title="Recurring invoices" 
         actions={
           <>
 {canManage && (

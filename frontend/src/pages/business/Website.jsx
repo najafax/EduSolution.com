@@ -1347,9 +1347,6 @@ export default function Website() {
     <div className="px-4 py-10 pb-24 sm:px-6 lg:px-8">
       <div>
         <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Website content</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          What you publish here appears on the public marketing site — edusolutionsmaldives.com.
-        </p>
       </div>
 
       <div className="mt-4">

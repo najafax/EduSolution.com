@@ -324,9 +324,7 @@ export default function Products() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
-        title="Products"
-        subtitle={<>A reusable catalog of products and services — pick one when building a quote or invoice to autofill its
-        description, price, and tax instead of typing it from scratch each time.</>}
+        title="Products" 
         actions={
           <>
 {canManage && (

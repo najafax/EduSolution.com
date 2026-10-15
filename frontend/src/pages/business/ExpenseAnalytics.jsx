@@ -66,9 +66,6 @@ export default function ExpenseAnalytics() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Expense analytics</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Spending by category and year, plus a full breakdown of every currency exchange.
-          </p>
         </div>
         <Link
           to="/expenses"

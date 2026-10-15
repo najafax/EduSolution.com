@@ -236,13 +236,6 @@ export default function Users() {
           </button>
         )
       } search={<SearchInput value={search} onChange={setSearch} placeholder="Search users…" />} />
-      <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
-        Everyone with an account can see and edit shared business data unless restricted below. Admins have full
-        access by default, except a handful of modules (Financials, Capital contributions, Owner draws,
-        Shareholders, Reports) that only a super admin can grant a specific admin into via Module permissions — a
-        super admin can also restrict a specific admin's access more broadly, the same way staff access is
-        controlled — and only a super admin can create, edit, or remove another admin or super admin account.
-      </p>
 
       {error && !showForm && resetTargetId === null && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
