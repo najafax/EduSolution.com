@@ -239,9 +239,10 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{greeting()}</p>
-      <h1 className="font-display text-3xl font-extrabold text-ink dark:text-white">{firstName}</h1>
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <div className="xl:flex xl:flex-wrap xl:items-baseline xl:gap-x-3">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 xl:order-2">{greeting()}</p>
+      <h1 className="font-display text-3xl font-extrabold text-ink dark:text-white xl:order-1 xl:text-2xl">{firstName}</h1>
       {/* Waits on the same `settingsLoaded` flag the financial content below
           gates on (see that section's own currency-symbol-flash note) —
           painting `user?.email` immediately and swapping to
@@ -250,9 +251,10 @@ export default function Dashboard() {
           than a clean single paint. A non-breaking space holds the line's
           height in the meantime so nothing shifts once the real value
           arrives. */}
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 xl:order-3 xl:mt-0">
         {settingsLoaded ? settings?.business_name || user?.email : ' '}
       </p>
+      </div>
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 

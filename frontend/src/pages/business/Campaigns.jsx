@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import PageToolbar from '../../components/PageToolbar';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -209,13 +210,13 @@ export default function Campaigns() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Campaigns</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Send a newsletter or promotional email to your clients.</p>
-        </div>
-        {canManage && (
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar
+        title="Campaigns"
+        subtitle={<>Send a newsletter or promotional email to your clients.</>}
+        actions={
+          <>
+{canManage && (
           <div className="flex flex-wrap gap-2">
             <button
               onClick={openCancelledLicensesCampaign}
@@ -242,7 +243,9 @@ export default function Campaigns() {
             </button>
           </div>
         )}
-      </div>
+          </>
+        }
+      />
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 

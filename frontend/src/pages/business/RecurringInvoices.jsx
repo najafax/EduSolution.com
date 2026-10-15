@@ -6,6 +6,7 @@ import { todayStr } from '../../lib/date';
 import LineItemsEditor from '../../components/LineItemsEditor';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import SearchableSelect from '../../components/SearchableSelect';
+import PageToolbar from '../../components/PageToolbar';
 import SearchInput from '../../components/SearchInput';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
@@ -172,10 +173,17 @@ export default function RecurringInvoices() {
   const symbol = settings?.currency_symbol || '$';
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Recurring invoices</h1>
-        {canManage && (
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar
+        title="Recurring invoices"
+        subtitle={<>Each template automatically creates a draft invoice on its next run date — review and send it from the{' '}
+        <Link to="/invoices" className="text-lagoon-600 hover:text-lagoon-500">
+          Invoices
+        </Link>{' '}
+        page like any other.</>}
+        actions={
+          <>
+{canManage && (
           <button
             onClick={startCreate}
             className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
@@ -184,18 +192,11 @@ export default function RecurringInvoices() {
             New template
           </button>
         )}
-      </div>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        Each template automatically creates a draft invoice on its next run date — review and send it from the{' '}
-        <Link to="/invoices" className="text-lagoon-600 hover:text-lagoon-500">
-          Invoices
-        </Link>{' '}
-        page like any other.
-      </p>
+          </>
+        }
+        search={<SearchInput value={search} onChange={setSearch} placeholder="Search recurring invoices…" />}
+      />
 
-      <div className="mt-4 sm:max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search recurring invoices…" />
-      </div>
 
       {error && !showForm && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 

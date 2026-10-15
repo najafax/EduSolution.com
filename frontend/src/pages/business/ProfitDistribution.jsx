@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../lib/useConfirm';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import Modal from '../../components/Modal';
+import PageToolbar from '../../components/PageToolbar';
 import SearchInput from '../../components/SearchInput';
 import SearchableSelect from '../../components/SearchableSelect';
 import StatusFilterChips from '../../components/StatusFilterChips';
@@ -448,21 +449,17 @@ export default function ProfitDistribution() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Profit Distribution</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Revenue received minus what it cost to buy USD for a supplier — the rest split among shareholders by
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar
+        title="Profit Distribution"
+        subtitle={<>Revenue received minus what it cost to buy USD for a supplier — the rest split among shareholders by
             ownership. Recording the real USD purchase happens on the{' '}
             <Link to="/supplier-costs" className="font-medium text-lagoon-700 underline hover:text-lagoon-600 dark:text-lagoon-400">
               Supplier Costs
             </Link>{' '}
-            report or the Expenses page, not here. Purely internal; nothing here is ever shown to a client.
-          </p>
-        </div>
-        {canManage && (
-          <div className="flex flex-wrap gap-2">
+            report or the Expenses page, not here. Purely internal; nothing here is ever shown to a client.</>}
+        actions={canManage && (
+<>
             {draftCount > 0 && (
               <button
                 onClick={handleDistributeAll}
@@ -480,9 +477,11 @@ export default function ProfitDistribution() {
               <PlusIcon width={16} height={16} />
               New record
             </button>
-          </div>
-        )}
-      </div>
+          </>
+)}
+        search={<SearchInput value={search} onChange={setSearch} placeholder="Search records…" />}
+        filters={<StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />}
+      />
 
       {canManage && (
         <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
@@ -540,12 +539,6 @@ export default function ProfitDistribution() {
         </p>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <div className="sm:max-w-sm">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search records…" />
-        </div>
-        <StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />
-      </div>
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 

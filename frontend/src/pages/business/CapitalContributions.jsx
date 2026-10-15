@@ -14,6 +14,7 @@ import SearchableSelect from '../../components/SearchableSelect';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
+import PageToolbar from '../../components/PageToolbar';
 import PageMenu from '../../components/PageMenu';
 import IconActionButton from '../../components/IconActionButton';
 import { BankIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon } from '../../components/icons';
@@ -139,15 +140,13 @@ export default function CapitalContributions() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Capital contributions</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Money an owner or partner has put into the business — separate from client revenue and expenses.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar
+        title="Capital contributions"
+        subtitle={<>Money an owner or partner has put into the business — separate from client revenue and expenses.</>}
+        actions={
+          <>
+
           <PageMenu items={[{ label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
           {canManage && (
             <button
@@ -158,14 +157,12 @@ export default function CapitalContributions() {
               New contribution
             </button>
           )}
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <div className="flex-1 sm:max-w-sm">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search contributions…" />
-        </div>
-        {contributors.length > 0 && (
+        
+          </>
+        }
+        search={<SearchInput value={search} onChange={setSearch} placeholder="Search contributions…" />}
+        extra={<div className="flex flex-wrap items-center gap-2">
+{contributors.length > 0 && (
           <div className="w-full max-w-xs sm:w-56">
             <SearchableSelect
               options={[{ value: '', label: 'All contributors' }, ...contributors.map((c) => ({ value: c, label: c }))]}
@@ -175,7 +172,10 @@ export default function CapitalContributions() {
             />
           </div>
         )}
-      </div>
+</div>}
+        
+      />
+
 
       {error && !showForm && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 

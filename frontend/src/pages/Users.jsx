@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import FloatingActionButton from '../components/FloatingActionButton';
+import PageToolbar from '../components/PageToolbar';
 import SearchInput from '../components/SearchInput';
 import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
@@ -217,17 +218,15 @@ export default function Users() {
 
   if (!canView) {
     return (
-      <div className="px-4 py-10 sm:px-6 lg:px-8">
+      <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
         <p className="text-sm text-slate-500 dark:text-slate-400">You don't have permission to view this page.</p>
       </div>
     );
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Users</h1>
-        {canManage && (
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar title="Users" actions={canManage && (
           <button
             onClick={startCreate}
             className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
@@ -235,19 +234,15 @@ export default function Users() {
             <PlusIcon width={16} height={16} />
             New user
           </button>
-        )}
-      </div>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        )
+      } search={<SearchInput value={search} onChange={setSearch} placeholder="Search users…" />} />
+      <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
         Everyone with an account can see and edit shared business data unless restricted below. Admins have full
         access by default, except a handful of modules (Financials, Capital contributions, Owner draws,
         Shareholders, Reports) that only a super admin can grant a specific admin into via Module permissions — a
         super admin can also restrict a specific admin's access more broadly, the same way staff access is
         controlled — and only a super admin can create, edit, or remove another admin or super admin account.
       </p>
-
-      <div className="mt-4 sm:max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search users…" />
-      </div>
 
       {error && !showForm && resetTargetId === null && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 

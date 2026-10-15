@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import PageToolbar from '../../components/PageToolbar';
 import SearchInput from '../../components/SearchInput';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
@@ -321,10 +322,14 @@ export default function Products() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Products</h1>
-        {canManage && (
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar
+        title="Products"
+        subtitle={<>A reusable catalog of products and services — pick one when building a quote or invoice to autofill its
+        description, price, and tax instead of typing it from scratch each time.</>}
+        actions={
+          <>
+{canManage && (
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowImport(true)}
@@ -342,15 +347,11 @@ export default function Products() {
             </button>
           </div>
         )}
-      </div>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        A reusable catalog of products and services — pick one when building a quote or invoice to autofill its
-        description, price, and tax instead of typing it from scratch each time.
-      </p>
+          </>
+        }
+        search={<SearchInput value={search} onChange={setSearch} placeholder="Search products…" />}
+      />
 
-      <div className="mt-4 sm:max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search products…" />
-      </div>
 
       {error && !showForm && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 

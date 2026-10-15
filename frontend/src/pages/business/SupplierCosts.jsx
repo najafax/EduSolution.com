@@ -92,7 +92,7 @@ export default function SupplierCosts() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <div>
         <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Supplier Costs</h1>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
