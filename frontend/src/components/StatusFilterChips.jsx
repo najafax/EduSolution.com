@@ -4,7 +4,7 @@
 // [{ value, label }, ...] — pass value: '' for the "All" chip.
 export default function StatusFilterChips({ options, value, onChange }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2 xl:flex-nowrap">
       {options.map((opt) => {
         const active = value === opt.value;
         return (
@@ -12,7 +12,7 @@ export default function StatusFilterChips({ options, value, onChange }) {
             key={opt.value || 'all'}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`min-h-9 rounded-full border px-3 text-sm font-medium capitalize ${
+            className={`min-h-9 shrink-0 whitespace-nowrap rounded-full border px-3 text-sm font-medium capitalize ${
               active
                 ? 'border-slate-900 bg-slate-900 text-white dark:border-lagoon-600 dark:bg-lagoon-600'
                 : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800'

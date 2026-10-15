@@ -12,6 +12,7 @@ import EmptyState from '../../components/EmptyState';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
+import PageToolbar from '../../components/PageToolbar';
 import PageMenu from '../../components/PageMenu';
 import IconActionButton from '../../components/IconActionButton';
 import RowActions from '../../components/RowActions';
@@ -290,10 +291,12 @@ export default function Invoices() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Invoices</h1>
-        <div className="flex flex-wrap gap-2">
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar
+        title="Invoices"
+        actions={
+          <>
+
           <PageMenu items={[{ label: 'Analytics', icon: ReportIcon, to: '/invoices/analytics' }, { label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
           {canManage && (
             <button
@@ -304,8 +307,12 @@ export default function Invoices() {
               New invoice
             </button>
           )}
-        </div>
-      </div>
+        
+          </>
+        }
+        search={<SearchInput value={search} onChange={setSearch} placeholder="Search invoices…" />}
+        filters={<StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />}
+      />
 
       {summary && (
         <div className="-mx-4 mt-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden [&>*]:min-w-[11rem] [&>*]:snap-start sm:[&>*]:min-w-0">
@@ -321,13 +328,7 @@ export default function Invoices() {
         </div>
       )}
 
-      <div className="mt-4 sm:max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search invoices…" />
-      </div>
 
-      <div className="mt-3">
-        <StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />
-      </div>
 
       {paymentNotice && <p className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">{paymentNotice}</p>}
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}

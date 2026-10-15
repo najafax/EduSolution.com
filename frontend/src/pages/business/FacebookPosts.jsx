@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import PageToolbar from '../../components/PageToolbar';
 import { resizeImage, dataUriByteLength } from '../../lib/imageResize';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -214,15 +215,13 @@ export default function FacebookPosts() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Facebook posts</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            AI-drafted post ideas for your Facebook Page, generated weekly — review, edit, and publish whichever ones you like.
-          </p>
-        </div>
-        {canManage && (
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar
+        title="Facebook posts"
+        subtitle={<>AI-drafted post ideas for your Facebook Page, generated weekly — review, edit, and publish whichever ones you like.</>}
+        actions={
+          <>
+{canManage && (
           <button
             onClick={handleGenerate}
             disabled={generating}
@@ -232,7 +231,9 @@ export default function FacebookPosts() {
             {generating ? 'Generating…' : 'Generate draft'}
           </button>
         )}
-      </div>
+          </>
+        }
+      />
 
       {canManage && options.postTypes.length > 0 && (
         <div className="mt-4 flex flex-wrap items-end gap-3 rounded-2xl bg-white p-3 shadow-sm dark:border dark:border-slate-700 dark:bg-slate-900">

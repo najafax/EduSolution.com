@@ -1337,7 +1337,7 @@ export default function Website() {
 
   if (!canView) {
     return (
-      <div className="px-4 py-10 sm:px-6 lg:px-8">
+      <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
         <p className="text-sm text-slate-600 dark:text-slate-400">You don't have permission to view this page.</p>
       </div>
     );

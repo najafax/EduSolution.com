@@ -13,6 +13,7 @@ import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
+import PageToolbar from '../../components/PageToolbar';
 import PageMenu from '../../components/PageMenu';
 import IconActionButton from '../../components/IconActionButton';
 import RowActions from '../../components/RowActions';
@@ -192,10 +193,12 @@ export default function Clients() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Clients</h1>
-        <div className="flex flex-wrap gap-2">
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar
+        title="Clients"
+        actions={
+          <>
+
           <PageMenu items={[{ label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
           {canManage && (
             <button
@@ -206,12 +209,12 @@ export default function Clients() {
               New client
             </button>
           )}
-        </div>
-      </div>
+        
+          </>
+        }
+        search={<SearchInput value={search} onChange={setSearch} placeholder="Search clients…" />}
+      />
 
-      <div className="mt-4 sm:max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search clients…" />
-      </div>
 
       {error && !showForm && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 

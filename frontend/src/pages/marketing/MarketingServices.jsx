@@ -115,7 +115,7 @@ export default function MarketingServices() {
           actually added at least one, so an empty catalog never shows a
           pointless section header with nothing under it. */}
       {services.length > 0 && (
-        <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
           <h2 className="font-display text-xl font-bold text-slate-900 dark:text-white">More ways we can help</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             {services.map((s) => {

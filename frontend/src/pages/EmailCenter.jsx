@@ -220,7 +220,7 @@ export default function EmailCenter() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Email center</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
         {canManage

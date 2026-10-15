@@ -16,6 +16,7 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import KpiCard from '../../components/KpiCard';
+import PageToolbar from '../../components/PageToolbar';
 import PageMenu from '../../components/PageMenu';
 import IconActionButton from '../../components/IconActionButton';
 import RowActions from '../../components/RowActions';
@@ -413,15 +414,13 @@ export default function Licenses() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Licenses</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Track active client licenses, renew them once paid, and stay ahead of expiries.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar
+        title="Licenses"
+        subtitle={<>Track active client licenses, renew them once paid, and stay ahead of expiries.</>}
+        actions={
+          <>
+
           <PageMenu items={[{ label: 'Analytics', icon: ReportIcon, to: '/licenses/analytics' }, { label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
           {canManage && (
             <button
@@ -432,8 +431,12 @@ export default function Licenses() {
               New license
             </button>
           )}
-        </div>
-      </div>
+        
+          </>
+        }
+        search={<SearchInput value={search} onChange={setSearch} placeholder="Search licenses…" />}
+        filters={<StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />}
+      />
 
       {summary && (
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -444,12 +447,6 @@ export default function Licenses() {
         </div>
       )}
 
-      <div className="mt-6 sm:max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search licenses…" />
-      </div>
-      <div className="mt-3">
-        <StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />
-      </div>
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 

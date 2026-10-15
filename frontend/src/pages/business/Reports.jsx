@@ -95,7 +95,7 @@ export default function Reports() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Reports</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         Download a PDF report for any date range — sales, tax, profit &amp; loss, expenses, and bank balance.
