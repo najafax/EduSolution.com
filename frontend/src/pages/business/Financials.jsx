@@ -216,7 +216,6 @@ export default function Financials() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Financials</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">A live view of what's owed, what's been paid, and where you stand.</p>
 
       <div className="mt-4">
         <StatusFilterChips options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />

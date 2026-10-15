@@ -95,11 +95,6 @@ export default function SupplierCosts() {
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <div>
         <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Supplier Costs</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          Automatically calculated from what's actually been sold — every invoice line item's quantity × its
-          product's own cost price (USD), rolled up by month and year. Not a manual entry tool: to actually record a
-          currency exchange purchase against a figure below, use "Record as expense" (or the Expenses page directly).
-        </p>
       </div>
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}

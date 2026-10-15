@@ -383,8 +383,7 @@ export default function OwnerDraws() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
-        title="Owner draws"
-        subtitle={<>Money an owner or partner has taken out of the business, and any of it paid back.</>}
+        title="Owner draws" 
         actions={
           <>
 

@@ -312,10 +312,6 @@ export default function Import() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Import historical data</h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        Bring in existing clients, expenses, invoices (with payment history), quotes, licenses, or products from a
-        CSV file. Preview first to catch errors — nothing is saved until you confirm.
-      </p>
       {(type === 'invoices' || type === 'quotes' || type === 'licenses') && (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
           Import clients first if you haven't already — each {type === 'invoices' ? 'invoice' : type === 'quotes' ? 'quote' : 'license'} row is

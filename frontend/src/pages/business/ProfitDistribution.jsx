@@ -451,13 +451,7 @@ export default function ProfitDistribution() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
-        title="Profit Distribution"
-        subtitle={<>Revenue received minus what it cost to buy USD for a supplier — the rest split among shareholders by
-            ownership. Recording the real USD purchase happens on the{' '}
-            <Link to="/supplier-costs" className="font-medium text-lagoon-700 underline hover:text-lagoon-600 dark:text-lagoon-400">
-              Supplier Costs
-            </Link>{' '}
-            report or the Expenses page, not here. Purely internal; nothing here is ever shown to a client.</>}
+        title="Profit Distribution" 
         actions={canManage && (
 <>
             {draftCount > 0 && (

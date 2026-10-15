@@ -212,8 +212,7 @@ export default function Campaigns() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
-        title="Campaigns"
-        subtitle={<>Send a newsletter or promotional email to your clients.</>}
+        title="Campaigns" 
         actions={
           <>
 {canManage && (
