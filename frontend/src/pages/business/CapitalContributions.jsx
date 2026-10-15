@@ -142,6 +142,8 @@ export default function CapitalContributions() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
+        mobileFilters="sheet"
+        activeChips={contributorFilter ? [{ key: 'who', label: contributorFilter, onClear: () => setContributorFilter('') }] : []}
         title="Capital contributions" 
         actions={
           <>

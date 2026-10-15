@@ -383,6 +383,12 @@ export default function OwnerDraws() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
+        mobileFilters="sheet"
+        activeChips={[
+          ...(typeFilter ? [{ key: 'type', label: TYPE_OPTIONS.find((o) => o.value === typeFilter)?.label || typeFilter, onClear: () => selectType('') }] : []),
+          ...(balanceFilter ? [{ key: 'bal', label: BALANCE_OPTIONS.find((o) => o.value === balanceFilter)?.label || balanceFilter, onClear: () => selectBalanceFilter('') }] : []),
+          ...(takenByFilter ? [{ key: 'by', label: takenByFilter, onClear: () => setTakenByFilter('') }] : []),
+        ]}
         title="Owner draws" 
         actions={
           <>
