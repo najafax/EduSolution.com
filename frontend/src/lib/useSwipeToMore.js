@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 const MIN_DISTANCE_PX = 90;
 const MAX_VERTICAL_PX = 60;
-// A touch that starts this close to the left edge is an edge swipe: it works
-// even over scrolling rows/tables, needs less travel, and claims the gesture
+// Opening More needs a touch that starts this close to the left edge; it works
+// even over scrolling rows/tables, needs little travel, and claims the gesture
 // from the browser's own swipe-back where the platform allows it.
 const EDGE_PX = 28;
 const EDGE_MIN_DISTANCE_PX = 50;
@@ -24,7 +24,7 @@ function startsInDragArea(target) {
   return false;
 }
 
-// Phones only: swipe left-to-right (best from the very left edge of the screen, or anywhere on the page) to open the More
+// Phones only: swipe left-to-right starting at the very left edge of the screen to open the More
 // page (same page as the bottom bar's More tab); on More, swipe
 // right-to-left to close it again, mirroring the tab's own toggle.
 export function useSwipeToMore({ enabled }) {
@@ -42,7 +42,11 @@ export function useSwipeToMore({ enabled }) {
       }
       const t = e.touches[0];
       const edge = t.clientX <= EDGE_PX;
-      start = edge || !startsInDragArea(e.target) ? { x: t.clientX, y: t.clientY, edge } : null;
+      // Opening More is an edge swipe only; swiping elsewhere on the page is
+      // left alone. Closing (right-to-left on More) works from anywhere.
+      const canOpen = edge && pathname !== '/more';
+      const canClose = pathname === '/more' && !startsInDragArea(e.target);
+      start = canOpen || canClose ? { x: t.clientX, y: t.clientY, edge } : null;
     }
 
     function onMove(e) {
