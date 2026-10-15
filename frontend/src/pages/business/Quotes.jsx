@@ -12,6 +12,7 @@ import EmptyState from '../../components/EmptyState';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
+import PageToolbar from '../../components/PageToolbar';
 import PageMenu from '../../components/PageMenu';
 import IconActionButton from '../../components/IconActionButton';
 import RowActions from '../../components/RowActions';
@@ -174,34 +175,30 @@ export default function Quotes() {
   }
 
   return (
-    <div className="px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-white">Quotes</h1>
-        <div className="flex flex-wrap gap-2">
-          <PageMenu items={[{ label: 'Analytics', icon: ReportIcon, to: '/quotes/analytics' }, { label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
-          {canManage && (
-            <button
-              onClick={() => setShowNewForm(true)}
-              className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
-            >
-              <PlusIcon width={16} height={16} />
-              New quote
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-4 sm:max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search quotes…" />
-      </div>
-
-      <div className="mt-3">
-        <StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />
-      </div>
+    <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
+      <PageToolbar
+        title="Quotes"
+        actions={
+          <>
+            <PageMenu items={[{ label: 'Analytics', icon: ReportIcon, to: '/quotes/analytics' }, { label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
+            {canManage && (
+              <button
+                onClick={() => setShowNewForm(true)}
+                className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
+              >
+                <PlusIcon width={16} height={16} />
+                New quote
+              </button>
+            )}
+          </>
+        }
+        search={<SearchInput value={search} onChange={setSearch} placeholder="Search quotes…" />}
+        filters={<StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />}
+      />
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-4 xl:mt-4 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
             <TableSkeleton rows={5} cols={['w-28', 'w-32', 'w-24', 'w-20', 'w-20', 'w-32']} />
