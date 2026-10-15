@@ -382,6 +382,11 @@ export default function Expenses() {
   return (
     <div className="px-4 py-10 sm:px-6 lg:px-8 xl:py-6">
       <PageToolbar
+        mobileFilters="sheet"
+        activeChips={[
+          ...(categoryFilter ? [{ key: 'cat', label: categoryFilter, onClear: () => setCategoryFilter('') }] : []),
+          ...(payeeFilter ? [{ key: 'payee', label: `Payee: ${payeeFilter}`, onClear: () => setPayeeFilter('') }] : []),
+        ]}
         title="Expenses"
         actions={
           <>

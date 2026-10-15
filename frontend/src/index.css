@@ -495,3 +495,20 @@ html:not(.dark) body::before {
   /* Search and chips sit borderless-compact inside the bar. */
   .page-toolbar input[type="search"] { min-height: 2.5rem; }
 }
+
+/* Phones: list-page action buttons collapse to compact icon-only squares
+   (the label stays in the DOM for screen readers); desktop is untouched. */
+@media (max-width: 1279.98px) {
+  .page-toolbar-actions button:not([aria-haspopup]),
+  .page-toolbar-actions > a {
+    font-size: 0 !important;
+    gap: 0 !important;
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem !important;
+    padding: 0 !important;
+    justify-content: center;
+    border-radius: 0.9rem;
+  }
+}
