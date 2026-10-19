@@ -221,85 +221,6 @@ router.put('/:id', manage, (req, res) => {
   res.json({ deal });
 });
 
-// TEMPORARY: bulk-deletes every draft deal, for clearing out test records
-// created while trying out this feature — never touches a distributed
-// deal, which is real, already-recorded financial history and stays
-// permanently locked here the same as PUT/DELETE /:id below. Registered
-// ahead of DELETE /:id so 'drafts' is never swallowed as an :id value.
-// A draft's own expense_id will never be set by any current write path
-// (the per-deal USD-conversion action that used to set it was removed —
-// see the top-of-file note), but this still reverses one if it's set on a
-// legacy row left over from before that removal, same reasoning
-// DELETE /distributed below still applies to a distributed deal's own
-// expense_id — otherwise this cleanup tool would leave a real,
-// still-subtracting expense behind with no deal left to explain it.
-// Remove this route (and its Profit Distribution page button) once it's
-// no longer needed for cleanup.
-router.delete('/drafts', manage, (req, res) => {
-  const drafts = db.prepare("SELECT * FROM deals WHERE status = 'draft'").all();
-  if (drafts.length === 0) return res.json({ deleted: 0 });
-
-  const deleteAll = db.transaction(() => {
-    for (const deal of drafts) {
-      if (deal.expense_id) {
-        db.prepare('DELETE FROM expenses WHERE id = ?').run(deal.expense_id);
-      }
-    }
-    db.prepare("DELETE FROM deals WHERE status = 'draft'").run();
-  });
-  deleteAll();
-
-  logActivity({
-    userName: req.user.name,
-    action: 'bulk deleted',
-    entityType: 'deal',
-    entityId: null,
-    entityLabel: `${drafts.length} draft deal(s) (test cleanup)`,
-  });
-  res.json({ deleted: drafts.length });
-});
-
-// TEMPORARY, same reasoning as DELETE /drafts above but for the other
-// side of the ledger — bulk-deletes every *distributed* deal, fully
-// reversing what POST /:id/distribute (or /distribute-all) wrote for it:
-// the linked 'currency exchange' expense (if any) and every owner_draws
-// row tied to that deal (deal_id = deal.id), then the deal itself. This
-// is what actually undoes a test distribution's effect on bankBalance —
-// deleting just the deal row alone (which PUT/DELETE /:id both still
-// refuse to do for a real, non-test distributed deal) would leave the
-// expense/payout rows behind, still subtracting from the running balance
-// with no deal left to explain them. Only ever touches rows this
-// feature itself created (matched by deal_id / the deal's own stored
-// expense_id) — never a manually-entered expense or owner draw. Remove
-// this route (and its Profit Distribution page button) once it's no
-// longer needed for cleanup; a real, non-test distributed deal should
-// never be deleted this way in production, since it erases genuine
-// financial history rather than test data.
-router.delete('/distributed', manage, (req, res) => {
-  const distributed = db.prepare("SELECT * FROM deals WHERE status = 'distributed'").all();
-  if (distributed.length === 0) return res.json({ deleted: 0 });
-
-  const deleteAll = db.transaction(() => {
-    for (const deal of distributed) {
-      db.prepare('DELETE FROM owner_draws WHERE deal_id = ?').run(deal.id);
-      if (deal.expense_id) {
-        db.prepare('DELETE FROM expenses WHERE id = ?').run(deal.expense_id);
-      }
-    }
-    db.prepare("DELETE FROM deals WHERE status = 'distributed'").run();
-  });
-  deleteAll();
-
-  logActivity({
-    userName: req.user.name,
-    action: 'bulk deleted',
-    entityType: 'deal',
-    entityId: null,
-    entityLabel: `${distributed.length} distributed deal(s) and their linked expense/payout records (test cleanup)`,
-  });
-  res.json({ deleted: distributed.length });
-});
-
 router.delete('/:id', manage, (req, res) => {
   const existing = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Deal not found' });
@@ -427,9 +348,6 @@ router.post('/:id/distribute', manage, (req, res) => {
 // net profit); an ineligible draft is skipped with a reason rather than
 // failing the whole batch, mirroring routes/import.js's own "partial
 // success is normal, not a failure state" convention for bulk operations.
-// Registered ahead of POST /:id/distribute purely for readability — the
-// two paths don't actually collide (one segment vs. two), unlike
-// DELETE /drafts above, which genuinely needs to come first.
 router.post('/distribute-all', manage, (req, res) => {
   const shareholders = db
     .prepare('SELECT * FROM shareholders WHERE active = 1 AND ownership_percent > 0 ORDER BY name COLLATE NOCASE')

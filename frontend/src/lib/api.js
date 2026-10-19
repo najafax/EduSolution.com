@@ -289,14 +289,6 @@ export const api = {
     // Distributes every eligible draft in one call. See routes/deals.js's
     // own POST /distribute-all.
     distributeAll: (token) => request('/deals/distribute-all', { method: 'POST', token }),
-    // TEMPORARY — see routes/deals.js's own DELETE /drafts. Bulk-clears
-    // test/draft records; never touches an already-distributed deal.
-    removeDrafts: (token) => request('/deals/drafts', { method: 'DELETE', token }),
-    // TEMPORARY — see routes/deals.js's own DELETE /distributed. Bulk-clears
-    // test *distributed* records: deletes each one's linked expense/
-    // owner_draws payout rows too, fully reversing its effect on bankBalance,
-    // then the deal itself.
-    removeDistributed: (token) => request('/deals/distributed', { method: 'DELETE', token }),
   },
 
   // Backs pages/business/SupplierCosts.jsx — an automatic, month/year
