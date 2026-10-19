@@ -92,4 +92,13 @@ function textToHtml(text) {
     .join('');
 }
 
-module.exports = { sendMail, textToHtml, escapeHtml };
+// True when ANY transport is configured (Resend's API key, or raw SMTP).
+// The automated jobs and staff notifications gate on this rather than on
+// SMTP_HOST alone: a deployment using Resend (as production does, since the
+// droplet blocks outbound SMTP) has no SMTP_HOST, and gating on it silently
+// disabled every automated email.
+function isEmailConfigured() {
+  return Boolean(process.env.RESEND_API_KEY || process.env.SMTP_HOST);
+}
+
+module.exports = { sendMail, textToHtml, escapeHtml, isEmailConfigured };

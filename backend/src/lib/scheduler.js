@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { renderInvoicePdf } = require('./pdf');
 const { renderProfitLossPdf } = require('./reportPdf');
-const { sendMail, textToHtml } = require('./mailer');
+const { sendMail, textToHtml, isEmailConfigured } = require('./mailer');
 const { computeTotals } = require('./totals');
 const { nextInvoiceNumber } = require('./numbering');
 const { runBackup } = require('./backup');
@@ -57,7 +57,7 @@ function dunningStage(overdueDays) {
 // Exported separately from the cron registration so it can be invoked
 // directly (tests, or a future manual "run now" route).
 async function runOverdueReminders() {
-  if (!process.env.SMTP_HOST) {
+  if (!isEmailConfigured()) {
     console.log('[reminders] SMTP not configured, skipping automated overdue reminders');
     return { sent: 0, skipped: true };
   }
@@ -88,6 +88,7 @@ async function runOverdueReminders() {
   for (const invoice of candidates) {
     try {
       const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(invoice.client_id);
+      if (!client?.email) continue; // nobody to send to
       const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order').all(invoice.id);
       const balanceDue = Math.round((invoice.total - invoice.amount_paid) * 100) / 100;
       const overdueDays = daysOverdue(invoice.due_date);
@@ -160,7 +161,7 @@ async function notifyStaffOfReminders(reminded, settings) {
 // (there's no license document to render, unlike an invoice), just the
 // templated reminder text.
 async function runLicenseExpiryAlerts() {
-  if (!process.env.SMTP_HOST) {
+  if (!isEmailConfigured()) {
     console.log('[license-alerts] SMTP not configured, skipping automated license expiry alerts');
     return { sent: 0, skipped: true };
   }
@@ -182,6 +183,7 @@ async function runLicenseExpiryAlerts() {
   for (const license of candidates) {
     try {
       const client = { name: license.client_name, email: license.client_email };
+      if (!client.email) continue; // nobody to send to
       const { subject, message } = licenseRemindEmail({ license, client, settings });
       await sendMail({ to: client.email, subject, html: textToHtml(message) });
 
@@ -213,7 +215,7 @@ async function runLicenseExpiryAlerts() {
 // this is an internal staff notification, not a client-facing send, so it
 // has no place in the Email Center's sent log.
 async function runMonthlyReport() {
-  if (!process.env.SMTP_HOST) {
+  if (!isEmailConfigured()) {
     console.log('[monthly-report] SMTP not configured, skipping automated monthly report');
     return { sent: 0, skipped: true };
   }
