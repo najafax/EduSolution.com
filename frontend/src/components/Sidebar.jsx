@@ -25,6 +25,7 @@ import {
   GlobeIcon,
   TrendDownIcon,
   FacebookIcon,
+  ClockIcon,
 } from './icons';
 
 // One icon per BUSINESS_LINKS entry (see Navbar.jsx) — a few modules
@@ -49,6 +50,7 @@ export const LINK_ICONS = {
   '/shareholders': UsersIcon,
   '/profit-distribution': BankIcon,
   '/supplier-costs': TrendDownIcon,
+  '/receivables': ClockIcon,
   '/reports': ReportIcon,
   '/activity': HistoryIcon,
   '/users': UsersIcon,
