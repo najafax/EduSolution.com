@@ -89,3 +89,34 @@ test('quotes: only draft/sent/accepted quotes convert, once, atomically', async 
   assert.equal(ok.status, 201);
   assert.equal((await post(`/quotes/${ctx.quote.id}/convert-to-invoice`, { due_date: today() })).status, 409);
 });
+
+test('import: calendar-invalid dates and bare years are rejected, amounts rounded to cents', async () => {
+  const csv = [
+    'description,category,amount,expense_date',
+    'Bad calendar day,rent,10,2026-02-31',
+    'Bare year,rent,10,2026',
+    'Good,rent,"10.005",2026-02-28',
+  ].join('\n');
+  const r = await post('/import/expenses', { csv, commit: false });
+  assert.equal(r.status, 200);
+  const status = r.data.results.map((x) => x.status);
+  assert.deepEqual(status, ['error', 'error', 'ok']);
+  const commit = await post('/import/expenses', { csv, commit: true });
+  assert.equal(commit.data.imported, 1);
+  const d = srv.db();
+  const row = d.prepare("SELECT amount FROM expenses WHERE description = 'Good'").get();
+  d.close();
+  assert.equal(row.amount, 10.01);
+});
+
+test('invoices/quotes: date order enforced; PUT cannot change status', async () => {
+  const items = [{ description: 'Thing', quantity: 1, unit_price: 10 }];
+  const bad = await post('/invoices', { client_id: ctx.client.id, issue_date: '2026-05-10', due_date: '2026-05-01', items });
+  assert.equal(bad.status, 400);
+  const badQ = await post('/quotes', { client_id: ctx.client.id, issue_date: '2026-05-10', expiry_date: '2026-05-01', items });
+  assert.equal(badQ.status, 400);
+  const inv = (await post('/invoices', { client_id: ctx.client.id, issue_date: today(), due_date: today(), items })).data.invoice;
+  const put = await srv.api('PUT', `/invoices/${inv.id}`, { client_id: ctx.client.id, issue_date: today(), due_date: today(), items, status: 'sent' }, boss);
+  assert.equal(put.status, 200);
+  assert.equal(put.data.invoice.status, 'draft');
+});

@@ -268,7 +268,8 @@ router.post('/', manage, (req, res) => {
   if (!client_id || !issue_date) {
     return res.status(400).json({ error: 'client_id and issue_date are required' });
   }
-  const quoteDateError = dateError(issue_date, 'issue_date') || (expiry_date ? dateError(expiry_date, 'expiry_date') : null);
+  const quoteDateError = dateError(issue_date, 'issue_date') || (expiry_date ? dateError(expiry_date, 'expiry_date') : null)
+    || (expiry_date && expiry_date < issue_date ? 'expiry_date cannot be before issue_date' : null);
   if (quoteDateError) return res.status(400).json({ error: quoteDateError });
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
@@ -338,7 +339,8 @@ router.put('/:id', manage, (req, res) => {
   if (!client_id || !issue_date) {
     return res.status(400).json({ error: 'client_id and issue_date are required' });
   }
-  const quoteDateError = dateError(issue_date, 'issue_date') || (expiry_date ? dateError(expiry_date, 'expiry_date') : null);
+  const quoteDateError = dateError(issue_date, 'issue_date') || (expiry_date ? dateError(expiry_date, 'expiry_date') : null)
+    || (expiry_date && expiry_date < issue_date ? 'expiry_date cannot be before issue_date' : null);
   if (quoteDateError) return res.status(400).json({ error: quoteDateError });
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
@@ -350,7 +352,8 @@ router.put('/:id', manage, (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 
-  const validStatuses = ['draft', 'sent', 'accepted', 'declined', 'expired', 'void'];
+  // 'void' is deliberately absent: voiding needs a reason (POST /:id/void).
+  const validStatuses = ['draft', 'sent', 'accepted', 'declined', 'expired'];
   const nextStatus = validStatuses.includes(status) ? status : existing.status;
 
   db.prepare(
