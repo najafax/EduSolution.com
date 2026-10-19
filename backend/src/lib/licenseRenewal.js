@@ -1,15 +1,11 @@
 const db = require('../db');
+const { addMonths, addYears } = require('./businessDate');
 
 // Same month-end-clamped billing-cycle math lib/scheduler.js's own
 // advanceDate() applies for recurring invoices (e.g. Jan 31 + monthly
 // clamps to Feb 28/29 instead of rolling into March).
 function advanceExpiry(dateStr, cycle) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  const originalDay = d.getDate();
-  if (cycle === 'yearly') d.setFullYear(d.getFullYear() + 1);
-  else d.setMonth(d.getMonth() + 1); // monthly, the default
-  if (d.getDate() !== originalDay) d.setDate(0);
-  return d.toISOString().slice(0, 10);
+  return cycle === 'yearly' ? addYears(dateStr, 1) : addMonths(dateStr, 1); // monthly, the default
 }
 
 // The one place a license actually gets renewed — extends expiry_date by

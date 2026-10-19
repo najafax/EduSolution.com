@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { todayStr } = require('../lib/businessDate');
+const { todayStr, addDays } = require('../lib/businessDate');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -14,6 +14,7 @@ const {
 } = require('../middleware/rateLimit');
 const { sendMail } = require('../lib/mailer');
 const { renderQuotePdf, renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
+const { clientForClient, invoiceForClient, quoteForClient } = require('../lib/clientView');
 const { logActivity } = require('../lib/activity');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
 const { notifyStaffOfPaymentProof } = require('../lib/paymentProofNotify');
@@ -235,7 +236,7 @@ function withComputedInvoice(invoice) {
 // — keep both in sync.
 const EXPIRY_WARNING_DAYS = 30;
 function warningDate() {
-  return new Date(Date.now() + EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return addDays(todayStr(), EXPIRY_WARNING_DAYS);
 }
 function withComputedLicense(license) {
   let displayStatus = license.status;
@@ -296,8 +297,10 @@ router.get('/quotes', requireClientAuth, (req, res) => {
   const quotes = db
     .prepare(`SELECT * FROM quotes WHERE client_id = ? AND ${CLIENT_VISIBLE_QUOTE} ORDER BY issue_date DESC, id DESC`)
     .all(req.clientAccount.client_id);
-  res.json({ quotes });
+  res.json({ quotes: quotes.map(quoteForClient) });
 });
+
+const clientQuoteResponse = (d) => ({ ...d, quote: quoteForClient(d.quote), client: clientForClient(d.client) });
 
 function getClientQuote(clientId, id) {
   const quote = db.prepare(`SELECT * FROM quotes WHERE id = ? AND client_id = ? AND ${CLIENT_VISIBLE_QUOTE}`).get(id, clientId);
@@ -312,7 +315,7 @@ router.get('/quotes/:id', requireClientAuth, (req, res) => {
   if (!data) return res.status(404).json({ error: 'Quote not found' });
   markViewed('quotes', data.quote.id);
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
-  res.json({ ...data, settings: publicSettings(settings) });
+  res.json({ ...data, quote: quoteForClient(data.quote), client: clientForClient(data.client), settings: publicSettings(settings) });
 });
 
 // Same accept/decline contract as routes/public.js's own
@@ -327,6 +330,9 @@ router.post('/quotes/:id/respond', requireClientAuth, (req, res) => {
   if (!data) return res.status(404).json({ error: 'Quote not found' });
   if (!['draft', 'sent'].includes(data.quote.status)) {
     return res.status(409).json({ error: `This quote has already been ${data.quote.status}` });
+  }
+  if (data.quote.expiry_date && data.quote.expiry_date < todayStr()) {
+    return res.status(409).json({ error: 'This quote has expired. Please contact us for an updated quote.' });
   }
 
   const { response } = req.body || {};
@@ -354,7 +360,7 @@ router.post('/quotes/:id/respond', requireClientAuth, (req, res) => {
     );
   }
 
-  res.json(getClientQuote(req.clientAccount.client_id, req.params.id));
+  res.json(clientQuoteResponse(getClientQuote(req.clientAccount.client_id, req.params.id)));
 });
 
 router.get('/quotes/:id/pdf', requireClientAuth, async (req, res) => {
@@ -372,14 +378,15 @@ router.get('/quotes/:id/pdf', requireClientAuth, async (req, res) => {
 
 router.get('/invoices', requireClientAuth, (req, res) => {
   const invoices = db
-    .prepare('SELECT * FROM invoices WHERE client_id = ? ORDER BY issue_date DESC, id DESC')
+    .prepare("SELECT * FROM invoices WHERE client_id = ? AND status != 'draft' ORDER BY issue_date DESC, id DESC")
     .all(req.clientAccount.client_id)
-    .map(withComputedInvoice);
+    .map(withComputedInvoice)
+    .map(invoiceForClient);
   res.json({ invoices });
 });
 
 function getClientInvoice(clientId, id) {
-  const invoice = db.prepare('SELECT * FROM invoices WHERE id = ? AND client_id = ?').get(id, clientId);
+  const invoice = db.prepare("SELECT * FROM invoices WHERE id = ? AND client_id = ? AND status != 'draft'").get(id, clientId);
   if (!invoice) return null;
   const items = db.prepare(`SELECT ${CLIENT_ITEM_COLUMNS} FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order`).all(invoice.id);
   const payments = db.prepare('SELECT * FROM payments WHERE invoice_id = ? ORDER BY paid_at').all(invoice.id);
@@ -395,7 +402,7 @@ router.get('/invoices/:id', requireClientAuth, (req, res) => {
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   markViewed('invoices', data.invoice.id);
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
-  res.json({ ...data, settings: publicSettings(settings) });
+  res.json({ ...data, invoice: invoiceForClient(data.invoice), client: clientForClient(data.client), settings: publicSettings(settings) });
 });
 
 const PAYMENT_PROOF_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
@@ -419,7 +426,7 @@ const PAYMENT_PROOF_MAX_BYTES = 6 * 1024 * 1024;
 // to pay (balance_due <= 0) or is void — there's nothing to prove payment
 // of at that point.
 router.post('/invoices/:id/payment-proof', requireClientAuth, (req, res) => {
-  const invoice = db.prepare('SELECT * FROM invoices WHERE id = ? AND client_id = ?').get(req.params.id, req.clientAccount.client_id);
+  const invoice = db.prepare("SELECT * FROM invoices WHERE id = ? AND client_id = ? AND status != 'draft'").get(req.params.id, req.clientAccount.client_id);
   if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
   if (invoice.status === 'void') return res.status(409).json({ error: 'This invoice has been voided' });
   const balanceDue = Math.round((invoice.total - invoice.amount_paid) * 100) / 100;

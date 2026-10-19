@@ -7,6 +7,7 @@ const { computeTotals } = require('../lib/totals');
 const { invoiceNumberForYear, quoteNumberForYear, receiptNumberForYear } = require('../lib/numbering');
 const { logActivity } = require('../lib/activity');
 const { advanceExpiry } = require('../lib/licenseRenewal');
+const { isValidDate } = require('../lib/validate');
 
 const router = Router();
 router.use(requireAuth);
@@ -34,6 +35,13 @@ function addDays(dateStr, days) {
 function parseNumber(value) {
   if (value == null) return NaN;
   return Number(String(value).trim().replace(/[$,]/g, ''));
+}
+
+// Money columns are stored to the cent; round at the door so 10.005-style
+// spreadsheet values cannot leave sub-cent residue in totals.
+function parseMoney(value) {
+  const n = parseNumber(value);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : n;
 }
 
 function toIsoIfValid(year, month, day) {
@@ -70,11 +78,14 @@ const AMBIGUOUS_DATE_RE = /^(\d{1,4})[/.\-](\d{1,2})[/.\-](\d{1,4})$/;
 function normalizeDate(raw, format = 'day-first') {
   const value = (raw || '').trim();
   if (!value) return null;
-  if (DATE_RE.test(value)) return value;
+  // A canonical-looking date must also be a real calendar day (2026-02-31 is not).
+  if (DATE_RE.test(value)) return isValidDate(value) ? value : null;
 
+  // Spreadsheet serial dates are 5 digits for 1954-2119; shorter/longer bare
+  // numbers (a year like 2026, a phone-number-ish value) are not dates.
   if (/^\d{4,6}$/.test(value)) {
     const serial = Number(value);
-    if (serial > 0) {
+    if (serial >= 20000 && serial <= 80000) {
       const epoch = Date.UTC(1899, 11, 30);
       const d = new Date(epoch + serial * 86400000);
       if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
@@ -202,7 +213,7 @@ function processClients(rows, commit) {
 function validateExpenseRow(row, dateFormat) {
   const description = (row.description || '').trim();
   const category = (row.category || 'other').trim().toLowerCase() || 'other';
-  const amount = parseNumber(row.amount);
+  const amount = parseMoney(row.amount);
   const expense_date = normalizeDate(row.expense_date, dateFormat);
 
   if (!description) return { ok: false, message: 'description is required' };
@@ -313,7 +324,7 @@ function validateInvoiceRow(row, clientsByEmail, clientsByName, dateFormat) {
   const dueDate = dueDateRaw ? normalizeDate(dueDateRaw, dateFormat) : addDays(issueDate, 14);
   if (!dueDate) return { ok: false, message: 'due_date must be a valid date (e.g. YYYY-MM-DD)' };
 
-  const amount = parseNumber(row.amount);
+  const amount = parseMoney(row.amount);
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: 'amount must be a positive number' };
 
   const taxRate = row.tax_rate ? parseNumber(row.tax_rate) : 0;
@@ -340,7 +351,7 @@ function validateInvoiceRow(row, clientsByEmail, clientsByName, dateFormat) {
   // for a historical export that only records final status, not a
   // separate payment amount that would just repeat the invoice total.
   const amountPaidGiven = (row.amount_paid || '').trim() !== '';
-  const amountPaid = amountPaidGiven ? parseNumber(row.amount_paid) : status === 'paid' ? totals.total : 0;
+  const amountPaid = amountPaidGiven ? parseMoney(row.amount_paid) : status === 'paid' ? totals.total : 0;
   if (!Number.isFinite(amountPaid) || amountPaid < 0) return { ok: false, message: 'amount_paid must be a non-negative number' };
   if (amountPaid > totals.total) {
     return { ok: false, message: `amount_paid (${amountPaid}) cannot exceed the invoice total (${totals.total})` };
@@ -489,7 +500,7 @@ function validateQuoteRow(row, clientsByEmail, clientsByName, dateFormat) {
   const expiryDate = expiryDateRaw ? normalizeDate(expiryDateRaw, dateFormat) : addDays(issueDate, 30);
   if (!expiryDate) return { ok: false, message: 'expiry_date must be a valid date (e.g. YYYY-MM-DD)' };
 
-  const amount = parseNumber(row.amount);
+  const amount = parseMoney(row.amount);
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: 'amount must be a positive number' };
 
   const taxRate = row.tax_rate ? parseNumber(row.tax_rate) : 0;
@@ -626,7 +637,7 @@ function validateLicenseRow(row, clientsByEmail, clientsByName, dateFormat) {
   if (expiryDate < startDate) return { ok: false, message: 'expiry_date cannot be before start_date' };
 
   const amountRaw = (row.amount || '').trim();
-  const amount = amountRaw ? parseNumber(row.amount) : 0;
+  const amount = amountRaw ? parseMoney(row.amount) : 0;
   if (!Number.isFinite(amount) || amount < 0) return { ok: false, message: 'amount must be a non-negative number' };
 
   // 'expiring_soon'/'expired' aren't real stored values — they're
@@ -869,7 +880,7 @@ function validateProductRow(row) {
   const name = (row.name || '').trim();
   if (!name) return { ok: false, message: 'name is required' };
 
-  const unitPrice = parseNumber(row.unit_price);
+  const unitPrice = parseMoney(row.unit_price);
   if (!Number.isFinite(unitPrice) || unitPrice < 0) {
     return { ok: false, message: 'unit_price must be a non-negative number' };
   }

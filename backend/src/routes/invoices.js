@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { dateError, round2: roundCents } = require('../lib/validate');
 const { stampItemCosts } = require('../lib/costSnapshot');
-const { todayStr } = require('../lib/businessDate');
+const { todayStr, businessYear } = require('../lib/businessDate');
 const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
@@ -247,7 +247,7 @@ router.get('/analytics', view, (req, res) => {
     const payments = db.prepare('SELECT invoice_id, amount, paid_at FROM payments').all();
     const voidEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'invoice' AND action = 'voided'").all();
 
-    const currentYear = new Date().getFullYear();
+    const currentYear = businessYear();
     // See routes/expenses.js's own GET /analytics for why this can't be a
     // bare `dateStr.slice(0, 4)` — a blank/malformed date (a pre-validation
     // row, a direct DB edit) would otherwise either throw or, worse, silently
@@ -328,7 +328,8 @@ router.post('/', manage, (req, res) => {
   if (!client_id || !issue_date || !due_date) {
     return res.status(400).json({ error: 'client_id, issue_date and due_date are required' });
   }
-  const invoiceDateError = dateError(issue_date, 'issue_date') || dateError(due_date, 'due_date');
+  const invoiceDateError = dateError(issue_date, 'issue_date') || dateError(due_date, 'due_date')
+    || (due_date < issue_date ? 'due_date cannot be before issue_date' : null);
   if (invoiceDateError) return res.status(400).json({ error: invoiceDateError });
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
@@ -400,7 +401,8 @@ router.put('/:id', manage, (req, res) => {
   if (!client_id || !issue_date || !due_date) {
     return res.status(400).json({ error: 'client_id, issue_date and due_date are required' });
   }
-  const invoiceDateError = dateError(issue_date, 'issue_date') || dateError(due_date, 'due_date');
+  const invoiceDateError = dateError(issue_date, 'issue_date') || dateError(due_date, 'due_date')
+    || (due_date < issue_date ? 'due_date cannot be before issue_date' : null);
   if (invoiceDateError) return res.status(400).json({ error: invoiceDateError });
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
@@ -416,8 +418,10 @@ router.put('/:id', manage, (req, res) => {
     return res.status(409).json({ error: 'New total cannot be less than the amount already paid on this invoice' });
   }
 
-  const validStatuses = ['draft', 'sent', 'void'];
-  const nextStatus = validStatuses.includes(status) ? status : existing.status;
+  // Status only changes through the dedicated actions (send, void, recover,
+  // record payment) — never by editing the document — so a draft cannot be
+  // flipped to "sent" (or voided without a reason) by a crafted PUT.
+  const nextStatus = existing.status;
 
   db.prepare(
     `UPDATE invoices SET client_id = ?, status = ?, issue_date = ?, due_date = ?, notes = ?, po_number = ?,

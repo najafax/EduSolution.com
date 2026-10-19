@@ -74,7 +74,16 @@ const portalAcceptInviteLimiter = rateLimit({
   handler: jsonHandler('Too many attempts. Please request a new invite link.'),
 });
 
+// Public quote accept/decline links are unauthenticated writes.
+const publicRespondLimiter = rateLimit({
+  ...base,
+  windowMs: 60 * 60 * 1000,
+  limit: 30,
+  handler: jsonHandler('Too many attempts. Please try again later.'),
+});
+
 module.exports = {
+  publicRespondLimiter,
   loginLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,

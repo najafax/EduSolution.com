@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { dateError } = require('../lib/validate');
 const { stampItemCosts } = require('../lib/costSnapshot');
-const { todayStr } = require('../lib/businessDate');
+const { todayStr, businessYear } = require('../lib/businessDate');
 const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
@@ -185,7 +185,7 @@ router.get('/analytics', view, (req, res) => {
     const convertedEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'quote' AND action = 'converted to invoice'").all();
 
     const decidedAt = (q) => q.client_responded_at || q.updated_at;
-    const currentYear = new Date().getFullYear();
+    const currentYear = businessYear();
     // See routes/expenses.js's own GET /analytics for why this can't be a
     // bare `dateStr.slice(0, 4)` — a blank/malformed date would otherwise
     // either throw or silently compute as year 0 and blow the loop below out
@@ -268,7 +268,8 @@ router.post('/', manage, (req, res) => {
   if (!client_id || !issue_date) {
     return res.status(400).json({ error: 'client_id and issue_date are required' });
   }
-  const quoteDateError = dateError(issue_date, 'issue_date') || (expiry_date ? dateError(expiry_date, 'expiry_date') : null);
+  const quoteDateError = dateError(issue_date, 'issue_date') || (expiry_date ? dateError(expiry_date, 'expiry_date') : null)
+    || (expiry_date && expiry_date < issue_date ? 'expiry_date cannot be before issue_date' : null);
   if (quoteDateError) return res.status(400).json({ error: quoteDateError });
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
@@ -338,7 +339,8 @@ router.put('/:id', manage, (req, res) => {
   if (!client_id || !issue_date) {
     return res.status(400).json({ error: 'client_id and issue_date are required' });
   }
-  const quoteDateError = dateError(issue_date, 'issue_date') || (expiry_date ? dateError(expiry_date, 'expiry_date') : null);
+  const quoteDateError = dateError(issue_date, 'issue_date') || (expiry_date ? dateError(expiry_date, 'expiry_date') : null)
+    || (expiry_date && expiry_date < issue_date ? 'expiry_date cannot be before issue_date' : null);
   if (quoteDateError) return res.status(400).json({ error: quoteDateError });
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
@@ -350,7 +352,8 @@ router.put('/:id', manage, (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 
-  const validStatuses = ['draft', 'sent', 'accepted', 'declined', 'expired', 'void'];
+  // 'void' is deliberately absent: voiding needs a reason (POST /:id/void).
+  const validStatuses = ['draft', 'sent', 'accepted', 'declined', 'expired'];
   const nextStatus = validStatuses.includes(status) ? status : existing.status;
 
   db.prepare(
@@ -507,57 +510,64 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
   if (data.quote.converted_invoice_id) {
     return res.status(409).json({ error: 'This quote has already been converted to an invoice' });
   }
+  if (!['draft', 'sent', 'accepted'].includes(data.quote.status)) {
+    return res.status(409).json({ error: `A ${data.quote.status} quote cannot be converted to an invoice` });
+  }
 
   const { due_date, po_number = '' } = req.body || {};
   if (!due_date) return res.status(400).json({ error: 'due_date is required' });
   const dueError = dateError(due_date, 'due_date');
   if (dueError) return res.status(400).json({ error: dueError });
 
-  const number = nextInvoiceNumber();
-  const publicToken = crypto.randomBytes(16).toString('hex');
-  const issueDate = todayStr();
+  const convert = db.transaction(() => {
+    const number = nextInvoiceNumber();
+    const publicToken = crypto.randomBytes(16).toString('hex');
+    const issueDate = todayStr();
 
-  const result = db
-    .prepare(
-      `INSERT INTO invoices (number, client_id, quote_id, status, issue_date, due_date, notes, discount_type, discount_value,
-         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name, po_number)
-       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      number,
-      data.quote.client_id,
-      data.quote.id,
-      issueDate,
-      due_date,
-      data.quote.notes,
-      data.quote.discount_type,
-      data.quote.discount_value,
-      data.quote.subtotal,
-      data.quote.discount_amount,
-      data.quote.tax_rate,
-      data.quote.tax_amount,
-      data.quote.total,
-      publicToken,
-      req.user.name,
-      po_number,
+    const result = db
+      .prepare(
+        `INSERT INTO invoices (number, client_id, quote_id, status, issue_date, due_date, notes, discount_type, discount_value,
+           subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name, po_number)
+         VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        number,
+        data.quote.client_id,
+        data.quote.id,
+        issueDate,
+        due_date,
+        data.quote.notes,
+        data.quote.discount_type,
+        data.quote.discount_value,
+        data.quote.subtotal,
+        data.quote.discount_amount,
+        data.quote.tax_rate,
+        data.quote.tax_amount,
+        data.quote.total,
+        publicToken,
+        req.user.name,
+        po_number,
+      );
+
+    const insertItem = db.prepare(
+      'INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order, product_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
     );
+    for (const item of data.items) {
+      insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order, item.product_id ?? null);
+    }
+    stampItemCosts(result.lastInsertRowid);
 
-  const insertItem = db.prepare(
-    'INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order, product_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  );
-  for (const item of data.items) {
-    insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order, item.product_id ?? null);
-  }
-  stampItemCosts(result.lastInsertRowid);
-
-  db.prepare(`UPDATE quotes SET converted_invoice_id = ?, status = 'accepted', updated_at = datetime('now') WHERE id = ?`).run(
-    result.lastInsertRowid,
-    req.params.id,
-  );
+    db.prepare(`UPDATE quotes SET converted_invoice_id = ?, status = 'accepted', updated_at = datetime('now') WHERE id = ?`).run(
+      result.lastInsertRowid,
+      req.params.id,
+    );
+    return { lastInsertRowid: result.lastInsertRowid, number };
+  });
+  const { lastInsertRowid, number: invoiceNumber } = convert();
 
   logActivity({ userName: req.user.name, action: 'converted to invoice', entityType: 'quote', entityId: data.quote.id, entityLabel: data.quote.number });
 
-  res.status(201).json({ invoiceId: result.lastInsertRowid, invoiceNumber: number });
+  res.status(201).json({ invoiceId: lastInsertRowid, invoiceNumber });
 });
 
 module.exports = router;

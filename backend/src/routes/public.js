@@ -4,6 +4,8 @@ const db = require('../db');
 const { CLIENT_ITEM_COLUMNS } = require('../lib/costSnapshot');
 const { renderQuotePdf, renderInvoicePdf } = require('../lib/pdf');
 const { logActivity } = require('../lib/activity');
+const { publicRespondLimiter } = require('../middleware/rateLimit');
+const { clientForClient, invoiceForClient, quoteForClient } = require('../lib/clientView');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
 
 const router = Router();
@@ -40,6 +42,9 @@ function publicSettings(settings) {
 // below, never request input, so the interpolation here carries no
 // injection risk — same as routes/dataReset.js's own table-name-from-a-
 // fixed-map pattern.
+const clientQuoteView = (d) => ({ ...d, quote: quoteForClient(d.quote), client: clientForClient(d.client) });
+const clientInvoiceView = (d) => ({ ...d, invoice: invoiceForClient(d.invoice), client: clientForClient(d.client) });
+
 function markViewed(table, id) {
   db.prepare(`UPDATE ${table} SET client_viewed_at = datetime('now') WHERE id = ? AND client_viewed_at IS NULL`).run(id);
 }
@@ -54,7 +59,8 @@ function getQuoteByToken(token) {
 
 function getInvoiceByToken(token) {
   const invoice = db.prepare('SELECT * FROM invoices WHERE public_token = ?').get(token);
-  if (!invoice) return null;
+  // A draft has not been issued to the client yet.
+  if (!invoice || invoice.status === 'draft') return null;
   const items = db.prepare(`SELECT ${CLIENT_ITEM_COLUMNS} FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order`).all(invoice.id);
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(invoice.client_id);
   return { invoice: withComputedInvoice(invoice), items, client };
@@ -65,14 +71,18 @@ router.get('/quotes/:token', (req, res) => {
   if (!data) return res.status(404).json({ error: 'Quote not found' });
   markViewed('quotes', data.quote.id);
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
-  res.json({ ...data, settings: publicSettings(settings) });
+  res.json({ ...clientQuoteView(data), settings: publicSettings(settings) });
 });
 
-router.post('/quotes/:token/respond', (req, res) => {
+router.post('/quotes/:token/respond', publicRespondLimiter, (req, res) => {
   const data = getQuoteByToken(req.params.token);
   if (!data) return res.status(404).json({ error: 'Quote not found' });
   if (!['draft', 'sent'].includes(data.quote.status)) {
     return res.status(409).json({ error: `This quote has already been ${data.quote.status}` });
+  }
+
+  if (data.quote.expiry_date && data.quote.expiry_date < todayStr()) {
+    return res.status(409).json({ error: 'This quote has expired. Please contact us for an updated quote.' });
   }
 
   const { response } = req.body || {};
@@ -100,7 +110,7 @@ router.post('/quotes/:token/respond', (req, res) => {
     );
   }
 
-  res.json(getQuoteByToken(req.params.token));
+  res.json(clientQuoteView(getQuoteByToken(req.params.token)));
 });
 
 router.get('/quotes/:token/pdf', async (req, res) => {
@@ -121,7 +131,7 @@ router.get('/invoices/:token', (req, res) => {
   if (!data) return res.status(404).json({ error: 'Invoice not found' });
   markViewed('invoices', data.invoice.id);
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
-  res.json({ ...data, settings: publicSettings(settings) });
+  res.json({ ...clientInvoiceView(data), settings: publicSettings(settings) });
 });
 
 router.get('/invoices/:token/pdf', async (req, res) => {

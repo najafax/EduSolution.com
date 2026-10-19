@@ -9,7 +9,8 @@ function toCsv(rows, columns) {
     // Free-text fields (client/expense/quote/invoice names and notes) are
     // attacker-controllable by any staff member with just that module's
     // `manage` permission, so prefix with a leading quote to force text mode.
-    const guarded = /^[=+\-@]/.test(str) ? `'${str}` : str;
+    // Real numbers (e.g. a negative balance) are not text and must stay numeric.
+    const guarded = typeof val !== 'number' && /^[=+\-@]/.test(str) ? `'${str}` : str;
     return /[",\n]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
   };
   const header = columns.map((c) => escape(c.label)).join(',');
