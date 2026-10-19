@@ -4,6 +4,7 @@ const db = require('../db');
 const { CLIENT_ITEM_COLUMNS } = require('../lib/costSnapshot');
 const { renderQuotePdf, renderInvoicePdf } = require('../lib/pdf');
 const { logActivity } = require('../lib/activity');
+const { publicRespondLimiter } = require('../middleware/rateLimit');
 const { clientForClient, invoiceForClient, quoteForClient } = require('../lib/clientView');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
 
@@ -73,11 +74,15 @@ router.get('/quotes/:token', (req, res) => {
   res.json({ ...clientQuoteView(data), settings: publicSettings(settings) });
 });
 
-router.post('/quotes/:token/respond', (req, res) => {
+router.post('/quotes/:token/respond', publicRespondLimiter, (req, res) => {
   const data = getQuoteByToken(req.params.token);
   if (!data) return res.status(404).json({ error: 'Quote not found' });
   if (!['draft', 'sent'].includes(data.quote.status)) {
     return res.status(409).json({ error: `This quote has already been ${data.quote.status}` });
+  }
+
+  if (data.quote.expiry_date && data.quote.expiry_date < todayStr()) {
+    return res.status(409).json({ error: 'This quote has expired. Please contact us for an updated quote.' });
   }
 
   const { response } = req.body || {};

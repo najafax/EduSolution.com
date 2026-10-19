@@ -331,6 +331,9 @@ router.post('/quotes/:id/respond', requireClientAuth, (req, res) => {
   if (!['draft', 'sent'].includes(data.quote.status)) {
     return res.status(409).json({ error: `This quote has already been ${data.quote.status}` });
   }
+  if (data.quote.expiry_date && data.quote.expiry_date < todayStr()) {
+    return res.status(409).json({ error: 'This quote has expired. Please contact us for an updated quote.' });
+  }
 
   const { response } = req.body || {};
   if (!['accepted', 'declined'].includes(response)) {

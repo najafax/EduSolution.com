@@ -120,3 +120,21 @@ test('invoices/quotes: date order enforced; PUT cannot change status', async () 
   assert.equal(put.status, 200);
   assert.equal(put.data.invoice.status, 'draft');
 });
+
+test('public quote: cannot be accepted after expiry', async () => {
+  const q = (await post('/quotes', {
+    client_id: ctx.client.id, issue_date: '2020-01-01', expiry_date: '2020-02-01',
+    items: [{ description: 'Thing', quantity: 1, unit_price: 5 }],
+  })).data.quote;
+  const d = srv.db();
+  d.prepare("UPDATE quotes SET status = 'sent' WHERE id = ?").run(q.id);
+  d.close();
+  const r = await srv.api('POST', `/public/quotes/${q.public_token}/respond`, { response: 'accepted' });
+  assert.equal(r.status, 409);
+});
+
+test('csv: negative numbers stay numeric, text starting with = is guarded', () => {
+  const { toCsv } = require('../src/lib/csv');
+  const out = toCsv([{ a: -5, b: '=SUM(A1)' }], [{ label: 'A', key: 'a' }, { label: 'B', key: 'b' }]);
+  assert.equal(out.split('\r\n')[1], "-5,'=SUM(A1)");
+});

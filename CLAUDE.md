@@ -9726,3 +9726,13 @@ Result of a full read-only finance audit followed by fixes. Supersedes older not
 - **Receivables aging** `asOf` now reflects payments dated on or before `asOf` (running `amount_paid` minus later payments) and includes since-paid invoices, so a past snapshot is not rewritten.
 - **Business-date calendar**: `lib/businessDate.js` gained `businessYear`, `addDays`, `yesterdayStr`, `recentMonthKeys`, `previousMonthRange`; the 6-month trend, supplier-cost months, dashboard year/license window, monthly report range, daily report date and document numbering year use them instead of the server clock.
 - **Tests**: `cd backend && npm test` (Node's built-in runner). `test/units.test.js` covers totals, USD ledger, validators and calendar helpers; `test/api.test.js` boots the real API against a throwaway SQLite file (`test/helpers.js`) and covers the cost leak, payment validation/rounding/reversal, date validation, bank-balance reconciliation, deals/shareholder guards, aging and the USD account. Tests never touch `data.sqlite3`.
+
+### Second-pass audit hardening (branch `audit/second-pass`)
+
+- **Client-facing responses** (`routes/public.js`, `routes/clientPortal.js`) pass rows through `lib/clientView.js` (`clientForClient`/`invoiceForClient`/`quoteForClient`), which removes staff-only fields (client `notes`, `void_reason`, `reminder_hold_*`, `created_by_name`, …). Add any new internal column to `INTERNAL` there. Draft invoices are invisible to clients (public link 404, portal list/detail/payment-proof). Licence `notes` are still shown in the portal on purpose.
+- **Quote conversion** only allows draft/sent/accepted quotes and runs in one transaction. Public/portal quote accept is refused after `expiry_date`; the public respond route is rate limited.
+- **Dates**: `lib/businessDate.js` `addMonths`/`addYears` (pure UTC, month-end clamped) back `advanceExpiry` and the recurring `advanceDate`; recurring due dates and analytics years use the business calendar.
+- **Import**: calendar-invalid ISO dates and bare years are rejected, serial dates only 20000–80000, money columns rounded to cents. Invoice/quote create/edit reject due/expiry before issue date; `PUT /invoices/:id` can no longer change status.
+- PAID stamp date ignores reversal rows; `toCsv` leaves numbers (e.g. negatives) unguarded.
+- Not changed (needs a business decision): Profit Distribution's estimated exchange rate vs the USD ledger; the 12-month "still to buy" window.
+- Tests: `backend/test/api2.test.js` plus a timezone test in `units.test.js` (26 total).

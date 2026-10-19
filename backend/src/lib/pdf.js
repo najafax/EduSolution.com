@@ -943,7 +943,8 @@ function renderInvoicePdfMinimal({ invoice, client, items, settings, payments })
   const doc = newDoc();
   const symbol = settings.currency_symbol || '$';
   const balanceDue = invoice.total - invoice.amount_paid;
-  const paidDate = payments && payments.length ? payments[payments.length - 1].paid_at : null;
+  // Latest real payment: a reversal row (negative amount) is not when it was paid.
+  const paidDate = (payments || []).filter((p) => p.amount > 0).map((p) => p.paid_at).sort().pop() || null;
 
   let y = drawMinimalHeader(doc, {
     title: 'INVOICE',
@@ -1083,7 +1084,8 @@ function renderInvoicePdf({ invoice, client, items, settings, payments }) {
   // getInvoiceWithItems), so the last entry is whichever payment most
   // recently pushed this invoice's balance to zero — the date printed on
   // the PAID stamp below.
-  const paidDate = payments && payments.length ? payments[payments.length - 1].paid_at : null;
+  // Latest real payment: a reversal row (negative amount) is not when it was paid.
+  const paidDate = (payments || []).filter((p) => p.amount > 0).map((p) => p.paid_at).sort().pop() || null;
 
   let y = drawHeader(doc, {
     title: 'INVOICE',
