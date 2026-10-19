@@ -81,6 +81,21 @@ function saveDealItems(dealId, items) {
   });
 }
 
+// One paid invoice's revenue can only be split once: no two deals may link
+// the same invoice.
+function invoiceTakenBy(invoiceId, exceptDealId = 0) {
+  return db.prepare('SELECT id, description FROM deals WHERE invoice_id = ? AND id != ?').get(invoiceId, exceptDealId);
+}
+
+// Shareholder percentages that add up past 100% would pay out more than the
+// profit being split.
+function ownershipError(shareholders) {
+  const total = shareholders.reduce((sum, sh) => sum + sh.ownership_percent, 0);
+  return total > 100.0001
+    ? `Active shareholders' ownership adds up to ${round2(total)}% — it must not exceed 100% before profit can be distributed.`
+    : null;
+}
+
 function validate(body) {
   const { description, revenue_amount, exchange_rate, items } = body || {};
   if (!description || !description.trim()) return 'description is required';
@@ -166,6 +181,8 @@ router.post('/', manage, (req, res) => {
     const invoice = db.prepare('SELECT id FROM invoices WHERE id = ?').get(invoiceIdNum);
     if (!invoice) return res.status(400).json({ error: 'Linked invoice not found' });
   }
+  const takenPost = invoiceIdNum && invoiceTakenBy(invoiceIdNum);
+  if (takenPost) return res.status(409).json({ error: `That invoice is already linked to another record ("${takenPost.description}").` });
 
   const insertDeal = db.transaction(() => {
     const info = db
@@ -207,6 +224,8 @@ router.put('/:id', manage, (req, res) => {
     const invoice = db.prepare('SELECT id FROM invoices WHERE id = ?').get(invoiceIdNum);
     if (!invoice) return res.status(400).json({ error: 'Linked invoice not found' });
   }
+  const takenPut = invoiceIdNum && invoiceTakenBy(invoiceIdNum, Number(req.params.id));
+  if (takenPut) return res.status(409).json({ error: `That invoice is already linked to another record ("${takenPut.description}").` });
 
   const updateDeal = db.transaction(() => {
     db.prepare(
@@ -298,6 +317,12 @@ function eligibilityError(computedDeal) {
   if (!invoice || !(invoice.amount_paid > 0)) {
     return 'The invoice linked to this deal has no recorded payment yet — link one that\'s actually been paid before distributing.';
   }
+  const alreadyDistributed = db
+    .prepare("SELECT description FROM deals WHERE invoice_id = ? AND id != ? AND status = 'distributed'")
+    .get(computedDeal.invoice_id, computedDeal.id);
+  if (alreadyDistributed) {
+    return `This invoice's revenue was already distributed through another record ("${alreadyDistributed.description}").`;
+  }
   if (computedDeal.cost_usd_total > 0 && !(computedDeal.exchange_rate > 0)) {
     return 'Set an exchange rate before distributing — this deal has a supplier cost in USD to convert.';
   }
@@ -324,6 +349,9 @@ router.post('/:id/distribute', manage, (req, res) => {
       .status(400)
       .json({ error: 'No active shareholders have an ownership percentage set — add one on the Shareholders page first.' });
   }
+
+  const ownershipProblem = ownershipError(shareholders);
+  if (ownershipProblem) return res.status(400).json({ error: ownershipProblem });
 
   const today = todayStr();
   const distribute = db.transaction(() => distributeDeal(computed, shareholders, req.user.name, today));
@@ -357,6 +385,9 @@ router.post('/distribute-all', manage, (req, res) => {
       .status(400)
       .json({ error: 'No active shareholders have an ownership percentage set — add one on the Shareholders page first.' });
   }
+
+  const ownershipProblem = ownershipError(shareholders);
+  if (ownershipProblem) return res.status(400).json({ error: ownershipProblem });
 
   const drafts = db
     .prepare("SELECT * FROM deals WHERE status = 'draft' ORDER BY created_at, id")

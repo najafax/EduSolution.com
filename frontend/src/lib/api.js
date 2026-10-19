@@ -186,6 +186,8 @@ export const api = {
     clearReminderHold: (id, token) => request(`/invoices/${id}/reminder-hold`, { method: 'DELETE', token }),
     recordPayment: (id, payload, token) =>
       request(`/invoices/${id}/payments`, { method: 'POST', body: payload, token }),
+    reversePayment: (id, paymentId, reason, token) =>
+      request(`/invoices/${id}/payments/${paymentId}/reverse`, { method: 'POST', body: { reason }, token }),
     receiptPreview: (id, paymentId, token) =>
       request(`/invoices/${id}/payments/${paymentId}/receipt-preview`, { token }),
     sendReceipt: (id, paymentId, payload, token) =>

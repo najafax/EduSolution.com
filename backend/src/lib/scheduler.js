@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { stampItemCosts } = require('./costSnapshot');
-const { todayStr } = require('./businessDate');
+const { todayStr, addDays, previousMonthRange } = require('./businessDate');
 const crypto = require('crypto');
 const db = require('../db');
 const { renderInvoicePdf } = require('./pdf');
@@ -170,7 +170,7 @@ async function runLicenseExpiryAlerts() {
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
-  const warningDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const warningDate = addDays(todayStr(), 30);
 
   const candidates = db
     .prepare(
@@ -232,12 +232,8 @@ async function runMonthlyReport() {
   // month" has no data of its own yet. new Date(y, m, 0) is the last day
   // of month `m - 1` (JS Date's day-0 rollback trick, same one
   // advanceDate() above relies on for month-end clamping).
-  const now = new Date();
-  const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastMonthEnd = new Date(firstOfThisMonth.getTime() - 1);
-  const from = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1).toISOString().slice(0, 10);
-  const to = lastMonthEnd.toISOString().slice(0, 10);
-  const monthLabel = lastMonthEnd.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const { from, to, label } = previousMonthRange();
+  const monthLabel = label.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   const symbol = settings.currency_symbol || '$';

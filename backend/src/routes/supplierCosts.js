@@ -3,6 +3,7 @@ const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { replay, position } = require('../lib/usdLedger');
+const { businessYear, recentMonthKeys } = require('../lib/businessDate');
 
 // What the business owes suppliers in USD (how much, month by month), set
 // against the USD account (lib/usdLedger.js, routes/usdAccount.js) that pays
@@ -97,7 +98,7 @@ function resolvedSoldItemRows() {
 // derivable date is simply left out of the byMonth/byYear breakdown rather
 // than corrupting the range or throwing.
 function makeDateHelpers() {
-  const currentYear = new Date().getFullYear();
+  const currentYear = businessYear();
   const yearOf = (d) => {
     if (typeof d !== 'string' || d.length < 4) return null;
     const y = Number(d.slice(0, 4));
@@ -113,15 +114,7 @@ function makeDateHelpers() {
   return { currentYear, yearOf, monthOf };
 }
 
-function monthKeysTrailing(count) {
-  const now = new Date();
-  const keys = [];
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-  }
-  return keys;
-}
+const monthKeysTrailing = recentMonthKeys;
 
 function summarizeRows(rows) {
   const usdCost = round2(rows.reduce((sum, r) => sum + r.quantity * (r.resolvedCostPrice || 0), 0));

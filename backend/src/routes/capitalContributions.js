@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { round2: roundCents, dateError } = require('../lib/validate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
@@ -132,6 +133,8 @@ function validate(body) {
   if (!Number.isFinite(amountNum) || amountNum <= 0) {
     return 'amount must be a positive number';
   }
+  const badDate = dateError(contribution_date, 'contribution_date');
+  if (badDate) return badDate;
   return null;
 }
 
@@ -142,7 +145,7 @@ router.post('/', manage, (req, res) => {
   const { contributor_name, amount, contribution_date, notes = '' } = req.body;
   const result = db
     .prepare('INSERT INTO capital_contributions (contributor_name, amount, contribution_date, notes, created_by_name) VALUES (?, ?, ?, ?, ?)')
-    .run(contributor_name.trim(), Number(amount), contribution_date, notes, req.user.name);
+    .run(contributor_name.trim(), roundCents(amount), contribution_date, notes, req.user.name);
 
   const contribution = db.prepare('SELECT * FROM capital_contributions WHERE id = ?').get(result.lastInsertRowid);
   logActivity({
@@ -165,7 +168,7 @@ router.put('/:id', manage, (req, res) => {
   const { contributor_name, amount, contribution_date, notes = '' } = req.body;
   db.prepare(
     `UPDATE capital_contributions SET contributor_name = ?, amount = ?, contribution_date = ?, notes = ?, updated_at = datetime('now') WHERE id = ?`,
-  ).run(contributor_name.trim(), Number(amount), contribution_date, notes, req.params.id);
+  ).run(contributor_name.trim(), roundCents(amount), contribution_date, notes, req.params.id);
 
   const contribution = db.prepare('SELECT * FROM capital_contributions WHERE id = ?').get(req.params.id);
   logActivity({

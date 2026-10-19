@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { dateError } = require('../lib/validate');
 const { stampItemCosts } = require('../lib/costSnapshot');
 const { todayStr } = require('../lib/businessDate');
 const crypto = require('crypto');
@@ -267,6 +268,8 @@ router.post('/', manage, (req, res) => {
   if (!client_id || !issue_date) {
     return res.status(400).json({ error: 'client_id and issue_date are required' });
   }
+  const quoteDateError = dateError(issue_date, 'issue_date') || (expiry_date ? dateError(expiry_date, 'expiry_date') : null);
+  if (quoteDateError) return res.status(400).json({ error: quoteDateError });
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
 
@@ -335,6 +338,8 @@ router.put('/:id', manage, (req, res) => {
   if (!client_id || !issue_date) {
     return res.status(400).json({ error: 'client_id and issue_date are required' });
   }
+  const quoteDateError = dateError(issue_date, 'issue_date') || (expiry_date ? dateError(expiry_date, 'expiry_date') : null);
+  if (quoteDateError) return res.status(400).json({ error: quoteDateError });
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
 
@@ -505,6 +510,8 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
 
   const { due_date, po_number = '' } = req.body || {};
   if (!due_date) return res.status(400).json({ error: 'due_date is required' });
+  const dueError = dateError(due_date, 'due_date');
+  if (dueError) return res.status(400).json({ error: dueError });
 
   const number = nextInvoiceNumber();
   const publicToken = crypto.randomBytes(16).toString('hex');

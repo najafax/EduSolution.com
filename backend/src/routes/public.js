@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
+const { CLIENT_ITEM_COLUMNS } = require('../lib/costSnapshot');
 const { renderQuotePdf, renderInvoicePdf } = require('../lib/pdf');
 const { logActivity } = require('../lib/activity');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
@@ -54,7 +55,7 @@ function getQuoteByToken(token) {
 function getInvoiceByToken(token) {
   const invoice = db.prepare('SELECT * FROM invoices WHERE public_token = ?').get(token);
   if (!invoice) return null;
-  const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order').all(invoice.id);
+  const items = db.prepare(`SELECT ${CLIENT_ITEM_COLUMNS} FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order`).all(invoice.id);
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(invoice.client_id);
   return { invoice: withComputedInvoice(invoice), items, client };
 }

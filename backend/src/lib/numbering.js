@@ -1,4 +1,5 @@
 const db = require('../db');
+const { businessYear } = require('./businessDate');
 
 // Sequential per-type, per-year numbers, e.g. Q-2026-0001, INV-2026-0001, R-2026-0001.
 // Safe without locking: better-sqlite3 calls are synchronous, so nothing else
@@ -17,11 +18,11 @@ function numberForYear(prefix, table, column, year) {
 }
 
 function nextNumber(prefix, table) {
-  return numberForYear(prefix, table, 'number', new Date().getFullYear());
+  return numberForYear(prefix, table, 'number', businessYear());
 }
 
 function nextReceiptNumber() {
-  return numberForYear('R', 'payments', 'receipt_number', new Date().getFullYear());
+  return numberForYear('R', 'payments', 'receipt_number', businessYear());
 }
 
 module.exports = {

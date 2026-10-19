@@ -34,6 +34,15 @@ function validate({ name, email, ownership_percent }) {
   return null;
 }
 
+// Active ownership across all shareholders may not exceed 100%.
+function ownershipOverflow(exceptId, active, percent) {
+  const others = db
+    .prepare('SELECT COALESCE(SUM(ownership_percent), 0) AS t FROM shareholders WHERE active = 1 AND id != ?')
+    .get(exceptId).t;
+  const total = others + (active ? Number(percent) || 0 : 0);
+  return total > 100.0001 ? `Active shareholders' ownership would add up to ${Math.round(total * 100) / 100}% — it cannot exceed 100%.` : null;
+}
+
 // No pagination/search — a shareholder list is inherently small (a
 // handful of people at most), the same "don't build it until needed" call
 // this app already makes for other small per-entity lists (e.g.
@@ -47,6 +56,8 @@ router.post('/', manage, (req, res) => {
   const { name = '', email = '', active = true, ownership_percent = 0 } = req.body || {};
   const error = validate({ name, email, ownership_percent });
   if (error) return res.status(400).json({ error });
+  const overflowNew = ownershipOverflow(0, active, ownership_percent);
+  if (overflowNew) return res.status(400).json({ error: overflowNew });
 
   const info = db
     .prepare('INSERT INTO shareholders (name, email, active, ownership_percent) VALUES (?, ?, ?, ?)')
@@ -68,6 +79,8 @@ router.put('/:id', manage, (req, res) => {
   } = req.body || {};
   const error = validate({ name, email, ownership_percent });
   if (error) return res.status(400).json({ error });
+  const overflowEdit = ownershipOverflow(existing.id, active, ownership_percent);
+  if (overflowEdit) return res.status(400).json({ error: overflowEdit });
 
   db.prepare('UPDATE shareholders SET name = ?, email = ?, active = ?, ownership_percent = ? WHERE id = ?').run(
     name.trim(),

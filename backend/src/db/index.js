@@ -946,6 +946,13 @@ const invoiceItemCostColumns = new Set(db.prepare('PRAGMA table_info(invoice_ite
 if (!invoiceItemCostColumns.has('cost_price')) {
   db.exec(`ALTER TABLE invoice_items ADD COLUMN cost_price REAL;`);
 }
+// A payment reversal is a negative payments row pointing back at the payment
+// it cancels (never an edit/delete), so every SUM(amount) over payments stays
+// correct and the audit trail is kept.
+const paymentColumns = new Set(db.prepare('PRAGMA table_info(payments)').all().map((c) => c.name));
+if (!paymentColumns.has('reverses_payment_id')) {
+  db.exec(`ALTER TABLE payments ADD COLUMN reverses_payment_id INTEGER;`);
+}
 db.exec(`
   CREATE TABLE IF NOT EXISTS supplier_cost_settlements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
