@@ -43,7 +43,7 @@ const MONTHS_BACK = 12;
 function soldItemRows() {
   return db
     .prepare(
-      `SELECT i.issue_date AS issue_date, ii.description AS description, ii.quantity AS quantity, ii.product_id AS product_id, p.cost_price AS cost_price
+      `SELECT i.issue_date AS issue_date, ii.description AS description, ii.quantity AS quantity, ii.product_id AS product_id, p.cost_price AS cost_price, ii.cost_price AS snapshot_cost
        FROM invoice_items ii
        JOIN invoices i ON i.id = ii.invoice_id
        LEFT JOIN products p ON p.id = ii.product_id
@@ -74,6 +74,9 @@ function productCostByName() {
 // cost_price when that resolved to a real product, else the
 // description-fallback match above, else null (genuinely unmatched).
 function resolveCostPrice(row, nameMap) {
+  // Cost stamped when the invoice was saved wins, so later cost_price edits
+  // don't rewrite past months.
+  if (row.snapshot_cost > 0) return row.snapshot_cost;
   if (row.product_id && row.cost_price !== null) return row.cost_price;
   const key = (row.description || '').trim().toLowerCase();
   return key && nameMap.has(key) ? nameMap.get(key) : null;
@@ -121,6 +124,52 @@ function summarizeRows(rows) {
   return { usdCost, itemCount: rows.length };
 }
 
+// What each month's cost is made of, biggest first (by item description).
+function linesOf(rows) {
+  const map = new Map();
+  for (const r of rows) {
+    const cost = r.quantity * (r.resolvedCostPrice || 0);
+    if (!(cost > 0)) continue;
+    const key = (r.description || '').trim() || 'Unnamed item';
+    const cur = map.get(key) || { name: key, quantity: 0, usdCost: 0 };
+    cur.quantity += r.quantity;
+    cur.usdCost += cost;
+    map.set(key, cur);
+  }
+  return [...map.values()].map((l) => ({ ...l, usdCost: round2(l.usdCost) })).sort((a, b) => b.usdCost - a.usdCost);
+}
+
+// USD already covered per sold-month: purchases recorded from this report
+// (expenses tagged with supplier_cost_month) plus months marked as already
+// bought elsewhere (supplier_cost_settlements, no expense created).
+function coveredByMonth() {
+  const recorded = new Map();
+  for (const r of db
+    .prepare("SELECT supplier_cost_month AS month, SUM(supplier_cost_usd) AS usd FROM expenses WHERE supplier_cost_month != '' GROUP BY supplier_cost_month")
+    .all()) {
+    recorded.set(r.month, r.usd);
+  }
+  const settled = new Map();
+  for (const r of db.prepare('SELECT month, SUM(usd) AS usd FROM supplier_cost_settlements GROUP BY month').all()) {
+    settled.set(r.month, r.usd);
+  }
+  return { recorded, settled };
+}
+
+function lastExchangeRate() {
+  const r = db
+    .prepare("SELECT exchange_rate FROM expenses WHERE category = 'currency exchange' AND exchange_rate > 0 ORDER BY expense_date DESC, id DESC LIMIT 1")
+    .get();
+  return r ? r.exchange_rate : null;
+}
+
+function monthStatus(usdCost, recordedUsd, settledUsd) {
+  const remainingUsd = round2(Math.max(usdCost - recordedUsd - settledUsd, 0));
+  let status = 'none';
+  if (usdCost > 0) status = remainingUsd <= 0.005 ? 'covered' : recordedUsd + settledUsd > 0 ? 'partial' : 'unrecorded';
+  return { remainingUsd, status };
+}
+
 // GET / — the report itself: a trailing 12-month view (gap months included
 // at zero, oldest first — same "don't silently skip a quiet month"
 // reasoning every other gap-filled breakdown in this app follows) plus a
@@ -134,10 +183,14 @@ router.get('/', view, (req, res) => {
     const rows = resolvedSoldItemRows();
     const { currentYear, yearOf, monthOf } = makeDateHelpers();
 
-    const byMonth = monthKeysTrailing(MONTHS_BACK).map((month) => ({
-      month,
-      ...summarizeRows(rows.filter((r) => monthOf(r.issue_date) === month)),
-    }));
+    const { recorded, settled } = coveredByMonth();
+    const byMonth = monthKeysTrailing(MONTHS_BACK).map((month) => {
+      const monthRows = rows.filter((r) => monthOf(r.issue_date) === month);
+      const sum = summarizeRows(monthRows);
+      const recordedUsd = round2(recorded.get(month) || 0);
+      const settledUsd = round2(settled.get(month) || 0);
+      return { month, ...sum, recordedUsd, settledUsd, ...monthStatus(sum.usdCost, recordedUsd, settledUsd), lines: linesOf(monthRows) };
+    });
 
     const validYears = rows.map((r) => yearOf(r.issue_date)).filter((y) => y !== null);
     const minYear = validYears.length ? Math.min(currentYear, ...validYears) : currentYear;
@@ -150,6 +203,11 @@ router.get('/', view, (req, res) => {
       byMonth,
       byYear,
       totals: summarizeRows(rows),
+      // Last 12 months only: older history usually predates this report and
+      // was handled elsewhere, so it shouldn't inflate "still to buy".
+      toBuyUsd: round2(byMonth.reduce((sum, m) => sum + m.remainingUsd, 0)),
+      recordedUsd: round2(byMonth.reduce((sum, m) => sum + m.recordedUsd + m.settledUsd, 0)),
+      lastRate: lastExchangeRate(),
     });
   } catch (err) {
     console.error('GET /api/supplier-costs failed:', err);
@@ -170,7 +228,7 @@ router.get('/', view, (req, res) => {
 // correction any other wrong expense entry already gets on the Expenses
 // page, not something this route needs to guard against.
 router.post('/record', manage, (req, res) => {
-  const { month, exchange_rate } = req.body || {};
+  const { month, exchange_rate, usd_amount, expense_date } = req.body || {};
   if (typeof month !== 'string' || !/^\d{4}-\d{2}$/.test(month)) {
     return res.status(400).json({ error: 'month must be in YYYY-MM format' });
   }
@@ -178,28 +236,47 @@ router.post('/record', manage, (req, res) => {
   if (!Number.isFinite(rateNum) || rateNum <= 0) {
     return res.status(400).json({ error: 'exchange_rate must be a positive number' });
   }
+  const dateStr = expense_date ? String(expense_date) : todayStr();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || Number.isNaN(Date.parse(dateStr))) {
+    return res.status(400).json({ error: 'expense_date must be a valid date (YYYY-MM-DD)' });
+  }
 
   const { monthOf } = makeDateHelpers();
   const rows = resolvedSoldItemRows().filter((r) => monthOf(r.issue_date) === month);
   const { usdCost } = summarizeRows(rows);
+  const { recorded, settled } = coveredByMonth();
+  const { remainingUsd } = monthStatus(usdCost, recorded.get(month) || 0, settled.get(month) || 0);
   if (!(usdCost > 0)) {
     return res.status(400).json({ error: 'There is no supplier cost to record for that month.' });
   }
+  if (!(remainingUsd > 0)) {
+    return res.status(409).json({ error: 'That month is already fully recorded.' });
+  }
+  // Default to everything still outstanding; allow a smaller partial purchase.
+  const usdNum = usd_amount === undefined || usd_amount === '' || usd_amount === null ? remainingUsd : Number(usd_amount);
+  if (!Number.isFinite(usdNum) || usdNum <= 0) {
+    return res.status(400).json({ error: 'usd_amount must be a positive number' });
+  }
+  if (usdNum > remainingUsd + 0.005) {
+    return res.status(400).json({ error: `Only $${remainingUsd.toFixed(2)} is still left to record for that month.` });
+  }
 
-  const costMvr = round2(usdCost * rateNum);
+  const costMvr = round2(usdNum * rateNum);
   const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleString('default', { month: 'long', year: 'numeric' });
-  const today = todayStr();
+  const partial = usdNum < remainingUsd - 0.005;
   const info = db
     .prepare(
-      `INSERT INTO expenses (category, description, amount, expense_date, exchange_rate, notes)
-       VALUES ('currency exchange', ?, ?, ?, ?, ?)`,
+      `INSERT INTO expenses (category, description, amount, expense_date, exchange_rate, notes, supplier_cost_month, supplier_cost_usd)
+       VALUES ('currency exchange', ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
-      `Supplier cost for ${monthLabel}`,
+      `Supplier cost for ${monthLabel}${partial ? ' (partial)' : ''}`,
       costMvr,
-      today,
+      dateStr,
       rateNum,
-      `Auto-calculated from ${rows.length} sold line item(s) (${usdCost.toFixed(2)} USD) in ${monthLabel}.`,
+      `Supplier cost for ${monthLabel}: $${usdNum.toFixed(2)} USD of $${usdCost.toFixed(2)} owed, from ${rows.length} sold line item(s).`,
+      month,
+      round2(usdNum),
     );
 
   logActivity({
@@ -207,10 +284,52 @@ router.post('/record', manage, (req, res) => {
     action: 'recorded supplier cost for',
     entityType: 'expense',
     entityId: info.lastInsertRowid,
-    entityLabel: `${monthLabel} (${costMvr.toFixed(2)} at rate ${rateNum})`,
+    entityLabel: `${monthLabel} ($${usdNum.toFixed(2)} at rate ${rateNum} = ${costMvr.toFixed(2)})`,
   });
 
-  res.status(201).json({ expenseId: info.lastInsertRowid, usdCost, costMvr, month, monthLabel });
+  res.status(201).json({ expenseId: info.lastInsertRowid, usdCost, usdRecorded: round2(usdNum), costMvr, month, monthLabel });
+});
+
+// POST /settle — marks (part of) a month's cost as already bought, with no
+// expense created (the purchase was recorded elsewhere, e.g. on the
+// Expenses page, or predates this report). Lets old months drop out of
+// "still to buy" without double-counting an expense.
+router.post('/settle', manage, (req, res) => {
+  const { month, usd_amount, note } = req.body || {};
+  if (typeof month !== 'string' || !/^\d{4}-\d{2}$/.test(month)) {
+    return res.status(400).json({ error: 'month must be in YYYY-MM format' });
+  }
+  const { monthOf } = makeDateHelpers();
+  const rows = resolvedSoldItemRows().filter((r) => monthOf(r.issue_date) === month);
+  const { usdCost } = summarizeRows(rows);
+  const { recorded, settled } = coveredByMonth();
+  const { remainingUsd } = monthStatus(usdCost, recorded.get(month) || 0, settled.get(month) || 0);
+  if (!(remainingUsd > 0)) return res.status(409).json({ error: 'Nothing is left to settle for that month.' });
+  const usdNum = usd_amount === undefined || usd_amount === '' || usd_amount === null ? remainingUsd : Number(usd_amount);
+  if (!Number.isFinite(usdNum) || usdNum <= 0 || usdNum > remainingUsd + 0.005) {
+    return res.status(400).json({ error: `usd_amount must be between 0 and $${remainingUsd.toFixed(2)}` });
+  }
+  db.prepare('INSERT INTO supplier_cost_settlements (month, usd, note, created_by_name) VALUES (?, ?, ?, ?)').run(
+    month,
+    round2(usdNum),
+    String(note || '').trim(),
+    req.user.name,
+  );
+  logActivity({
+    userName: req.user.name,
+    action: 'marked supplier cost as already bought for',
+    entityType: 'expense',
+    entityId: null,
+    entityLabel: `${month} ($${usdNum.toFixed(2)})`,
+  });
+  res.status(201).json({ month, usdSettled: round2(usdNum) });
+});
+
+// DELETE /settle/:month — undoes any "already bought" marks for a month.
+router.delete('/settle/:month', manage, (req, res) => {
+  if (!/^\d{4}-\d{2}$/.test(req.params.month)) return res.status(400).json({ error: 'month must be in YYYY-MM format' });
+  const info = db.prepare('DELETE FROM supplier_cost_settlements WHERE month = ?').run(req.params.month);
+  res.json({ removed: info.changes });
 });
 
 module.exports = router;

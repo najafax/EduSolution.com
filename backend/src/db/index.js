@@ -924,6 +924,30 @@ if (!expenseColumns.has('payee')) {
 if (!expenseColumns.has('exchange_rate')) {
   db.exec(`ALTER TABLE expenses ADD COLUMN exchange_rate REAL;`);
 }
+// Supplier Costs report tracking: which sold-month a recorded purchase
+// settles, and the exact USD it covers (see routes/supplierCosts.js).
+if (!expenseColumns.has('supplier_cost_month')) {
+  db.exec(`ALTER TABLE expenses ADD COLUMN supplier_cost_month TEXT NOT NULL DEFAULT '';`);
+}
+if (!expenseColumns.has('supplier_cost_usd')) {
+  db.exec(`ALTER TABLE expenses ADD COLUMN supplier_cost_usd REAL NOT NULL DEFAULT 0;`);
+}
+// Cost snapshot stamped on a line item when the invoice is saved, so a
+// later product cost_price change doesn't rewrite past months.
+const invoiceItemCostColumns = new Set(db.prepare('PRAGMA table_info(invoice_items)').all().map((c) => c.name));
+if (!invoiceItemCostColumns.has('cost_price')) {
+  db.exec(`ALTER TABLE invoice_items ADD COLUMN cost_price REAL;`);
+}
+db.exec(`
+  CREATE TABLE IF NOT EXISTS supplier_cost_settlements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    month TEXT NOT NULL,
+    usd REAL NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
 if (!expenseColumns.has('payee_account_number')) {
   db.exec(`ALTER TABLE expenses ADD COLUMN payee_account_number TEXT NOT NULL DEFAULT '';`);
 }

@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { stampItemCosts } = require('../lib/costSnapshot');
 const { todayStr } = require('../lib/businessDate');
 const crypto = require('crypto');
 const db = require('../db');
@@ -57,6 +58,7 @@ function saveItems(invoiceId, items) {
   for (const item of items) {
     insert.run(invoiceId, item.description, item.quantity, item.unit_price, item.amount, item.sort_order, item.product_id ?? null);
   }
+  stampItemCosts(invoiceId);
 }
 
 const PAGE_SIZE = 20;

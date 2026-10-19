@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { stampItemCosts } = require('../lib/costSnapshot');
 const { todayStr } = require('../lib/businessDate');
 const crypto = require('crypto');
 const db = require('../db');
@@ -540,6 +541,7 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
   for (const item of data.items) {
     insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order, item.product_id ?? null);
   }
+  stampItemCosts(result.lastInsertRowid);
 
   db.prepare(`UPDATE quotes SET converted_invoice_id = ?, status = 'accepted', updated_at = datetime('now') WHERE id = ?`).run(
     result.lastInsertRowid,

@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const { stampItemCosts } = require('./costSnapshot');
 const { todayStr } = require('./businessDate');
 const crypto = require('crypto');
 const db = require('../db');
@@ -406,6 +407,7 @@ async function generateDueRecurringInvoices() {
       for (const item of totals.items) {
         insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order);
       }
+      stampItemCosts(result.lastInsertRowid);
 
       const nextRunDate = advanceDate(recurring.next_run_date, recurring.frequency);
       db.prepare(`UPDATE recurring_invoices SET last_generated_at = datetime('now'), next_run_date = ? WHERE id = ?`).run(
