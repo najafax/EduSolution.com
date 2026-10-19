@@ -92,7 +92,7 @@ export default function RecordPaymentModal({ open, onClose, invoice, token, onRe
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Date</span>
               <div className="mt-1 flex h-11 w-full items-center overflow-hidden rounded-md border border-slate-300 px-3 focus-within:border-lagoon-500 dark:border-slate-600">
                 <input
-                  type="date"
+                  type="date" max={todayStr()}
                   required
                   value={payment.paid_at}
                   onChange={(e) => setPayment((p) => ({ ...p, paid_at: e.target.value }))}

@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { round2: roundCents, dateError } = require('../lib/validate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
@@ -225,8 +226,10 @@ router.post('/:id/returns', manage, (req, res) => {
   if (!draw) return res.status(404).json({ error: 'Draw not found' });
 
   const { amount, draw_date, notes = '' } = req.body || {};
-  const amountNum = Number(amount);
+  const amountNum = roundCents(amount);
   if (!draw_date) return res.status(400).json({ error: 'draw_date is required' });
+  const returnDateError = dateError(draw_date, 'draw_date');
+  if (returnDateError) return res.status(400).json({ error: returnDateError });
   if (!Number.isFinite(amountNum) || amountNum <= 0) {
     return res.status(400).json({ error: 'amount must be a positive number' });
   }
@@ -346,6 +349,8 @@ function validate(body) {
   if (!Number.isFinite(amountNum) || amountNum <= 0) {
     return 'amount must be a positive number';
   }
+  const badDate = dateError(draw_date, 'draw_date');
+  if (badDate) return badDate;
   return null;
 }
 
@@ -356,7 +361,7 @@ router.post('/', manage, (req, res) => {
   const { type = 'draw', taken_by_name, amount, draw_date, notes = '' } = req.body;
   const result = db
     .prepare('INSERT INTO owner_draws (type, taken_by_name, amount, draw_date, notes, created_by_name) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(type, taken_by_name.trim(), Number(amount), draw_date, notes, req.user.name);
+    .run(type, taken_by_name.trim(), roundCents(amount), draw_date, notes, req.user.name);
 
   const draw = withComputedDraw(db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(result.lastInsertRowid));
   logActivity({
@@ -399,7 +404,7 @@ router.put('/:id', manage, (req, res) => {
   if (error) return res.status(400).json({ error });
 
   const { type = 'draw', taken_by_name, amount, draw_date, notes = '' } = req.body;
-  const amountNum = Number(amount);
+  const amountNum = roundCents(amount);
 
   // A draw that already has recorded returns against it can't silently
   // stop being a draw, or shrink below what's already been paid back —

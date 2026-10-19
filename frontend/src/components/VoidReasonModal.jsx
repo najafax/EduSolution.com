@@ -10,7 +10,7 @@ import Modal from './Modal';
 // is the one place that reason gets typed in, modeled directly on
 // InvoiceDetail.jsx's own pre-existing "Reject this payment proof" modal
 // (same required textarea + Cancel/red-submit footer shape).
-export default function VoidReasonModal({ open, onClose, onVoid, title = 'Void this document?', error }) {
+export default function VoidReasonModal({ open, onClose, onVoid, title = 'Void this document?', error, reasonLabel = 'Reason for voiding', submitLabel = 'Void', busyLabel = 'Voiding…', placeholder = 'e.g. client cancelled the order, duplicate document, entered in error' }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -39,13 +39,13 @@ export default function VoidReasonModal({ open, onClose, onVoid, title = 'Void t
     <Modal open={open} onClose={handleClose} title={title} maxWidthClass="max-w-md">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <label className="block">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Reason for voiding</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{reasonLabel}</span>
           <textarea
             required
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
-            placeholder="e.g. client cancelled the order, duplicate document, entered in error"
+            placeholder={placeholder}
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
           />
         </label>
@@ -64,7 +64,7 @@ export default function VoidReasonModal({ open, onClose, onVoid, title = 'Void t
             disabled={busy || !reason.trim()}
             className="min-h-11 rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-60"
           >
-            {busy ? 'Voiding…' : 'Void'}
+            {busy ? busyLabel : submitLabel}
           </button>
         </div>
       </form>

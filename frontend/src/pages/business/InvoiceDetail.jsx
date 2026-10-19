@@ -25,6 +25,8 @@ export default function InvoiceDetail() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [showPayment, setShowPayment] = useState(false);
+  const [reverseTarget, setReverseTarget] = useState(null);
+  const [reverseError, setReverseError] = useState('');
   // { type: 'send' } | { type: 'remind' } | { type: 'receipt', paymentId } | null —
   // one EmailPreviewModal instance shared by all three send-email triggers
   // on this page, since only one can be open at a time.
@@ -178,6 +180,19 @@ export default function InvoiceDetail() {
     }
   }
 
+  async function handleReverse(reason) {
+    setReverseError('');
+    try {
+      await api.invoices.reversePayment(id, reverseTarget.id, reason, token);
+      setReverseTarget(null);
+      setNotice('Payment reversed.');
+      load();
+    } catch (err) {
+      setReverseError(err.message);
+      throw err;
+    }
+  }
+
   async function handleRecover() {
     if (
       !(await confirm({
@@ -238,6 +253,8 @@ export default function InvoiceDetail() {
   if (!data || !settingsLoaded) return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6">Loading…</div>;
 
   const { invoice, items, client, payments, paymentProofs } = data;
+  // A payment can be reversed once; the reversal entry itself (negative) cannot.
+  const isReversible = (p) => canManage && p.amount > 0 && !payments.some((x) => x.reverses_payment_id === p.id);
   const pendingProofCount = paymentProofs.filter((p) => p.status === 'pending').length;
   const symbol = settings?.currency_symbol || '$';
   const isLocked = invoice.status === 'sent' || invoice.status === 'paid';
@@ -510,19 +527,24 @@ export default function InvoiceDetail() {
                         <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">{symbol}{p.amount.toFixed(2)}</td>
                         <td className="whitespace-nowrap px-6 py-3">
                           <div className="flex justify-end gap-1.5">
-                            <IconActionButton
-                              icon={DownloadIcon}
-                              tone="lagoon"
-                              onClick={() => handleDownloadReceipt(p.id)}
-                              title="Download receipt"
-                            />
-                            {canManage && (
+                            {p.amount > 0 && (
+                              <IconActionButton
+                                icon={DownloadIcon}
+                                tone="lagoon"
+                                onClick={() => handleDownloadReceipt(p.id)}
+                                title="Download receipt"
+                              />
+                            )}
+                            {canManage && p.amount > 0 && (
                               <IconActionButton
                                 icon={SendIcon}
                                 tone="lagoon"
                                 onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })}
                                 title="Email receipt"
                               />
+                            )}
+                            {isReversible(p) && (
+                              <IconActionButton icon={RefreshIcon} tone="red" onClick={() => setReverseTarget(p)} title="Reverse payment" />
                             )}
                           </div>
                         </td>
@@ -552,14 +574,19 @@ export default function InvoiceDetail() {
                       <dd className="text-slate-900 dark:text-white">{p.method.replace('_', ' ')}</dd>
                     </div>
                     <div className="flex gap-1.5 pt-1">
-                      <IconActionButton icon={DownloadIcon} tone="lagoon" onClick={() => handleDownloadReceipt(p.id)} title="Download receipt" />
-                      {canManage && (
+                      {p.amount > 0 && (
+                        <IconActionButton icon={DownloadIcon} tone="lagoon" onClick={() => handleDownloadReceipt(p.id)} title="Download receipt" />
+                      )}
+                      {canManage && p.amount > 0 && (
                         <IconActionButton
                           icon={SendIcon}
                           tone="lagoon"
                           onClick={() => setEmailModal({ type: 'receipt', paymentId: p.id })}
                           title="Email receipt"
                         />
+                      )}
+                      {isReversible(p) && (
+                        <IconActionButton icon={RefreshIcon} tone="red" onClick={() => setReverseTarget(p)} title="Reverse payment" />
                       )}
                     </div>
                   </MobileListAccordion>
@@ -760,6 +787,18 @@ export default function InvoiceDetail() {
         onVoid={handleVoid}
         title="Void this invoice?"
         error={voidError}
+      />
+
+      <VoidReasonModal
+        open={Boolean(reverseTarget)}
+        onClose={() => setReverseTarget(null)}
+        onVoid={handleReverse}
+        title={reverseTarget ? `Reverse payment ${reverseTarget.receipt_number}?` : 'Reverse payment?'}
+        reasonLabel="Reason for reversing (e.g. wrong invoice, wrong amount, bounced)"
+        submitLabel="Reverse payment"
+        busyLabel="Reversing…"
+        placeholder="e.g. recorded against the wrong invoice"
+        error={reverseError}
       />
 
       <RecordPaymentModal

@@ -18,6 +18,7 @@ const { logActivity } = require('./activity');
 // why that's a different instant than `dateStr` below, which is always
 // yesterday's date by the time this runs).
 const { computeSummary } = require('../routes/financials');
+const { yesterdayStr } = require('./businessDate');
 
 // Payments/expenses recorded against yesterday's date — the job runs at
 // 08:30 Maldives time (see lib/scheduler.js), so "today" has barely started
@@ -25,11 +26,7 @@ const { computeSummary } = require('../routes/financials');
 // just-completed day is the only reading that makes sense, the same
 // "previous period" framing runMonthlyReport() already uses for the month
 // before it.
-function yesterday() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
+const yesterday = yesterdayStr;
 
 function computeDailyEarnings(dateStr) {
   const payments = db

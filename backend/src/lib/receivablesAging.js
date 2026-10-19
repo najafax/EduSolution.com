@@ -1,8 +1,8 @@
 const db = require('../db');
 const { todayStr } = require('./businessDate');
 
-// Accounts-receivable aging: what clients still owe on SENT invoices (draft
-// and void are not receivables), bucketed by how many days past due_date the
+// Accounts-receivable aging: what clients owed on SENT (and since-paid)
+// invoices as of `asOf` (draft and void are not receivables), bucketed by how many days past due_date the
 // invoice is as of `asOf`. An invoice not yet due is "current". Partially
 // paid invoices count at their remaining balance.
 const BUCKETS = [
@@ -25,12 +25,16 @@ function computeAging(asOf = todayStr()) {
   const rows = db
     .prepare(
       `SELECT invoices.id, invoices.number, invoices.issue_date, invoices.due_date, invoices.total, invoices.amount_paid,
-              invoices.client_id, clients.name AS client_name
+              invoices.client_id, clients.name AS client_name,
+              -- what was already paid by asOf: today's running total minus
+              -- payments dated after it (so a past snapshot is not rewritten
+              -- by later payments or by an invoice that has since been paid)
+              invoices.amount_paid - COALESCE((SELECT SUM(amount) FROM payments WHERE payments.invoice_id = invoices.id AND payments.paid_at > ?), 0) AS paid_as_of
        FROM invoices JOIN clients ON clients.id = invoices.client_id
-       WHERE invoices.status = 'sent' AND invoices.issue_date <= ?
+       WHERE invoices.status IN ('sent', 'paid') AND invoices.issue_date <= ?
        ORDER BY clients.name COLLATE NOCASE, invoices.due_date`,
     )
-    .all(asOf);
+    .all(asOf, asOf);
 
   const totals = Object.fromEntries(BUCKETS.map((b) => [b.key, { amount: 0, count: 0 }]));
   const clientMap = new Map();
@@ -38,7 +42,7 @@ function computeAging(asOf = todayStr()) {
   let overdueBalance = 0;
 
   for (const inv of rows) {
-    const balance = round2(inv.total - inv.amount_paid);
+    const balance = round2(inv.total - inv.paid_as_of);
     if (balance <= 0) continue;
     const daysOverdue = asOfDay - dayNumber(inv.due_date);
     const bucket = bucketFor(daysOverdue);
@@ -66,7 +70,7 @@ function computeAging(asOf = todayStr()) {
       issue_date: inv.issue_date,
       due_date: inv.due_date,
       total: inv.total,
-      amount_paid: inv.amount_paid,
+      amount_paid: round2(inv.paid_as_of),
       balance,
       days_overdue: Math.max(daysOverdue, 0),
       bucket: bucket.key,

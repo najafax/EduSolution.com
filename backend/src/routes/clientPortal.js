@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
+const { CLIENT_ITEM_COLUMNS } = require('../lib/costSnapshot');
 const { requireClientAuth } = require('../middleware/clientAuth');
 const {
   portalLoginLimiter,
@@ -380,7 +381,7 @@ router.get('/invoices', requireClientAuth, (req, res) => {
 function getClientInvoice(clientId, id) {
   const invoice = db.prepare('SELECT * FROM invoices WHERE id = ? AND client_id = ?').get(id, clientId);
   if (!invoice) return null;
-  const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order').all(invoice.id);
+  const items = db.prepare(`SELECT ${CLIENT_ITEM_COLUMNS} FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order`).all(invoice.id);
   const payments = db.prepare('SELECT * FROM payments WHERE invoice_id = ? ORDER BY paid_at').all(invoice.id);
   const paymentProofs = db
     .prepare('SELECT id, file_name, file_type, note, status, uploaded_at, review_note FROM payment_proofs WHERE invoice_id = ? ORDER BY uploaded_at DESC')
@@ -510,6 +511,7 @@ router.get('/invoices/:id/payments/:paymentId/pdf', requireClientAuth, async (re
     .prepare('SELECT * FROM payments WHERE id = ? AND invoice_id = ?')
     .get(req.params.paymentId, req.params.id);
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
+  if (payment.amount <= 0) return res.status(400).json({ error: 'No receipt exists for a payment reversal' });
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   const buffer = await renderReceiptPdf({ payment, invoice: data.invoice, client: data.client, settings });

@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { todayStr } = require('../lib/businessDate');
+const { todayStr, businessYear, addDays } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { hasPermission } = require('../lib/permissions');
@@ -22,7 +22,7 @@ const today = () => todayStr();
 // returns for that exact query, just computed in-process (see
 // routes/financials.js's own computeSummary export) instead of over a
 // second HTTP round-trip.
-const yearFrom = () => `${new Date().getFullYear()}-01-01`;
+const yearFrom = () => `${businessYear()}-01-01`;
 
 // GET /api/dashboard/overview — the single combined fetch behind
 // Dashboard.jsx, replacing what used to be up to 8 separate requests fired
@@ -87,7 +87,7 @@ router.get('/overview', (req, res) => {
     // call EXPIRY_WARNING_DAYS already gets between routes/licenses.js and
     // lib/scheduler.js (keep all three in sync).
     const EXPIRY_WARNING_DAYS = 30;
-    const warningDate = new Date(Date.now() + EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const warningDate = addDays(today(), EXPIRY_WARNING_DAYS);
     const expiringLicenses =
       canFinancials && canLicenses
         ? db
@@ -101,7 +101,7 @@ router.get('/overview', (req, res) => {
             .all(today(), warningDate)
         : [];
 
-    const thisYear = String(new Date().getFullYear());
+    const thisYear = String(businessYear());
 
     // Mirrors routes/quotes.js's GET /analytics: created (count by
     // issue_date year, all statuses), amountQuoted (sum of total, void
@@ -137,7 +137,7 @@ router.get('/overview', (req, res) => {
             db
               .prepare("SELECT COALESCE(SUM(total), 0) AS t FROM invoices WHERE strftime('%Y', issue_date) = ? AND status NOT IN ('void', 'draft')")
               .get(thisYear).t || 0,
-          paymentsReceived: db.prepare("SELECT COUNT(*) AS c FROM payments WHERE strftime('%Y', paid_at) = ?").get(thisYear).c,
+          paymentsReceived: db.prepare("SELECT COUNT(*) AS c FROM payments WHERE amount > 0 AND strftime('%Y', paid_at) = ?").get(thisYear).c,
           amountCollected: db.prepare("SELECT COALESCE(SUM(amount), 0) AS t FROM payments WHERE strftime('%Y', paid_at) = ?").get(thisYear).t || 0,
         }
       : null;

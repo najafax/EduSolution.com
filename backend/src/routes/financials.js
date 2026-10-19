@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const usdLedger = require('../lib/usdLedger');
-const { todayStr } = require('../lib/businessDate');
+const { todayStr, recentMonthKeys } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 
@@ -11,16 +11,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const today = () => todayStr();
 const monthKey = (dateStr) => dateStr.slice(0, 7); // 'YYYY-MM'
 
-// Last `count` calendar months including the current one, oldest first.
-function recentMonths(count) {
-  const months = [];
-  const now = new Date();
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-  }
-  return months;
-}
+const recentMonths = recentMonthKeys;
 
 // The whole GET /summary computation, pulled out into a plain function so
 // routes/dashboard.js's combined overview endpoint can call it in-process

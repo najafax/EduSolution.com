@@ -9714,3 +9714,15 @@ cash are unchanged. Supplier Costs (owed per month from sent/paid invoice
 items × `invoice_items.cost_price`, stamped at save time by
 `lib/costSnapshot.js`) is compared against payments tagged with
 `supplier_cost_month` and `supplier_cost_settlements` ("already paid").
+
+### Financial audit hardening (branch `audit/financial-hardening`)
+
+Result of a full read-only finance audit followed by fixes. Supersedes older notes where they conflict (in particular, the `currency exchange` expense category no longer exists — see "USD account").
+
+- **Supplier cost is internal.** `invoice_items.cost_price` is never returned by `routes/public.js` or `routes/clientPortal.js` (`lib/costSnapshot.js` `CLIENT_ITEM_COLUMNS` is the explicit column list), and `routes/invoices.js` strips it from every JSON response for users without `financials:view`.
+- **Payments** (`POST /invoices/:id/payments`): `paid_at` must be a real date and not in the future, `amount` is rounded to cents, and the payment row, invoice total/status and any license auto-renewal commit in one transaction. There is no payment edit/delete. `POST /invoices/:id/payments/:paymentId/reverse` (reason required) appends a negative `payments` row (`reverses_payment_id` points at the original; `ALTER TABLE`-guarded), lowers `amount_paid`, and sends a `paid` invoice back to `sent`. Every `SUM(amount)` over payments stays correct without changes; a reversal has no receipt and cannot itself be reversed or reversed twice. Licenses renewed by the original payment are not rolled back. Payment *counts* in analytics/dashboard only count `amount > 0`.
+- **`lib/validate.js`**: `isValidDate`/`dateError`/`round2`. Used for expense, capital contribution, owner draw (incl. returns), invoice (issue/due), quote (issue/expiry, convert due date) dates; expense/contribution/draw amounts are stored rounded to cents.
+- **Profit distribution** (`routes/deals.js`, `routes/shareholders.js`): one deal per invoice (409), active shareholder ownership may not total over 100% (400 on save, and re-checked at distribute time), and an invoice already distributed through another deal is ineligible.
+- **Receivables aging** `asOf` now reflects payments dated on or before `asOf` (running `amount_paid` minus later payments) and includes since-paid invoices, so a past snapshot is not rewritten.
+- **Business-date calendar**: `lib/businessDate.js` gained `businessYear`, `addDays`, `yesterdayStr`, `recentMonthKeys`, `previousMonthRange`; the 6-month trend, supplier-cost months, dashboard year/license window, monthly report range, daily report date and document numbering year use them instead of the server clock.
+- **Tests**: `cd backend && npm test` (Node's built-in runner). `test/units.test.js` covers totals, USD ledger, validators and calendar helpers; `test/api.test.js` boots the real API against a throwaway SQLite file (`test/helpers.js`) and covers the cost leak, payment validation/rounding/reversal, date validation, bank-balance reconciliation, deals/shareholder guards, aging and the USD account. Tests never touch `data.sqlite3`.

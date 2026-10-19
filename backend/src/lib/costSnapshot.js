@@ -20,4 +20,9 @@ function stampItemCosts(invoiceId) {
   ).run(invoiceId);
 }
 
-module.exports = { stampItemCosts };
+// Columns of invoice_items that may ever leave the building to a client. The
+// supplier cost snapshot (cost_price) is internal margin data and must never
+// be returned by a public-link or client-portal route.
+const CLIENT_ITEM_COLUMNS = 'id, invoice_id, description, quantity, unit_price, amount, sort_order, product_id';
+
+module.exports = { stampItemCosts, CLIENT_ITEM_COLUMNS };

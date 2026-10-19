@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { dateError, round2: roundCents } = require('../lib/validate');
 const { stampItemCosts } = require('../lib/costSnapshot');
 const { todayStr } = require('../lib/businessDate');
 const crypto = require('crypto');
@@ -14,9 +15,25 @@ const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
 const { toXlsxBuffer } = require('../lib/xlsx');
 const { renewLicense } = require('../lib/licenseRenewal');
+const { hasPermission } = require('../lib/permissions');
 
 const router = Router();
 router.use(requireAuth);
+
+// invoice_items.cost_price is the supplier cost snapshot (margin data). Only
+// users who can see Financials may receive it; everyone else gets items
+// without it, whichever invoice route is answering.
+router.use((req, res, next) => {
+  if (hasPermission(req.user, 'financials', 'view')) return next();
+  const json = res.json.bind(res);
+  res.json = (body) =>
+    json(
+      body && Array.isArray(body.items)
+        ? { ...body, items: body.items.map(({ cost_price, ...rest }) => rest) }
+        : body,
+    );
+  next();
+});
 const view = requirePermission('invoices', 'view');
 const manage = requirePermission('invoices', 'manage');
 
@@ -255,7 +272,7 @@ router.get('/analytics', view, (req, res) => {
         year,
         issued: issuedThisYear.length,
         amountInvoiced: round2(issuedThisYear.filter((i) => i.status !== 'void' && i.status !== 'draft').reduce((sum, i) => sum + i.total, 0)),
-        paymentsReceived: paymentsThisYear.length,
+        paymentsReceived: paymentsThisYear.filter((p) => p.amount > 0).length,
         amountCollected: round2(paymentsThisYear.reduce((sum, p) => sum + p.amount, 0)),
         voided: voidEvents.filter((v) => yearOf(v.created_at) === year).length,
       });
@@ -311,6 +328,8 @@ router.post('/', manage, (req, res) => {
   if (!client_id || !issue_date || !due_date) {
     return res.status(400).json({ error: 'client_id, issue_date and due_date are required' });
   }
+  const invoiceDateError = dateError(issue_date, 'issue_date') || dateError(due_date, 'due_date');
+  if (invoiceDateError) return res.status(400).json({ error: invoiceDateError });
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
 
@@ -381,6 +400,8 @@ router.put('/:id', manage, (req, res) => {
   if (!client_id || !issue_date || !due_date) {
     return res.status(400).json({ error: 'client_id, issue_date and due_date are required' });
   }
+  const invoiceDateError = dateError(issue_date, 'issue_date') || dateError(due_date, 'due_date');
+  if (invoiceDateError) return res.status(400).json({ error: invoiceDateError });
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!client) return res.status(400).json({ error: 'Unknown client_id' });
 
@@ -687,38 +708,43 @@ router.post('/:id/payments', manage, (req, res) => {
   }
 
   const { amount, method = 'bank_transfer', reference = '', notes = '', paid_at } = req.body || {};
-  const amountNum = Number(amount);
+  const amountNum = roundCents(amount);
   if (!Number.isFinite(amountNum) || amountNum <= 0) {
     return res.status(400).json({ error: 'amount must be a positive number' });
   }
-  if (amountNum > data.invoice.balance_due) {
+  if (amountNum > data.invoice.balance_due + 0.001) {
     return res.status(400).json({ error: `amount cannot exceed the balance due (${data.invoice.balance_due})` });
   }
   const validMethods = ['cash', 'bank_transfer', 'card', 'cheque', 'other'];
   if (!validMethods.includes(method)) {
     return res.status(400).json({ error: `method must be one of: ${validMethods.join(', ')}` });
   }
-
-  const receiptNumber = nextReceiptNumber();
   const paidAt = paid_at || today();
+  const paidAtError = dateError(paidAt, 'paid_at');
+  if (paidAtError) return res.status(400).json({ error: paidAtError });
+  if (paidAt > today()) return res.status(400).json({ error: 'paid_at cannot be in the future' });
 
-  const result = db
-    .prepare(
-      'INSERT INTO payments (receipt_number, invoice_id, amount, method, reference, notes, paid_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    )
-    .run(receiptNumber, req.params.id, amountNum, method, reference, notes, paidAt);
+  // The payment row, the invoice's running total/status and any license
+  // renewal it triggers all commit together or not at all.
+  const record = db.transaction(() => {
+    const receiptNumber = nextReceiptNumber();
+    const result = db
+      .prepare(
+        'INSERT INTO payments (receipt_number, invoice_id, amount, method, reference, notes, paid_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(receiptNumber, req.params.id, amountNum, method, reference, notes, paidAt);
 
-  const newAmountPaid = Math.round((data.invoice.amount_paid + amountNum) * 100) / 100;
-  const newStatus = newAmountPaid >= data.invoice.total ? 'paid' : data.invoice.status;
+    const newAmountPaid = roundCents(data.invoice.amount_paid + amountNum);
+    const newStatus = newAmountPaid >= data.invoice.total ? 'paid' : data.invoice.status;
 
-  db.prepare(`UPDATE invoices SET amount_paid = ?, status = ?, updated_at = datetime('now') WHERE id = ?`).run(
-    newAmountPaid,
-    newStatus,
-    req.params.id,
-  );
+    db.prepare(`UPDATE invoices SET amount_paid = ?, status = ?, updated_at = datetime('now') WHERE id = ?`).run(
+      newAmountPaid,
+      newStatus,
+      req.params.id,
+    );
 
-  const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'recorded payment for', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: `${data.invoice.number} (${receiptNumber})` });
+    const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(result.lastInsertRowid);
+    logActivity({ userName: req.user.name, action: 'recorded payment for', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: `${data.invoice.number} (${receiptNumber})` });
 
   // Auto-renew any of this client's active *or cancelled* licenses that
   // this invoice was actually billing for — matched by a line item
@@ -792,7 +818,44 @@ router.post('/:id/payments', manage, (req, res) => {
     }
   }
 
+    return { payment, autoRenewedLicenses };
+  });
+
+  const { payment, autoRenewedLicenses } = record();
   res.status(201).json({ payment, invoice: getInvoiceWithItems(req.params.id).invoice, autoRenewedLicenses });
+});
+
+// Reverses (cancels) a recorded payment — for a payment entered against the
+// wrong invoice, with the wrong amount, or that bounced. Never edits or
+// deletes the original: it appends a negative payment row that points back
+// at it, so every payment total stays correct and the trail is permanent.
+// Licenses auto-renewed by the original payment are NOT rolled back.
+router.post('/:id/payments/:paymentId/reverse', manage, (req, res) => {
+  const data = getInvoiceWithItems(req.params.id);
+  if (!data) return res.status(404).json({ error: 'Invoice not found' });
+  const original = db.prepare('SELECT * FROM payments WHERE id = ? AND invoice_id = ?').get(req.params.paymentId, req.params.id);
+  if (!original) return res.status(404).json({ error: 'Payment not found' });
+  if (original.amount <= 0 || original.reverses_payment_id) {
+    return res.status(409).json({ error: 'A reversal entry cannot be reversed' });
+  }
+  if (db.prepare('SELECT 1 FROM payments WHERE reverses_payment_id = ?').get(original.id)) {
+    return res.status(409).json({ error: 'This payment has already been reversed' });
+  }
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (!reason) return res.status(400).json({ error: 'A reason is required to reverse a payment' });
+
+  const reverse = db.transaction(() => {
+    const receiptNumber = nextReceiptNumber();
+    db.prepare(
+      'INSERT INTO payments (receipt_number, invoice_id, amount, method, reference, notes, paid_at, reverses_payment_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(receiptNumber, original.invoice_id, -original.amount, original.method, `Reversal of ${original.receipt_number}`, reason, today(), original.id);
+    const newAmountPaid = Math.max(roundCents(data.invoice.amount_paid - original.amount), 0);
+    const newStatus = data.invoice.status === 'paid' && newAmountPaid < data.invoice.total ? 'sent' : data.invoice.status;
+    db.prepare(`UPDATE invoices SET amount_paid = ?, status = ?, updated_at = datetime('now') WHERE id = ?`).run(newAmountPaid, newStatus, original.invoice_id);
+    logActivity({ userName: req.user.name, action: 'reversed payment for', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: `${data.invoice.number} (${original.receipt_number}) — ${reason}` });
+  });
+  reverse();
+  res.json(getInvoiceWithItems(req.params.id));
 });
 
 router.get('/:id/payments/:paymentId/pdf', view, async (req, res) => {
@@ -802,6 +865,7 @@ router.get('/:id/payments/:paymentId/pdf', view, async (req, res) => {
     .prepare('SELECT * FROM payments WHERE id = ? AND invoice_id = ?')
     .get(req.params.paymentId, req.params.id);
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
+  if (payment.amount <= 0) return res.status(400).json({ error: 'No receipt exists for a payment reversal' });
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   const buffer = await renderReceiptPdf({ payment, invoice: data.invoice, client: data.client, settings });
@@ -819,6 +883,7 @@ router.get('/:id/payments/:paymentId/receipt-preview', manage, (req, res) => {
     .prepare('SELECT * FROM payments WHERE id = ? AND invoice_id = ?')
     .get(req.params.paymentId, req.params.id);
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
+  if (payment.amount <= 0) return res.status(400).json({ error: 'No receipt exists for a payment reversal' });
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   res.json(receiptSendEmail({ payment, client: data.client, settings }));
 });
@@ -830,6 +895,7 @@ router.post('/:id/payments/:paymentId/send-receipt', manage, async (req, res) =>
     .prepare('SELECT * FROM payments WHERE id = ? AND invoice_id = ?')
     .get(req.params.paymentId, req.params.id);
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
+  if (payment.amount <= 0) return res.status(400).json({ error: 'No receipt exists for a payment reversal' });
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
   const defaults = receiptSendEmail({ payment, client: data.client, settings });

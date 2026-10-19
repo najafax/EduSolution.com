@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { round2: roundCents, dateError } = require('../lib/validate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
@@ -224,6 +225,8 @@ function validate(body) {
   if (!Number.isFinite(amountNum) || amountNum <= 0) {
     return 'amount must be a positive number';
   }
+  const badDate = dateError(expense_date, 'expense_date');
+  if (badDate) return badDate;
   if (!CATEGORIES.includes(category)) {
     return `category must be one of: ${CATEGORIES.join(', ')}`;
   }
@@ -240,7 +243,7 @@ router.post('/', manage, (req, res) => {
       `INSERT INTO expenses (category, description, amount, expense_date, payee, notes)
        VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .run(category, description.trim(), Number(amount), expense_date, payee.trim(), notes);
+    .run(category, description.trim(), roundCents(amount), expense_date, payee.trim(), notes);
 
   const expense = db.prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);
   logActivity({ userName: req.user.name, action: 'created', entityType: 'expense', entityId: expense.id, entityLabel: expense.description });
@@ -261,7 +264,7 @@ router.put('/:id', manage, (req, res) => {
   ).run(
     category,
     description.trim(),
-    Number(amount),
+    roundCents(amount),
     expense_date,
     payee.trim(),
     notes,
