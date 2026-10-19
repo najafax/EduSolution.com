@@ -30,6 +30,7 @@ const websiteRoutes = require('./routes/website');
 const shareholdersRoutes = require('./routes/shareholders');
 const dealsRoutes = require('./routes/deals');
 const supplierCostsRoutes = require('./routes/supplierCosts');
+const usdAccountRoutes = require('./routes/usdAccount');
 const facebookPostsRoutes = require('./routes/facebookPosts');
 const { startScheduler } = require('./lib/scheduler');
 
@@ -85,6 +86,7 @@ app.use('/api/website', websiteRoutes);
 app.use('/api/shareholders', shareholdersRoutes);
 app.use('/api/deals', dealsRoutes);
 app.use('/api/supplier-costs', supplierCostsRoutes);
+app.use('/api/usd-account', usdAccountRoutes);
 app.use('/api/facebook-posts', facebookPostsRoutes);
 
 app.use((req, res) => {

@@ -158,6 +158,14 @@ export default function Financials() {
       tone: 'neutral',
     },
     {
+      key: 'supplierCosts',
+      label: 'Supplier costs',
+      value: money(symbol, summary.supplierCosts || 0),
+      sub: 'USD paid to suppliers, at average cost',
+      icon: <ExpenseIcon />,
+      tone: 'neutral',
+    },
+    {
       key: 'profit',
       label: 'Net profit',
       value: money(symbol, summary.netProfit),
@@ -196,8 +204,19 @@ export default function Financials() {
       tone: 'neutral',
     },
     {
+      key: 'usdAccount',
+      label: 'USD account',
+      value: `$${(summary.usdBalance || 0).toFixed(2)}`,
+      sub:
+        summary.usdAvgRate
+          ? `Worth ${money(symbol, summary.usdBookValueMvr || 0)} at ${summary.usdAvgRate.toFixed(2)} average`
+          : 'No USD held',
+      icon: <BankIcon />,
+      tone: 'neutral',
+    },
+    {
       key: 'bankBalance',
-      label: 'Bank balance',
+      label: 'Bank balance (MVR)',
       value: money(symbol, summary.bankBalance),
       // Bank balance is a running total, not a period sum — a period
       // filter moves *when* it's measured (see routes/financials.js's own
@@ -207,7 +226,7 @@ export default function Financials() {
       sub:
         summary.bankBalanceAsOf && summary.bankBalanceAsOf !== todayStr()
           ? `As of ${summary.bankBalanceAsOf}`
-          : 'Starting balance + net profit + contributions − owner draws − distributions',
+          : 'MVR cash: payments − expenses − draws − USD bought. USD held is shown separately',
       icon: <BankIcon />,
       tone: isPositiveBalance ? 'positive' : 'negative',
     },

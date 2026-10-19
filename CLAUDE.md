@@ -9696,3 +9696,21 @@ Below `md`: a grouped menu (General / Finance / System) where tapping an item
 opens that one section with a back link. Same fields, validation and single
 `PUT /api/settings` Save as before; Save shows on desktop and inside a phone
 section only.
+
+### USD account (`backend/src/lib/usdLedger.js`, `routes/usdAccount.js`, `routes/supplierCosts.js`)
+
+Buying USD is an asset swap, not an expense. `usd_transactions` is a ledger
+(`opening` | `buy` | `supplier_payment` | `sell`) replayed in (date, id) order
+at weighted-average MVR cost. A supplier payment is the expense (USD × average
+cost); a `sell` books FX gain/loss; a `buy` only moves MVR cash out.
+`financials.js` adds `supplierCosts`/`fxResult` to `netProfit`, subtracts MVR
+spent on buys (net of sells) from `bankBalance`, and returns the USD balance;
+`reports.js`, the monthly/daily emails and the dashboard follow. Writes are
+validated by replay (the USD balance may never go negative). The old
+`currency exchange` expense category was removed: a one-time, flag-guarded
+migration (`business_settings.usd_ledger_migrated`) turns each such expense
+into a buy + an immediate supplier payment of the same USD, so past profit and
+cash are unchanged. Supplier Costs (owed per month from sent/paid invoice
+items × `invoice_items.cost_price`, stamped at save time by
+`lib/costSnapshot.js`) is compared against payments tagged with
+`supplier_cost_month` and `supplier_cost_settlements` ("already paid").

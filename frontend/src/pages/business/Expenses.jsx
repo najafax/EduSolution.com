@@ -27,14 +27,12 @@ import { ExpenseIcon, DownloadIcon, UploadIcon, PlusIcon, PencilIcon, TrashIcon,
 // string, not worth coupling two page files over), same acceptable-
 // duplication call Products.jsx's own PRODUCTS_CSV_TEMPLATE already
 // makes. Keep both in sync if the columns ever change. Shows a mix of
-// categories on purpose (including one currency-exchange row) — the
-// whole point of this template is to demonstrate that one file can carry
-// every category at once, currency exchange included.
+// categories on purpose — the whole point of this template is to
+// demonstrate that one file can carry every category at once.
 const EXPENSES_CSV_TEMPLATE =
-  'category,description,amount,expense_date,payee,notes,exchange_rate,payee_account_number,usd_destination\n' +
-  'rent,Office rent for March,15000,2026-03-01,,,,,\n' +
-  'shareholder payments,Q1 dividend,5000,2026-03-15,Jane Doe,,,,\n' +
-  'currency exchange,MVR to USD for EduPage renewal,15420,2026-03-20,,,15.42,7730000123456,EduPage license renewal\n';
+  'category,description,amount,expense_date,payee,notes\n' +
+  'rent,Office rent for March,15000,2026-03-01,,\n' +
+  'shareholder payments,Q1 dividend,5000,2026-03-15,Jane Doe,\n';
 
 function downloadExpensesTemplate() {
   const blob = new Blob([EXPENSES_CSV_TEMPLATE], { type: 'text/csv' });
@@ -53,23 +51,9 @@ function downloadExpensesTemplate() {
 // for directly on this page, same reasoning Products.jsx's own embedded
 // import got: sending someone to the generic Import page just to bring in
 // a batch of expenses is unnecessary friction. This one file handles
-// every category, currency exchange included — a row's own `category`
-// column decides what it becomes, exactly like the manual form's own
-// Category dropdown; only a row whose category is `currency exchange`
-// needs `exchange_rate` filled in (see routes/expenses.js's own
-// validation), every other category leaves it blank. This deliberately
-// replaced an earlier version of this modal that only imported currency
-// exchange rows (forcing every row to that one category) — that meant a
-// business with a mixed batch of expenses had to split it into two
-// separate files and two separate imports to bring everything in; a
-// single `expenses` import handles the mix in one pass instead. The
-// standalone Import page's own `currency-exchange` type (still there,
-// still calling the same backend route as `expenses` — see
-// processCurrencyExchange() in routes/import.js) is unaffected: it's
-// still a real convenience for someone whose entire file is nothing but
-// currency exchange rows and would rather not repeat that column value
-// on every line, but it was never the right default for the page where
-// most expenses actually get created.
+// every category — a row's own `category` column decides what it becomes,
+// exactly like the manual form's own Category dropdown. (Buying USD and
+// paying suppliers are tracked on the Supplier Costs page, not here.)
 function ImportModal({ open, onClose, token, onImported }) {
   const [fileName, setFileName] = useState('');
   const [csvText, setCsvText] = useState('');
@@ -135,15 +119,14 @@ function ImportModal({ open, onClose, token, onImported }) {
   return (
     <Modal open={open} onClose={handleClose} title="Import expenses" maxWidthClass="max-w-2xl">
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Bring in a batch of expenses from a CSV file — any category, including currency exchange, all in one file.
+        Bring in a batch of expenses from a CSV file — any category, all in one file.
         Preview first to catch errors — nothing is saved until you confirm.
       </p>
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
         <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Expected columns</p>
         <p className="mt-1 break-words font-mono text-xs text-slate-600 dark:text-slate-400">
-          category*, description*, amount*, expense_date*, payee, notes, exchange_rate (required for currency
-          exchange), payee_account_number, usd_destination
+          category*, description*, amount*, expense_date*, payee, notes
         </p>
         <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">* required</p>
         <button
@@ -235,9 +218,6 @@ const EMPTY_FORM = {
   expense_date: todayStr(),
   payee: '',
   notes: '',
-  exchange_rate: '',
-  payee_account_number: '',
-  usd_destination: '',
 };
 
 export default function Expenses() {
@@ -318,18 +298,10 @@ export default function Expenses() {
       expense_date: expense.expense_date,
       payee: expense.payee,
       notes: expense.notes,
-      exchange_rate: expense.exchange_rate ?? '',
-      payee_account_number: expense.payee_account_number || '',
-      usd_destination: expense.usd_destination || '',
     });
     setEditingId(expense.id);
     setShowForm(true);
   }
-
-  const isCurrencyExchange = form.category === 'currency exchange';
-  const exchangeRateNum = Number(form.exchange_rate);
-  const amountUsdPreview =
-    isCurrencyExchange && form.amount && exchangeRateNum > 0 ? Number(form.amount) / exchangeRateNum : null;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -501,54 +473,6 @@ export default function Expenses() {
             />
           </label>
 
-          {isCurrencyExchange && (
-            <div className="sm:col-span-2 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 dark:border-slate-700 dark:bg-slate-800/50">
-              <p className="text-xs text-slate-500 dark:text-slate-400 sm:col-span-2">
-                Amount above is what was paid in local currency to buy USD. Enter the rate used to see how much USD the
-                company received.
-              </p>
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Exchange rate</span>
-                <input
-                  type="number"
-                  min="0.0001"
-                  step="0.0001"
-                  required={isCurrencyExchange}
-                  value={form.exchange_rate}
-                  onChange={(e) => setForm((f) => ({ ...f, exchange_rate: e.target.value }))}
-                  placeholder="e.g. 15.42"
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount received (USD)</span>
-                <div className="mt-1 flex min-h-11 w-full items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-base text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                  {amountUsdPreview !== null ? `$${amountUsdPreview.toFixed(2)}` : '—'}
-                </div>
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Payee account number</span>
-                <input
-                  type="text"
-                  value={form.payee_account_number}
-                  onChange={(e) => setForm((f) => ({ ...f, payee_account_number: e.target.value }))}
-                  placeholder="Account the USD was paid to"
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">USD destination</span>
-                <input
-                  type="text"
-                  value={form.usd_destination}
-                  onChange={(e) => setForm((f) => ({ ...f, usd_destination: e.target.value }))}
-                  placeholder="What the USD was used for — e.g. EduPage license renewal"
-                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                />
-              </label>
-            </div>
-          )}
-
           <div className="sm:col-span-2">
             <label className="block">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
@@ -614,11 +538,6 @@ export default function Expenses() {
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">{expense.description}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-900 dark:text-white">
                         {expense.amount.toFixed(2)}
-                        {expense.amount_usd !== null && (
-                          <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                            ${expense.amount_usd.toFixed(2)} @ {expense.exchange_rate}
-                          </p>
-                        )}
                       </td>
                       {canManage && (
                         <td className="whitespace-nowrap px-4 py-3">
@@ -663,9 +582,6 @@ export default function Expenses() {
                         </div>
                         <div className="shrink-0 text-right">
                           <p className="text-slate-900 dark:text-white">{expense.amount.toFixed(2)}</p>
-                          {expense.amount_usd !== null && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400">${expense.amount_usd.toFixed(2)}</p>
-                          )}
                         </div>
                       </div>
                     }
@@ -678,30 +594,6 @@ export default function Expenses() {
                       <div className="flex justify-between">
                         <dt className="text-slate-500 dark:text-slate-400">Payee</dt>
                         <dd className="text-slate-900 dark:text-white">{expense.payee}</dd>
-                      </div>
-                    )}
-                    {expense.amount_usd !== null && (
-                      <div className="flex justify-between">
-                        <dt className="text-slate-500 dark:text-slate-400">Exchange rate</dt>
-                        <dd className="text-slate-900 dark:text-white">{expense.exchange_rate}</dd>
-                      </div>
-                    )}
-                    {expense.amount_usd !== null && (
-                      <div className="flex justify-between">
-                        <dt className="text-slate-500 dark:text-slate-400">Amount (USD)</dt>
-                        <dd className="text-slate-900 dark:text-white">${expense.amount_usd.toFixed(2)}</dd>
-                      </div>
-                    )}
-                    {expense.payee_account_number && (
-                      <div className="flex justify-between">
-                        <dt className="text-slate-500 dark:text-slate-400">Payee account number</dt>
-                        <dd className="text-slate-900 dark:text-white">{expense.payee_account_number}</dd>
-                      </div>
-                    )}
-                    {expense.usd_destination && (
-                      <div className="flex justify-between">
-                        <dt className="text-slate-500 dark:text-slate-400">USD destination</dt>
-                        <dd className="text-slate-900 dark:text-white">{expense.usd_destination}</dd>
                       </div>
                     )}
                     {canManage && (

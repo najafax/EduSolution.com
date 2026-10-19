@@ -297,10 +297,18 @@ export const api = {
   // routes/supplierCosts.js.
   supplierCosts: {
     report: (token) => request('/supplier-costs', { token }),
-    // Recomputes the given month's USD cost server-side and writes it as a
-    // real 'currency exchange' expense at the given rate. See
-    // routes/supplierCosts.js's own POST /record.
-    record: (payload, token) => request('/supplier-costs/record', { method: 'POST', body: payload, token }),
+    // Marks (part of) a month as already bought, with no expense created.
+    settle: (payload, token) => request('/supplier-costs/settle', { method: 'POST', body: payload, token }),
+    unsettle: (month, token) => request(`/supplier-costs/settle/${month}`, { method: 'DELETE', token }),
+  },
+
+  // The USD account ledger: opening balance, USD bought, supplier payments,
+  // conversions back to MVR. See routes/usdAccount.js.
+  usdAccount: {
+    get: (token) => request('/usd-account', { token }),
+    create: (payload, token) => request('/usd-account', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/usd-account/${id}`, { method: 'PUT', body: payload, token }),
+    remove: (id, token) => request(`/usd-account/${id}`, { method: 'DELETE', token }),
   },
 
   recurringInvoices: {

@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const usdLedger = require('../lib/usdLedger');
 const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
@@ -93,7 +94,13 @@ function computeSummary(from, to) {
   // business earning it — folding it in would make "net profit" claim the
   // business was more profitable than it actually was. It still belongs in
   // bankBalance below, since that cash really did land in the account.
-  const netProfit = Math.round((cashRevenue - totalExpenses) * 100) / 100;
+  // Supplier costs (USD paid to suppliers, at the USD account's average cost)
+  // and realised FX gain/loss on converting USD back to MVR are P&L items
+  // too; buying USD itself is not (it just swaps MVR for USD).
+  const ledgerRows = usdLedger.replay().rows;
+  const supplierCosts = usdLedger.supplierCostMvr(filtered ? from : null, filtered ? to : null, ledgerRows);
+  const fxResult = usdLedger.fxResultMvr(filtered ? from : null, filtered ? to : null, ledgerRows);
+  const netProfit = Math.round((cashRevenue - totalExpenses - supplierCosts + fxResult) * 100) / 100;
 
   const contributionDateFilter = filtered ? ' AND contribution_date BETWEEN ? AND ?' : '';
   const totalCapitalContributions = db
@@ -136,20 +143,25 @@ function computeSummary(from, to) {
   // that route's separate opening/closing split (nothing here needs the
   // opening figure, only the running total through `asOf`).
   const asOf = filtered ? to : today();
-  const startingBalance = db.prepare('SELECT starting_balance FROM business_settings WHERE id = 1').get()?.starting_balance || 0;
-  const paidThroughAsOf = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at <= ?').get(asOf).total;
-  const expensesThroughAsOf = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date <= ?').get(asOf).total;
-  const contributionsThroughAsOf = db
-    .prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM capital_contributions WHERE contribution_date <= ?')
-    .get(asOf).total;
-  const drawsThroughAsOf = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'draw' AND draw_date <= ?").get(asOf).total;
-  const returnsThroughAsOf = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return' AND draw_date <= ?").get(asOf).total;
-  const distributionsThroughAsOf = db
-    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'profit_distribution' AND draw_date <= ?")
-    .get(asOf).total;
+  const openingRow = db.prepare('SELECT starting_balance, starting_balance_date FROM business_settings WHERE id = 1').get() || {};
+  const startingBalance = openingRow.starting_balance || 0;
+  // Only transactions on/after the starting-balance date count (blank = no cutoff).
+  const sinceDate = openingRow.starting_balance_date || '0000-00-00';
+  const sum = (table, col, extra = '') =>
+    db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM ${table} WHERE ${col} >= ? AND ${col} <= ?${extra}`).get(sinceDate, asOf).total;
+  const paidThroughAsOf = sum('payments', 'paid_at');
+  const expensesThroughAsOf = sum('expenses', 'expense_date');
+  const contributionsThroughAsOf = sum('capital_contributions', 'contribution_date');
+  const drawsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'draw'");
+  const returnsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'return'");
+  const distributionsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'profit_distribution'");
+  // MVR cash moved by the USD account: buys go out, conversions back come in.
+  const usdCashFlow = usdLedger.mvrCashFlow(sinceDate === '0000-00-00' ? null : sinceDate, asOf, ledgerRows);
+  const usdPosition = usdLedger.position(asOf, ledgerRows);
   const bankBalance =
     Math.round(
       (startingBalance +
+        usdCashFlow +
         paidThroughAsOf +
         contributionsThroughAsOf -
         expensesThroughAsOf -
@@ -205,6 +217,11 @@ function computeSummary(from, to) {
     invoiceCount: invoices.length,
     clientCount,
     totalExpenses: Math.round(totalExpenses * 100) / 100,
+    supplierCosts,
+    fxResult,
+    usdBalance: usdPosition.balanceUsd,
+    usdBookValueMvr: usdPosition.bookValueMvr,
+    usdAvgRate: usdPosition.avgRate,
     netProfit,
     // The cash-basis revenue netProfit above is actually derived from
     // (see the comment there) — returned so the frontend's own margin %
@@ -218,6 +235,7 @@ function computeSummary(from, to) {
     totalOwnerDistributions: Math.round(totalOwnerDistributions * 100) / 100,
     bankBalance,
     bankBalanceAsOf: asOf,
+    startingBalanceDate: openingRow.starting_balance_date || '',
     quoteCounts,
     invoiceCounts,
     monthlyTrend,

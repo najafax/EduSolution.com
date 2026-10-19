@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const { stampItemCosts } = require('./costSnapshot');
 const { todayStr } = require('./businessDate');
 const crypto = require('crypto');
 const db = require('../db');
@@ -249,7 +250,8 @@ async function runMonthlyReport() {
   const revenueTotal = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at BETWEEN ? AND ?').get(from, to).total;
   const expensesByCategory = db
     .prepare('SELECT category, COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY category ORDER BY total DESC')
-    .all(from, to);
+    .all(from, to)
+    .concat(require('./usdLedger').profitLossRows(from, to));
   const totalExpenses = expensesByCategory.reduce((sum, c) => sum + c.total, 0);
   const netProfit = Math.round((revenueTotal - totalExpenses) * 100) / 100;
   const totalInvoiced = db
@@ -406,6 +408,7 @@ async function generateDueRecurringInvoices() {
       for (const item of totals.items) {
         insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order);
       }
+      stampItemCosts(result.lastInsertRowid);
 
       const nextRunDate = advanceDate(recurring.next_run_date, recurring.frequency);
       db.prepare(`UPDATE recurring_invoices SET last_generated_at = datetime('now'), next_run_date = ? WHERE id = ?`).run(

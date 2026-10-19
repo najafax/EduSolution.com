@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const usdLedger = require('../lib/usdLedger');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { renderSalesReportPdf, renderTaxReportPdf, renderExpenseReportPdf, renderProfitLossPdf, renderBankBalancePdf, renderReceivablesAgingPdf } = require('../lib/reportPdf');
@@ -116,7 +117,8 @@ router.get('/profit-loss/pdf', async (req, res) => {
     .get(range.from, range.to).total;
   const expensesByCategory = db
     .prepare('SELECT category, COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY category ORDER BY total DESC')
-    .all(range.from, range.to);
+    .all(range.from, range.to)
+    .concat(usdLedger.profitLossRows(range.from, range.to));
   const totalExpenses = expensesByCategory.reduce((sum, c) => sum + c.total, 0);
   const buffer = await renderProfitLossPdf({
     revenueTotal,
@@ -135,47 +137,50 @@ router.get('/profit-loss/pdf', async (req, res) => {
 // now": opening balance is everything recorded strictly before `from`,
 // closing balance adds everything through `to` (inclusive, same BETWEEN
 // convention every other report here uses).
+function dayBefore(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 router.get('/bank-balance/pdf', async (req, res) => {
   const range = parseDateRange(req, res);
   if (!range) return;
 
-  const startingBalance = getSettings().starting_balance || 0;
-  const paidBefore = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at < ?').get(range.from).total;
-  const expensesBefore = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date < ?').get(range.from).total;
-  const contributionsBefore = db
-    .prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM capital_contributions WHERE contribution_date < ?')
-    .get(range.from).total;
-  const drawsBefore = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'draw' AND draw_date < ?").get(range.from).total;
-  const returnsBefore = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return' AND draw_date < ?").get(range.from).total;
-  // Same 'profit_distribution' handling as routes/financials.js's own
-  // bankBalance — a one-way payout from a deal's net profit, excluded from
-  // drawsBefore/totalDraws below (that's a draw/return-only figure) but
-  // still real cash that left the business, so it gets its own line here.
-  const distributionsBefore = db
-    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'profit_distribution' AND draw_date < ?")
-    .get(range.from).total;
+  const settingsRow = getSettings();
+  const startingBalance = settingsRow.starting_balance || 0;
+  // Transactions dated before the starting-balance date are already inside
+  // the starting balance, so they never count (blank = no cutoff).
+  const sinceDate = settingsRow.starting_balance_date || '0000-00-00';
+  const before = (table, col, extra = '') =>
+    db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM ${table} WHERE ${col} >= ? AND ${col} < ?${extra}`).get(sinceDate, range.from).total;
+  const paidBefore = before('payments', 'paid_at');
+  const expensesBefore = before('expenses', 'expense_date');
+  const contributionsBefore = before('capital_contributions', 'contribution_date');
+  const drawsBefore = before('owner_draws', 'draw_date', " AND type = 'draw'");
+  const returnsBefore = before('owner_draws', 'draw_date', " AND type = 'return'");
+  const distributionsBefore = before('owner_draws', 'draw_date', " AND type = 'profit_distribution'");
+  const ledgerRows = usdLedger.replay().rows;
+  const sinceOrNull = sinceDate === '0000-00-00' ? null : sinceDate;
+  const usdBefore = usdLedger.mvrCashFlow(sinceOrNull, dayBefore(range.from), ledgerRows);
   const openingBalance =
     Math.round(
-      (startingBalance + paidBefore + contributionsBefore - expensesBefore - drawsBefore + returnsBefore - distributionsBefore) * 100,
+      (startingBalance + usdBefore + paidBefore + contributionsBefore - expensesBefore - drawsBefore + returnsBefore - distributionsBefore) * 100,
     ) / 100;
 
-  const totalPayments = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at BETWEEN ? AND ?').get(range.from, range.to).total;
-  const totalExpenses = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date BETWEEN ? AND ?').get(range.from, range.to).total;
-  const totalContributions = db
-    .prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM capital_contributions WHERE contribution_date BETWEEN ? AND ?')
-    .get(range.from, range.to).total;
-  const totalDraws = db
-    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'draw' AND draw_date BETWEEN ? AND ?")
-    .get(range.from, range.to).total;
-  const totalReturns = db
-    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return' AND draw_date BETWEEN ? AND ?")
-    .get(range.from, range.to).total;
-  const totalDistributions = db
-    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'profit_distribution' AND draw_date BETWEEN ? AND ?")
-    .get(range.from, range.to).total;
+  const periodFrom = range.from > sinceDate ? range.from : sinceDate;
+  const within = (table, col, extra = '') =>
+    db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM ${table} WHERE ${col} BETWEEN ? AND ?${extra}`).get(periodFrom, range.to).total;
+  const totalPayments = within('payments', 'paid_at');
+  const totalExpenses = within('expenses', 'expense_date');
+  const totalContributions = within('capital_contributions', 'contribution_date');
+  const totalDraws = within('owner_draws', 'draw_date', " AND type = 'draw'");
+  const totalReturns = within('owner_draws', 'draw_date', " AND type = 'return'");
+  const totalDistributions = within('owner_draws', 'draw_date', " AND type = 'profit_distribution'");
+  const totalUsdNet = usdLedger.mvrCashFlow(periodFrom, range.to, ledgerRows);
   const closingBalance =
     Math.round(
-      (openingBalance + totalPayments + totalContributions - totalExpenses - totalDraws + totalReturns - totalDistributions) * 100,
+      (openingBalance + totalUsdNet + totalPayments + totalContributions - totalExpenses - totalDraws + totalReturns - totalDistributions) * 100,
     ) / 100;
 
   const buffer = await renderBankBalancePdf({
@@ -186,6 +191,7 @@ router.get('/bank-balance/pdf', async (req, res) => {
     totalDraws,
     totalReturns,
     totalDistributions,
+    totalUsdNet,
     closingBalance,
     from: range.from,
     to: range.to,

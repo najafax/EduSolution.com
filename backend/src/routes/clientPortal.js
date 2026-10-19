@@ -249,7 +249,7 @@ function withComputedLicense(license) {
 // client account is no more trusted with starting_balance/
 // session_timeout_minutes than an anonymous public_token holder is.
 function publicSettings(settings) {
-  const { session_timeout_minutes, starting_balance, ...rest } = settings;
+  const { session_timeout_minutes, starting_balance, starting_balance_date, ...rest } = settings;
   return rest;
 }
 
