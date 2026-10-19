@@ -38,6 +38,7 @@ const OwnerDraws = lazy(() => import('./pages/business/OwnerDraws'));
 const Shareholders = lazy(() => import('./pages/business/Shareholders'));
 const ProfitDistribution = lazy(() => import('./pages/business/ProfitDistribution'));
 const SupplierCosts = lazy(() => import('./pages/business/SupplierCosts'));
+const ReceivablesAging = lazy(() => import('./pages/business/ReceivablesAging'));
 const Settings = lazy(() => import('./pages/business/Settings'));
 const Quotes = lazy(() => import('./pages/business/Quotes'));
 const QuoteRequests = lazy(() => import('./pages/business/QuoteRequests'));
@@ -203,6 +204,7 @@ export default function App() {
                 <Route path="/shareholders" element={<Protected><Shareholders /></Protected>} />
                 <Route path="/profit-distribution" element={<Protected><ProfitDistribution /></Protected>} />
                 <Route path="/supplier-costs" element={<Protected><SupplierCosts /></Protected>} />
+                <Route path="/receivables" element={<Protected><ReceivablesAging /></Protected>} />
                 <Route path="/settings" element={<Protected><Settings /></Protected>} />
                 <Route path="/import" element={<Protected><Import /></Protected>} />
 

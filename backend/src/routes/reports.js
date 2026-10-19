@@ -1,7 +1,8 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { renderSalesReportPdf, renderTaxReportPdf, renderExpenseReportPdf, renderProfitLossPdf, renderBankBalancePdf } = require('../lib/reportPdf');
+const { renderSalesReportPdf, renderTaxReportPdf, renderExpenseReportPdf, renderProfitLossPdf, renderBankBalancePdf, renderReceivablesAgingPdf } = require('../lib/reportPdf');
+const { computeAging } = require('../lib/receivablesAging');
 
 const router = Router();
 router.use(requireAuth);
@@ -49,6 +50,32 @@ function invoicesInRange(from, to) {
     )
     .all(from, to);
 }
+
+// Receivables aging: a point-in-time snapshot (what is owed as of a date),
+// not a from/to range, so it has its own optional ?asOf= param.
+function parseAsOf(req, res) {
+  const { asOf } = req.query;
+  if (asOf === undefined || asOf === '') return undefined;
+  if (!DATE_RE.test(asOf)) {
+    res.status(400).json({ error: 'asOf must be YYYY-MM-DD' });
+    return null;
+  }
+  return asOf;
+}
+
+router.get('/receivables-aging', (req, res) => {
+  const asOf = parseAsOf(req, res);
+  if (asOf === null) return;
+  res.json(computeAging(asOf));
+});
+
+router.get('/receivables-aging/pdf', async (req, res) => {
+  const asOf = parseAsOf(req, res);
+  if (asOf === null) return;
+  const aging = computeAging(asOf);
+  const buffer = await renderReceivablesAgingPdf({ aging, settings: getSettings() });
+  sendPdf(res, buffer, `receivables-aging-${aging.asOf}.pdf`);
+});
 
 router.get('/sales/pdf', async (req, res) => {
   const range = parseDateRange(req, res);

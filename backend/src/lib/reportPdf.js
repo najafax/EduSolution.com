@@ -599,7 +599,53 @@ function renderOwnerStatementPdf({ name, records, settings }) {
   return docToBuffer(doc, (d) => addPageFooter(d, settings));
 }
 
+function renderReceivablesAgingPdf({ aging, settings }) {
+  const doc = newDoc();
+  let y = drawReportHeader(doc, { title: 'RECEIVABLES AGING', subtitle: `As of ${aging.asOf}`, settings });
+
+  if (aging.clients.length === 0) {
+    drawEmptyNotice(doc, 'No outstanding invoices.', y);
+    return docToBuffer(doc, (d) => addPageFooter(d, settings));
+  }
+
+  const columns = [
+    { key: 'client_name', label: 'CLIENT', x: 0, width: 107 },
+    { key: 'current', label: 'CURRENT', x: 110, width: 60, align: 'right', format: (r) => amountOnly(r.current) },
+    { key: 'd1_30', label: '1-30', x: 173, width: 60, align: 'right', format: (r) => amountOnly(r.d1_30) },
+    { key: 'd31_60', label: '31-60', x: 236, width: 60, align: 'right', format: (r) => amountOnly(r.d31_60) },
+    { key: 'd61_90', label: '61-90', x: 299, width: 60, align: 'right', format: (r) => amountOnly(r.d61_90) },
+    { key: 'd90plus', label: '90+', x: 362, width: 60, align: 'right', format: (r) => amountOnly(r.d90plus) },
+    { key: 'total', label: 'TOTAL', x: 425, width: 70, align: 'right', format: (r) => amountOnly(r.total) },
+  ];
+  y = drawReportTable(doc, { columns, rows: aging.clients }, y);
+
+  y = drawSummaryBox(
+    doc,
+    [
+      ...aging.buckets.map((b) => ({ label: b.label === 'Current' ? 'Current (not yet due)' : `${b.label} overdue`, value: amountOnly(b.amount) })),
+      { label: 'Total receivable', value: amountOnly(aging.total) },
+    ],
+    y,
+    { dividerBeforeLast: true },
+  );
+
+  const detail = aging.clients.flatMap((c) => c.invoices.map((i) => ({ ...i, client_name: c.client_name })));
+  doc.moveDown(1.5);
+  const dcolumns = [
+    { key: 'number', label: 'INVOICE #', x: 0, width: 70 },
+    { key: 'client_name', label: 'CLIENT', x: 73, width: 130 },
+    { key: 'due_date', label: 'DUE', x: 206, width: 62 },
+    { key: 'days_overdue', label: 'DAYS OVERDUE', x: 271, width: 70, align: 'right', format: (r) => (r.days_overdue > 0 ? String(r.days_overdue) : '-') },
+    { key: 'total', label: 'TOTAL', x: 344, width: 74, align: 'right', format: (r) => amountOnly(r.total) },
+    { key: 'balance', label: 'BALANCE', x: 421, width: 74, align: 'right', format: (r) => amountOnly(r.balance) },
+  ];
+  drawReportTable(doc, { columns: dcolumns, rows: detail }, doc.y);
+
+  return docToBuffer(doc, (d) => addPageFooter(d, settings));
+}
+
 module.exports = {
+  renderReceivablesAgingPdf,
   renderSalesReportPdf,
   renderTaxReportPdf,
   renderExpenseReportPdf,

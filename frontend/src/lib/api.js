@@ -383,6 +383,8 @@ export const api = {
     expensesPdf: (from, to, token) => openPdf(`/reports/expenses/pdf${qs({ from, to })}`, token),
     profitLossPdf: (from, to, token) => openPdf(`/reports/profit-loss/pdf${qs({ from, to })}`, token),
     bankBalancePdf: (from, to, token) => openPdf(`/reports/bank-balance/pdf${qs({ from, to })}`, token),
+    receivablesAging: (asOf, token) => request(`/reports/receivables-aging${qs({ asOf })}`, { token }),
+    receivablesAgingPdf: (asOf, token) => openPdf(`/reports/receivables-aging/pdf${qs({ asOf })}`, token),
   },
 
   emailCenter: {
