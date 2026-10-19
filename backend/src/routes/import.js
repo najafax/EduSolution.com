@@ -15,7 +15,7 @@ router.use(requirePermission('import', 'manage'));
 const MAX_ROWS = 5000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const EXPENSE_CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'shareholder payments', 'marketing', 'software', 'travel', 'currency exchange', 'other'];
+const EXPENSE_CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'shareholder payments', 'marketing', 'software', 'travel', 'other'];
 const PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'cheque', 'other'];
 const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'void'];
 const QUOTE_STATUSES = ['draft', 'sent', 'accepted', 'declined', 'expired'];
@@ -211,20 +211,6 @@ function validateExpenseRow(row, dateFormat) {
   if (!EXPENSE_CATEGORIES.includes(category)) {
     return { ok: false, message: `category must be one of: ${EXPENSE_CATEGORIES.join(', ')}` };
   }
-  // Same "only meaningful for this one category" rule as the manual form
-  // (routes/expenses.js) — a rate on any other category's row is ignored,
-  // never stored.
-  let exchangeRate = null;
-  let payeeAccountNumber = '';
-  let usdDestination = '';
-  if (category === 'currency exchange') {
-    exchangeRate = parseNumber(row.exchange_rate);
-    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
-      return { ok: false, message: 'exchange_rate must be a positive number for a currency exchange row' };
-    }
-    payeeAccountNumber = (row.payee_account_number || '').trim();
-    usdDestination = (row.usd_destination || '').trim();
-  }
   return {
     ok: true,
     values: {
@@ -234,9 +220,6 @@ function validateExpenseRow(row, dateFormat) {
       expense_date,
       payee: (row.payee || '').trim(),
       notes: (row.notes || '').trim(),
-      exchangeRate,
-      payeeAccountNumber,
-      usdDestination,
     },
   };
 }
@@ -246,8 +229,8 @@ function processExpenses(rows, commit) {
   const results = [];
   let imported = 0;
   const insert = db.prepare(
-    `INSERT INTO expenses (category, description, amount, expense_date, payee, notes, exchange_rate, payee_account_number, usd_destination)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO expenses (category, description, amount, expense_date, payee, notes)
+     VALUES (?, ?, ?, ?, ?, ?)`,
   );
 
   rows.forEach((row, index) => {
@@ -266,9 +249,6 @@ function processExpenses(rows, commit) {
         v.expense_date,
         v.payee,
         v.notes,
-        v.exchangeRate,
-        v.payeeAccountNumber,
-        v.usdDestination,
       );
       imported += 1;
       results.push({ row: rowNumber, status: 'ok', message: 'imported', preview: v.description, id: result.lastInsertRowid });
@@ -278,29 +258,6 @@ function processExpenses(rows, commit) {
   });
 
   return { results, imported };
-}
-
-// A dedicated import type for currency-exchange rows specifically, layered
-// entirely on top of processExpenses()/validateExpenseRow() above rather
-// than a parallel implementation — every currency-exchange expense is
-// still, underneath, a plain `expenses` row with `category = 'currency
-// exchange'` (see routes/expenses.js's own "Currency exchange details"
-// note), so this just forces that category onto every row before handing
-// off to the exact same validator/inserter the generic `expenses` type
-// already uses. This exists because the generic `expenses` importer
-// technically already supports currency-exchange rows (a `category` column
-// set to `currency exchange` on each row, per its own CSV template), but
-// making someone repeat that exact string on every row of a CSV that's
-// *entirely* currency exchanges is unnecessary friction — this type drops
-// the `category` column from the CSV shape altogether (any value present
-// there is silently overridden, not read) and every row goes straight to
-// the `exchange_rate`-required validation branch, since that branch is
-// keyed on `category === 'currency exchange'` and that's now guaranteed.
-function processCurrencyExchange(rows, commit) {
-  return processExpenses(
-    rows.map((row) => ({ ...row, category: 'currency exchange' })),
-    commit,
-  );
 }
 
 // Shared by invoice and quote rows: matched by email first (the primary,
@@ -1023,7 +980,6 @@ const HANDLERS = {
   quotes: processQuotes,
   licenses: processLicenses,
   products: processProducts,
-  'currency-exchange': processCurrencyExchange,
 };
 
 router.post('/:type', (req, res) => {
@@ -1031,7 +987,7 @@ router.post('/:type', (req, res) => {
   const handler = HANDLERS[type];
   if (!handler) {
     return res.status(400).json({
-      error: `Unknown import type "${type}". Must be one of: clients, expenses, invoices, quotes, licenses, products, currency-exchange.`,
+      error: `Unknown import type "${type}". Must be one of: clients, expenses, invoices, quotes, licenses, products.`,
     });
   }
 
@@ -1066,18 +1022,11 @@ router.post('/:type', (req, res) => {
     const label =
       type === 'invoices' && outcome.paymentsImported > 0
         ? `${outcome.imported} invoices (${outcome.paymentsImported} with payment history)`
-        : type === 'currency-exchange'
-          ? `${outcome.imported} currency exchange expenses`
-          : `${outcome.imported} ${type}`;
-    // currency-exchange rows are, under the hood, plain `expenses` rows
-    // (see processCurrencyExchange() above) — logged with the same
-    // entityType every other expense mutation already uses rather than a
-    // synthetic 'currency-exchange' type nothing else in activity_log
-    // would ever produce.
+        : `${outcome.imported} ${type}`;
     logActivity({
       userName: req.user.name,
       action: 'bulk imported',
-      entityType: type === 'currency-exchange' ? 'expense' : type,
+      entityType: type,
       entityId: null,
       entityLabel: `${label} from CSV`,
     });

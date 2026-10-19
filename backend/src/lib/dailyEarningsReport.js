@@ -44,7 +44,14 @@ function computeDailyEarnings(dateStr) {
     .all(dateStr);
   const totalReceived = Math.round(payments.reduce((sum, p) => sum + p.amount, 0) * 100) / 100;
 
-  const expenses = db.prepare('SELECT * FROM expenses WHERE expense_date = ? ORDER BY category').all(dateStr);
+  const expenses = db
+    .prepare('SELECT * FROM expenses WHERE expense_date = ? ORDER BY category')
+    .all(dateStr)
+    .concat(
+      require('./usdLedger')
+        .profitLossRows(dateStr, dateStr)
+        .map((r) => ({ category: r.category, description: 'USD account', amount: r.total })),
+    );
   const totalExpenses = Math.round(expenses.reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
 
   const netEarning = Math.round((totalReceived - totalExpenses) * 100) / 100;

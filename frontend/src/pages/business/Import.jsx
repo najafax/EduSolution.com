@@ -10,7 +10,7 @@ const TYPES = [
     value: 'expenses',
     label: 'Expenses',
     columns:
-      'category*, description*, amount*, expense_date*, payee, notes, exchange_rate (required for currency exchange), payee_account_number, usd_destination',
+      'category*, description*, amount*, expense_date*, payee, notes',
   },
   {
     value: 'invoices',
@@ -37,21 +37,14 @@ const TYPES = [
     columns: 'name*, description, unit_price*, tax_rate, visible_in_portal',
     note: 'A row matching an existing product by name (case-insensitive) updates it in place instead of creating a duplicate — safe to re-import an edited export.',
   },
-  {
-    value: 'currency-exchange',
-    label: 'Currency exchange',
-    columns: 'description*, amount*, expense_date*, exchange_rate*, payee, payee_account_number, usd_destination, notes',
-    note: "Every row is imported as an expense with category \"currency exchange\" — there's no category column, since this type is only for that one category. Same as importing under the general Expenses type with every row's category already set.",
-  },
 ];
 
 const TEMPLATES = {
   clients: 'name,email,phone,address,notes\nAcme School,jane@example.com,+960 7000000,"Male, Maldives",Sample notes\n',
   expenses:
-    'category,description,amount,expense_date,payee,notes,exchange_rate,payee_account_number,usd_destination\n' +
-    'rent,Office rent for March,15000,2026-03-01,,,,,\n' +
-    'shareholder payments,Q1 dividend,5000,2026-03-15,Jane Doe,,,,\n' +
-    'currency exchange,MVR to USD for EduPage renewal,15420,2026-03-20,,,15.42,7730000123456,EduPage license renewal\n',
+    'category,description,amount,expense_date,payee,notes\n' +
+    'rent,Office rent for March,15000,2026-03-01,,\n' +
+    'shareholder payments,Q1 dividend,5000,2026-03-15,Jane Doe,\n',
   invoices:
     'client_email,client_name,number,issue_date,due_date,description,amount,tax_rate,amount_paid,paid_date,payment_method,status,notes\n' +
     'jane@example.com,,,2024-01-15,2024-01-29,Website design,2000,0,2000,2024-01-20,bank_transfer,,Fully paid example\n' +
@@ -69,10 +62,6 @@ const TEMPLATES = {
     'name,description,unit_price,tax_rate,visible_in_portal\n' +
     'LMS Pro Annual License,Learning management system — annual plan,1200,0,true\n' +
     'Consulting Hour,General consulting, billed hourly,75,0,false\n',
-  'currency-exchange':
-    'description,amount,expense_date,exchange_rate,payee,payee_account_number,usd_destination,notes\n' +
-    'MVR to USD for EduPage renewal,15420,2026-03-20,15.42,,7730000123456,EduPage license renewal,\n' +
-    'MVR to USD for hosting bill,3200,2026-04-02,15.55,,7730000123456,Annual hosting invoice,\n',
 };
 
 function downloadTemplate(type) {

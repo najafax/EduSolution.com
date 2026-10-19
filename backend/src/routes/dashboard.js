@@ -155,7 +155,9 @@ router.get('/overview', (req, res) => {
     // expense_date year.
     const expensesOverview = canExpenses
       ? {
-          total: db.prepare("SELECT COALESCE(SUM(amount), 0) AS t FROM expenses WHERE strftime('%Y', expense_date) = ?").get(thisYear).t || 0,
+          total:
+            (db.prepare("SELECT COALESCE(SUM(amount), 0) AS t FROM expenses WHERE strftime('%Y', expense_date) = ?").get(thisYear).t || 0) +
+            require('../lib/usdLedger').supplierCostMvr(`${thisYear}-01-01`, `${thisYear}-12-31`),
           count: db.prepare("SELECT COUNT(*) AS c FROM expenses WHERE strftime('%Y', expense_date) = ?").get(thisYear).c,
         }
       : null;

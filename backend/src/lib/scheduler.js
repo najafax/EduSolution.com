@@ -250,7 +250,8 @@ async function runMonthlyReport() {
   const revenueTotal = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at BETWEEN ? AND ?').get(from, to).total;
   const expensesByCategory = db
     .prepare('SELECT category, COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY category ORDER BY total DESC')
-    .all(from, to);
+    .all(from, to)
+    .concat(require('./usdLedger').profitLossRows(from, to));
   const totalExpenses = expensesByCategory.reduce((sum, c) => sum + c.total, 0);
   const netProfit = Math.round((revenueTotal - totalExpenses) * 100) / 100;
   const totalInvoiced = db

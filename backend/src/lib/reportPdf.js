@@ -504,6 +504,7 @@ function renderBankBalancePdf({
   totalDraws,
   totalReturns,
   totalDistributions,
+  totalUsdNet = 0,
   closingBalance,
   from,
   to,
@@ -524,6 +525,7 @@ function renderBankBalancePdf({
   if (totalDraws) rows.push({ label: 'Owner draws', value: signedAmountOnly(-totalDraws) });
   if (totalReturns) rows.push({ label: 'Owner returns', value: amountOnly(totalReturns) });
   if (totalDistributions) rows.push({ label: 'Profit distributions', value: signedAmountOnly(-totalDistributions) });
+  if (totalUsdNet) rows.push({ label: 'USD account (bought less converted back)', value: signedAmountOnly(totalUsdNet) });
   rows.push(
     { label: 'Expenses', value: signedAmountOnly(-totalExpenses) },
     { label: 'Closing balance', value: signedAmountOnly(closingBalance), bold: true },
@@ -536,7 +538,7 @@ function renderBankBalancePdf({
     .fontSize(8)
     .fillColor(COLORS.muted)
     .text(
-      "Opening balance is the starting balance set in Settings plus every payment received and capital contribution recorded before this period, minus expenses, net owner draws, and profit distributions. Not a live bank feed — money moving outside this app (loans, tax remittances) isn't reflected.",
+      "Opening balance is the starting balance set in Settings plus every payment received and capital contribution recorded before this period, minus expenses, net owner draws, profit distributions, and MVR spent buying USD (net of USD converted back). Supplier payments made from the USD account don't move MVR cash. Not a live bank feed — money moving outside this app (loans, tax remittances) isn't reflected.",
       MARGIN,
       y,
       { width: CONTENT_WIDTH },

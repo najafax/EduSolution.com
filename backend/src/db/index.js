@@ -1215,6 +1215,58 @@ if (!invoiceColumns.has('reminder_hold_note')) {
   db.exec(`ALTER TABLE invoices ADD COLUMN reminder_hold_note TEXT NOT NULL DEFAULT '';`);
 }
 
+// ---------------------------------------------------------------------------
+// USD account ledger (see lib/usdLedger.js). Buying USD is an asset swap, not
+// an expense; the expense is recorded when USD is paid to a supplier. This
+// replaces the old 'currency exchange' expense category: each such expense
+// (which treated "bought USD" and "paid supplier" as one event) is converted
+// once into a buy + an immediate supplier payment of the same USD, so past
+// profit and cash figures are unchanged. Guarded by a flag so it runs once.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS usd_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    txn_date TEXT NOT NULL,
+    type TEXT NOT NULL,
+    usd_amount REAL NOT NULL,
+    mvr_amount REAL NOT NULL DEFAULT 0,
+    payee TEXT NOT NULL DEFAULT '',
+    reference TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    supplier_cost_month TEXT NOT NULL DEFAULT '',
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_usd_transactions_date ON usd_transactions(txn_date);
+`);
+const settingsColumnsUsd = new Set(db.prepare('PRAGMA table_info(business_settings)').all().map((c) => c.name));
+if (!settingsColumnsUsd.has('usd_ledger_migrated')) {
+  db.exec(`ALTER TABLE business_settings ADD COLUMN usd_ledger_migrated INTEGER NOT NULL DEFAULT 0;`);
+}
+const usdMigrated = db.prepare('SELECT usd_ledger_migrated AS m FROM business_settings WHERE id = 1').get();
+if (usdMigrated && !usdMigrated.m) {
+  db.transaction(() => {
+    const old = db.prepare("SELECT * FROM expenses WHERE category = 'currency exchange' ORDER BY expense_date ASC, id ASC").all();
+    const ins = db.prepare(
+      `INSERT INTO usd_transactions (txn_date, type, usd_amount, mvr_amount, payee, reference, notes, supplier_cost_month, created_by_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Migrated')`,
+    );
+    for (const e of old) {
+      const usd = e.exchange_rate > 0 ? Math.round((e.amount / e.exchange_rate) * 100) / 100 : 0;
+      if (!(usd > 0)) {
+        // No usable rate: keep it as an ordinary expense rather than guess.
+        db.prepare("UPDATE expenses SET category = 'other' WHERE id = ?").run(e.id);
+        continue;
+      }
+      const note = `Migrated from expense #${e.id}: ${e.description}`;
+      ins.run(e.expense_date, 'buy', usd, e.amount, '', '', note, '');
+      ins.run(e.expense_date, 'supplier_payment', usd, 0, e.payee || '', '', note, e.supplier_cost_month || '');
+      db.prepare('DELETE FROM expenses WHERE id = ?').run(e.id);
+    }
+    db.prepare('UPDATE business_settings SET usd_ledger_migrated = 1 WHERE id = 1').run();
+  })();
+}
+
 db.pragma('foreign_keys = ON');
 
 // Bound params rather than string-interpolated into the exec() block above,

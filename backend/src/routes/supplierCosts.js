@@ -1,9 +1,14 @@
 const { Router } = require('express');
-const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
+const { replay, position } = require('../lib/usdLedger');
 
+// What the business owes suppliers in USD (how much, month by month), set
+// against the USD account (lib/usdLedger.js, routes/usdAccount.js) that pays
+// it. Supplier payments are made from that account and are what gets
+// expensed; this report only measures the debt and how much is paid.
+//
 // Automatic, aggregate view of how much USD this business needs to spend on
 // suppliers, computed straight from real sold invoice line items × each
 // matched product's own `cost_price` (USD) — not a manual per-transaction
@@ -16,8 +21,7 @@ const { logActivity } = require('../lib/activity');
 // Source is invoices only (not quotes) — a quote is a proposal, not a sale
 // — and follows the exact same "issued" convention `routes/invoices.js`'s
 // own analytics already use for `amountInvoiced`: every invoice regardless
-// of status except `void` (draft included — see that route's own
-// `issuedThisYear`/`amountInvoiced` split), keyed by the invoice's own
+// of status except `void` and `draft`, keyed by the invoice's own
 // `issue_date`. A line item resolves its USD cost primarily by joining to
 // `products` on `product_id` — but an item with no `product_id` (most
 // commonly a bulk-imported historical invoice: routes/import.js's own
@@ -139,15 +143,15 @@ function linesOf(rows) {
   return [...map.values()].map((l) => ({ ...l, usdCost: round2(l.usdCost) })).sort((a, b) => b.usdCost - a.usdCost);
 }
 
-// USD already covered per sold-month: purchases recorded from this report
-// (expenses tagged with supplier_cost_month) plus months marked as already
-// bought elsewhere (supplier_cost_settlements, no expense created).
-function coveredByMonth() {
+// USD already paid per sold-month: supplier payments from the USD account
+// ledger tagged to that month, plus months marked as already paid elsewhere
+// (supplier_cost_settlements, no ledger entry created).
+function coveredByMonth(ledgerRows) {
   const recorded = new Map();
-  for (const r of db
-    .prepare("SELECT supplier_cost_month AS month, SUM(supplier_cost_usd) AS usd FROM expenses WHERE supplier_cost_month != '' GROUP BY supplier_cost_month")
-    .all()) {
-    recorded.set(r.month, r.usd);
+  for (const r of ledgerRows) {
+    if (r.type === 'supplier_payment' && r.supplier_cost_month) {
+      recorded.set(r.supplier_cost_month, (recorded.get(r.supplier_cost_month) || 0) + r.usd_amount);
+    }
   }
   const settled = new Map();
   for (const r of db.prepare('SELECT month, SUM(usd) AS usd FROM supplier_cost_settlements GROUP BY month').all()) {
@@ -156,11 +160,10 @@ function coveredByMonth() {
   return { recorded, settled };
 }
 
-function lastExchangeRate() {
-  const r = db
-    .prepare("SELECT exchange_rate FROM expenses WHERE category = 'currency exchange' AND exchange_rate > 0 ORDER BY expense_date DESC, id DESC LIMIT 1")
-    .get();
-  return r ? r.exchange_rate : null;
+function lastBuyRate(ledgerRows) {
+  const buys = ledgerRows.filter((r) => r.type === 'buy' && r.usd_amount > 0);
+  const b = buys[buys.length - 1];
+  return b ? b.mvr_amount / b.usd_amount : null;
 }
 
 function monthStatus(usdCost, recordedUsd, settledUsd) {
@@ -183,7 +186,8 @@ router.get('/', view, (req, res) => {
     const rows = resolvedSoldItemRows();
     const { currentYear, yearOf, monthOf } = makeDateHelpers();
 
-    const { recorded, settled } = coveredByMonth();
+    const ledger = replay().rows;
+    const { recorded, settled } = coveredByMonth(ledger);
     const byMonth = monthKeysTrailing(MONTHS_BACK).map((month) => {
       const monthRows = rows.filter((r) => monthOf(r.issue_date) === month);
       const sum = summarizeRows(monthRows);
@@ -199,95 +203,24 @@ router.get('/', view, (req, res) => {
       byYear.push({ year, ...summarizeRows(rows.filter((r) => yearOf(r.issue_date) === year)) });
     }
 
+    const toPayUsd = round2(byMonth.reduce((sum, m) => sum + m.remainingUsd, 0));
+    const usdPos = position(null, ledger);
     res.json({
       byMonth,
       byYear,
       totals: summarizeRows(rows),
       // Last 12 months only: older history usually predates this report and
       // was handled elsewhere, so it shouldn't inflate "still to buy".
-      toBuyUsd: round2(byMonth.reduce((sum, m) => sum + m.remainingUsd, 0)),
-      recordedUsd: round2(byMonth.reduce((sum, m) => sum + m.recordedUsd + m.settledUsd, 0)),
-      lastRate: lastExchangeRate(),
+      toPayUsd,
+      paidUsd: round2(byMonth.reduce((sum, m) => sum + m.recordedUsd + m.settledUsd, 0)),
+      usdAccount: { ...usdPos, hasOpening: ledger.some((r) => r.type === 'opening'), lastBuyRate: lastBuyRate(ledger) },
+      // Positive = the account covers everything owed; negative = USD still to buy.
+      coverUsd: round2(usdPos.balanceUsd - toPayUsd),
     });
   } catch (err) {
     console.error('GET /api/supplier-costs failed:', err);
     res.status(500).json({ error: 'Failed to load the supplier cost report' });
   }
-});
-
-// POST /record — the "Record as expense" action: recomputes the given
-// month's USD cost fresh, server-side (never trusts a client-submitted
-// total), and writes it as a real `category: 'currency exchange'` expense
-// on the existing Expenses page at the given rate — the one, single place
-// a real currency-exchange purchase is recorded in this app (see
-// routes/deals.js's own top-of-file note on why this replaced a
-// deal-scoped conversion mechanism). No dedicated "already recorded this
-// month" tracking — a business can record the same month's figure more
-// than once if they choose to (e.g. a partial purchase now, the rest
-// later); if that turns out to be a mistake, it's the same one-off manual
-// correction any other wrong expense entry already gets on the Expenses
-// page, not something this route needs to guard against.
-router.post('/record', manage, (req, res) => {
-  const { month, exchange_rate, usd_amount, expense_date } = req.body || {};
-  if (typeof month !== 'string' || !/^\d{4}-\d{2}$/.test(month)) {
-    return res.status(400).json({ error: 'month must be in YYYY-MM format' });
-  }
-  const rateNum = Number(exchange_rate);
-  if (!Number.isFinite(rateNum) || rateNum <= 0) {
-    return res.status(400).json({ error: 'exchange_rate must be a positive number' });
-  }
-  const dateStr = expense_date ? String(expense_date) : todayStr();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || Number.isNaN(Date.parse(dateStr))) {
-    return res.status(400).json({ error: 'expense_date must be a valid date (YYYY-MM-DD)' });
-  }
-
-  const { monthOf } = makeDateHelpers();
-  const rows = resolvedSoldItemRows().filter((r) => monthOf(r.issue_date) === month);
-  const { usdCost } = summarizeRows(rows);
-  const { recorded, settled } = coveredByMonth();
-  const { remainingUsd } = monthStatus(usdCost, recorded.get(month) || 0, settled.get(month) || 0);
-  if (!(usdCost > 0)) {
-    return res.status(400).json({ error: 'There is no supplier cost to record for that month.' });
-  }
-  if (!(remainingUsd > 0)) {
-    return res.status(409).json({ error: 'That month is already fully recorded.' });
-  }
-  // Default to everything still outstanding; allow a smaller partial purchase.
-  const usdNum = usd_amount === undefined || usd_amount === '' || usd_amount === null ? remainingUsd : Number(usd_amount);
-  if (!Number.isFinite(usdNum) || usdNum <= 0) {
-    return res.status(400).json({ error: 'usd_amount must be a positive number' });
-  }
-  if (usdNum > remainingUsd + 0.005) {
-    return res.status(400).json({ error: `Only $${remainingUsd.toFixed(2)} is still left to record for that month.` });
-  }
-
-  const costMvr = round2(usdNum * rateNum);
-  const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleString('default', { month: 'long', year: 'numeric' });
-  const partial = usdNum < remainingUsd - 0.005;
-  const info = db
-    .prepare(
-      `INSERT INTO expenses (category, description, amount, expense_date, exchange_rate, notes, supplier_cost_month, supplier_cost_usd)
-       VALUES ('currency exchange', ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      `Supplier cost for ${monthLabel}${partial ? ' (partial)' : ''}`,
-      costMvr,
-      dateStr,
-      rateNum,
-      `Supplier cost for ${monthLabel}: $${usdNum.toFixed(2)} USD of $${usdCost.toFixed(2)} owed, from ${rows.length} sold line item(s).`,
-      month,
-      round2(usdNum),
-    );
-
-  logActivity({
-    userName: req.user.name,
-    action: 'recorded supplier cost for',
-    entityType: 'expense',
-    entityId: info.lastInsertRowid,
-    entityLabel: `${monthLabel} ($${usdNum.toFixed(2)} at rate ${rateNum} = ${costMvr.toFixed(2)})`,
-  });
-
-  res.status(201).json({ expenseId: info.lastInsertRowid, usdCost, usdRecorded: round2(usdNum), costMvr, month, monthLabel });
 });
 
 // POST /settle — marks (part of) a month's cost as already bought, with no
@@ -302,7 +235,7 @@ router.post('/settle', manage, (req, res) => {
   const { monthOf } = makeDateHelpers();
   const rows = resolvedSoldItemRows().filter((r) => monthOf(r.issue_date) === month);
   const { usdCost } = summarizeRows(rows);
-  const { recorded, settled } = coveredByMonth();
+  const { recorded, settled } = coveredByMonth(replay().rows);
   const { remainingUsd } = monthStatus(usdCost, recorded.get(month) || 0, settled.get(month) || 0);
   if (!(remainingUsd > 0)) return res.status(409).json({ error: 'Nothing is left to settle for that month.' });
   const usdNum = usd_amount === undefined || usd_amount === '' || usd_amount === null ? remainingUsd : Number(usd_amount);

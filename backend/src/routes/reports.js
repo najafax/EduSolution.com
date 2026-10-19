@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const usdLedger = require('../lib/usdLedger');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { renderSalesReportPdf, renderTaxReportPdf, renderExpenseReportPdf, renderProfitLossPdf, renderBankBalancePdf, renderReceivablesAgingPdf } = require('../lib/reportPdf');
@@ -116,7 +117,8 @@ router.get('/profit-loss/pdf', async (req, res) => {
     .get(range.from, range.to).total;
   const expensesByCategory = db
     .prepare('SELECT category, COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY category ORDER BY total DESC')
-    .all(range.from, range.to);
+    .all(range.from, range.to)
+    .concat(usdLedger.profitLossRows(range.from, range.to));
   const totalExpenses = expensesByCategory.reduce((sum, c) => sum + c.total, 0);
   const buffer = await renderProfitLossPdf({
     revenueTotal,
@@ -135,6 +137,12 @@ router.get('/profit-loss/pdf', async (req, res) => {
 // now": opening balance is everything recorded strictly before `from`,
 // closing balance adds everything through `to` (inclusive, same BETWEEN
 // convention every other report here uses).
+function dayBefore(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 router.get('/bank-balance/pdf', async (req, res) => {
   const range = parseDateRange(req, res);
   if (!range) return;
@@ -152,9 +160,12 @@ router.get('/bank-balance/pdf', async (req, res) => {
   const drawsBefore = before('owner_draws', 'draw_date', " AND type = 'draw'");
   const returnsBefore = before('owner_draws', 'draw_date', " AND type = 'return'");
   const distributionsBefore = before('owner_draws', 'draw_date', " AND type = 'profit_distribution'");
+  const ledgerRows = usdLedger.replay().rows;
+  const sinceOrNull = sinceDate === '0000-00-00' ? null : sinceDate;
+  const usdBefore = usdLedger.mvrCashFlow(sinceOrNull, dayBefore(range.from), ledgerRows);
   const openingBalance =
     Math.round(
-      (startingBalance + paidBefore + contributionsBefore - expensesBefore - drawsBefore + returnsBefore - distributionsBefore) * 100,
+      (startingBalance + usdBefore + paidBefore + contributionsBefore - expensesBefore - drawsBefore + returnsBefore - distributionsBefore) * 100,
     ) / 100;
 
   const periodFrom = range.from > sinceDate ? range.from : sinceDate;
@@ -166,9 +177,10 @@ router.get('/bank-balance/pdf', async (req, res) => {
   const totalDraws = within('owner_draws', 'draw_date', " AND type = 'draw'");
   const totalReturns = within('owner_draws', 'draw_date', " AND type = 'return'");
   const totalDistributions = within('owner_draws', 'draw_date', " AND type = 'profit_distribution'");
+  const totalUsdNet = usdLedger.mvrCashFlow(periodFrom, range.to, ledgerRows);
   const closingBalance =
     Math.round(
-      (openingBalance + totalPayments + totalContributions - totalExpenses - totalDraws + totalReturns - totalDistributions) * 100,
+      (openingBalance + totalUsdNet + totalPayments + totalContributions - totalExpenses - totalDraws + totalReturns - totalDistributions) * 100,
     ) / 100;
 
   const buffer = await renderBankBalancePdf({
@@ -179,6 +191,7 @@ router.get('/bank-balance/pdf', async (req, res) => {
     totalDraws,
     totalReturns,
     totalDistributions,
+    totalUsdNet,
     closingBalance,
     from: range.from,
     to: range.to,

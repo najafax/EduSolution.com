@@ -41,7 +41,7 @@ export const BUSINESS_LINKS = [
   { to: '/financials', label: 'Financials', module: 'financials', group: 'Finance' },
   { to: '/shareholders', label: 'Shareholders', module: 'financials', group: 'Finance' },
   { to: '/profit-distribution', label: 'Profit Distribution', module: 'financials', group: 'Finance' },
-  { to: '/supplier-costs', label: 'Supplier Costs', module: 'financials', group: 'Finance' },
+  { to: '/supplier-costs', label: 'USD & Suppliers', module: 'financials', group: 'Finance' },
   { to: '/receivables', label: 'Receivables', module: 'financials', group: 'Finance' },
   { to: '/reports', label: 'Reports', module: 'financials', group: 'Finance' },
   { to: '/activity', label: 'Activity', module: 'activity', group: 'Operations' },

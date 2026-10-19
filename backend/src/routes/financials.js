@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const usdLedger = require('../lib/usdLedger');
 const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
@@ -93,7 +94,13 @@ function computeSummary(from, to) {
   // business earning it — folding it in would make "net profit" claim the
   // business was more profitable than it actually was. It still belongs in
   // bankBalance below, since that cash really did land in the account.
-  const netProfit = Math.round((cashRevenue - totalExpenses) * 100) / 100;
+  // Supplier costs (USD paid to suppliers, at the USD account's average cost)
+  // and realised FX gain/loss on converting USD back to MVR are P&L items
+  // too; buying USD itself is not (it just swaps MVR for USD).
+  const ledgerRows = usdLedger.replay().rows;
+  const supplierCosts = usdLedger.supplierCostMvr(filtered ? from : null, filtered ? to : null, ledgerRows);
+  const fxResult = usdLedger.fxResultMvr(filtered ? from : null, filtered ? to : null, ledgerRows);
+  const netProfit = Math.round((cashRevenue - totalExpenses - supplierCosts + fxResult) * 100) / 100;
 
   const contributionDateFilter = filtered ? ' AND contribution_date BETWEEN ? AND ?' : '';
   const totalCapitalContributions = db
@@ -148,9 +155,13 @@ function computeSummary(from, to) {
   const drawsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'draw'");
   const returnsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'return'");
   const distributionsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'profit_distribution'");
+  // MVR cash moved by the USD account: buys go out, conversions back come in.
+  const usdCashFlow = usdLedger.mvrCashFlow(sinceDate === '0000-00-00' ? null : sinceDate, asOf, ledgerRows);
+  const usdPosition = usdLedger.position(asOf, ledgerRows);
   const bankBalance =
     Math.round(
       (startingBalance +
+        usdCashFlow +
         paidThroughAsOf +
         contributionsThroughAsOf -
         expensesThroughAsOf -
@@ -206,6 +217,11 @@ function computeSummary(from, to) {
     invoiceCount: invoices.length,
     clientCount,
     totalExpenses: Math.round(totalExpenses * 100) / 100,
+    supplierCosts,
+    fxResult,
+    usdBalance: usdPosition.balanceUsd,
+    usdBookValueMvr: usdPosition.bookValueMvr,
+    usdAvgRate: usdPosition.avgRate,
     netProfit,
     // The cash-basis revenue netProfit above is actually derived from
     // (see the comment there) — returned so the frontend's own margin %
