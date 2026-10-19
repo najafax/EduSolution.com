@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { dateError } = require('../lib/validate');
 const { stampItemCosts } = require('../lib/costSnapshot');
-const { todayStr } = require('../lib/businessDate');
+const { todayStr, businessYear } = require('../lib/businessDate');
 const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
@@ -185,7 +185,7 @@ router.get('/analytics', view, (req, res) => {
     const convertedEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'quote' AND action = 'converted to invoice'").all();
 
     const decidedAt = (q) => q.client_responded_at || q.updated_at;
-    const currentYear = new Date().getFullYear();
+    const currentYear = businessYear();
     // See routes/expenses.js's own GET /analytics for why this can't be a
     // bare `dateStr.slice(0, 4)` — a blank/malformed date would otherwise
     // either throw or silently compute as year 0 and blow the loop below out

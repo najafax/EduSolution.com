@@ -78,3 +78,26 @@ test('businessDate: pure calendar helpers', () => {
   assert.equal(todayStr(new Date('2026-12-31T20:00:00Z')), '2027-01-01');
   assert.deepEqual(recentMonthKeys(2, new Date('2026-12-31T20:00:00Z')), ['2026-12', '2027-01']);
 });
+
+test('date advance: month-end clamping is independent of the server timezone', () => {
+  const { spawnSync } = require('child_process');
+  const code = `
+    const { advanceExpiry } = require('./src/lib/licenseRenewal');
+    const { addMonths, addYears } = require('./src/lib/businessDate');
+    const out = [
+      advanceExpiry('2026-01-31', 'monthly'),
+      advanceExpiry('2028-01-31', 'monthly'),
+      advanceExpiry('2026-12-31', 'monthly'),
+      advanceExpiry('2028-02-29', 'yearly'),
+      advanceExpiry('2026-09-01', 'yearly'),
+      addMonths('2026-03-31', 1),
+      addYears('2026-05-15', 2),
+    ];
+    console.log(JSON.stringify(out));`;
+  const expected = ['2026-02-28', '2028-02-29', '2027-01-31', '2029-02-28', '2027-09-01', '2026-04-30', '2028-05-15'];
+  for (const tz of ['UTC', 'Indian/Maldives', 'Pacific/Kiritimati', 'America/Los_Angeles']) {
+    const r = spawnSync('node', ['-e', code], { cwd: require('path').join(__dirname, '..'), env: { ...process.env, TZ: tz, DB_PATH: ':memory:' } });
+    assert.equal(r.status, 0, r.stderr.toString());
+    assert.deepEqual(JSON.parse(r.stdout.toString()), expected, `TZ=${tz}`);
+  }
+});

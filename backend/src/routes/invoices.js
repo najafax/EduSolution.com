@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { dateError, round2: roundCents } = require('../lib/validate');
 const { stampItemCosts } = require('../lib/costSnapshot');
-const { todayStr } = require('../lib/businessDate');
+const { todayStr, businessYear } = require('../lib/businessDate');
 const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
@@ -247,7 +247,7 @@ router.get('/analytics', view, (req, res) => {
     const payments = db.prepare('SELECT invoice_id, amount, paid_at FROM payments').all();
     const voidEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'invoice' AND action = 'voided'").all();
 
-    const currentYear = new Date().getFullYear();
+    const currentYear = businessYear();
     // See routes/expenses.js's own GET /analytics for why this can't be a
     // bare `dateStr.slice(0, 4)` — a blank/malformed date (a pre-validation
     // row, a direct DB edit) would otherwise either throw or, worse, silently

@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { todayStr } = require('../lib/businessDate');
+const { todayStr, addDays } = require('../lib/businessDate');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -236,7 +236,7 @@ function withComputedInvoice(invoice) {
 // — keep both in sync.
 const EXPIRY_WARNING_DAYS = 30;
 function warningDate() {
-  return new Date(Date.now() + EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return addDays(todayStr(), EXPIRY_WARNING_DAYS);
 }
 function withComputedLicense(license) {
   let displayStatus = license.status;

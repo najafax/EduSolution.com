@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { round2: roundCents, dateError } = require('../lib/validate');
 const db = require('../db');
+const { businessYear } = require('../lib/businessDate');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
@@ -149,7 +150,7 @@ router.get('/export.xlsx', view, async (req, res) => {
 router.get('/analytics', view, (req, res) => {
   try {
     const rows = db.prepare('SELECT category, amount, expense_date FROM expenses').all();
-    const currentYear = new Date().getFullYear();
+    const currentYear = businessYear();
     // expense_date is required and validated non-blank on every write path
     // (create/update, CSV import), but a row written before that validation
     // existed, or edited directly against the database, can still carry a

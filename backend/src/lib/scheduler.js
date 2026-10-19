@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { stampItemCosts } = require('./costSnapshot');
-const { todayStr, addDays, previousMonthRange } = require('./businessDate');
+const { todayStr, addDays, addMonths, addYears, previousMonthRange } = require('./businessDate');
 const crypto = require('crypto');
 const db = require('../db');
 const { renderInvoicePdf } = require('./pdf');
@@ -338,21 +338,9 @@ function expireOverdueQuotes() {
 }
 
 function advanceDate(dateStr, frequency) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  if (frequency === 'weekly') {
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().slice(0, 10);
-  }
-
-  const originalDay = d.getDate();
-  if (frequency === 'yearly') d.setFullYear(d.getFullYear() + 1);
-  else d.setMonth(d.getMonth() + 1); // monthly, the default
-
-  // setMonth/setFullYear roll over into the following month when the
-  // anchor day doesn't exist in the target month (e.g. Jan 31 -> Mar 3).
-  // Clamp back to the target month's last day instead of drifting forward.
-  if (d.getDate() !== originalDay) d.setDate(0);
-  return d.toISOString().slice(0, 10);
+  if (frequency === 'weekly') return addDays(dateStr, 7);
+  if (frequency === 'yearly') return addYears(dateStr, 1);
+  return addMonths(dateStr, 1); // monthly, the default
 }
 
 // Turns every due recurring-invoice template into a real draft invoice,
@@ -373,7 +361,7 @@ async function generateDueRecurringInvoices() {
       const number = nextInvoiceNumber();
       const publicToken = crypto.randomBytes(16).toString('hex');
       const issueDate = today();
-      const dueDate = new Date(Date.now() + recurring.due_in_days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const dueDate = addDays(issueDate, recurring.due_in_days);
 
       const result = db
         .prepare(

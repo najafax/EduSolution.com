@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { todayStr } = require('../lib/businessDate');
+const { todayStr, addDays, businessYear } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { sendMail, textToHtml } = require('../lib/mailer');
@@ -28,7 +28,7 @@ const today = () => todayStr();
 const EXPIRY_WARNING_DAYS = 30;
 
 function warningDate() {
-  return new Date(Date.now() + EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return addDays(todayStr(), EXPIRY_WARNING_DAYS);
 }
 
 // `status` only ever stores 'active' | 'cancelled' — everything else
@@ -238,7 +238,7 @@ router.get('/analytics', view, (req, res) => {
     const reactivations = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'reactivated'").all();
 
     const amountByLicenseId = new Map(licenses.map((l) => [l.id, l.amount]));
-    const currentYear = new Date().getFullYear();
+    const currentYear = businessYear();
     // See routes/expenses.js's own GET /analytics for why this can't be a
     // bare `dateStr.slice(0, 4)` — a blank/malformed date would otherwise
     // either throw or silently compute as year 0 and blow the loop below out

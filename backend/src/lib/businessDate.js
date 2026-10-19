@@ -26,6 +26,19 @@ function addDays(dateStr, days) {
   return d.toISOString().slice(0, 10);
 }
 
+// Adds whole months/years to a YYYY-MM-DD date in pure UTC calendar math,
+// clamping to the target month's last day (Jan 31 + 1 month = Feb 28/29).
+// Independent of the server's timezone.
+function addMonths(dateStr, months) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const target = new Date(Date.UTC(y, m - 1 + months, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(d, lastDay));
+  return target.toISOString().slice(0, 10);
+}
+
+const addYears = (dateStr, years) => addMonths(dateStr, years * 12);
+
 const yesterdayStr = (now = new Date()) => addDays(todayStr(now), -1);
 
 // The last `count` calendar months including the current one, oldest first
@@ -48,4 +61,4 @@ function previousMonthRange(now = new Date()) {
   return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10), label: first };
 }
 
-module.exports = { todayStr, businessYear, addDays, yesterdayStr, recentMonthKeys, previousMonthRange };
+module.exports = { todayStr, businessYear, addDays, addMonths, addYears, yesterdayStr, recentMonthKeys, previousMonthRange };
