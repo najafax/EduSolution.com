@@ -129,15 +129,6 @@ export default function ProfitDistribution() {
   const [bulkDistributing, setBulkDistributing] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
 
-  // TEMPORARY: bulk-clears draft/test records — see routes/deals.js's own
-  // DELETE /drafts. Remove this button (and that route) once it's no
-  // longer needed for cleanup.
-  const [deletingDrafts, setDeletingDrafts] = useState(false);
-  // TEMPORARY: bulk-clears distributed/test records, reversing their real
-  // expense + owner_draws side effects too — see routes/deals.js's own
-  // DELETE /distributed.
-  const [deletingDistributed, setDeletingDistributed] = useState(false);
-
   const { confirm, confirmDialog } = useConfirm();
 
   function load() {
@@ -388,55 +379,6 @@ export default function ProfitDistribution() {
     }
   }
 
-  // TEMPORARY: see routes/deals.js's own DELETE /drafts note.
-  async function handleDeleteDrafts() {
-    if (
-      !(await confirm({
-        title: 'Delete every draft record?',
-        message:
-          'This clears out test/draft records only — any already-distributed record is real financial history and is never touched. A draft that already had its USD purchase recorded has that expense reversed too.',
-        confirmLabel: 'Delete drafts',
-      }))
-    )
-      return;
-    setDeletingDrafts(true);
-    try {
-      const { deleted } = await api.deals.removeDrafts(token);
-      toast(`Deleted ${deleted} draft record${deleted === 1 ? '' : 's'}.`, { type: 'success' });
-      load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setDeletingDrafts(false);
-    }
-  }
-
-  // TEMPORARY: see routes/deals.js's own DELETE /distributed note — this
-  // is the one that actually undoes a test distribution's effect on the
-  // bank balance, by deleting the linked expense + shareholder payout rows
-  // along with the deal itself, not just the deal record on its own.
-  async function handleDeleteDistributed() {
-    if (
-      !(await confirm({
-        title: 'Delete every distributed record?',
-        message:
-          'This permanently deletes every already-distributed record, along with the supplier-cost expense and shareholder payouts it created — reversing its effect on the bank balance. Only use this for test data; a real distribution should never be deleted this way.',
-        confirmLabel: 'Delete distributed',
-      }))
-    )
-      return;
-    setDeletingDistributed(true);
-    try {
-      const { deleted } = await api.deals.removeDistributed(token);
-      toast(`Deleted ${deleted} distributed record${deleted === 1 ? '' : 's'} and their linked expense/payout entries.`, { type: 'success' });
-      load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setDeletingDistributed(false);
-    }
-  }
-
   function rowActions(deal) {
     if (!canManage) return null;
     if (deal.status === 'draft') {
@@ -485,29 +427,6 @@ export default function ProfitDistribution() {
         search={<SearchInput value={search} onChange={setSearch} placeholder="Search records…" />}
         filters={<StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />}
       />
-
-      {canManage && (
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-          <button
-            onClick={handleDeleteDrafts}
-            disabled={deletingDrafts}
-            title="Temporary cleanup tool — clears draft/test records only, never a distributed one"
-            className="flex min-h-9 items-center gap-1.5 rounded-md border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
-          >
-            <TrashIcon width={14} height={14} />
-            {deletingDrafts ? 'Deleting…' : 'Delete all drafts (test cleanup)'}
-          </button>
-          <button
-            onClick={handleDeleteDistributed}
-            disabled={deletingDistributed}
-            title="Temporary cleanup tool — deletes distributed records AND their linked expense/shareholder-payout rows, reversing the bank balance effect"
-            className="flex min-h-9 items-center gap-1.5 rounded-md border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
-          >
-            <TrashIcon width={14} height={14} />
-            {deletingDistributed ? 'Deleting…' : 'Delete all distributed (test cleanup)'}
-          </button>
-        </div>
-      )}
 
       {bulkResult && (
         <div className="mt-4 rounded-md border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
