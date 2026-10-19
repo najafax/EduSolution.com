@@ -301,6 +301,9 @@ export const api = {
     // real 'currency exchange' expense at the given rate. See
     // routes/supplierCosts.js's own POST /record.
     record: (payload, token) => request('/supplier-costs/record', { method: 'POST', body: payload, token }),
+    // Marks (part of) a month as already bought, with no expense created.
+    settle: (payload, token) => request('/supplier-costs/settle', { method: 'POST', body: payload, token }),
+    unsettle: (month, token) => request(`/supplier-costs/settle/${month}`, { method: 'DELETE', token }),
   },
 
   recurringInvoices: {
