@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { hasPermission } = require('../lib/permissions');
@@ -13,7 +14,7 @@ const router = Router();
 // partial response instead of a 403 for the whole thing.
 router.use(requireAuth);
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayStr();
 // Matches Dashboard.jsx's own YEAR_FROM/YEAR_TO (startOfYearStr()/todayStr())
 // — the same "this calendar year so far" range Financials.jsx's own "This
 // year" filter tab already sends to GET /financials/summary, so this
@@ -134,7 +135,7 @@ router.get('/overview', (req, res) => {
           issued: db.prepare("SELECT COUNT(*) AS c FROM invoices WHERE strftime('%Y', issue_date) = ?").get(thisYear).c,
           amountInvoiced:
             db
-              .prepare("SELECT COALESCE(SUM(total), 0) AS t FROM invoices WHERE strftime('%Y', issue_date) = ? AND status != 'void'")
+              .prepare("SELECT COALESCE(SUM(total), 0) AS t FROM invoices WHERE strftime('%Y', issue_date) = ? AND status NOT IN ('void', 'draft')")
               .get(thisYear).t || 0,
           paymentsReceived: db.prepare("SELECT COUNT(*) AS c FROM payments WHERE strftime('%Y', paid_at) = ?").get(thisYear).c,
           amountCollected: db.prepare("SELECT COALESCE(SUM(amount), 0) AS t FROM payments WHERE strftime('%Y', paid_at) = ?").get(thisYear).t || 0,

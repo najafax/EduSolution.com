@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { todayStr } = require('../lib/businessDate');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -212,7 +213,7 @@ router.post('/change-password', requireClientAuth, async (req, res) => {
 // document set is inherently small, so the same don't-build-it-until-
 // needed call routes/reports.js's own docs make elsewhere.
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayStr();
 
 // Mirrors routes/invoices.js's/routes/public.js's own withComputed() —
 // same computed balance_due/is_overdue/is_partially_paid fields, kept as

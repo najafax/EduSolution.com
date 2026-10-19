@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
@@ -51,7 +52,23 @@ function withComputedDeal(deal) {
   const costUsdTotal = round2(items.reduce((sum, item) => sum + item.quantity * item.cost_price, 0));
   const costMvr = deal.exchange_rate ? round2(costUsdTotal * deal.exchange_rate) : 0;
   const netProfit = round2(deal.revenue_amount - costMvr);
-  return { ...deal, items, cost_usd_total: costUsdTotal, cost_mvr: costMvr, net_profit: netProfit };
+  // Tax collected on the linked invoice is owed to the tax authority, not
+  // profit to split — surfaced so the UI can warn when the revenue figure
+  // still includes it (revenue above the invoice's pre-tax amount).
+  const inv = deal.invoice_id ? db.prepare('SELECT total, tax_amount FROM invoices WHERE id = ?').get(deal.invoice_id) : null;
+  const invoiceTax = inv ? round2(inv.tax_amount || 0) : 0;
+  const invoicePretax = inv ? round2(inv.total - invoiceTax) : null;
+  const revenueIncludesTax = Boolean(inv) && invoiceTax > 0 && deal.revenue_amount > invoicePretax + 0.01;
+  return {
+    ...deal,
+    items,
+    cost_usd_total: costUsdTotal,
+    cost_mvr: costMvr,
+    net_profit: netProfit,
+    invoice_tax_amount: invoiceTax,
+    invoice_pretax_total: invoicePretax,
+    revenue_includes_tax: revenueIncludesTax,
+  };
 }
 
 function saveDealItems(dealId, items) {
@@ -387,7 +404,7 @@ router.post('/:id/distribute', manage, (req, res) => {
       .json({ error: 'No active shareholders have an ownership percentage set — add one on the Shareholders page first.' });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
   const distribute = db.transaction(() => distributeDeal(computed, shareholders, req.user.name, today));
   distribute();
 
@@ -431,7 +448,7 @@ router.post('/distribute-all', manage, (req, res) => {
     return res.status(400).json({ error: 'There are no draft deals to distribute.' });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
   const distributed = [];
   const skipped = [];
 

@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
@@ -46,7 +47,7 @@ function soldItemRows() {
        FROM invoice_items ii
        JOIN invoices i ON i.id = ii.invoice_id
        LEFT JOIN products p ON p.id = ii.product_id
-       WHERE i.status != 'void'`,
+       WHERE i.status NOT IN ('void', 'draft')`,
     )
     .all();
 }
@@ -187,7 +188,7 @@ router.post('/record', manage, (req, res) => {
 
   const costMvr = round2(usdCost * rateNum);
   const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleString('default', { month: 'long', year: 'numeric' });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
   const info = db
     .prepare(
       `INSERT INTO expenses (category, description, amount, expense_date, exchange_rate, notes)
