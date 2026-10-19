@@ -5,7 +5,7 @@
 // the cron job does, and requiring scheduler.js from a route file would
 // pull in node-cron's own registration side effects for no reason.
 const db = require('../db');
-const { sendMail, textToHtml } = require('./mailer');
+const { sendMail, textToHtml, isEmailConfigured } = require('./mailer');
 const { renderDailyEarningsPdf } = require('./reportPdf');
 const { shareholderDailyEarningsEmail } = require('./emailTemplates');
 const { logEmail } = require('./emailLog');
@@ -57,7 +57,7 @@ function computeDailyEarnings(dateStr) {
 // the manual "Send report now" button (routes/shareholders.js) always
 // calls this with no argument, matching the cron job exactly.
 async function runDailyEarningsReport(dateStr = yesterday()) {
-  if (!process.env.SMTP_HOST) {
+  if (!isEmailConfigured()) {
     console.log('[daily-earnings] SMTP not configured, skipping');
     return { sent: 0, skipped: true, reason: 'smtp_not_configured' };
   }

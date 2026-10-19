@@ -1,5 +1,5 @@
 const db = require('../db');
-const { sendMail } = require('./mailer');
+const { sendMail, isEmailConfigured } = require('./mailer');
 
 // Optional per-user preference (MyAccount.jsx), same shape as
 // lib/scheduler.js's notifyStaffOfReminders() — an internal staff digest,
@@ -13,7 +13,7 @@ const { sendMail } = require('./mailer');
 // accept response. Best-effort: one recipient's send failing doesn't stop
 // the others.
 async function notifyStaffOfQuoteAccepted({ quote, client }) {
-  if (!process.env.SMTP_HOST) return;
+  if (!isEmailConfigured()) return;
 
   const recipients = db.prepare('SELECT email FROM users WHERE active = 1 AND notify_quote_responses = 1').all();
   if (recipients.length === 0) return;

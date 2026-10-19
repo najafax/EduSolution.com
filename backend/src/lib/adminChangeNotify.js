@@ -1,5 +1,5 @@
 const db = require('../db');
-const { sendMail } = require('./mailer');
+const { sendMail, isEmailConfigured } = require('./mailer');
 
 // Optional per-user preference (MyAccount.jsx's notify_admin_changes,
 // meaningful only for a super_admin account), same shape as
@@ -19,7 +19,7 @@ const { sendMail } = require('./mailer');
 // notifying the person who just made the change would be noise, not a
 // signal.
 async function notifyOfAdminTierChange({ user, actorId, actorName, wasNew }) {
-  if (!process.env.SMTP_HOST) return;
+  if (!isEmailConfigured()) return;
 
   const recipients = db
     .prepare("SELECT email FROM users WHERE active = 1 AND role = 'super_admin' AND notify_admin_changes = 1 AND id != ?")
