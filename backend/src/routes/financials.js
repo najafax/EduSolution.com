@@ -136,17 +136,18 @@ function computeSummary(from, to) {
   // that route's separate opening/closing split (nothing here needs the
   // opening figure, only the running total through `asOf`).
   const asOf = filtered ? to : today();
-  const startingBalance = db.prepare('SELECT starting_balance FROM business_settings WHERE id = 1').get()?.starting_balance || 0;
-  const paidThroughAsOf = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE paid_at <= ?').get(asOf).total;
-  const expensesThroughAsOf = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date <= ?').get(asOf).total;
-  const contributionsThroughAsOf = db
-    .prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM capital_contributions WHERE contribution_date <= ?')
-    .get(asOf).total;
-  const drawsThroughAsOf = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'draw' AND draw_date <= ?").get(asOf).total;
-  const returnsThroughAsOf = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'return' AND draw_date <= ?").get(asOf).total;
-  const distributionsThroughAsOf = db
-    .prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM owner_draws WHERE type = 'profit_distribution' AND draw_date <= ?")
-    .get(asOf).total;
+  const openingRow = db.prepare('SELECT starting_balance, starting_balance_date FROM business_settings WHERE id = 1').get() || {};
+  const startingBalance = openingRow.starting_balance || 0;
+  // Only transactions on/after the starting-balance date count (blank = no cutoff).
+  const sinceDate = openingRow.starting_balance_date || '0000-00-00';
+  const sum = (table, col, extra = '') =>
+    db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM ${table} WHERE ${col} >= ? AND ${col} <= ?${extra}`).get(sinceDate, asOf).total;
+  const paidThroughAsOf = sum('payments', 'paid_at');
+  const expensesThroughAsOf = sum('expenses', 'expense_date');
+  const contributionsThroughAsOf = sum('capital_contributions', 'contribution_date');
+  const drawsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'draw'");
+  const returnsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'return'");
+  const distributionsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'profit_distribution'");
   const bankBalance =
     Math.round(
       (startingBalance +
@@ -218,6 +219,7 @@ function computeSummary(from, to) {
     totalOwnerDistributions: Math.round(totalOwnerDistributions * 100) / 100,
     bankBalance,
     bankBalanceAsOf: asOf,
+    startingBalanceDate: openingRow.starting_balance_date || '',
     quoteCounts,
     invoiceCounts,
     monthlyTrend,

@@ -149,7 +149,7 @@ export default function Settings() {
       case 'business':
         return form.business_name || 'Not set yet';
       case 'financial':
-        return `${form.currency_symbol || '$'} · Starting balance ${Number(form.starting_balance || 0).toFixed(2)}`;
+        return `${form.currency_symbol || '$'} · Starting balance ${Number(form.starting_balance || 0).toFixed(2)}${form.starting_balance_date ? ` as of ${form.starting_balance_date}` : ''}`;
       case 'security':
         return `${form.session_timeout_minutes || 30} min timeout${form.signatory_name ? ` · ${form.signatory_name}` : ''}`;
       case 'data': {
@@ -251,9 +251,16 @@ export default function Settings() {
                 />
               </label>
             </div>
+            <Field
+              label="Starting balance date (optional)"
+              type="date"
+              value={form.starting_balance_date || ''}
+              onChange={(v) => setForm((f) => ({ ...f, starting_balance_date: v }))}
+            />
             <span className="-mt-1 block text-xs text-slate-500 dark:text-slate-400">
-              Your account balance on the day you started using this app. Financials adds every payment collected and subtracts
-              every expense recorded since to show a running current balance.
+              The starting balance is your account balance at the start of this date. Financials then adds every payment,
+              contribution and return dated on or after it, and subtracts every expense, draw and distribution. Anything dated
+              earlier is left out of the bank balance, so older history can't distort it. Leave blank to count everything recorded.
             </span>
             <label className="block">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bank / payment details</span>

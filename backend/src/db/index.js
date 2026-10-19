@@ -787,6 +787,14 @@ if (!settingsColumns.has('starting_balance')) {
   db.exec(`ALTER TABLE business_settings ADD COLUMN starting_balance REAL NOT NULL DEFAULT 0;`);
 }
 
+// Same pattern again: `starting_balance_date` — the date the starting
+// balance was measured at. Blank means "no cutoff" (every recorded
+// transaction counts toward the bank balance, the original behavior);
+// when set, only transactions dated on/after it are added to the balance.
+if (!settingsColumns.has('starting_balance_date')) {
+  db.exec(`ALTER TABLE business_settings ADD COLUMN starting_balance_date TEXT NOT NULL DEFAULT '';`);
+}
+
 // Same pattern again: `clients` used to have separate `name` (contact
 // person) and `company` fields, which in practice was just a confusing
 // way to ask the same question twice — a client here always means the

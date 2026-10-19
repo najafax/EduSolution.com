@@ -140,6 +140,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     signatory_name = '',
     pdf_template = 'modern',
     starting_balance = 0,
+    starting_balance_date = '',
   } = req.body || {};
 
   const timeoutNum = Number(session_timeout_minutes);
@@ -152,6 +153,11 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
   const startingBalanceNum = Number(starting_balance);
   if (!Number.isFinite(startingBalanceNum)) {
     return res.status(400).json({ error: 'starting_balance must be a number' });
+  }
+
+  const startingBalanceDate = String(starting_balance_date || '').trim();
+  if (startingBalanceDate && (!/^\d{4}-\d{2}-\d{2}$/.test(startingBalanceDate) || Number.isNaN(Date.parse(startingBalanceDate)))) {
+    return res.status(400).json({ error: 'starting_balance_date must be a valid date (YYYY-MM-DD) or blank' });
   }
 
   let signatureImage, stampImage, logoImage;
@@ -167,7 +173,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     `UPDATE business_settings
      SET business_name = ?, email = ?, phone = ?, address = ?, tax_id = ?, currency_symbol = ?, bank_details = ?,
          session_timeout_minutes = ?, signature_image = ?, stamp_image = ?, logo_image = ?, signatory_name = ?,
-         pdf_template = ?, starting_balance = ?, updated_at = datetime('now')
+         pdf_template = ?, starting_balance = ?, starting_balance_date = ?, updated_at = datetime('now')
      WHERE id = 1`,
   ).run(
     business_name,
@@ -184,6 +190,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     signatory_name,
     pdf_template,
     startingBalanceNum,
+    startingBalanceDate,
   );
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();

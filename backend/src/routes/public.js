@@ -27,7 +27,7 @@ function withComputedInvoice(invoice) {
 // bank_details, logo/signature/stamp images, etc.) is fine as-is: it's the
 // same data this same token can already pull via the PDF route.
 function publicSettings(settings) {
-  const { session_timeout_minutes, starting_balance, ...rest } = settings;
+  const { session_timeout_minutes, starting_balance, starting_balance_date, ...rest } = settings;
   return rest;
 }
 
