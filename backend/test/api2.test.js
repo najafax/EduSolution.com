@@ -62,3 +62,30 @@ test('security: portal hides internal fields and draft invoices', async () => {
   const q = await get('/portal/quotes', t);
   assert.equal(q.data.quotes.length, 1);
 });
+
+test('quotes: only draft/sent/accepted quotes convert, once, atomically', async () => {
+  const mkQuote = async () =>
+    (await post('/quotes', {
+      client_id: ctx.client.id, issue_date: today(), expiry_date: today(),
+      items: [{ description: 'Thing', quantity: 1, unit_price: 50 }],
+    })).data.quote;
+  const voidQ = await mkQuote();
+  assert.equal((await post(`/quotes/${voidQ.id}/void`, { reason: 'test' })).status, 200);
+  const declinedQ = await mkQuote();
+  const expiredQ = await mkQuote();
+  const d = srv.db();
+  d.prepare("UPDATE quotes SET status = 'declined' WHERE id = ?").run(declinedQ.id);
+  d.prepare("UPDATE quotes SET status = 'expired' WHERE id = ?").run(expiredQ.id);
+  const before = d.prepare('SELECT COUNT(*) AS c FROM invoices').get().c;
+  d.close();
+  for (const q of [voidQ, declinedQ, expiredQ]) {
+    const r = await post(`/quotes/${q.id}/convert-to-invoice`, { due_date: today() });
+    assert.equal(r.status, 409, `quote ${q.id} should not convert`);
+  }
+  const d2 = srv.db();
+  assert.equal(d2.prepare('SELECT COUNT(*) AS c FROM invoices').get().c, before);
+  d2.close();
+  const ok = await post(`/quotes/${ctx.quote.id}/convert-to-invoice`, { due_date: today() });
+  assert.equal(ok.status, 201);
+  assert.equal((await post(`/quotes/${ctx.quote.id}/convert-to-invoice`, { due_date: today() })).status, 409);
+});

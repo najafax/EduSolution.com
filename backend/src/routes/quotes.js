@@ -507,57 +507,64 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
   if (data.quote.converted_invoice_id) {
     return res.status(409).json({ error: 'This quote has already been converted to an invoice' });
   }
+  if (!['draft', 'sent', 'accepted'].includes(data.quote.status)) {
+    return res.status(409).json({ error: `A ${data.quote.status} quote cannot be converted to an invoice` });
+  }
 
   const { due_date, po_number = '' } = req.body || {};
   if (!due_date) return res.status(400).json({ error: 'due_date is required' });
   const dueError = dateError(due_date, 'due_date');
   if (dueError) return res.status(400).json({ error: dueError });
 
-  const number = nextInvoiceNumber();
-  const publicToken = crypto.randomBytes(16).toString('hex');
-  const issueDate = todayStr();
+  const convert = db.transaction(() => {
+    const number = nextInvoiceNumber();
+    const publicToken = crypto.randomBytes(16).toString('hex');
+    const issueDate = todayStr();
 
-  const result = db
-    .prepare(
-      `INSERT INTO invoices (number, client_id, quote_id, status, issue_date, due_date, notes, discount_type, discount_value,
-         subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name, po_number)
-       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      number,
-      data.quote.client_id,
-      data.quote.id,
-      issueDate,
-      due_date,
-      data.quote.notes,
-      data.quote.discount_type,
-      data.quote.discount_value,
-      data.quote.subtotal,
-      data.quote.discount_amount,
-      data.quote.tax_rate,
-      data.quote.tax_amount,
-      data.quote.total,
-      publicToken,
-      req.user.name,
-      po_number,
+    const result = db
+      .prepare(
+        `INSERT INTO invoices (number, client_id, quote_id, status, issue_date, due_date, notes, discount_type, discount_value,
+           subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name, po_number)
+         VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        number,
+        data.quote.client_id,
+        data.quote.id,
+        issueDate,
+        due_date,
+        data.quote.notes,
+        data.quote.discount_type,
+        data.quote.discount_value,
+        data.quote.subtotal,
+        data.quote.discount_amount,
+        data.quote.tax_rate,
+        data.quote.tax_amount,
+        data.quote.total,
+        publicToken,
+        req.user.name,
+        po_number,
+      );
+
+    const insertItem = db.prepare(
+      'INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order, product_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
     );
+    for (const item of data.items) {
+      insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order, item.product_id ?? null);
+    }
+    stampItemCosts(result.lastInsertRowid);
 
-  const insertItem = db.prepare(
-    'INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order, product_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  );
-  for (const item of data.items) {
-    insertItem.run(result.lastInsertRowid, item.description, item.quantity, item.unit_price, item.amount, item.sort_order, item.product_id ?? null);
-  }
-  stampItemCosts(result.lastInsertRowid);
-
-  db.prepare(`UPDATE quotes SET converted_invoice_id = ?, status = 'accepted', updated_at = datetime('now') WHERE id = ?`).run(
-    result.lastInsertRowid,
-    req.params.id,
-  );
+    db.prepare(`UPDATE quotes SET converted_invoice_id = ?, status = 'accepted', updated_at = datetime('now') WHERE id = ?`).run(
+      result.lastInsertRowid,
+      req.params.id,
+    );
+    return { lastInsertRowid: result.lastInsertRowid, number };
+  });
+  const { lastInsertRowid, number: invoiceNumber } = convert();
 
   logActivity({ userName: req.user.name, action: 'converted to invoice', entityType: 'quote', entityId: data.quote.id, entityLabel: data.quote.number });
 
-  res.status(201).json({ invoiceId: result.lastInsertRowid, invoiceNumber: number });
+  res.status(201).json({ invoiceId: lastInsertRowid, invoiceNumber });
 });
 
 module.exports = router;
