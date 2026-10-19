@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const { todayStr } = require('./businessDate');
 const crypto = require('crypto');
 const db = require('../db');
 const { renderInvoicePdf } = require('./pdf');
@@ -12,7 +13,7 @@ const { licenseRemindEmail, overdueReminderEmail } = require('./emailTemplates')
 const { runDailyEarningsReport } = require('./dailyEarningsReport');
 const { isConfigured: isFacebookDraftingConfigured, createDraft: createFacebookDraft } = require('./facebookPostDraft');
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayStr();
 
 // How many days overdue an invoice needs to be before the automated
 // reminder escalates to a firmer tone, then a final notice. This is a
@@ -252,7 +253,7 @@ async function runMonthlyReport() {
   const totalExpenses = expensesByCategory.reduce((sum, c) => sum + c.total, 0);
   const netProfit = Math.round((revenueTotal - totalExpenses) * 100) / 100;
   const totalInvoiced = db
-    .prepare(`SELECT COALESCE(SUM(total), 0) AS total FROM invoices WHERE status != 'void' AND issue_date BETWEEN ? AND ?`)
+    .prepare(`SELECT COALESCE(SUM(total), 0) AS total FROM invoices WHERE status NOT IN ('void', 'draft') AND issue_date BETWEEN ? AND ?`)
     .get(from, to).total;
 
   let buffer;

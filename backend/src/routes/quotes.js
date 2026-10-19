@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { todayStr } = require('../lib/businessDate');
 const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
@@ -506,7 +507,7 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
 
   const number = nextInvoiceNumber();
   const publicToken = crypto.randomBytes(16).toString('hex');
-  const issueDate = new Date().toISOString().slice(0, 10);
+  const issueDate = todayStr();
 
   const result = db
     .prepare(

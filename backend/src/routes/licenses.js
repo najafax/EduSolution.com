@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { sendMail, textToHtml } = require('../lib/mailer');
@@ -16,7 +17,7 @@ const view = requirePermission('licenses', 'view');
 const manage = requirePermission('licenses', 'manage');
 
 const BILLING_CYCLES = ['monthly', 'yearly'];
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayStr();
 
 // How many days out a still-active license starts counting as "expiring
 // soon" — both for the `display_status` badge below and for which licenses

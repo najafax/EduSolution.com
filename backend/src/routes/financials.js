@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 
@@ -6,7 +7,7 @@ const router = Router();
 router.use(requireAuth);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayStr();
 const monthKey = (dateStr) => dateStr.slice(0, 7); // 'YYYY-MM'
 
 // Last `count` calendar months including the current one, oldest first.
@@ -31,7 +32,7 @@ function computeSummary(from, to) {
   const dateFilter = filtered ? ' AND issue_date BETWEEN ? AND ?' : '';
   const dateArgs = filtered ? [from, to] : [];
 
-  const invoices = db.prepare(`SELECT * FROM invoices WHERE status != 'void'${dateFilter}`).all(...dateArgs);
+  const invoices = db.prepare(`SELECT * FROM invoices WHERE status NOT IN ('void', 'draft')${dateFilter}`).all(...dateArgs);
 
   const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
   const totalPaid = invoices.reduce((sum, inv) => sum + inv.amount_paid, 0);
@@ -165,7 +166,7 @@ function computeSummary(from, to) {
   // which filter tab is selected.
   const months = recentMonths(6);
   const invoicedByMonth = Object.fromEntries(months.map((m) => [m, 0]));
-  const allInvoices = filtered ? db.prepare("SELECT * FROM invoices WHERE status != 'void'").all() : invoices;
+  const allInvoices = filtered ? db.prepare("SELECT * FROM invoices WHERE status NOT IN ('void', 'draft')").all() : invoices;
   for (const inv of allInvoices) {
     const key = monthKey(inv.issue_date);
     if (key in invoicedByMonth) invoicedByMonth[key] += inv.total;

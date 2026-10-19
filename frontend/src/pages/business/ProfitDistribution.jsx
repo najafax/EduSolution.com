@@ -113,6 +113,9 @@ export default function ProfitDistribution() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  // Tax on the linked invoice (tax collected is owed to the tax authority, not
+  // profit): { tax, pretax } or null. Display/convenience only, never saved.
+  const [taxInfo, setTaxInfo] = useState(null);
 
   const [distributeTarget, setDistributeTarget] = useState(null);
   const [distributing, setDistributing] = useState(false);
@@ -201,6 +204,7 @@ export default function ProfitDistribution() {
   const formNetProfit = round2((Number(form.revenue_amount) || 0) - formCostMvr);
 
   function startCreate() {
+    setTaxInfo(null);
     setForm(EMPTY_FORM);
     setEditingId(null);
     setFormError('');
@@ -208,6 +212,7 @@ export default function ProfitDistribution() {
   }
 
   function startEdit(deal) {
+    setTaxInfo(deal.invoice_tax_amount > 0 ? { tax: deal.invoice_tax_amount, pretax: deal.invoice_pretax_total } : null);
     setForm({
       description: deal.description,
       invoice_id: deal.invoice_id ? String(deal.invoice_id) : '',
@@ -241,9 +246,13 @@ export default function ProfitDistribution() {
           cost_price: product ? product.cost_price : 0,
         };
       });
+      const tax = round2(invoice.tax_amount || 0);
+      const pretax = round2(invoice.total - tax);
+      setTaxInfo(tax > 0 ? { tax, pretax } : null);
       setForm((f) => ({
         ...f,
-        revenue_amount: invoice.total,
+        // Pre-tax by default: tax collected is owed to the tax authority, not profit to split.
+        revenue_amount: pretax,
         items: f.items.length === 0 ? nextItems : f.items,
       }));
     } catch (err) {
@@ -585,6 +594,19 @@ export default function ProfitDistribution() {
               onChange={(e) => setForm((f) => ({ ...f, revenue_amount: e.target.value }))}
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
+            {taxInfo && Number(form.revenue_amount) > taxInfo.pretax + 0.01 && (
+              <span className="mt-1.5 block text-xs text-amber-700 dark:text-amber-400">
+                This is more than the invoice's pre-tax amount. The invoice includes {symbol}{taxInfo.tax.toFixed(2)} tax,
+                which is owed to the tax authority, not profit to split.{' '}
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, revenue_amount: taxInfo.pretax }))}
+                  className="font-semibold underline"
+                >
+                  Use pre-tax {symbol}{taxInfo.pretax.toFixed(2)}
+                </button>
+              </span>
+            )}
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Supplier / payee (optional)</span>
@@ -742,6 +764,13 @@ export default function ProfitDistribution() {
               }
               return null;
             })()}
+            {distributeTarget.revenue_includes_tax && (
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Revenue here includes tax. The linked invoice carries {symbol}{distributeTarget.invoice_tax_amount.toFixed(2)} of
+                tax, which is owed to the tax authority, not profit. Edit the record to use the pre-tax amount
+                ({symbol}{distributeTarget.invoice_pretax_total.toFixed(2)}) before distributing.
+              </p>
+            )}
             <div className="grid gap-1 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Revenue</span>

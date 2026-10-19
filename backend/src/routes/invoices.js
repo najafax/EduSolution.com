@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { todayStr } = require('../lib/businessDate');
 const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
@@ -18,7 +19,7 @@ router.use(requireAuth);
 const view = requirePermission('invoices', 'view');
 const manage = requirePermission('invoices', 'manage');
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayStr();
 
 function withComputed(invoice) {
   const balanceDue = Math.round((invoice.total - invoice.amount_paid) * 100) / 100;
@@ -251,7 +252,7 @@ router.get('/analytics', view, (req, res) => {
       byYear.push({
         year,
         issued: issuedThisYear.length,
-        amountInvoiced: round2(issuedThisYear.filter((i) => i.status !== 'void').reduce((sum, i) => sum + i.total, 0)),
+        amountInvoiced: round2(issuedThisYear.filter((i) => i.status !== 'void' && i.status !== 'draft').reduce((sum, i) => sum + i.total, 0)),
         paymentsReceived: paymentsThisYear.length,
         amountCollected: round2(paymentsThisYear.reduce((sum, p) => sum + p.amount, 0)),
         voided: voidEvents.filter((v) => yearOf(v.created_at) === year).length,
@@ -267,7 +268,7 @@ router.get('/analytics', view, (req, res) => {
       .prepare(
         `SELECT clients.id, clients.name, COUNT(*) AS invoice_count, COALESCE(SUM(invoices.total), 0) AS total_amount
          FROM invoices JOIN clients ON clients.id = invoices.client_id
-         WHERE invoices.status != 'void'
+         WHERE invoices.status NOT IN ('void', 'draft')
          GROUP BY clients.id
          ORDER BY total_amount DESC, invoice_count DESC
          LIMIT 5`,
@@ -280,7 +281,7 @@ router.get('/analytics', view, (req, res) => {
       topClients,
       totals: {
         totalInvoices: invoices.length,
-        totalInvoiced: round2(invoices.filter((i) => i.status !== 'void').reduce((sum, i) => sum + i.total, 0)),
+        totalInvoiced: round2(invoices.filter((i) => i.status !== 'void' && i.status !== 'draft').reduce((sum, i) => sum + i.total, 0)),
         totalCollected: round2(payments.reduce((sum, p) => sum + p.amount, 0)),
         totalOutstanding: round2(invoices.filter((i) => i.status === 'sent').reduce((sum, i) => sum + (i.total - i.amount_paid), 0)),
         totalVoided: byStatus.void,

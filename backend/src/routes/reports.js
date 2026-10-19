@@ -44,7 +44,7 @@ function invoicesInRange(from, to) {
     .prepare(
       `SELECT invoices.*, clients.name AS client_name
        FROM invoices JOIN clients ON clients.id = invoices.client_id
-       WHERE invoices.status != 'void' AND issue_date BETWEEN ? AND ?
+       WHERE invoices.status NOT IN ('void', 'draft') AND issue_date BETWEEN ? AND ?
        ORDER BY issue_date ASC, invoices.id ASC`,
     )
     .all(from, to);

@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { renderQuotePdf, renderInvoicePdf } = require('../lib/pdf');
 const { logActivity } = require('../lib/activity');
@@ -6,7 +7,7 @@ const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
 
 const router = Router();
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayStr();
 
 function withComputedInvoice(invoice) {
   const balanceDue = Math.round((invoice.total - invoice.amount_paid) * 100) / 100;
