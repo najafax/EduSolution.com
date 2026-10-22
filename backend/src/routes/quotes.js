@@ -510,7 +510,7 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
   if (data.quote.converted_invoice_id) {
     return res.status(409).json({ error: 'This quote has already been converted to an invoice' });
   }
-  if (!['draft', 'sent', 'accepted'].includes(data.quote.status)) {
+  if (!['draft', 'sent', 'accepted', 'expired'].includes(data.quote.status)) {
     return res.status(409).json({ error: `A ${data.quote.status} quote cannot be converted to an invoice` });
   }
 

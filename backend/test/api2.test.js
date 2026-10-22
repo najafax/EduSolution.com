@@ -78,13 +78,15 @@ test('quotes: only draft/sent/accepted quotes convert, once, atomically', async 
   d.prepare("UPDATE quotes SET status = 'expired' WHERE id = ?").run(expiredQ.id);
   const before = d.prepare('SELECT COUNT(*) AS c FROM invoices').get().c;
   d.close();
-  for (const q of [voidQ, declinedQ, expiredQ]) {
+  for (const q of [voidQ, declinedQ]) {
     const r = await post(`/quotes/${q.id}/convert-to-invoice`, { due_date: today() });
     assert.equal(r.status, 409, `quote ${q.id} should not convert`);
   }
   const d2 = srv.db();
   assert.equal(d2.prepare('SELECT COUNT(*) AS c FROM invoices').get().c, before);
   d2.close();
+  // An expired quote can still be converted (the client may still want it).
+  assert.equal((await post(`/quotes/${expiredQ.id}/convert-to-invoice`, { due_date: today() })).status, 201);
   const ok = await post(`/quotes/${ctx.quote.id}/convert-to-invoice`, { due_date: today() });
   assert.equal(ok.status, 201);
   assert.equal((await post(`/quotes/${ctx.quote.id}/convert-to-invoice`, { due_date: today() })).status, 409);

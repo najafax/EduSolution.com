@@ -135,7 +135,7 @@ export default function QuoteDetail() {
               Email to client
             </button>
           )}
-          {canManage && canManageInvoices && !quote.converted_invoice_id && (
+          {canManage && canManageInvoices && !quote.converted_invoice_id && quote.status !== 'void' && quote.status !== 'declined' && (
             <button onClick={() => setShowConvert((v) => !v)} className="flex min-h-11 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
               <InvoiceIcon width={16} height={16} />
               Convert to invoice
