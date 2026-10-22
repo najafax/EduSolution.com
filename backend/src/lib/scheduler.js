@@ -458,6 +458,16 @@ function startScheduler() {
   cron.schedule('30 3 * * *', () => {
     runDailyEarningsReport().catch((err) => console.error('[daily-earnings] job failed:', err));
   });
+  // Nightly automatic profit distribution (off until switched on from the
+  // Profit Distribution page) — after the 03:30 daily earnings email.
+  cron.schedule('45 3 * * *', () => {
+    try {
+      const result = require('../routes/deals').autoDistribute('Automated');
+      console.log('[profit-auto] distributed:', (result.distributed || []).length, 'waiting:', (result.waiting || []).length);
+    } catch (err) {
+      console.error('[profit-auto] job failed:', err);
+    }
+  });
   // 09:00 on the 1st of each month — after the daily jobs above have had
   // their usual run, and comfortably after runBackup()'s 03:00 slot so a
   // slow backup can never delay this. node-cron's 5-field expressions

@@ -128,6 +128,13 @@ export default function ProfitDistribution() {
   // each skip with its own reason) since a batch can partially succeed.
   const [bulkDistributing, setBulkDistributing] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
+  const [auto, setAuto] = useState(null);
+  const [autoBusy, setAutoBusy] = useState(false);
+  const [trueUpTarget, setTrueUpTarget] = useState(null);
+  const [trueUpRate, setTrueUpRate] = useState('');
+  const [trueUpPlan, setTrueUpPlan] = useState(null);
+  const [trueUpError, setTrueUpError] = useState('');
+  const [trueUpBusy, setTrueUpBusy] = useState(false);
 
   const { confirm, confirmDialog } = useConfirm();
 
@@ -379,6 +386,88 @@ export default function ProfitDistribution() {
     }
   }
 
+  function loadAuto() {
+    api.deals.autoSettings(token).then(setAuto).catch(() => {});
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(loadAuto, [token]);
+
+  async function toggleAuto() {
+    setAutoBusy(true);
+    try {
+      if (!auto.enabled) {
+        const ok = await confirm({
+          title: 'Turn on automatic distribution?',
+          message:
+            'Every night, each invoice that has been fully paid from today onward is split among active shareholders by their ownership %. Older invoices are never touched. Supplier cost uses the USD account average rate and can be adjusted to the actual rate afterward.',
+          confirmLabel: 'Turn on',
+          danger: false,
+        });
+        if (!ok) return;
+      }
+      await api.deals.setAuto(!auto.enabled, token);
+      loadAuto();
+      toast(auto.enabled ? 'Automatic distribution turned off.' : 'Automatic distribution turned on.', { type: 'success' });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAutoBusy(false);
+    }
+  }
+
+  async function runAutoNow() {
+    setAutoBusy(true);
+    try {
+      const r = await api.deals.autoRun(token);
+      if (r.skipped) toast('Nothing to run — ' + (r.skipped === 'off' ? 'automatic distribution is off.' : 'no active shareholders with an ownership %.'), { type: 'info' });
+      else toast(`Distributed ${r.distributed.length} invoice(s); ${r.waiting.length} waiting.`, { type: 'success' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAutoBusy(false);
+    }
+  }
+
+  function openTrueUp(deal) {
+    setTrueUpTarget(deal);
+    setTrueUpRate(auto?.usdAverageRate ? String(auto.usdAverageRate) : String(deal.exchange_rate || ''));
+    setTrueUpPlan(null);
+    setTrueUpError('');
+  }
+
+  useEffect(() => {
+    if (!trueUpTarget || !(Number(trueUpRate) > 0)) {
+      setTrueUpPlan(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      api.deals
+        .trueUpPreview(trueUpTarget.id, trueUpRate, token)
+        .then((plan) => !cancelled && (setTrueUpPlan(plan), setTrueUpError('')))
+        .catch((err) => !cancelled && (setTrueUpPlan(null), setTrueUpError(err.message)));
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [trueUpTarget, trueUpRate, token]);
+
+  async function submitTrueUp() {
+    setTrueUpBusy(true);
+    try {
+      await api.deals.trueUp(trueUpTarget.id, Number(trueUpRate), token);
+      toast('Payout adjusted to the actual rate.', { type: 'success' });
+      setTrueUpTarget(null);
+      load();
+    } catch (err) {
+      setTrueUpError(err.message);
+    } finally {
+      setTrueUpBusy(false);
+    }
+  }
+
   function rowActions(deal) {
     if (!canManage) return null;
     if (deal.status === 'draft') {
@@ -396,7 +485,20 @@ export default function ProfitDistribution() {
         </>
       );
     }
-    return <IconActionButton icon={UsersIcon} tone="lagoon" onClick={() => openView(deal)} title="View split" label="View distribution" />;
+    return (
+      <>
+        <IconActionButton icon={UsersIcon} tone="lagoon" onClick={() => openView(deal)} title="View split" label="View distribution" />
+        {deal.cost_usd_total > 0 && (
+          <IconActionButton
+            icon={RefreshIcon}
+            tone="amber"
+            onClick={() => openTrueUp(deal)}
+            title="Adjust to actual rate"
+            label="Adjust payout to actual USD rate"
+          />
+        )}
+      </>
+    );
   }
 
   return (
@@ -427,6 +529,30 @@ export default function ProfitDistribution() {
         search={<SearchInput value={search} onChange={setSearch} placeholder="Search records…" />}
         filters={<StatusFilterChips options={STATUS_OPTIONS} value={status} onChange={setStatus} />}
       />
+
+      {canManage && auto && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white p-4 text-sm dark:border dark:border-slate-700 dark:bg-slate-900">
+          <div className="min-w-0">
+            <p className="font-medium text-slate-900 dark:text-white">
+              Automatic distribution: {auto.enabled ? `on (invoices paid since ${auto.from})` : 'off'}
+            </p>
+            <p className="text-slate-500 dark:text-slate-400">
+              Each night, fully paid invoices are split by shareholder %. Cost uses the USD account average rate
+              {auto.usdAverageRate ? ` (now ${auto.usdAverageRate})` : ''}; adjust to the actual rate afterward.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {auto.enabled && (
+              <button onClick={runAutoNow} disabled={autoBusy} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+                Run now
+              </button>
+            )}
+            <button onClick={toggleAuto} disabled={autoBusy} className="min-h-11 rounded-md bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60 dark:bg-lagoon-600 dark:hover:bg-lagoon-500">
+              {auto.enabled ? 'Turn off' : 'Turn on'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {bulkResult && (
         <div className="mt-4 rounded-md border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
@@ -768,6 +894,61 @@ export default function ProfitDistribution() {
                 onClick={() => setDistributeTarget(null)}
                 className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
               >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={Boolean(trueUpTarget)} onClose={() => setTrueUpTarget(null)} title="Adjust payout to actual rate" maxWidthClass="max-w-lg">
+        {trueUpTarget && (
+          <div className="grid gap-3">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {trueUpTarget.description} — paid at estimated rate {trueUpTarget.exchange_rate}. Enter the rate the USD actually cost; each
+              shareholder's payout is scaled to the new profit and the difference is recorded.
+            </p>
+            <label className="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+              Actual rate (MVR per USD)
+              <input
+                type="number"
+                step="0.0001"
+                min="0"
+                value={trueUpRate}
+                onChange={(e) => setTrueUpRate(e.target.value)}
+                className="min-h-11 rounded-md border border-slate-300 px-3 text-base dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              />
+            </label>
+            {trueUpPlan && (
+              <div className="rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-800">
+                <p className="text-slate-600 dark:text-slate-300">
+                  Net profit {symbol}{trueUpPlan.oldNet.toFixed(2)} → {symbol}{trueUpPlan.newNet.toFixed(2)}
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {trueUpPlan.rows.map((r) => (
+                    <li key={r.name} className="flex justify-between">
+                      <span className="text-slate-800 dark:text-slate-200">{r.name}</span>
+                      <span className={r.adjustment < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                        {r.adjustment >= 0 ? '+' : ''}{r.adjustment.toFixed(2)} (→ {r.target.toFixed(2)})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {trueUpPlan.rows.some((r) => r.adjustment < 0) && (
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">A negative amount means that shareholder was overpaid and owes it back.</p>
+                )}
+              </div>
+            )}
+            {trueUpError && <p className="text-sm text-red-600 dark:text-red-400">{trueUpError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={submitTrueUp}
+                disabled={trueUpBusy || !trueUpPlan}
+                className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
+              >
+                {trueUpBusy ? 'Saving…' : 'Apply adjustment'}
+              </button>
+              <button onClick={() => setTrueUpTarget(null)} className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 dark:border-slate-600 dark:text-slate-200">
                 Cancel
               </button>
             </div>

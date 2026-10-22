@@ -3,6 +3,7 @@ const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
+const { position } = require('../lib/usdLedger');
 
 // Internal profit-distribution calculator — never surfaced to a client, not
 // even when a deal links back to a real invoice (see db/index.js's own
@@ -117,6 +118,36 @@ function validate(body) {
   }
   return null;
 }
+
+// Automatic distribution switch (see autoDistribute() below). Registered
+// before GET /:id so 'auto-settings' is never taken for an id.
+router.get('/auto-settings', view, (req, res) => {
+  const row = db.prepare('SELECT auto_profit_from AS from_date FROM business_settings WHERE id = 1').get();
+  const rate = position(todayStr()).avgRate;
+  res.json({ enabled: Boolean(row.from_date), from: row.from_date || null, usdAverageRate: rate ? Math.round(rate * 10000) / 10000 : null });
+});
+
+router.put('/auto-settings', manage, (req, res) => {
+  const enabled = Boolean(req.body && req.body.enabled);
+  const current = db.prepare('SELECT auto_profit_from AS from_date FROM business_settings WHERE id = 1').get().from_date;
+  // Turning it on starts from today; switching it on again while already on
+  // keeps the original start date.
+  const next = enabled ? current || todayStr() : '';
+  db.prepare('UPDATE business_settings SET auto_profit_from = ? WHERE id = 1').run(next);
+  logActivity({
+    userName: req.user.name,
+    action: enabled ? 'turned on automatic profit distribution' : 'turned off automatic profit distribution',
+    entityType: 'deal',
+    entityId: null,
+    entityLabel: next ? `from ${next}` : '',
+  });
+  res.json({ enabled: Boolean(next), from: next || null });
+});
+
+// Same job as the nightly cron run, on demand.
+router.post('/auto-run', manage, (req, res) => {
+  res.json(autoDistribute(req.user.name));
+});
 
 router.get('/', view, (req, res) => {
   const { q, status, page: pageParam } = req.query;
@@ -428,4 +459,158 @@ router.post('/distribute-all', manage, (req, res) => {
   res.json({ distributed, skipped });
 });
 
+// ---------------------------------------------------------------------------
+// Automatic distribution (nightly, lib/scheduler.js) — off until someone turns
+// it on (business_settings.auto_profit_from). For every invoice that is fully
+// paid on/after that date and not yet linked to a deal, it creates a deal
+// (revenue = invoice total minus the tax collected; supplier cost = the
+// invoice's own stamped USD cost per line; estimated rate = the USD account's
+// average rate today) and distributes it by shareholder ownership %, using the
+// exact same eligibility rules and payout code as the manual button. Anything
+// ineligible (no USD rate yet, no profit, no shareholders) creates nothing and
+// is simply retried the next night. Later, trueUp() corrects the payout to the
+// actual rate.
+function autoDistribute(userName = 'Automated') {
+  const from = db.prepare('SELECT auto_profit_from AS f FROM business_settings WHERE id = 1').get().f;
+  if (!from) return { skipped: 'off', distributed: [], waiting: [] };
+
+  const shareholders = db
+    .prepare('SELECT * FROM shareholders WHERE active = 1 AND ownership_percent > 0 ORDER BY name COLLATE NOCASE')
+    .all();
+  if (shareholders.length === 0 || ownershipError(shareholders)) {
+    return { skipped: 'shareholders', distributed: [], waiting: [] };
+  }
+
+  const today = todayStr();
+  const rate = position(today).avgRate || null;
+  const candidates = db
+    .prepare(
+      `SELECT i.*, c.name AS client_name,
+              (SELECT MAX(substr(paid_at, 1, 10)) FROM payments WHERE invoice_id = i.id AND amount > 0) AS paid_on
+       FROM invoices i JOIN clients c ON c.id = i.client_id
+       WHERE i.status = 'paid' AND NOT EXISTS (SELECT 1 FROM deals d WHERE d.invoice_id = i.id)
+       ORDER BY i.id`,
+    )
+    .all()
+    .filter((i) => i.paid_on && i.paid_on >= from);
+
+  const distributed = [];
+  const waiting = [];
+  const ROLLBACK = new Error('rollback');
+  for (const inv of candidates) {
+    const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order, id').all(inv.id);
+    const costItems = items.filter((it) => it.cost_price > 0);
+    let result = null;
+    try {
+      db.transaction(() => {
+        const info = db
+          .prepare(
+            `INSERT INTO deals (description, invoice_id, revenue_amount, exchange_rate, created_by_name) VALUES (?, ?, ?, ?, ?)`,
+          )
+          .run(`${inv.number} — ${inv.client_name} (auto)`, inv.id, round2(inv.total - (inv.tax_amount || 0)), costItems.length ? rate : null, userName);
+        saveDealItems(
+          info.lastInsertRowid,
+          costItems.map((it) => ({ product_id: it.product_id, description: it.description || 'Item', quantity: it.quantity, cost_price: it.cost_price })),
+        );
+        const computed = withComputedDeal(db.prepare('SELECT * FROM deals WHERE id = ?').get(info.lastInsertRowid));
+        const error = eligibilityError(computed);
+        if (error) {
+          result = { invoice: inv.number, reason: error };
+          throw ROLLBACK;
+        }
+        distributeDeal(computed, shareholders, userName, today);
+        result = { invoice: inv.number, deal_id: computed.id, net_profit: computed.net_profit };
+      })();
+      distributed.push(result);
+    } catch (err) {
+      if (err !== ROLLBACK) throw err;
+      waiting.push(result);
+    }
+  }
+
+  if (distributed.length > 0) {
+    logActivity({
+      userName,
+      action: 'auto-distributed profit for',
+      entityType: 'deal',
+      entityId: null,
+      entityLabel: `${distributed.length} invoice(s) (net ${round2(distributed.reduce((s, d) => s + d.net_profit, 0)).toFixed(2)})`,
+    });
+  }
+  return { distributed, waiting };
+}
+
+// Adjusting a distributed deal's payout to the actual USD rate. Each
+// shareholder's payout is scaled by (net profit at the actual rate) ÷ (net
+// profit at the rate currently on the deal), then the difference to what was
+// already paid is booked as another 'profit_distribution' row (positive = pay
+// more, negative = pay back). Using what was actually paid — not today's
+// ownership % — keeps this correct even if shareholdings changed since, and
+// makes it safe to repeat.
+function planTrueUp(deal, newRate) {
+  if (deal.status !== 'distributed') return { error: 'Only a distributed record can be adjusted.' };
+  const computed = withComputedDeal(deal);
+  if (!(computed.cost_usd_total > 0)) return { error: 'This record has no USD supplier cost, so there is no rate to adjust.' };
+  if (!(newRate > 0)) return { error: 'exchange_rate must be a positive number' };
+  if (!(computed.net_profit > 0)) return { error: 'This record has no profit to scale.' };
+  const newCostMvr = round2(computed.cost_usd_total * newRate);
+  const newNet = round2(computed.revenue_amount - newCostMvr);
+  if (!(newNet > 0)) return { error: `At rate ${newRate} the cost (${newCostMvr.toFixed(2)}) leaves no profit to distribute. Check the rate.` };
+  const scale = newNet / computed.net_profit;
+  const paid = db
+    .prepare(
+      `SELECT taken_by_name AS name, ROUND(SUM(amount), 2) AS paid FROM owner_draws
+       WHERE deal_id = ? AND type = 'profit_distribution' GROUP BY taken_by_name ORDER BY name COLLATE NOCASE`,
+    )
+    .all(deal.id);
+  const rows = paid.map((p) => {
+    const target = round2(p.paid * scale);
+    return { name: p.name, paid: p.paid, target, adjustment: round2(target - p.paid) };
+  });
+  return {
+    oldRate: deal.exchange_rate,
+    newRate,
+    oldNet: computed.net_profit,
+    newNet,
+    rows,
+    total_adjustment: round2(rows.reduce((s, r) => s + r.adjustment, 0)),
+  };
+}
+
+router.get('/:id/true-up-preview', view, (req, res) => {
+  const deal = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
+  if (!deal) return res.status(404).json({ error: 'Deal not found' });
+  const plan = planTrueUp(deal, Number(req.query.exchange_rate));
+  if (plan.error) return res.status(400).json({ error: plan.error });
+  res.json(plan);
+});
+
+router.post('/:id/true-up', manage, (req, res) => {
+  const deal = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
+  if (!deal) return res.status(404).json({ error: 'Deal not found' });
+  const plan = planTrueUp(deal, Number(req.body && req.body.exchange_rate));
+  if (plan.error) return res.status(400).json({ error: plan.error });
+
+  const today = todayStr();
+  const note = `True-up to actual rate ${plan.newRate} (was ${plan.oldRate}) — ${deal.description}`;
+  db.transaction(() => {
+    for (const r of plan.rows) {
+      if (Math.abs(r.adjustment) < 0.005) continue;
+      db.prepare(
+        `INSERT INTO owner_draws (type, deal_id, taken_by_name, amount, draw_date, notes, created_by_name) VALUES ('profit_distribution', ?, ?, ?, ?, ?, ?)`,
+      ).run(deal.id, r.name, r.adjustment, today, note, req.user.name);
+    }
+    db.prepare(`UPDATE deals SET exchange_rate = ?, updated_at = datetime('now') WHERE id = ?`).run(plan.newRate, deal.id);
+  })();
+  logActivity({
+    userName: req.user.name,
+    action: 'adjusted payout to actual rate for',
+    entityType: 'deal',
+    entityId: deal.id,
+    entityLabel: `${deal.description}: ${plan.oldRate} → ${plan.newRate} (net adjustment ${plan.total_adjustment.toFixed(2)})`,
+  });
+  res.json({ plan, deal: withComputedDeal(db.prepare('SELECT * FROM deals WHERE id = ?').get(deal.id)) });
+});
+
+router.autoDistribute = autoDistribute;
 module.exports = router;

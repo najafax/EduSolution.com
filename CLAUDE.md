@@ -9736,3 +9736,9 @@ Result of a full read-only finance audit followed by fixes. Supersedes older not
 - PAID stamp date ignores reversal rows; `toCsv` leaves numbers (e.g. negatives) unguarded.
 - Not changed (needs a business decision): Profit Distribution's estimated exchange rate vs the USD ledger; the 12-month "still to buy" window.
 - Tests: `backend/test/api2.test.js` plus a timezone test in `units.test.js` (26 total).
+
+### Automatic profit distribution + payout true-up (`routes/deals.js`)
+
+- **Nightly job** (`lib/scheduler.js`, 03:45 server time → `deals.autoDistribute()`; also `POST /api/deals/auto-run`): off until switched on from the Profit Distribution page (`business_settings.auto_profit_from`, set to today when turned on — history is never back-filled). For each invoice fully paid on/after that date with no deal yet, it creates a deal (revenue = invoice total minus tax collected; cost = the invoice's stamped USD line costs; estimated rate = USD account average rate today) and distributes it by shareholder ownership % with the same `eligibilityError()`/`distributeDeal()` as the manual button. Ineligible invoices (no USD rate yet, no profit, no shareholders) create nothing and retry the next night.
+- **Adjust to actual rate**: `GET /:id/true-up-preview?exchange_rate=` and `POST /:id/true-up`. Each shareholder's total payout is scaled by (net at the actual rate ÷ net at the deal's current rate); the difference is appended as another `profit_distribution` row (negative = overpaid, owes back), and the deal's rate is updated. Based on what was actually paid, not today's ownership %, so it stays correct if shareholdings changed and is safe to repeat. Refused if the new rate leaves no profit.
+- The true-up is manual (the UI prefills the USD account average rate); the actual rate per deal isn't knowable automatically.
