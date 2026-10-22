@@ -140,3 +140,60 @@ test('csv: negative numbers stay numeric, text starting with = is guarded', () =
   const out = toCsv([{ a: -5, b: '=SUM(A1)' }], [{ label: 'A', key: 'a' }, { label: 'B', key: 'b' }]);
   assert.equal(out.split('\r\n')[1], "-5,'=SUM(A1)");
 });
+
+test('profit: nightly auto-distribution by share %, then payout adjusted to the actual rate', async () => {
+  const sh1 = (await post('/shareholders', { name: 'Auto A', email: 'a@auto.test', ownership_percent: 60 })).data.shareholder;
+  const sh2 = (await post('/shareholders', { name: 'Auto B', email: 'b@auto.test', ownership_percent: 40 })).data.shareholder;
+  assert.ok(sh1 && sh2);
+  assert.equal((await post('/usd-account', { type: 'buy', usd_amount: 1000, mvr_amount: 15000, txn_date: today() })).status, 201);
+  const product = (await post('/products', { name: 'AutoWidget', unit_price: 1000, cost_price: 10 })).data.product;
+  const inv = (await post('/invoices', {
+    client_id: ctx.client.id, issue_date: today(), due_date: today(),
+    items: [{ description: 'AutoWidget', quantity: 5, unit_price: 1000, product_id: product.id }],
+  })).data.invoice; // total 5000, supplier cost 5 x $10 = $50
+  const d = srv.db();
+  d.prepare("UPDATE invoices SET status = 'sent' WHERE id = ?").run(inv.id);
+  d.close();
+  assert.equal((await post(`/invoices/${inv.id}/payments`, { amount: 5000 })).status, 201);
+
+  // Off by default: nothing is distributed.
+  assert.equal((await get('/deals/auto-settings')).data.enabled, false);
+  assert.equal((await post('/deals/auto-run', {})).data.skipped, 'off');
+  assert.equal((await srv.api('PUT', '/deals/auto-settings', { enabled: true }, boss)).data.enabled, true);
+
+  // Invoices paid before the switch-on date are never back-filled.
+  const d2 = srv.db();
+  d2.prepare('UPDATE business_settings SET auto_profit_from = ?').run('2999-01-01');
+  d2.close();
+  let run = (await post('/deals/auto-run', {})).data;
+  assert.equal(run.distributed.length, 0);
+  const d3 = srv.db();
+  d3.prepare('UPDATE business_settings SET auto_profit_from = ?').run('2000-01-01');
+  d3.close();
+
+  // Now: revenue 5000 (no tax), cost $50 x avg 15 = 750 -> net 4250, split 60/40.
+  run = (await post('/deals/auto-run', {})).data;
+  assert.equal(run.distributed.length, 1);
+  const dealId = run.distributed[0].deal_id;
+  const split = (await get(`/deals/${dealId}`)).data.distributions;
+  const byName = Object.fromEntries(split.map((x) => [x.taken_by_name, x.amount]));
+  assert.equal(byName['Auto A'], 2550);
+  assert.equal(byName['Auto B'], 1700);
+  // Running again does nothing (one deal per invoice).
+  assert.equal((await post('/deals/auto-run', {})).data.distributed.length, 0);
+
+  // Actual rate turned out to be 16: cost 800 -> net 4200 -> 2520 / 1680.
+  const preview = (await get(`/deals/${dealId}/true-up-preview?exchange_rate=16`)).data;
+  assert.equal(preview.newNet, 4200);
+  assert.equal(preview.total_adjustment, -50);
+  assert.equal((await post(`/deals/${dealId}/true-up`, { exchange_rate: 16 })).status, 200);
+  const after = (await get(`/deals/${dealId}`)).data.distributions;
+  const totals = {};
+  for (const x of after) totals[x.taken_by_name] = Math.round((totals[x.taken_by_name] || 0) * 100 + x.amount * 100) / 100;
+  assert.equal(totals['Auto A'], 2520);
+  assert.equal(totals['Auto B'], 1680);
+  // Repeating at the same rate changes nothing.
+  assert.equal((await get(`/deals/${dealId}/true-up-preview?exchange_rate=16`)).data.total_adjustment, 0);
+  // A rate that wipes out the profit is refused.
+  assert.equal((await post(`/deals/${dealId}/true-up`, { exchange_rate: 200 })).status, 400);
+});

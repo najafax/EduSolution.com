@@ -291,6 +291,13 @@ export const api = {
     // Distributes every eligible draft in one call. See routes/deals.js's
     // own POST /distribute-all.
     distributeAll: (token) => request('/deals/distribute-all', { method: 'POST', token }),
+    // Automatic nightly distribution switch + on-demand run, and adjusting a
+    // distributed payout to the actual USD rate (routes/deals.js).
+    autoSettings: (token) => request('/deals/auto-settings', { token }),
+    setAuto: (enabled, token) => request('/deals/auto-settings', { method: 'PUT', body: { enabled }, token }),
+    autoRun: (token) => request('/deals/auto-run', { method: 'POST', token }),
+    trueUpPreview: (id, rate, token) => request(`/deals/${id}/true-up-preview?exchange_rate=${encodeURIComponent(rate)}`, { token }),
+    trueUp: (id, rate, token) => request(`/deals/${id}/true-up`, { method: 'POST', body: { exchange_rate: rate }, token }),
   },
 
   // Backs pages/business/SupplierCosts.jsx — an automatic, month/year
