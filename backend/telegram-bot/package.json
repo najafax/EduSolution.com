@@ -9,5 +9,8 @@
   },
   "dependencies": {
     "node-telegram-bot-api": "^2.1.0"
+  },
+  "engines": {
+    "node": "^22.23.4 || ^24.22.1 || >=26.12.1"
   }
 }
