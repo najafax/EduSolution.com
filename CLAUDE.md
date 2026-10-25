@@ -9746,3 +9746,7 @@ Result of a full read-only finance audit followed by fixes. Supersedes older not
 ### Gmail API mailer (`backend/src/lib/mailer.js`)
 
 The droplet blocks outbound SMTP (ports 587/465 time out), so Gmail SMTP can't be used. When `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET` and `GMAIL_REFRESH_TOKEN` are all set, `sendMail()` sends through the Gmail API over HTTPS (`users/me/messages/send`), taking priority over Resend and SMTP; unset any one to fall back. The MIME message (attachments, Reply-To) is built with nodemailer's MailComposer; the access token is refreshed from the refresh token and cached. Gmail sends as the authorised account (a different From is rewritten unless it is a verified "send as" alias). Gmail limits: about 500 messages/day (free), 2,000 (Workspace). Tests: `backend/test/mailer.test.js` (mocked `fetch`).
+
+### Gmail failure alert (`backend/src/lib/opsAlert.js`)
+
+Gmail is the sole sender when configured (no Resend/SMTP fallback). If a Gmail send fails, `sendMail()` calls `sendOpsAlert()` — a fire-and-forget Telegram message to every id in `TELEGRAM_ALLOWED_USER_IDS` using `TELEGRAM_BOT_TOKEN` (the same vars as the ops bot), throttled to one alert per hour per key, a no-op when those vars are unset, never throws — and then rethrows the original error so callers behave as before. Alert text never includes credentials. Test: `backend/test/mailer.test.js`.

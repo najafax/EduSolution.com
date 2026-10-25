@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 const MailComposer = require('nodemailer/lib/mail-composer');
+const { sendOpsAlert } = require('./opsAlert');
 
 let transporter;
 let resendClient;
@@ -97,7 +98,16 @@ async function sendMail({ to, subject, html, attachments }) {
   const replyTo = replyToAddress();
 
   if (gmailConfigured()) {
-    await sendViaGmail({ from, to, subject, html, attachments, replyTo });
+    try {
+      await sendViaGmail({ from, to, subject, html, attachments, replyTo });
+    } catch (err) {
+      // Gmail is the sole sender (no fallback): tell the operator, then let the caller see the failure.
+      sendOpsAlert(
+        `⚠️ Gmail send failed — client emails are NOT going out.\n${err.message}\nCheck the GMAIL_* settings / Google authorisation on the server.`,
+        'gmail-send'
+      );
+      throw err;
+    }
     return;
   }
 
