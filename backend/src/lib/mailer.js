@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
+const MailComposer = require('nodemailer/lib/mail-composer');
 
 let transporter;
 let resendClient;
@@ -42,9 +43,64 @@ function replyToAddress() {
   return v === undefined ? DEFAULT_REPLY_TO : v.trim() || undefined;
 }
 
+// Gmail API over HTTPS (port 443), preferred over everything else when the
+// three GMAIL_* values are set. Needed because the droplet blocks outbound
+// SMTP (so Gmail's own SMTP can't be used) — the Gmail API never opens a
+// raw SMTP connection. Sends as the authorised account; Gmail rewrites any
+// other From address to it unless that address is a verified "send as" alias.
+const gmailConfigured = () =>
+  Boolean(process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET && process.env.GMAIL_REFRESH_TOKEN);
+
+let gmailToken = null; // { value, expiresAt }
+async function gmailAccessToken() {
+  if (gmailToken && gmailToken.expiresAt > Date.now() + 60_000) return gmailToken.value;
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.GMAIL_CLIENT_ID,
+      client_secret: process.env.GMAIL_CLIENT_SECRET,
+      refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) {
+    const err = new Error(`Gmail authorisation failed: ${data.error_description || data.error || res.status}`);
+    err.code = 'GMAIL_AUTH_ERROR';
+    throw err;
+  }
+  gmailToken = { value: data.access_token, expiresAt: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
+  return gmailToken.value;
+}
+
+async function sendViaGmail({ from, to, subject, html, attachments, replyTo }) {
+  const raw = await new MailComposer({ from, to, subject, html, attachments, ...(replyTo && { replyTo }) })
+    .compile()
+    .build();
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${await gmailAccessToken()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw: raw.toString('base64url') }),
+  });
+  if (!res.ok) {
+    if (res.status === 401) gmailToken = null;
+    const data = await res.json().catch(() => ({}));
+    const err = new Error(`Gmail failed to send the email: ${data.error?.message || res.status}`);
+    err.code = 'GMAIL_SEND_ERROR';
+    throw err;
+  }
+}
+
 async function sendMail({ to, subject, html, attachments }) {
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const from = process.env.SMTP_FROM || process.env.GMAIL_FROM || process.env.SMTP_USER;
   const replyTo = replyToAddress();
+
+  if (gmailConfigured()) {
+    await sendViaGmail({ from, to, subject, html, attachments, replyTo });
+    return;
+  }
+
   const resend = getResendClient();
 
   if (resend) {
@@ -60,7 +116,7 @@ async function sendMail({ to, subject, html, attachments }) {
   const t = getTransporter();
   if (!t) {
     const error = new Error(
-      'Email is not configured. Set RESEND_API_KEY (preferred) or SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and SMTP_FROM in backend/.env.',
+      'Email is not configured. Set GMAIL_CLIENT_ID/GMAIL_CLIENT_SECRET/GMAIL_REFRESH_TOKEN, RESEND_API_KEY, or SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and SMTP_FROM in backend/.env.',
     );
     error.code = 'EMAIL_NOT_CONFIGURED';
     throw error;
@@ -98,7 +154,7 @@ function textToHtml(text) {
 // droplet blocks outbound SMTP) has no SMTP_HOST, and gating on it silently
 // disabled every automated email.
 function isEmailConfigured() {
-  return Boolean(process.env.RESEND_API_KEY || process.env.SMTP_HOST);
+  return Boolean(gmailConfigured() || process.env.RESEND_API_KEY || process.env.SMTP_HOST);
 }
 
 module.exports = { sendMail, textToHtml, escapeHtml, isEmailConfigured };
