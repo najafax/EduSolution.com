@@ -119,20 +119,27 @@ function validate(body) {
   return null;
 }
 
+// Company rule: profit distribution officially starts on 1 January 2027, so
+// automatic distribution never picks up an invoice paid before this date, even
+// if it was switched on earlier or is switched on before then.
+const AUTO_PROFIT_EARLIEST = '2027-01-01';
+const effectiveAutoFrom = (stored) => (stored ? (stored < AUTO_PROFIT_EARLIEST ? AUTO_PROFIT_EARLIEST : stored) : '');
+
 // Automatic distribution switch (see autoDistribute() below). Registered
 // before GET /:id so 'auto-settings' is never taken for an id.
 router.get('/auto-settings', view, (req, res) => {
   const row = db.prepare('SELECT auto_profit_from AS from_date FROM business_settings WHERE id = 1').get();
   const rate = position(todayStr()).avgRate;
-  res.json({ enabled: Boolean(row.from_date), from: row.from_date || null, usdAverageRate: rate ? Math.round(rate * 10000) / 10000 : null });
+  const from = effectiveAutoFrom(row.from_date);
+  res.json({ enabled: Boolean(from), from: from || null, usdAverageRate: rate ? Math.round(rate * 10000) / 10000 : null });
 });
 
 router.put('/auto-settings', manage, (req, res) => {
   const enabled = Boolean(req.body && req.body.enabled);
   const current = db.prepare('SELECT auto_profit_from AS from_date FROM business_settings WHERE id = 1').get().from_date;
-  // Turning it on starts from today; switching it on again while already on
-  // keeps the original start date.
-  const next = enabled ? current || todayStr() : '';
+  // Turning it on starts from today, but never before AUTO_PROFIT_EARLIEST;
+  // switching it on again while already on keeps the original start date.
+  const next = enabled ? effectiveAutoFrom(current || todayStr()) : '';
   db.prepare('UPDATE business_settings SET auto_profit_from = ? WHERE id = 1').run(next);
   logActivity({
     userName: req.user.name,
@@ -471,7 +478,7 @@ router.post('/distribute-all', manage, (req, res) => {
 // is simply retried the next night. Later, trueUp() corrects the payout to the
 // actual rate.
 function autoDistribute(userName = 'Automated') {
-  const from = db.prepare('SELECT auto_profit_from AS f FROM business_settings WHERE id = 1').get().f;
+  const from = effectiveAutoFrom(db.prepare('SELECT auto_profit_from AS f FROM business_settings WHERE id = 1').get().f);
   if (!from) return { skipped: 'off', distributed: [], waiting: [] };
 
   const shareholders = db

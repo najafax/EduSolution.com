@@ -171,6 +171,13 @@ test('profit: nightly auto-distribution by share %, then payout adjusted to the 
   d3.prepare('UPDATE business_settings SET auto_profit_from = ?').run('2000-01-01');
   d3.close();
 
+  // Company rule: nothing paid before 1 Jan 2027 is ever distributed, however early the switch date.
+  assert.equal((await get('/deals/auto-settings')).data.from, '2027-01-01');
+  assert.equal((await post('/deals/auto-run', {})).data.distributed.length, 0);
+  const d4 = srv.db();
+  d4.prepare('UPDATE payments SET paid_at = ? WHERE invoice_id = ?').run('2027-01-05', inv.id);
+  d4.close();
+
   // Now: revenue 5000 (no tax), cost $50 x avg 15 = 750 -> net 4250, split 60/40.
   run = (await post('/deals/auto-run', {})).data;
   assert.equal(run.distributed.length, 1);
