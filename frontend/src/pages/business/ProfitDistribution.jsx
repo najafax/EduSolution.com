@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -17,7 +16,7 @@ import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import RowActions from '../../components/RowActions';
-import { BankIcon, PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XIcon, UsersIcon, RefreshIcon } from '../../components/icons';
+import { BankIcon, PlusIcon, PencilIcon, TrashIcon, XIcon, UsersIcon, RefreshIcon } from '../../components/icons';
 
 // Internal profit calculator — revenue received (MVR) minus what it cost to
 // buy USD to pay a supplier, split among shareholders by ownership_percent
@@ -117,17 +116,8 @@ export default function ProfitDistribution() {
   // profit): { tax, pretax } or null. Display/convenience only, never saved.
   const [taxInfo, setTaxInfo] = useState(null);
 
-  const [distributeTarget, setDistributeTarget] = useState(null);
-  const [distributing, setDistributing] = useState(false);
-  const [distributeError, setDistributeError] = useState('');
-
   const [viewTarget, setViewTarget] = useState(null);
 
-  // Bulk distribute-all: a single confirm-then-act button, no form of its
-  // own — reports back what actually happened (distributed vs. skipped,
-  // each skip with its own reason) since a batch can partially succeed.
-  const [bulkDistributing, setBulkDistributing] = useState(false);
-  const [bulkResult, setBulkResult] = useState(null);
   const [auto, setAuto] = useState(null);
   const [autoBusy, setAutoBusy] = useState(false);
   const [trueUpTarget, setTrueUpTarget] = useState(null);
@@ -180,7 +170,6 @@ export default function ProfitDistribution() {
   }, [token]);
 
   const eligibleShareholders = useMemo(() => shareholders.filter((s) => s.active && s.ownership_percent > 0), [shareholders]);
-  const draftCount = useMemo(() => deals.filter((d) => d.status === 'draft').length, [deals]);
 
   const invoiceOptions = useMemo(
     () =>
@@ -330,59 +319,12 @@ export default function ProfitDistribution() {
     }
   }
 
-  async function handleDistribute() {
-    if (!distributeTarget) return;
-    setDistributeError('');
-    setDistributing(true);
-    try {
-      await api.deals.distribute(distributeTarget.id, token);
-      toast('Profit distributed.', { type: 'success' });
-      setDistributeTarget(null);
-      load();
-    } catch (err) {
-      setDistributeError(err.message);
-    } finally {
-      setDistributing(false);
-    }
-  }
-
   async function openView(deal) {
     try {
       const data = await api.deals.get(deal.id, token);
       setViewTarget(data);
     } catch (err) {
       setError(err.message);
-    }
-  }
-
-  // Distributes every eligible draft record in one call — see
-  // routes/deals.js's own POST /distribute-all. An ineligible draft (no
-  // profit, or a USD cost with no exchange rate set) is skipped with its
-  // own reason rather than blocking the rest of the batch.
-  async function handleDistributeAll() {
-    if (
-      !(await confirm({
-        title: 'Distribute all eligible drafts?',
-        message:
-          'Every draft record with a positive net profit (and a real exchange rate for any USD cost) will be distributed now. This writes real expense and owner-payout records and cannot be undone from here.',
-        confirmLabel: 'Distribute all',
-      }))
-    )
-      return;
-    setBulkResult(null);
-    setBulkDistributing(true);
-    try {
-      const { distributed, skipped } = await api.deals.distributeAll(token);
-      setBulkResult({ distributed, skipped });
-      toast(
-        `Distributed ${distributed.length} deal${distributed.length === 1 ? '' : 's'}${skipped.length > 0 ? `, skipped ${skipped.length}` : ''}.`,
-        { type: distributed.length > 0 ? 'success' : 'error' },
-      );
-      load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBulkDistributing(false);
     }
   }
 
@@ -474,13 +416,6 @@ export default function ProfitDistribution() {
       return (
         <>
           <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(deal)} title="Edit" label="Edit record" />
-          <IconActionButton
-            icon={CheckCircleIcon}
-            tone="emerald"
-            onClick={() => setDistributeTarget(deal)}
-            title="Distribute"
-            label="Distribute record"
-          />
           <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(deal)} title="Delete" label="Delete record" />
         </>
       );
@@ -507,16 +442,6 @@ export default function ProfitDistribution() {
         title="Profit Distribution" 
         actions={canManage && (
 <>
-            {draftCount > 0 && (
-              <button
-                onClick={handleDistributeAll}
-                disabled={bulkDistributing}
-                className="flex min-h-11 items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-4 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-              >
-                <RefreshIcon width={16} height={16} className={bulkDistributing ? 'animate-spin' : ''} />
-                {bulkDistributing ? 'Distributing…' : 'Distribute all'}
-              </button>
-            )}
             <button
               onClick={startCreate}
               className="flex min-h-11 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
@@ -551,32 +476,6 @@ export default function ProfitDistribution() {
               {auto.enabled ? 'Turn off' : 'Turn on'}
             </button>
           </div>
-        </div>
-      )}
-
-      {bulkResult && (
-        <div className="mt-4 rounded-md border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <p className="font-medium text-slate-900 dark:text-white">
-              Distributed {bulkResult.distributed.length}, skipped {bulkResult.skipped.length}
-            </p>
-            <button
-              onClick={() => setBulkResult(null)}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-              aria-label="Dismiss"
-            >
-              <XIcon width={14} height={14} />
-            </button>
-          </div>
-          {bulkResult.skipped.length > 0 && (
-            <ul className="mt-2 space-y-1 text-slate-600 dark:text-slate-400">
-              {bulkResult.skipped.map((s) => (
-                <li key={s.id}>
-                  <span className="font-medium text-slate-800 dark:text-slate-200">{s.description}:</span> {s.reason}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
 
@@ -782,123 +681,6 @@ export default function ProfitDistribution() {
             </button>
           </div>
         </form>
-      </Modal>
-
-      <Modal
-        open={Boolean(distributeTarget)}
-        onClose={() => {
-          setDistributeTarget(null);
-          setDistributeError('');
-        }}
-        title="Distribute this record"
-        maxWidthClass="max-w-lg"
-      >
-        {distributeTarget && (
-          <div className="grid gap-3">
-            <p className="text-sm text-slate-600 dark:text-slate-400">{distributeTarget.description}</p>
-            {(() => {
-              const linkedInvoice = distributeTarget.invoice_id ? invoices.find((inv) => inv.id === distributeTarget.invoice_id) : null;
-              if (!distributeTarget.invoice_id || !linkedInvoice || !(linkedInvoice.amount_paid > 0)) {
-                return (
-                  <p className="text-sm text-amber-700 dark:text-amber-400">
-                    This record isn't linked to a real, paid invoice — edit it and pick one before distributing.
-                    Without one, the revenue was never actually added to the bank balance, so distributing would
-                    incorrectly subtract money that isn't there.
-                  </p>
-                );
-              }
-              return null;
-            })()}
-            {distributeTarget.revenue_includes_tax && (
-              <p className="text-sm text-amber-700 dark:text-amber-400">
-                Revenue here includes tax. The linked invoice carries {symbol}{distributeTarget.invoice_tax_amount.toFixed(2)} of
-                tax, which is owed to the tax authority, not profit. Edit the record to use the pre-tax amount
-                ({symbol}{distributeTarget.invoice_pretax_total.toFixed(2)}) before distributing.
-              </p>
-            )}
-            <div className="grid gap-1 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
-              <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>Revenue</span>
-                <span>
-                  {symbol}
-                  {distributeTarget.revenue_amount.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>Supplier cost</span>
-                <span>
-                  {symbol}
-                  {distributeTarget.cost_mvr.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between font-semibold text-slate-900 dark:text-white">
-                <span>Net profit</span>
-                <span
-                  className={distributeTarget.net_profit < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}
-                >
-                  {symbol}
-                  {distributeTarget.net_profit.toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            {distributeTarget.cost_usd_total > 0 && (
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                This only pays shareholders their share of net profit — recording the real USD purchase happens
-                separately, on the Supplier Costs report or the Expenses page.
-              </p>
-            )}
-
-            {eligibleShareholders.length === 0 ? (
-              <p className="text-sm text-amber-700 dark:text-amber-400">
-                No active shareholder has an ownership percentage set — add one on the Shareholders page first.
-              </p>
-            ) : (
-              <div>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Split preview</p>
-                <div className="mt-1 divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-700">
-                  {eligibleShareholders.map((s) => (
-                    <div key={s.id} className="flex justify-between px-3 py-2 text-sm">
-                      <span className="text-slate-700 dark:text-slate-300">
-                        {s.name} ({s.ownership_percent}%)
-                      </span>
-                      <span className="font-medium text-slate-900 dark:text-white">
-                        {symbol}
-                        {round2((distributeTarget.net_profit * s.ownership_percent) / 100).toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {distributeError && <p className="text-sm text-red-600 dark:text-red-400">{distributeError}</p>}
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleDistribute}
-                disabled={
-                  distributing ||
-                  eligibleShareholders.length === 0 ||
-                  distributeTarget.net_profit <= 0 ||
-                  !distributeTarget.invoice_id ||
-                  !invoices.find((inv) => inv.id === distributeTarget.invoice_id && inv.amount_paid > 0)
-                }
-                className="min-h-11 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-60"
-              >
-                {distributing ? 'Distributing…' : 'Distribute'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDistributeTarget(null)}
-                className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
       </Modal>
 
       <Modal open={Boolean(trueUpTarget)} onClose={() => setTrueUpTarget(null)} title="Adjust payout to actual rate" maxWidthClass="max-w-lg">
