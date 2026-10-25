@@ -399,7 +399,7 @@ export default function ProfitDistribution() {
         const ok = await confirm({
           title: 'Turn on automatic distribution?',
           message:
-            'Every night, each invoice that has been fully paid from today onward is split among active shareholders by their ownership %. Older invoices are never touched. Supplier cost uses the USD account average rate and can be adjusted to the actual rate afterward.',
+            'Every night, each invoice fully paid on or after 1 January 2027 (the date profit distribution officially starts) is split among active shareholders by their ownership %. Older invoices are never touched. Supplier cost uses the USD account average rate and can be adjusted to the actual rate afterward.',
           confirmLabel: 'Turn on',
           danger: false,
         });
