@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import BottomSheet from './BottomSheet';
 import { useToggleLink } from '../lib/useToggleLink';
 import { useSwipeToMore } from '../lib/useSwipeToMore';
+import { useHideOnScroll } from '../lib/useHideOnScroll';
 import { HomeIcon, InvoiceIcon, UsersIcon, GridIcon, PlusIcon, QuoteIcon, ExpenseIcon, ChevronRightIcon } from './icons';
 
 // Studio redesign (stage 1): four destinations plus one create button, as a
@@ -35,6 +36,9 @@ export default function BottomNav() {
   const [createOpen, setCreateOpen] = useState(false);
   const toggleMore = useToggleLink('/more');
   useSwipeToMore({ enabled: true });
+  // Tucks away while scrolling down; never while the Create sheet is open.
+  const scrolledAway = useHideOnScroll({ resetKey: location.pathname });
+  const hidden = scrolledAway && !createOpen;
 
   const path = location.pathname;
   const startsWith = (to) => path === to || path.startsWith(`${to}/`);
@@ -79,8 +83,14 @@ export default function BottomNav() {
     <>
       <nav
         aria-label="Main"
-        className="fixed inset-x-3 z-30 flex items-center gap-1 rounded-[28px] border border-white/40 bg-white/25 p-1.5 shadow-xl shadow-slate-900/10 ring-1 ring-white/30 backdrop-blur-xl backdrop-saturate-200 sm:hidden dark:border-white/10 dark:bg-slate-900/30 dark:ring-white/5 dark:shadow-black/40"
-        style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+        className="fixed inset-x-3 z-30 flex items-center gap-1 rounded-[28px] border border-white/40 bg-white/25 p-1.5 shadow-xl shadow-slate-900/10 ring-1 ring-white/30 backdrop-blur-xl backdrop-saturate-200 transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none sm:hidden dark:border-white/10 dark:bg-slate-900/30 dark:ring-white/5 dark:shadow-black/40"
+        aria-hidden={hidden || undefined}
+        style={{
+          bottom: 'calc(0.75rem + env(safe-area-inset-bottom))',
+          transform: hidden ? 'translateY(calc(100% + 1.5rem + env(safe-area-inset-bottom)))' : 'translateY(0)',
+          opacity: hidden ? 0 : 1,
+          pointerEvents: hidden ? 'none' : undefined,
+        }}
       >
         {left.map(renderTab)}
         {createItems.length > 0 && (

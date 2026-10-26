@@ -9045,6 +9045,7 @@ desktop `Sidebar` wherever they conflict with this section.
   root); `--font-display` is now self-hosted Bricolage Grotesque
   (`public/fonts/bricolage-latin.woff2`, one variable file, latin subset,
   precached via `vite.config.js`) with Sora as fallback.
+- **Bottom bar auto-hides**: `lib/useHideOnScroll.js` slides `BottomNav` down and fades it out (300ms, transform/opacity, instant under reduced motion) after >10px of downward scroll; it returns on upward scroll, near the page top/bottom, after 1.5s of scroll idle, on navigation, and while the Create sheet is open. Hidden while a form field is focused (keyboard). Layout padding is unchanged so nothing jumps.
 - **Not in this stage**: card/list restyling, per-row primary-action
   pattern, split-view lists, full-screen form sheets, and the "Record
   payment" shortcut in Create (needs an invoice picker) — later stages.
