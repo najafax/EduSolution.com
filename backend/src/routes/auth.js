@@ -4,7 +4,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { loginLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rateLimit');
+const { loginLimiter, mfaLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rateLimit');
+const totp = require('../lib/totp');
+const { logActivity } = require('../lib/activity');
 const { sendMail } = require('../lib/mailer');
 const { effectivePermissions } = require('../lib/permissions');
 const { createSession, revokeOtherSessions } = require('../lib/sessions');
@@ -59,6 +61,7 @@ function publicUser(user) {
     notifyPaymentProofs: Boolean(user.notify_payment_proofs),
     notifyAdminChanges: Boolean(user.notify_admin_changes),
     avatarImage: user.avatar_image || '',
+    twoFactorEnabled: Boolean(user.totp_enabled),
     createdAt: user.created_at,
   };
 }
@@ -90,14 +93,143 @@ router.post('/login', loginLimiter, async (req, res) => {
     return res.status(401).json({ error: 'This account has been deactivated' });
   }
 
+  // Two-step login: the password was right, but this account also needs a
+  // code. Hand back a 5-minute single-purpose ticket, not a session.
+  if (user.totp_enabled) {
+    const mfaToken = jwt.sign({ id: user.id, type: 'mfa' }, process.env.JWT_SECRET, { expiresIn: '5m' });
+    return res.json({ mfaRequired: true, mfaToken });
+  }
+
+  res.json(startSession(user, req));
+});
+
+function startSession(user, req) {
   const jti = createSession(user.id, req);
-  const token = signToken(user, jti);
-  res.json({
-    token,
+  return {
+    token: signToken(user, jti),
     user: publicUser(user),
     permissions: effectivePermissions(user),
     sessionTimeoutMinutes: getSessionTimeoutMinutes(),
-  });
+  };
+}
+
+// Checks a submitted 2-step code against a user: a current authenticator code
+// (never the same time-step twice) or, failing that, an unused recovery code
+// (consumed on use). Returns 'totp' | 'recovery' | null and records the use.
+function checkSecondFactor(user, code) {
+  const secret = totp.decryptSecret(user.totp_secret);
+  if (secret) {
+    const step = totp.verifyCode(secret, code, { lastStep: user.totp_last_step });
+    if (step) {
+      db.prepare('UPDATE users SET totp_last_step = ? WHERE id = ?').run(step, user.id);
+      return 'totp';
+    }
+  }
+  const hash = totp.hashRecoveryCode(code);
+  let remaining;
+  try {
+    remaining = JSON.parse(user.totp_recovery || '[]');
+  } catch {
+    remaining = [];
+  }
+  if (remaining.includes(hash)) {
+    db.prepare('UPDATE users SET totp_recovery = ? WHERE id = ?').run(
+      JSON.stringify(remaining.filter((h) => h !== hash)),
+      user.id,
+    );
+    return 'recovery';
+  }
+  return null;
+}
+
+router.post('/login/mfa', mfaLimiter, (req, res) => {
+  const { mfaToken, code } = req.body || {};
+  if (!mfaToken || !code) return res.status(400).json({ error: 'A code is required' });
+  let payload;
+  try {
+    payload = jwt.verify(mfaToken, process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: 'This sign-in has expired. Please log in again.' });
+  }
+  if (payload.type !== 'mfa') return res.status(401).json({ error: 'This sign-in has expired. Please log in again.' });
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+  if (!user || !user.active || !user.totp_enabled) {
+    return res.status(401).json({ error: 'This sign-in has expired. Please log in again.' });
+  }
+  const used = checkSecondFactor(user, code);
+  if (!used) return res.status(401).json({ error: 'That code is not valid. Check the code and try again.' });
+  if (used === 'recovery') {
+    logActivity({ userName: user.name, action: 'signed in with a recovery code', entityType: 'user', entityId: user.id, entityLabel: user.email });
+  }
+  res.json(startSession(user, req));
+});
+
+// --- Managing your own 2-step verification (any logged-in account) --------
+const TWO_FACTOR_ISSUER = 'Edu Solutions';
+
+router.post('/2fa/setup', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (user.totp_enabled) return res.status(409).json({ error: 'Two-step verification is already on.' });
+  const secret = totp.generateSecret();
+  db.prepare('UPDATE users SET totp_secret = ? WHERE id = ?').run(totp.encryptSecret(secret), user.id);
+  res.json({ secret, otpauthUri: totp.otpauthUri({ secret, account: user.email, issuer: TWO_FACTOR_ISSUER }) });
+});
+
+router.post('/2fa/enable', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (user.totp_enabled) return res.status(409).json({ error: 'Two-step verification is already on.' });
+  const secret = totp.decryptSecret(user.totp_secret);
+  if (!secret) return res.status(400).json({ error: 'Start setup first.' });
+  const step = totp.verifyCode(secret, (req.body || {}).code);
+  if (!step) return res.status(400).json({ error: 'That code is not valid. Check the code and try again.' });
+  const { codes, hashes } = totp.generateRecoveryCodes();
+  db.prepare('UPDATE users SET totp_enabled = 1, totp_last_step = ?, totp_recovery = ? WHERE id = ?').run(
+    step,
+    JSON.stringify(hashes),
+    user.id,
+  );
+  logActivity({ userName: user.name, action: 'turned on two-step verification', entityType: 'user', entityId: user.id, entityLabel: user.email });
+  res.json({ recoveryCodes: codes });
+});
+
+// Turning it off, or making new recovery codes, needs both the password and a
+// current code — a stolen session alone must not be able to weaken the account.
+async function requirePasswordAndCode(req, res) {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user.totp_enabled) {
+    res.status(409).json({ error: 'Two-step verification is not on.' });
+    return null;
+  }
+  const { password, code } = req.body || {};
+  if (!password || !code) {
+    res.status(400).json({ error: 'Your password and a code are required' });
+    return null;
+  }
+  if (!(await bcrypt.compare(password, user.password_hash))) {
+    res.status(401).json({ error: 'Your password is incorrect' });
+    return null;
+  }
+  if (!checkSecondFactor(user, code)) {
+    res.status(401).json({ error: 'That code is not valid. Check the code and try again.' });
+    return null;
+  }
+  return user;
+}
+
+router.post('/2fa/disable', requireAuth, mfaLimiter, async (req, res) => {
+  const user = await requirePasswordAndCode(req, res);
+  if (!user) return;
+  db.prepare(`UPDATE users SET totp_enabled = 0, totp_secret = '', totp_last_step = 0, totp_recovery = '[]' WHERE id = ?`).run(user.id);
+  logActivity({ userName: user.name, action: 'turned off two-step verification', entityType: 'user', entityId: user.id, entityLabel: user.email });
+  res.json({ message: 'Two-step verification is off.' });
+});
+
+router.post('/2fa/recovery-codes', requireAuth, mfaLimiter, async (req, res) => {
+  const user = await requirePasswordAndCode(req, res);
+  if (!user) return;
+  const { codes, hashes } = totp.generateRecoveryCodes();
+  db.prepare('UPDATE users SET totp_recovery = ? WHERE id = ?').run(JSON.stringify(hashes), user.id);
+  res.json({ recoveryCodes: codes });
 });
 
 router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {

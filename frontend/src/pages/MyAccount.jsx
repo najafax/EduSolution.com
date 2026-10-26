@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { useConfirm } from '../lib/useConfirm';
+import TwoFactorCard from '../components/TwoFactorCard';
 import { resizeImage, dataUriByteLength } from '../lib/imageResize';
 import FontSizeControl from '../components/FontSizeControl';
 
@@ -350,6 +351,8 @@ export default function MyAccount() {
           {passwordSubmitting ? 'Saving…' : 'Change password'}
         </button>
       </form>
+
+      <TwoFactorCard />
 
       <section className="mt-4 glass rounded-3xl p-5">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Text size</h2>

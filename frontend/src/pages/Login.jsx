@@ -37,6 +37,9 @@ function LoginForm() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Set when the password was right but the account also needs a 2-step code.
+  const [mfaToken, setMfaToken] = useState('');
+  const [code, setCode] = useState('');
   const [notice] = useState(() => {
     const idleMessage = sessionStorage.getItem(IDLE_LOGOUT_MESSAGE_KEY);
     if (idleMessage) {
@@ -55,7 +58,12 @@ function LoginForm() {
     setError('');
     setSubmitting(true);
     try {
-      const { token, user, permissions, sessionTimeoutMinutes } = await api.login(form);
+      const result = await api.login(form);
+      if (result.mfaRequired) {
+        setMfaToken(result.mfaToken);
+        return;
+      }
+      const { token, user, permissions, sessionTimeoutMinutes } = result;
       login(token, user, permissions, sessionTimeoutMinutes);
       navigate('/dashboard');
     } catch (staffErr) {
@@ -75,12 +83,80 @@ function LoginForm() {
     }
   }
 
+  async function handleMfaSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const { token, user, permissions, sessionTimeoutMinutes } = await api.loginMfa(mfaToken, code);
+      login(token, user, permissions, sessionTimeoutMinutes);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message);
+      // An expired ticket can't be retried — send them back to the password step.
+      if (/expired/i.test(err.message)) {
+        setMfaToken('');
+        setCode('');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   // Focus rings use a soft outer glow (box-shadow) layered under the
   // existing border-color change, rather than border-color alone — the
   // same premium-input treatment Stripe/Linear-style forms use, a bit more
   // considered than a flat 1px color swap.
   const inputClass =
     'mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3.5 py-2 text-base shadow-sm transition-shadow focus:border-lagoon-500 focus:shadow-[0_0_0_3px_rgba(14,124,134,0.15)] focus:outline-none dark:border-slate-600 dark:bg-slate-950 dark:text-white dark:focus:shadow-[0_0_0_3px_rgba(63,169,166,0.2)]';
+
+  if (mfaToken) {
+    return (
+      <div className="rounded-3xl bg-white dark:border p-7 shadow-xl sm:p-9 dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="text-xl font-bold text-ink dark:text-white">Two-step verification</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          Enter the 6-digit code from your authenticator app. Lost your phone? Use one of your recovery codes instead.
+        </p>
+        <form onSubmit={handleMfaSubmit} className="mt-6 flex flex-col gap-5">
+          <div>
+            <label htmlFor="code" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Code
+            </label>
+            <input
+              id="code"
+              name="code"
+              inputMode="text"
+              autoComplete="one-time-code"
+              autoFocus
+              required
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className={`${inputClass} tracking-widest`}
+            />
+          </div>
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="min-h-11 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-lagoon-600/25 hover:bg-slate-700 dark:bg-lagoon-600 dark:hover:bg-lagoon-500 disabled:opacity-60"
+          >
+            {submitting ? 'Checking…' : 'Verify and log in'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMfaToken('');
+              setCode('');
+              setError('');
+            }}
+            className="text-sm font-medium text-lagoon-600 hover:text-lagoon-500"
+          >
+            Back
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-3xl bg-white dark:border p-7 shadow-xl sm:p-9 dark:border-slate-700 dark:bg-slate-900">

@@ -73,6 +73,16 @@ async function downloadFile(path, token, filename) {
 
 export const api = {
   login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
+  // Second step when the account has two-step verification on (login() then
+  // returns { mfaRequired, mfaToken } instead of a session).
+  loginMfa: (mfaToken, code) => request('/auth/login/mfa', { method: 'POST', body: { mfaToken, code } }),
+  twoFactor: {
+    setup: (token) => request('/auth/2fa/setup', { method: 'POST', body: {}, token }),
+    enable: (code, token) => request('/auth/2fa/enable', { method: 'POST', body: { code }, token }),
+    disable: (password, code, token) => request('/auth/2fa/disable', { method: 'POST', body: { password, code }, token }),
+    newRecoveryCodes: (password, code, token) =>
+      request('/auth/2fa/recovery-codes', { method: 'POST', body: { password, code }, token }),
+  },
   me: (token) => request('/auth/me', { token }),
   forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: { email } }),
   resetPassword: (token, password) => request('/auth/reset-password', { method: 'POST', body: { token, password } }),
@@ -417,6 +427,7 @@ export const api = {
     update: (id, payload, token) => request(`/users/${id}`, { method: 'PUT', body: payload, token }),
     resetPassword: (id, password, token) =>
       request(`/users/${id}/reset-password`, { method: 'POST', body: { password }, token }),
+    reset2fa: (id, token) => request(`/users/${id}/reset-2fa`, { method: 'POST', body: {}, token }),
     remove: (id, token) => request(`/users/${id}`, { method: 'DELETE', token }),
     modules: (token) => request('/users/meta/modules', { token }),
   },
