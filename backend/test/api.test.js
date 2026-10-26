@@ -167,3 +167,21 @@ test('USD account: supplier payment books expense at average cost; cannot overdr
   assert.equal(s.supplierCosts, 620); // 40 x 15.50
   assert.equal(s.usdBalance, 60);
 });
+
+test('payment proofs: staff can view the file, review, reject (note required) and delete', async () => {
+  const d = srv.db();
+  const mk = () => d.prepare(
+    "INSERT INTO payment_proofs (invoice_id, file_data, file_name, file_type) VALUES (?, 'data:text/plain;base64,aGk=', 'slip.txt', 'text/plain')",
+  ).run(ctx.invoice.id).lastInsertRowid;
+  const a = mk();
+  const b = mk();
+  d.close();
+  const base = `/invoices/${ctx.invoice.id}/payment-proofs`;
+  assert.equal((await get(`${base}/${a}/file`)).status, 200);
+  assert.equal((await get(`${base}/99999/file`)).status, 404);
+  assert.equal((await post(`${base}/${a}/review`, {})).status, 200);
+  assert.equal((await post(`${base}/${b}/reject`, {})).status, 400); // note required
+  assert.equal((await post(`${base}/${b}/reject`, { note: 'Wrong amount' })).status, 200);
+  assert.equal((await srv.api('DELETE', `${base}/${a}`, null, boss)).status, 204);
+  assert.equal((await post(`${base}/${a}/review`, {})).status, 404);
+});
