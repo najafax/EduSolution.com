@@ -9758,3 +9758,7 @@ Gmail is the sole sender when configured (no Resend/SMTP fallback). If a Gmail s
 - `frontend/e2e/smoke.test.cjs` (`cd frontend && npm run build && npm run e2e`): Playwright smoke tests (login, create client, phone bottom-nav auto-hide) against the real API on a throwaway DB; also a CI job. Uses ports 4000/4173.
 - `pages/business/Website.jsx` is now just the tab shell; each CMS tab lives in `pages/business/website/<Name>Section.jsx` with shared fields/constants (incl. `SERVICE_ICON_OPTIONS`) in `website/shared.jsx`. Behaviour unchanged.
 - `routes/invoices.js`: the staff payment-proof routes (file/review/reject/delete) moved to `routes/invoicePaymentProofs.js`, mounted at `/:id/payment-proofs`; same URLs and permissions, now covered by a test.
+
+### Backup verification
+- `npm run backup:verify` (backend; `-- <key>` for a specific backup, `-- --file x.gz` for a local file) downloads the newest daily backup, unpacks it to a scratch file and runs `lib/backupVerify.js` (SQLite integrity check, foreign keys, required tables, row counts). Never touches the live DB. Exits non-zero on a problem.
+- `lib/backup.js` `verifyLatestBackup()` does the same weekly (Sunday 04:30 server time, `lib/scheduler.js`) and sends a Telegram ops alert only when it fails.

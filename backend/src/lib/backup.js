@@ -10,6 +10,8 @@ const {
   DeleteObjectCommand,
 } = require('@aws-sdk/client-s3');
 const db = require('../db');
+const { verifySqliteFile } = require('./backupVerify');
+const { sendOpsAlert } = require('./opsAlert');
 
 const BUCKET = process.env.BACKUP_S3_BUCKET;
 const ENDPOINT = process.env.BACKUP_S3_ENDPOINT;
@@ -128,4 +130,28 @@ async function runBackup() {
   }
 }
 
-module.exports = { isConfigured, runBackup, listBackups, downloadBackup, createSnapshot };
+// Weekly proof that the newest daily backup really restores: download it,
+// unpack to a scratch file, run the integrity/table checks, delete it. Only a
+// problem is reported (Telegram, via opsAlert) — a healthy run just logs.
+async function verifyLatestBackup() {
+  if (!isConfigured()) return { skipped: true };
+  const scratch = path.join(os.tmpdir(), `edusolution-verify-${Date.now()}.sqlite3`);
+  try {
+    const all = await listBackups('backups/daily/');
+    if (all.length === 0) throw new Error('no daily backups found in the bucket');
+    const newest = all[all.length - 1];
+    await downloadBackup(newest.Key, scratch);
+    const result = verifySqliteFile(scratch);
+    if (!result.ok) throw new Error(`${newest.Key}: ${result.problems.join('; ')}`);
+    console.log(`[backup] verified ${newest.Key} restores cleanly (${JSON.stringify(result.counts)})`);
+    return { skipped: false, ok: true, key: newest.Key, counts: result.counts };
+  } catch (err) {
+    console.error('[backup] verification FAILED:', err.message);
+    sendOpsAlert(`⚠️ Backup verification FAILED — the latest backup may not restore.\n${err.message}`, 'backup-verify');
+    return { skipped: false, ok: false, error: err.message };
+  } finally {
+    for (const p of [scratch, `${scratch}-wal`, `${scratch}-shm`]) if (fs.existsSync(p)) fs.unlinkSync(p);
+  }
+}
+
+module.exports = { isConfigured, runBackup, listBackups, downloadBackup, createSnapshot, verifyLatestBackup };
