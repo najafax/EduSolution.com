@@ -263,6 +263,23 @@ export default function Settings() {
               earlier is left out of the bank balance, so older history can't distort it. Leave blank to count everything recorded.
             </span>
             <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Draft license renewal invoices (days before expiry)</span>
+              <input
+                type="number"
+                min="0"
+                max="90"
+                step="1"
+                value={form.license_invoice_lead_days ?? 0}
+                onChange={(e) => setForm((f) => ({ ...f, license_invoice_lead_days: e.target.value }))}
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              />
+              <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                0 = off. Otherwise each morning the app drafts an invoice for any active license expiring within this many days (or
+                lapsed in the last 30), at the license's amount. It is only ever a draft for you to review and send, and paying it
+                renews the license automatically.
+              </span>
+            </label>
+            <label className="block">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bank / payment details</span>
               <textarea
                 value={form.bank_details}

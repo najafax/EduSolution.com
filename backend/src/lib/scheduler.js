@@ -12,6 +12,7 @@ const { runBackup, verifyLatestBackup } = require('./backup');
 const { logEmail } = require('./emailLog');
 const { licenseRemindEmail, overdueReminderEmail } = require('./emailTemplates');
 const { runDailyEarningsReport } = require('./dailyEarningsReport');
+const { generateLicenseRenewalInvoices } = require('./licenseRenewalInvoices');
 const { isConfigured: isFacebookDraftingConfigured, createDraft: createFacebookDraft } = require('./facebookPostDraft');
 
 const today = () => todayStr();
@@ -419,6 +420,16 @@ function startScheduler() {
   // Daily at 07:30, between the recurring-invoice job above and the
   // reminder jobs below — no SMTP dependency (this doesn't email anyone,
   // just a status flip), so it always runs regardless of mail config.
+  // 07:15, right after recurring invoices. Does nothing unless "Draft license
+  // renewal invoices" is switched on in Settings; only ever creates DRAFTS.
+  cron.schedule('15 7 * * *', () => {
+    try {
+      generateLicenseRenewalInvoices();
+    } catch (err) {
+      console.error('[license-invoices] job failed:', err);
+    }
+  });
+
   cron.schedule('30 7 * * *', () => {
     try {
       expireOverdueQuotes();
@@ -501,5 +512,6 @@ module.exports = {
   runDailyEarningsReport,
   generateWeeklyFacebookDraft,
   runBackup,
+  generateLicenseRenewalInvoices,
   verifyLatestBackup,
 };

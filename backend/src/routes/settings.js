@@ -141,6 +141,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     pdf_template = 'modern',
     starting_balance = 0,
     starting_balance_date = '',
+    license_invoice_lead_days,
   } = req.body || {};
 
   const timeoutNum = Number(session_timeout_minutes);
@@ -149,6 +150,14 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
   }
   if (!PDF_TEMPLATES.has(pdf_template)) {
     return res.status(400).json({ error: `pdf_template must be one of: ${[...PDF_TEMPLATES].join(', ')}` });
+  }
+  // Omitted (e.g. an older client) = leave the saved value alone.
+  let leadDays = null;
+  if (license_invoice_lead_days !== undefined && license_invoice_lead_days !== '') {
+    leadDays = Number(license_invoice_lead_days);
+    if (!Number.isInteger(leadDays) || leadDays < 0 || leadDays > 90) {
+      return res.status(400).json({ error: 'license_invoice_lead_days must be a whole number from 0 (off) to 90' });
+    }
   }
   const startingBalanceNum = Number(starting_balance);
   if (!Number.isFinite(startingBalanceNum)) {
@@ -173,7 +182,8 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     `UPDATE business_settings
      SET business_name = ?, email = ?, phone = ?, address = ?, tax_id = ?, currency_symbol = ?, bank_details = ?,
          session_timeout_minutes = ?, signature_image = ?, stamp_image = ?, logo_image = ?, signatory_name = ?,
-         pdf_template = ?, starting_balance = ?, starting_balance_date = ?, updated_at = datetime('now')
+         pdf_template = ?, starting_balance = ?, starting_balance_date = ?,
+         license_invoice_lead_days = COALESCE(?, license_invoice_lead_days), updated_at = datetime('now')
      WHERE id = 1`,
   ).run(
     business_name,
@@ -191,6 +201,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     pdf_template,
     startingBalanceNum,
     startingBalanceDate,
+    leadDays,
   );
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();

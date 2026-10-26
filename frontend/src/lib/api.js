@@ -338,6 +338,7 @@ export const api = {
     update: (id, payload, token) => request(`/licenses/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/licenses/${id}`, { method: 'DELETE', token }),
     renew: (id, payload, token) => request(`/licenses/${id}/renew`, { method: 'POST', body: payload, token }),
+    createRenewalInvoices: (token) => request('/licenses/renewal-invoices/run', { method: 'POST', body: {}, token }),
     renewals: (id, token) => request(`/licenses/${id}/renewals`, { token }),
     remindPreview: (id, token) => request(`/licenses/${id}/remind-preview`, { token }),
     remind: (id, payload, token) => request(`/licenses/${id}/remind`, { method: 'POST', body: payload, token }),

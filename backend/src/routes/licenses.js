@@ -10,6 +10,7 @@ const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
 const { toXlsxBuffer } = require('../lib/xlsx');
 const { renewLicense, advanceExpiry } = require('../lib/licenseRenewal');
+const { generateLicenseRenewalInvoices } = require('../lib/licenseRenewalInvoices');
 
 const router = Router();
 router.use(requireAuth);
@@ -83,6 +84,15 @@ function buildLicenseWhere({ q, status }) {
   return { where, params };
 }
 
+// The renewal invoice drafted for the license's current cycle (see
+// lib/licenseRenewalInvoices.js) — only reported while it is still for the
+// current expiry_date and not void, so the list stops showing it once the
+// license has been renewed.
+const RENEWAL_INVOICE_COLS = `CASE WHEN licenses.renewal_invoice_for = licenses.expiry_date AND ri.status != 'void' THEN ri.id END AS renewal_invoice_id_current,
+  CASE WHEN licenses.renewal_invoice_for = licenses.expiry_date AND ri.status != 'void' THEN ri.number END AS renewal_invoice_number,
+  CASE WHEN licenses.renewal_invoice_for = licenses.expiry_date AND ri.status != 'void' THEN ri.status END AS renewal_invoice_status`;
+const RENEWAL_INVOICE_JOIN = 'LEFT JOIN invoices ri ON ri.id = licenses.renewal_invoice_id';
+
 router.get('/', view, (req, res) => {
   const { q, status, page: pageParam } = req.query;
   const { where, params } = buildLicenseWhere({ q, status });
@@ -96,7 +106,7 @@ router.get('/', view, (req, res) => {
 
   if (!pageParam) {
     const rows = db
-      .prepare(`SELECT licenses.*, clients.name AS client_name ${baseFrom} ${where} ${orderBy}`)
+      .prepare(`SELECT licenses.*, clients.name AS client_name, ${RENEWAL_INVOICE_COLS} ${baseFrom} ${RENEWAL_INVOICE_JOIN} ${where} ${orderBy}`)
       .all(...params);
     return res.json({ licenses: rows.map(withComputed) });
   }
@@ -105,7 +115,7 @@ router.get('/', view, (req, res) => {
   const offset = (page - 1) * PAGE_SIZE;
   const { total } = db.prepare(`SELECT COUNT(*) AS total ${baseFrom} ${where}`).get(...params);
   const rows = db
-    .prepare(`SELECT licenses.*, clients.name AS client_name ${baseFrom} ${where} ${orderBy} LIMIT ? OFFSET ?`)
+    .prepare(`SELECT licenses.*, clients.name AS client_name, ${RENEWAL_INVOICE_COLS} ${baseFrom} ${RENEWAL_INVOICE_JOIN} ${where} ${orderBy} LIMIT ? OFFSET ?`)
     .all(...params, PAGE_SIZE, offset);
   res.json({
     licenses: rows.map(withComputed),
@@ -114,6 +124,16 @@ router.get('/', view, (req, res) => {
     total,
     totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
   });
+});
+
+// "Create renewal invoices now" — the same job the 07:15 cron runs. Needs both
+// licenses and invoices manage since it creates invoices.
+router.post('/renewal-invoices/run', manage, requirePermission('invoices', 'manage'), (req, res) => {
+  const result = generateLicenseRenewalInvoices({ userName: req.user.name });
+  if (result.skipped === 'off') {
+    return res.status(409).json({ error: 'Renewal invoices are switched off. Turn them on in Settings first.' });
+  }
+  res.json(result);
 });
 
 // Independent of pagination/search — the summary strip at the top of
