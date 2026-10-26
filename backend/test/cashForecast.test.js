@@ -58,3 +58,19 @@ test('a licence whose cycle is already on a sent invoice is not counted twice; d
   const dash = (await srv.api('GET', '/dashboard/overview', null, boss)).data;
   assert.equal(dash.cashForecast.buckets.length, 3);
 });
+
+test('supplier cost is estimated on income that is not invoiced yet', async () => {
+  const d = srv.db();
+  const client = (await post('/clients', { name: 'Gamma', email: 'g@gamma.test' })).data.client;
+  // Past sold item: 100 revenue with 10 USD cost (cost snapshot on the line).
+  const inv = d.prepare("INSERT INTO invoices (number, client_id, issue_date, due_date, status, subtotal, total, public_token) VALUES ('INV-S', ?, ?, ?, 'paid', 100, 100, 'tok-s')").run(client.id, daysFromNow(-30), daysFromNow(-20));
+  d.prepare("INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, cost_price) VALUES (?, 'Sold thing', 1, 100, 100, 10)").run(inv.lastInsertRowid);
+  // A USD buy gives the forecast a rate (19 MVR per USD).
+  d.prepare("INSERT INTO usd_transactions (type, txn_date, usd_amount, mvr_amount) VALUES ('buy', ?, 1000, 19000)").run(daysFromNow(-10));
+  const f = (await srv.api('GET', '/financials/cash-forecast', null, boss)).data;
+  const income = f.buckets[0].recurringIn + f.buckets[0].licensesIn;
+  assert.ok(income > 0);
+  assert.ok(f.supplier.estimateSharePct > 0);
+  assert.ok(f.buckets[0].supplierEstOut > 0);
+  assert.ok(Math.abs(f.buckets[0].supplierEstOut - income * f.supplier.estimateSharePct / 100) < 0.05);
+});

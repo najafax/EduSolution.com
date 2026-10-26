@@ -3,7 +3,7 @@ const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { replay, position } = require('../lib/usdLedger');
-const { businessYear, recentMonthKeys } = require('../lib/businessDate');
+const { businessYear, recentMonthKeys, addDays } = require('../lib/businessDate');
 
 // What the business owes suppliers in USD (how much, month by month), set
 // against the USD account (lib/usdLedger.js, routes/usdAccount.js) that pays
@@ -273,6 +273,32 @@ router.computeToPay = function computeToPay() {
   }
   const pos = position(null, ledger);
   return { toPayUsd: round2(toPayUsd), rate: lastBuyRate(ledger) || pos.avgRate || null };
+};
+
+// Reused by lib/cashForecast.js: how many USD of supplier cost each MVR of
+// invoiced revenue has carried over the last 12 months (all sent/paid items,
+// including ones with no cost, so a mixed catalogue is not overstated).
+// Used to estimate the supplier cost of income that is not invoiced yet.
+router.computeCostShare = function computeCostShare(today) {
+  const nameMap = productCostByName();
+  const since = addDays(today, -365);
+  const rows = db
+    .prepare(
+      `SELECT i.issue_date AS issue_date, ii.description AS description, ii.quantity AS quantity, ii.amount AS amount,
+              ii.product_id AS product_id, p.cost_price AS cost_price, ii.cost_price AS snapshot_cost
+         FROM invoice_items ii
+         JOIN invoices i ON i.id = ii.invoice_id
+         LEFT JOIN products p ON p.id = ii.product_id
+        WHERE i.status NOT IN ('void', 'draft') AND i.issue_date > ? AND i.issue_date <= ?`
+    )
+    .all(since, today);
+  let revenue = 0;
+  let costUsd = 0;
+  for (const r of rows) {
+    revenue += r.amount || 0;
+    costUsd += r.quantity * (resolveCostPrice(r, nameMap) || 0);
+  }
+  return { usdPerMvr: revenue > 0 ? costUsd / revenue : 0, revenue: round2(revenue), costUsd: round2(costUsd) };
 };
 
 module.exports = router;

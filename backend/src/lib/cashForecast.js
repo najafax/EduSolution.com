@@ -4,6 +4,8 @@
 //        to be generated (due date = run date + due_in_days), licence renewals
 //        not already on a sent invoice
 //   out: USD still owed to suppliers (valued at the latest buy rate) due now,
+//        an estimate of supplier cost on income not yet invoiced (recurring
+//        invoices and licence renewals, at the last 12 months' cost share),
 //        plus a typical month of expenses (average of the last 90 days)
 // Overdue invoices are reported separately and NOT counted as scheduled cash
 // in, because when (or whether) they pay is unknowable.
@@ -28,6 +30,7 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
     recurringIn: 0,
     licensesIn: 0,
     supplierOut: 0,
+    supplierEstOut: 0,
     expensesOut: 0,
   }));
   const add = (date, key, amount) => {
@@ -92,6 +95,12 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
   const supplierMvr = rate ? toPayUsd * rate : 0;
   buckets[0].supplierOut += supplierMvr;
 
+  // Supplier cost we expect on income that has not been invoiced yet, in the
+  // same bucket as that income. Invoiced items are already in supplierOut.
+  const share = require('../routes/supplierCosts').computeCostShare(today);
+  const costShare = rate ? share.usdPerMvr * rate : 0; // MVR of cost per MVR of income
+  for (const b of buckets) b.supplierEstOut += (b.recurringIn + b.licensesIn) * costShare;
+
   // A typical month of recorded expenses (last 90 days / 3), every 30 days.
   const spent = db
     .prepare('SELECT COALESCE(SUM(amount), 0) AS t FROM expenses WHERE expense_date > ? AND expense_date <= ?')
@@ -102,7 +111,7 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
   let running = openingBalance;
   const out = buckets.map((b) => {
     const cashIn = b.invoicesIn + b.recurringIn + b.licensesIn;
-    const cashOut = b.supplierOut + b.expensesOut;
+    const cashOut = b.supplierOut + b.supplierEstOut + b.expensesOut;
     running += cashIn - cashOut;
     return {
       days: b.days,
@@ -110,6 +119,7 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
       recurringIn: round2(b.recurringIn),
       licensesIn: round2(b.licensesIn),
       supplierOut: round2(b.supplierOut),
+      supplierEstOut: round2(b.supplierEstOut),
       expensesOut: round2(b.expensesOut),
       cashIn: round2(cashIn),
       cashOut: round2(cashOut),
@@ -123,7 +133,7 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
     openingBalance: round2(openingBalance),
     buckets: out,
     overdue: { amount: round2(overdueAmount), count: overdueCount },
-    supplier: { toPayUsd, rate: rate ? round2(rate * 10000) / 10000 : null },
+    supplier: { toPayUsd, rate: rate ? round2(rate * 10000) / 10000 : null, estimateSharePct: round2(costShare * 100) },
     typicalMonthlyExpenses: round2(typicalMonth),
     lowestBalance: round2(Math.min(openingBalance, ...out.map((b) => b.projectedBalance))),
   };

@@ -10,6 +10,7 @@ const IN_ROWS = [
 ];
 const OUT_ROWS = [
   ['supplierOut', 'Supplier costs owed'],
+  ['supplierEstOut', 'Supplier costs (estimated)'],
   ['expensesOut', 'Typical expenses'],
 ];
 
@@ -72,6 +73,12 @@ export default function CashForecastCard({ forecast, symbol }) {
           <li>
             Supplier costs are ${supplier.toPayUsd.toFixed(2)} still to buy
             {supplier.rate ? ` at ${supplier.rate}` : ' (no USD purchase yet to price it, so not counted)'}, shown in the first 30 days.
+          </li>
+        )}
+        {supplier.estimateSharePct > 0 && (
+          <li>
+            Estimated supplier costs assume {supplier.estimateSharePct}% of recurring invoices and license renewals goes to suppliers, based on the
+            last 12 months.
           </li>
         )}
         <li>Typical expenses are the average of the last 90 days. Owner draws and payouts are not forecast.</li>
