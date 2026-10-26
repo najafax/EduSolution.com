@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { reportError } from '../lib/reportError';
 
 // Nothing in this app previously caught a render-time crash anywhere —
 // React's default behavior with no error boundary is to unmount the
@@ -25,6 +26,7 @@ export default class ErrorBoundary extends Component {
   componentDidCatch(error, info) {
     // eslint-disable-next-line no-console
     console.error('Page crashed:', error, info.componentStack);
+    reportError(error, { where: 'render', componentStack: info.componentStack });
   }
 
   render() {

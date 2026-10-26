@@ -1317,4 +1317,24 @@ db.prepare(
   `INSERT OR IGNORE INTO business_settings (id, business_name, address, phone) VALUES (1, ?, ?, ?)`,
 ).run('Edu Solutions Pvt Ltd', "Vinares tower, aboomaa hin'gun", '+960 7921335');
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS error_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fingerprint TEXT NOT NULL UNIQUE,
+    source TEXT NOT NULL DEFAULT 'server',
+    message TEXT NOT NULL,
+    stack TEXT NOT NULL DEFAULT '',
+    url TEXT NOT NULL DEFAULT '',
+    method TEXT NOT NULL DEFAULT '',
+    user_agent TEXT NOT NULL DEFAULT '',
+    user_id INTEGER,
+    user_name TEXT NOT NULL DEFAULT '',
+    count INTEGER NOT NULL DEFAULT 1,
+    resolved INTEGER NOT NULL DEFAULT 0,
+    first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_error_log_seen ON error_log(last_seen_at);
+`);
+
 module.exports = db;

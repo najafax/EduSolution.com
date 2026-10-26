@@ -13,7 +13,7 @@ import { HomeIcon, LogoutIcon, ChevronRightIcon } from '../components/icons';
 // desktop users can open it by URL but have the sidebar, so it's mainly a
 // phone screen.
 export default function More() {
-  const { user, logout, can, isSuperAdmin } = useAuth();
+  const { user, logout, can, isSuperAdmin, isUnrestrictedAdmin } = useAuth();
   const navigate = useNavigate();
 
   const groups = GROUP_ORDER.filter((g) => g !== 'Overview')
@@ -23,7 +23,8 @@ export default function More() {
         (l) =>
           l.group === group &&
           (!l.module || can(l.module, 'view')) &&
-          (!l.superAdminOnly || isSuperAdmin),
+          (!l.superAdminOnly || isSuperAdmin) &&
+          (!l.adminOnly || isUnrestrictedAdmin),
       ),
     }))
     .filter((g) => g.links.length > 0);

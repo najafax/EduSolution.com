@@ -353,6 +353,11 @@ export const api = {
       downloadFile(`/licenses/export.xlsx${qs({ q, status })}`, token, status ? `licenses-${status}.xlsx` : 'licenses.xlsx'),
   },
 
+  errorLog: {
+    list: (token, status = 'open') => request(`/error-log?status=${status}`, { token }),
+    resolve: (id, token) => request(`/error-log/${id}/resolve`, { method: 'POST', token }),
+    resolveAll: (token) => request('/error-log/resolve-all', { method: 'POST', token }),
+  },
   activity: {
     list: (token, page = 1) => request(`/activity?page=${page}`, { token }),
   },

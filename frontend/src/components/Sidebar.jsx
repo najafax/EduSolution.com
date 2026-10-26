@@ -26,6 +26,7 @@ import {
   TrendDownIcon,
   FacebookIcon,
   ClockIcon,
+  AlertTriangleIcon,
 } from './icons';
 
 // One icon per BUSINESS_LINKS entry (see Navbar.jsx) — a few modules
@@ -53,6 +54,7 @@ export const LINK_ICONS = {
   '/receivables': ClockIcon,
   '/reports': ReportIcon,
   '/activity': HistoryIcon,
+  '/error-log': AlertTriangleIcon,
   '/users': UsersIcon,
   '/email-center': SendIcon,
   '/website-content': GlobeIcon,
@@ -92,7 +94,7 @@ export const LINK_ICONS = {
 // already has a route to search without this copy; a tablet visitor still
 // doesn't, so it stays visible from `sm:` up).
 export default function Sidebar({ mobileOpen = false, onMobileClose }) {
-  const { user, logout, can } = useAuth();
+  const { user, logout, can, isUnrestrictedAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -118,7 +120,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
   if (!user) return null;
 
   const visibleLinks = BUSINESS_LINKS.filter(
-    (link) => !link.module || can(link.module, 'view'),
+    (link) => (!link.module || can(link.module, 'view')) && (!link.adminOnly || isUnrestrictedAdmin),
   );
   // Grouped by Navbar.jsx's own `group` field (see that file's note) —
   // a group is only rendered at all once it actually has a visible link,

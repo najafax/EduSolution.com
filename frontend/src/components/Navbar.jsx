@@ -45,6 +45,7 @@ export const BUSINESS_LINKS = [
   { to: '/receivables', label: 'Receivables', module: 'financials', group: 'Finance' },
   { to: '/reports', label: 'Reports', module: 'financials', group: 'Finance' },
   { to: '/activity', label: 'Activity', module: 'activity', group: 'Operations' },
+  { to: '/error-log', label: 'Error log', module: 'settings', group: 'Admin', adminOnly: true },
   { to: '/users', label: 'Users', module: 'users', group: 'Admin' },
   { to: '/email-center', label: 'Email center', module: 'email_center', group: 'Admin' },
   { to: '/website-content', label: 'Website content', module: 'website', group: 'Admin' },
