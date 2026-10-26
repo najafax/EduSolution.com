@@ -106,3 +106,19 @@ test('phone: bottom nav shows, hides on scroll down, returns on scroll up', asyn
   assert.equal(await opacity(), '1');
   await ctx.close();
 });
+
+test('desktop: every Website content tab renders and its form opens', async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await login(page);
+  await page.goto(`${APP}/website-content`);
+  for (const tab of ['News & announcements', 'Testimonials', 'Services', 'Team', 'Gallery', 'Videos']) {
+    await page.getByRole('button', { name: tab, exact: true }).click();
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: /^New |^Add / }).first().click();
+    await page.getByRole('button', { name: 'Cancel' }).first().click();
+  }
+  assert.deepEqual(errors, []);
+  await page.close();
+});
