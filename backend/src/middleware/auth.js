@@ -24,7 +24,9 @@ function requireAuth(req, res, next) {
   // Reject anything carrying the client-portal discriminator (see
   // middleware/clientAuth.js's own reverse check) before it ever reaches
   // the users lookup below.
-  if (payload.type === 'client') {
+  // An `mfa` token is the short-lived "password was right, now send your
+  // 2-step code" ticket from POST /auth/login — it must never act as a login.
+  if (payload.type === 'client' || payload.type === 'mfa') {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 

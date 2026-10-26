@@ -40,6 +40,7 @@ function publicUser(user) {
     active: Boolean(user.active),
     restricted: Boolean(user.restricted),
     notify_overdue: Boolean(user.notify_overdue),
+    two_factor_enabled: Boolean(user.totp_enabled),
     created_at: user.created_at,
   };
 }
@@ -286,6 +287,22 @@ router.post('/:id/reset-password', manage, async (req, res) => {
       entityLabel: `${existing.name} (${existing.role})`,
     });
   }
+  res.status(204).end();
+});
+
+// Lockout recovery: someone lost their phone and their recovery codes. Clears
+// their 2-step setup (they sign in with just the password and can set it up
+// again) and signs out their existing sessions. Same admin-tier rule as the
+// other account actions: only a super admin may do this for an admin.
+router.post('/:id/reset-2fa', manage, (req, res) => {
+  const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'User not found' });
+  if (!assertSuperAdminForAdminTier(req, res, existing.role)) return;
+  if (!existing.totp_enabled) return res.status(409).json({ error: 'This account does not use two-step verification.' });
+
+  db.prepare(`UPDATE users SET totp_enabled = 0, totp_secret = '', totp_last_step = 0, totp_recovery = '[]' WHERE id = ?`).run(existing.id);
+  db.prepare(`UPDATE sessions SET revoked_at = datetime('now') WHERE user_id = ? AND revoked_at IS NULL`).run(existing.id);
+  logActivity({ userName: req.user.name, action: 'reset two-step verification for', entityType: 'user', entityId: existing.id, entityLabel: existing.name });
   res.status(204).end();
 });
 

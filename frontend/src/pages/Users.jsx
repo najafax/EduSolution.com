@@ -7,7 +7,7 @@ import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import MobileListAccordion from '../components/MobileListAccordion';
 import IconActionButton from '../components/IconActionButton';
-import { PlusIcon, PencilIcon, KeyIcon, TrashIcon } from '../components/icons';
+import { PlusIcon, PencilIcon, KeyIcon, ShieldIcon, TrashIcon } from '../components/icons';
 import { useConfirm } from '../lib/useConfirm';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { isAdminRole, roleLabel } from '../lib/roles';
@@ -194,6 +194,24 @@ export default function Users() {
     setError('');
     try {
       await api.users.remove(user.id, token);
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleReset2fa(user) {
+    if (
+      !(await confirm({
+        title: `Reset two-step verification for ${user.name}?`,
+        message: 'They will be signed out everywhere and can sign in with just their password until they set it up again.',
+        confirmLabel: 'Reset',
+      }))
+    )
+      return;
+    setError('');
+    try {
+      await api.users.reset2fa(user.id, token);
       load();
     } catch (err) {
       setError(err.message);
@@ -523,6 +541,9 @@ export default function Users() {
                                 onClick={() => setResetTargetId(u.id)}
                                 title="Reset password"
                               />
+                              {u.two_factor_enabled && (
+                                <IconActionButton icon={ShieldIcon} tone="amber" onClick={() => handleReset2fa(u)} title="Reset two-step verification" />
+                              )}
                               {u.id !== currentUser.id && (
                                 <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(u)} title="Delete" label="Delete user" />
                               )}
@@ -577,6 +598,9 @@ export default function Users() {
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(u)} title="Edit" label="Edit user" />
                       <IconActionButton icon={KeyIcon} tone="slate" onClick={() => setResetTargetId(u.id)} title="Reset password" />
+                      {u.two_factor_enabled && (
+                        <IconActionButton icon={ShieldIcon} tone="amber" onClick={() => handleReset2fa(u)} title="Reset two-step verification" />
+                      )}
                       {u.id !== currentUser.id && (
                         <IconActionButton icon={TrashIcon} tone="red" onClick={() => handleDelete(u)} title="Delete" label="Delete user" />
                       )}

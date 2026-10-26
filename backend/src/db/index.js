@@ -1059,6 +1059,20 @@ if (!userColumns.has('restricted')) {
   db.exec(`ALTER TABLE users ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0;`);
 }
 
+// Two-step login (lib/totp.js, routes/auth.js). `totp_secret` is the AES-GCM
+// encrypted shared secret; it exists from "setup" but the account only
+// requires a code once `totp_enabled` = 1 (after the first code is proven).
+// `totp_last_step` stops a code being accepted twice; `totp_recovery` is a
+// JSON array of SHA-256 hashes of the unused one-time recovery codes.
+if (!userColumns.has('totp_secret')) {
+  db.exec(`
+    ALTER TABLE users ADD COLUMN totp_secret TEXT NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN totp_last_step INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN totp_recovery TEXT NOT NULL DEFAULT '[]';
+  `);
+}
+
 // `notify_admin_changes` — the opt-in preference (MyAccount.jsx, mirroring
 // `notify_overdue`/`notify_quote_responses`/etc.) for the staff digest sent
 // when a new admin-tier account is created or an existing account is

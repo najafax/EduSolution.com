@@ -20,6 +20,15 @@ const loginLimiter = rateLimit({
   handler: jsonHandler('Too many login attempts. Please try again in 15 minutes.'),
 });
 
+// Second login step. Same budget as the password step: 6-digit codes are only
+// safe because guesses are capped.
+const mfaLimiter = rateLimit({
+  ...base,
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  handler: jsonHandler('Too many attempts. Please try again in 15 minutes.'),
+});
+
 // Tighter, because each accepted request sends an email — this is the one
 // endpoint an abuser can use to generate outbound mail from your SMTP account.
 const forgotPasswordLimiter = rateLimit({
@@ -85,6 +94,7 @@ const publicRespondLimiter = rateLimit({
 module.exports = {
   publicRespondLimiter,
   loginLimiter,
+  mfaLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,
   portalLoginLimiter,

@@ -9762,3 +9762,9 @@ Gmail is the sole sender when configured (no Resend/SMTP fallback). If a Gmail s
 ### Backup verification
 - `npm run backup:verify` (backend; `-- <key>` for a specific backup, `-- --file x.gz` for a local file) downloads the newest daily backup, unpacks it to a scratch file and runs `lib/backupVerify.js` (SQLite integrity check, foreign keys, required tables, row counts). Never touches the live DB. Exits non-zero on a problem.
 - `lib/backup.js` `verifyLatestBackup()` does the same weekly (Sunday 04:30 server time, `lib/scheduler.js`) and sends a Telegram ops alert only when it fails.
+
+### Two-step verification (authenticator app)
+- Optional per account (recommended for admin-tier): My account → "Two-step verification" (`components/TwoFactorCard.jsx`) shows a QR/key, proves it with one code, then shows 10 one-time recovery codes. `lib/totp.js` is a dependency-free RFC 6238 implementation (SHA-1, 6 digits, 30s, ±1 step); the secret is stored AES-256-GCM encrypted (key from `JWT_SECRET`), `users.totp_*` columns are `ALTER TABLE`-guarded.
+- Login: `POST /auth/login` returns `{ mfaRequired, mfaToken }` (5-minute JWT with `type: 'mfa'`, rejected by `requireAuth`) instead of a session when the account has it on; `POST /auth/login/mfa` (rate limited) takes the code or a recovery code and issues the session. A code's time step can't be reused; recovery codes are consumed.
+- Turning off / new recovery codes need password + a code. Lockout recovery: super admin (or `users:manage` for staff) uses the shield button on the Users page (`POST /users/:id/reset-2fa`, also signs them out), or `npm run reset-2fa -- <email>` on the server. **Rotating `JWT_SECRET` makes stored secrets unreadable — reset 2-step for affected accounts afterwards.**
+- Tests: `backend/test/twofactor.test.js` (RFC vector, login flow, replay, recovery, reset) and an e2e test in `frontend/e2e`.

@@ -37,6 +37,10 @@ before(async () => {
     cwd: path.join(ROOT, 'backend'), env, encoding: 'utf8',
   });
   assert.equal(mk.status, 0, mk.stderr);
+  const mk2 = spawnSync('node', ['scripts/create-user.js', '--name', 'MFA', '--email', 'mfa@example.test', '--password', PASSWORD], {
+    cwd: path.join(ROOT, 'backend'), env, encoding: 'utf8',
+  });
+  assert.equal(mk2.status, 0, mk2.stderr);
   procs.push(spawn('node', ['src/index.js'], { cwd: path.join(ROOT, 'backend'), env, stdio: 'ignore' }));
   procs.push(spawn('npx', ['vite', 'preview', '--port', '4173', '--strictPort'], { cwd: path.join(ROOT, 'frontend'), env, stdio: 'ignore' }));
   await waitFor('http://localhost:4000/api/auth/me');
@@ -120,5 +124,43 @@ test('desktop: every Website content tab renders and its form opens', async () =
     await page.getByRole('button', { name: 'Cancel' }).first().click();
   }
   assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test('two-step verification: set up on My account, then required at login', async () => {
+  const totp = require(path.join(ROOT, 'backend', 'src', 'lib', 'totp.js'));
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(`${APP}/login`);
+  await page.fill('input[type=email]', 'mfa@example.test');
+  await page.fill('input[type=password]', PASSWORD);
+  await page.click('button[type=submit]');
+  await page.waitForURL('**/dashboard');
+
+  await page.goto(`${APP}/account`);
+  await page.getByRole('button', { name: 'Set up two-step verification' }).click();
+  const secret = (await page.locator('p.font-mono').first().innerText()).trim();
+  const step = totp.currentStep();
+  await page.getByLabel('6-digit code').fill(totp.codeForStep(secret, step));
+  await page.getByRole('button', { name: 'Turn on' }).click();
+  await page.getByText('Save your recovery codes now').waitFor();
+  assert.equal(await page.locator('ul.font-mono li').count(), 10);
+  await page.getByRole('button', { name: "I've saved them" }).click();
+
+  // Fresh browser: the password alone must not be enough.
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const p2 = await ctx.newPage();
+  await p2.goto(`${APP}/login`);
+  await p2.fill('input[type=email]', 'mfa@example.test');
+  await p2.fill('input[type=password]', PASSWORD);
+  await p2.click('button[type=submit]');
+  await p2.getByRole('heading', { name: 'Two-step verification' }).waitFor();
+  assert.match(p2.url(), /\/login$/);
+  await p2.getByLabel('Code').fill('000000');
+  await p2.getByRole('button', { name: 'Verify and log in' }).click();
+  await p2.getByText('not valid').waitFor();
+  await p2.getByLabel('Code').fill(totp.codeForStep(secret, step + 1));
+  await p2.getByRole('button', { name: 'Verify and log in' }).click();
+  await p2.waitForURL('**/dashboard');
+  await ctx.close();
   await page.close();
 });
