@@ -6,7 +6,6 @@ import { todayStr, advanceExpiryStr, timeAgo } from '../../lib/date';
 import StatusBadge from '../../components/StatusBadge';
 import SearchInput from '../../components/SearchInput';
 import StatusFilterChips from '../../components/StatusFilterChips';
-import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
@@ -829,7 +828,6 @@ export default function Licenses() {
         )}
       </Modal>
 
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New license" />}
 
       {confirmDialog}
     </div>

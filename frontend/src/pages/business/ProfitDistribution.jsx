@@ -10,7 +10,6 @@ import SearchInput from '../../components/SearchInput';
 import SearchableSelect from '../../components/SearchableSelect';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import Pagination from '../../components/Pagination';
-import FloatingActionButton from '../../components/FloatingActionButton';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
@@ -899,7 +898,6 @@ export default function ProfitDistribution() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New record" />}
 
       {confirmDialog}
     </div>

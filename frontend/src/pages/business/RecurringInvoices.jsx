@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { todayStr } from '../../lib/date';
 import LineItemsEditor from '../../components/LineItemsEditor';
-import FloatingActionButton from '../../components/FloatingActionButton';
 import SearchableSelect from '../../components/SearchableSelect';
 import PageToolbar from '../../components/PageToolbar';
 import SearchInput from '../../components/SearchInput';
@@ -441,7 +439,6 @@ export default function RecurringInvoices() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New recurring invoice" />}
 
       {confirmDialog}
     </div>

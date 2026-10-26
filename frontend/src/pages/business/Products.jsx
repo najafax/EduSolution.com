@@ -3,7 +3,6 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import PageToolbar from '../../components/PageToolbar';
 import SearchInput from '../../components/SearchInput';
-import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import MobileListAccordion from '../../components/MobileListAccordion';
@@ -566,7 +565,6 @@ export default function Products() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New product" />}
 
       {canManage && <ImportModal open={showImport} onClose={() => setShowImport(false)} token={token} onImported={load} />}
 

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
-import { roleLabel } from '../lib/roles';
 import { useConfirm } from '../lib/useConfirm';
 import { resizeImage, dataUriByteLength } from '../lib/imageResize';
 import FontSizeControl from '../components/FontSizeControl';

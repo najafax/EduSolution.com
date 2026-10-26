@@ -4,7 +4,6 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../../components/StatusBadge';
 import SearchInput from '../../components/SearchInput';
-import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
@@ -484,7 +483,6 @@ export default function Invoices() {
         />
       </Modal>
 
-      {canManage && !showNewForm && <FloatingActionButton onClick={() => setShowNewForm(true)} label="New invoice" />}
 
       <EmailPreviewModal
         open={emailModal !== null}

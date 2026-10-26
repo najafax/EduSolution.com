@@ -6,7 +6,6 @@ import { useConfirm } from '../../lib/useConfirm';
 import Modal from '../../components/Modal';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import StatusBadge from '../../components/StatusBadge';
-import FloatingActionButton from '../../components/FloatingActionButton';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
@@ -320,7 +319,6 @@ function PostsSection({ token, canManage }) {
           </>
         )}
       </div>
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New post" />}
       {confirmDialog}
     </div>
   );
@@ -535,7 +533,6 @@ function TestimonialsSection({ token, canManage }) {
           </>
         )}
       </div>
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New testimonial" />}
       {confirmDialog}
     </div>
   );
@@ -753,7 +750,6 @@ function ServicesSection({ token, canManage }) {
           </>
         )}
       </div>
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New service" />}
       {confirmDialog}
     </div>
   );
@@ -956,7 +952,6 @@ function TeamSection({ token, canManage }) {
           </>
         )}
       </div>
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New team member" />}
       {confirmDialog}
     </div>
   );
@@ -1117,7 +1112,6 @@ function GallerySection({ token, canManage }) {
           ))}
         </div>
       )}
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New image" />}
       {confirmDialog}
     </div>
   );
@@ -1321,7 +1315,6 @@ function VideosSection({ token, canManage }) {
           ))}
         </div>
       )}
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New video" />}
       {confirmDialog}
     </div>
   );

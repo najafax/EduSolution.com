@@ -8,7 +8,6 @@ import { useConfirm } from '../../lib/useConfirm';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { todayStr } from '../../lib/date';
 import SearchInput from '../../components/SearchInput';
-import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import StatusFilterChips from '../../components/StatusFilterChips';
@@ -622,7 +621,6 @@ export default function Expenses() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New expense" />}
 
       {canManage && <ImportModal open={showImport} onClose={() => setShowImport(false)} token={token} onImported={load} />}
 

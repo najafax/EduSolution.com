@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
-import FloatingActionButton from '../components/FloatingActionButton';
 import PageToolbar from '../components/PageToolbar';
 import SearchInput from '../components/SearchInput';
 import Pagination from '../components/Pagination';
@@ -592,7 +591,6 @@ export default function Users() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New user" />}
 
       {confirmDialog}
     </div>
