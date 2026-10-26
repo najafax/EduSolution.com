@@ -137,11 +137,8 @@ test('deals: one invoice per deal, ownership capped at 100%, no double distribut
   const d1 = await mk();
   assert.equal(d1.status, 201);
   assert.equal((await mk()).status, 409); // same invoice twice
-  const dist = await post(`/deals/${d1.data.deal.id}/distribute`, {});
-  assert.equal(dist.status, 200, JSON.stringify(dist.data));
-  const total = dist.data.distributions.reduce((s, r) => s + r.amount, 0);
-  assert.equal(Math.round(total * 100) / 100, 80); // 60% + 40% of net profit 80
-  assert.equal((await post(`/deals/${d1.data.deal.id}/distribute`, {})).status, 409);
+  // Manual distribution no longer exists; only the dated automatic job distributes.
+  assert.equal((await post(`/deals/${d1.data.deal.id}/distribute`, {})).status, 404);
 });
 
 test('receivables aging: a past snapshot is not rewritten by later payments', async () => {

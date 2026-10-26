@@ -5,7 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../lib/useConfirm';
 import Modal from '../../components/Modal';
-import FloatingActionButton from '../../components/FloatingActionButton';
 import { TableSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
@@ -320,7 +319,6 @@ export default function Shareholders() {
         )}
       </div>
 
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New shareholder" />}
 
       {confirmDialog}
     </div>

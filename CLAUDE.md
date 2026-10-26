@@ -9751,3 +9751,7 @@ The droplet blocks outbound SMTP (ports 587/465 time out), so Gmail SMTP can't b
 ### Gmail failure alert (`backend/src/lib/opsAlert.js`)
 
 Gmail is the sole sender when configured (no Resend/SMTP fallback). If a Gmail send fails, `sendMail()` calls `sendOpsAlert()` — a fire-and-forget Telegram message to every id in `TELEGRAM_ALLOWED_USER_IDS` using `TELEGRAM_BOT_TOKEN` (the same vars as the ops bot), throttled to one alert per hour per key, a no-op when those vars are unset, never throws — and then rethrows the original error so callers behave as before. Alert text never includes credentials. Test: `backend/test/mailer.test.js`.
+
+### Hardening pass
+- `.github/workflows/ci.yml` runs backend tests and frontend lint + build on every push to main and every PR.
+- There is **no manual profit-distribution route** any more (`POST /deals/:id/distribute` and `/distribute-all` were removed): only the nightly `autoDistribute()` distributes, so the 2027-01-01 floor can't be bypassed. `FloatingActionButton` was deleted (it had been a no-op since the Studio shell). `nodemailer` is v10 (security fix).

@@ -7,7 +7,6 @@ import { useUndoableDelete } from '../../lib/useUndoableDelete';
 import { useConfirm } from '../../lib/useConfirm';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import SearchInput from '../../components/SearchInput';
-import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import { TableSkeleton } from '../../components/Skeleton';
@@ -334,7 +333,6 @@ export default function Clients() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New client" />}
 
       <EmailPreviewModal
         open={emailModal !== null}

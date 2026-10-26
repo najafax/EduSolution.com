@@ -282,15 +282,6 @@ export const api = {
     create: (payload, token) => request('/deals', { method: 'POST', body: payload, token }),
     update: (id, payload, token) => request(`/deals/${id}`, { method: 'PUT', body: payload, token }),
     remove: (id, token) => request(`/deals/${id}`, { method: 'DELETE', token }),
-    // Pays shareholders their share of net profit as this deal currently
-    // computes it — deliberately does not touch the USD cost side at all;
-    // recording a real USD purchase now lives on the Expenses page and
-    // routes/supplierCosts.js's own report/record action, not here. See
-    // routes/deals.js's own POST /:id/distribute.
-    distribute: (id, token) => request(`/deals/${id}/distribute`, { method: 'POST', token }),
-    // Distributes every eligible draft in one call. See routes/deals.js's
-    // own POST /distribute-all.
-    distributeAll: (token) => request('/deals/distribute-all', { method: 'POST', token }),
     // Automatic nightly distribution switch + on-demand run, and adjusting a
     // distributed payout to the actual USD rate (routes/deals.js).
     autoSettings: (token) => request('/deals/auto-settings', { token }),

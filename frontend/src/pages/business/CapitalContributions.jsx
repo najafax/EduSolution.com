@@ -7,7 +7,6 @@ import { useConfirm } from '../../lib/useConfirm';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { todayStr } from '../../lib/date';
 import SearchInput from '../../components/SearchInput';
-import FloatingActionButton from '../../components/FloatingActionButton';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import SearchableSelect from '../../components/SearchableSelect';
@@ -348,7 +347,6 @@ export default function CapitalContributions() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
-      {canManage && !showForm && <FloatingActionButton onClick={startCreate} label="New contribution" />}
 
       {confirmDialog}
     </div>
