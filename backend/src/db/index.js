@@ -914,6 +914,21 @@ if (!facebookPostColumns.has('image_data')) {
 // window of its own (a confirmation is a one-time fact about a specific
 // renewal, not a nag that should eventually repeat on a timer). Reuses
 // the already-declared licenseColumns set from the url migration above.
+// Renewal invoices drafted automatically ahead of a license's expiry (see
+// lib/licenseRenewalInvoices.js). `renewal_invoice_for` records which
+// expiry_date the draft was made for, so one cycle never gets two drafts and
+// the next cycle (a new expiry_date) gets its own.
+if (!licenseColumns.has('renewal_invoice_id')) {
+  db.exec(`
+    ALTER TABLE licenses ADD COLUMN renewal_invoice_id INTEGER;
+    ALTER TABLE licenses ADD COLUMN renewal_invoice_for TEXT NOT NULL DEFAULT '';
+  `);
+}
+if (!settingsColumns.has('license_invoice_lead_days')) {
+  // 0 = off. Otherwise: draft a renewal invoice this many days before expiry.
+  db.exec(`ALTER TABLE business_settings ADD COLUMN license_invoice_lead_days INTEGER NOT NULL DEFAULT 0;`);
+}
+
 if (!licenseColumns.has('last_renewal_confirmation_sent_at')) {
   db.exec(`ALTER TABLE licenses ADD COLUMN last_renewal_confirmation_sent_at TEXT;`);
 }

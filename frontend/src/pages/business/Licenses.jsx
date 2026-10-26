@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-
+import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { todayStr, advanceExpiryStr, timeAgo } from '../../lib/date';
@@ -83,6 +83,7 @@ export default function Licenses() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -319,6 +320,20 @@ export default function Licenses() {
   // Exports whatever's currently filtered on this page (status chip, and
   // the search box once its debounce settles) rather than always the full
   // table — see routes/invoices.js's own loadInvoiceExport() note.
+  async function handleCreateRenewalInvoices() {
+    setError('');
+    setNotice('');
+    try {
+      const { created, notBilled } = await api.licenses.createRenewalInvoices(token);
+      const parts = [created.length ? `Drafted ${created.length} renewal invoice${created.length === 1 ? '' : 's'}: ${created.map((c) => c.number).join(', ')}.` : 'No new renewal invoices were needed.'];
+      if (notBilled.length) parts.push(`Not billed: ${notBilled.map((n) => `${n.name} (${n.reason})`).join('; ')}.`);
+      setNotice(parts.join(' '));
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleExportCsv() {
     setError('');
     try {
@@ -419,7 +434,7 @@ export default function Licenses() {
         actions={
           <>
 
-          <PageMenu items={[{ label: 'Analytics', icon: ReportIcon, to: '/licenses/analytics' }, { label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
+          <PageMenu items={[{ label: 'Analytics', icon: ReportIcon, to: '/licenses/analytics' }, ...(canManage ? [{ label: 'Create renewal invoices now', icon: PlusIcon, onClick: handleCreateRenewalInvoices }] : []), { label: 'Export CSV', icon: DownloadIcon, onClick: handleExportCsv }, { label: 'Export Excel', icon: DownloadIcon, onClick: handleExportXlsx }]} />
           {canManage && (
             <button
               onClick={startCreate}
@@ -447,6 +462,7 @@ export default function Licenses() {
 
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {notice && <p className="mt-4 text-sm text-emerald-700 dark:text-emerald-400">{notice}</p>}
 
       <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading || !settingsLoaded ? (
@@ -481,6 +497,14 @@ export default function Licenses() {
                     <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <td className="whitespace-nowrap px-4 py-3">
                         <p className="font-medium text-slate-900 dark:text-white">{l.name}</p>
+                        {l.renewal_invoice_number && (
+                          <p className="mt-0.5 text-xs">
+                            <Link to={`/invoices/${l.renewal_invoice_id_current}`} className="font-medium text-lagoon-600 hover:underline">
+                              Renewal invoice {l.renewal_invoice_number}
+                            </Link>{' '}
+                            <span className="text-slate-500 dark:text-slate-400">({l.renewal_invoice_status})</span>
+                          </p>
+                        )}
                         {l.last_renewal_confirmation_sent_at && (
                           <p className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">
                             Renewal confirmation sent {timeAgo(l.last_renewal_confirmation_sent_at)}
@@ -540,6 +564,9 @@ export default function Licenses() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-slate-900 dark:text-white">{l.name}</p>
                         <p className="truncate text-slate-500 dark:text-slate-400">{l.client_name}</p>
+                        {l.renewal_invoice_number && (
+                          <p className="truncate text-xs text-lagoon-600 dark:text-lagoon-400">Renewal invoice {l.renewal_invoice_number} ({l.renewal_invoice_status})</p>
+                        )}
                         {l.last_renewal_confirmation_sent_at && (
                           <p className="truncate text-xs text-emerald-600 dark:text-emerald-400">
                             Renewal confirmation sent {timeAgo(l.last_renewal_confirmation_sent_at)}

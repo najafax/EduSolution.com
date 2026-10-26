@@ -164,3 +164,34 @@ test('two-step verification: set up on My account, then required at login', asyn
   await ctx.close();
   await page.close();
 });
+
+test('license renewal invoices: switched on in Settings, drafted from the Licenses page', async () => {
+  const api = async (method, p, body, token) => {
+    const res = await fetch(`http://localhost:4000/api${p}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return res.json().catch(() => ({}));
+  };
+  const { token } = await api('POST', '/auth/login', { email: EMAIL, password: PASSWORD });
+  const client = (await api('POST', '/clients', { name: 'Renewal Co', email: 'r@example.test' }, token)).client;
+  const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  await api('POST', '/licenses', { client_id: client.id, name: 'E2E Licence', billing_cycle: 'yearly', amount: 300, start_date: day(-340), expiry_date: day(10) }, token);
+
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await login(page);
+  await page.goto(`${APP}/settings`);
+  // Financial section holds the lead-days field.
+  await page.getByText('Financial', { exact: true }).first().click();
+  await page.getByLabel(/Draft license renewal invoices/).first().fill('21');
+  await page.getByRole('button', { name: /^Save/ }).first().click();
+  await page.getByText(/saved/i).first().waitFor();
+
+  await page.goto(`${APP}/licenses`);
+  await page.getByRole('button', { name: 'More actions' }).first().click();
+  await page.getByText('Create renewal invoices now').click();
+  await page.getByText(/Drafted 1 renewal invoice/).waitFor();
+  await page.getByText(/Renewal invoice INV-/).first().waitFor();
+  await page.close();
+});
