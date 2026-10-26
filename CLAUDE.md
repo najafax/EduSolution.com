@@ -9755,3 +9755,4 @@ Gmail is the sole sender when configured (no Resend/SMTP fallback). If a Gmail s
 ### Hardening pass
 - `.github/workflows/ci.yml` runs backend tests and frontend lint + build on every push to main and every PR.
 - There is **no manual profit-distribution route** any more (`POST /deals/:id/distribute` and `/distribute-all` were removed): only the nightly `autoDistribute()` distributes, so the 2027-01-01 floor can't be bypassed. `FloatingActionButton` was deleted (it had been a no-op since the Studio shell). `nodemailer` is v10 (security fix).
+- `frontend/e2e/smoke.test.cjs` (`cd frontend && npm run build && npm run e2e`): Playwright smoke tests (login, create client, phone bottom-nav auto-hide) against the real API on a throwaway DB; also a CI job. Uses ports 4000/4173.
