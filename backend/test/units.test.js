@@ -101,3 +101,38 @@ test('date advance: month-end clamping is independent of the server timezone', (
     assert.deepEqual(JSON.parse(r.stdout.toString()), expected, `TZ=${tz}`);
   }
 });
+
+test('backup verification: a healthy database passes, a corrupt or incomplete one fails', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const Database = require('better-sqlite3');
+  const { verifySqliteFile } = require('../src/lib/backupVerify');
+  const dir = fs.mkdtempSync(path.join(__dirname, '.verify-'));
+  try {
+    const good = path.join(dir, 'good.sqlite3');
+    const g = new Database(good);
+    g.exec(`CREATE TABLE users (id INTEGER PRIMARY KEY); CREATE TABLE clients (id INTEGER PRIMARY KEY);
+      CREATE TABLE invoices (id INTEGER PRIMARY KEY); CREATE TABLE invoice_items (id INTEGER PRIMARY KEY);
+      CREATE TABLE payments (id INTEGER PRIMARY KEY); CREATE TABLE business_settings (id INTEGER PRIMARY KEY);
+      INSERT INTO users (id) VALUES (1);`);
+    g.close();
+    const ok = verifySqliteFile(good);
+    assert.equal(ok.ok, true, ok.problems.join(','));
+    assert.equal(ok.counts.users, 1);
+
+    const partial = path.join(dir, 'partial.sqlite3');
+    const p = new Database(partial);
+    p.exec('CREATE TABLE users (id INTEGER PRIMARY KEY); INSERT INTO users (id) VALUES (1);');
+    p.close();
+    const bad = verifySqliteFile(partial);
+    assert.equal(bad.ok, false);
+    assert.ok(bad.problems.some((m) => m.includes('Missing table: invoices')));
+
+    const junk = path.join(dir, 'junk.sqlite3');
+    fs.writeFileSync(junk, Buffer.from('this is not a database at all, just text'.repeat(50)));
+    assert.equal(verifySqliteFile(junk).ok, false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

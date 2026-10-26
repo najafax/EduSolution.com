@@ -8,7 +8,7 @@ const { renderProfitLossPdf } = require('./reportPdf');
 const { sendMail, textToHtml, isEmailConfigured } = require('./mailer');
 const { computeTotals } = require('./totals');
 const { nextInvoiceNumber } = require('./numbering');
-const { runBackup } = require('./backup');
+const { runBackup, verifyLatestBackup } = require('./backup');
 const { logEmail } = require('./emailLog');
 const { licenseRemindEmail, overdueReminderEmail } = require('./emailTemplates');
 const { runDailyEarningsReport } = require('./dailyEarningsReport');
@@ -455,6 +455,12 @@ function startScheduler() {
   // host, an explicit TZ env var), this schedule moves with it rather than
   // silently staying pinned to GMT/Maldives time — re-derive the UTC
   // offset above if the deploy's own timezone ever changes.
+  // Sundays 04:30 server time — an hour and a half after the nightly backup,
+  // so the newest daily file is already there. Only alerts on a problem.
+  cron.schedule('30 4 * * 0', () => {
+    verifyLatestBackup().catch((err) => console.error('[backup] verification job failed:', err));
+  });
+
   cron.schedule('30 3 * * *', () => {
     runDailyEarningsReport().catch((err) => console.error('[daily-earnings] job failed:', err));
   });
@@ -495,4 +501,5 @@ module.exports = {
   runDailyEarningsReport,
   generateWeeklyFacebookDraft,
   runBackup,
+  verifyLatestBackup,
 };
