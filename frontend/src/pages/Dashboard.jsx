@@ -9,6 +9,7 @@ import StatBars from '../components/StatBars';
 import AttentionCarousel from '../components/AttentionCarousel';
 import KpiCard from '../components/KpiCard';
 import DashboardRail from '../components/DashboardRail';
+import CashForecastCard from '../components/CashForecastCard';
 import Accordion from '../components/Accordion';
 import {
   AlertTriangleIcon,
@@ -57,6 +58,7 @@ const RAIL_SHORTCUT_LIMIT = 6;
 export default function Dashboard() {
   const { user, token, can } = useAuth();
   const [summary, setSummary] = useState(null);
+  const [cashForecast, setCashForecast] = useState(null);
   const [settings, setSettings] = useState(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [error, setError] = useState('');
@@ -91,6 +93,7 @@ export default function Dashboard() {
       .overview(token)
       .then((data) => {
         if (data.financials) setSummary(data.financials);
+        setCashForecast(data.cashForecast || null);
         if (data.settings) setSettings(data.settings);
         setOverdueInvoices(data.overdueInvoices || []);
         setExpiringLicenses(data.expiringLicenses || []);
@@ -325,6 +328,8 @@ export default function Dashboard() {
                 ]}
               />
             </div>
+
+            <CashForecastCard forecast={cashForecast} symbol={symbol} />
 
             <section className="mt-6 rounded-[28px] bg-white p-2 shadow-sm dark:bg-slate-900">
               <h2 className="px-4 pb-1 pt-3 font-display text-base font-extrabold text-slate-900 dark:text-white">Recent payments</h2>

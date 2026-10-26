@@ -247,5 +247,21 @@ router.get('/summary', requirePermission('financials', 'view'), (req, res) => {
   res.json(computeSummary(from, to));
 });
 
+// Expected cash in/out over the next 30/60/90 days (see lib/cashForecast.js).
+function cashForecast() {
+  const { computeCashForecast } = require('../lib/cashForecast');
+  return computeCashForecast({ openingBalance: computeSummary().bankBalance });
+}
+router.cashForecast = cashForecast;
+
+router.get('/cash-forecast', requirePermission('financials', 'view'), (req, res) => {
+  try {
+    res.json(cashForecast());
+  } catch (err) {
+    console.error('GET /api/financials/cash-forecast failed:', err);
+    res.status(500).json({ error: 'Failed to build the cash forecast' });
+  }
+});
+
 module.exports = router;
 module.exports.computeSummary = computeSummary;

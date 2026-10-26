@@ -55,6 +55,15 @@ router.get('/overview', (req, res) => {
 
     const financials = canFinancials ? financialsRoutes.computeSummary(yearFrom(), today()) : null;
 
+    let cashForecast = null;
+    if (canFinancials) {
+      try {
+        cashForecast = financialsRoutes.cashForecast();
+      } catch (err) {
+        console.error('cash forecast failed:', err);
+      }
+    }
+
     let settings = null;
     if (canSettings) {
       const row = db.prepare('SELECT currency_symbol, business_name FROM business_settings WHERE id = 1').get();
@@ -164,6 +173,7 @@ router.get('/overview', (req, res) => {
 
     res.json({
       financials,
+      cashForecast,
       settings,
       overdueInvoices,
       expiringLicenses,
