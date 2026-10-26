@@ -209,7 +209,7 @@ test('license renewal invoices: switched on in Settings, drafted from the Licens
   await page.getByText(/saved/i).first().waitFor();
 
   await page.goto(`${APP}/licenses`);
-  await page.getByRole('button', { name: 'More actions' }).last().click(); // the row menu, after the page menu
+  await page.getByRole('button', { name: 'More actions' }).first().click(); // the page (header) menu
   await page.getByText('Create renewal invoices now').click();
   await page.getByText(/Drafted 1 renewal invoice/).waitFor();
   await page.getByText(/Renewal invoice INV-/).first().waitFor();
