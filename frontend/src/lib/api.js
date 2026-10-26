@@ -122,6 +122,7 @@ export const api = {
     // rather than always the full table.
     exportCsv: (token, { q } = {}) => downloadFile(`/clients/export.csv${qs({ q })}`, token, 'clients.csv'),
     exportXlsx: (token, { q } = {}) => downloadFile(`/clients/export.xlsx${qs({ q })}`, token, 'clients.xlsx'),
+    openStatementPdf: (id, { from, to } = {}, token) => openPdf(`/clients/${id}/statement/pdf${qs({ from, to })}`, token),
     portalInvitePreview: (id, token) => request(`/clients/${id}/portal-invite-preview`, { token }),
     portalInvite: (id, payload, token) => request(`/clients/${id}/portal-invite`, { method: 'POST', body: payload, token }),
   },

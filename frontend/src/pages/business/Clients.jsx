@@ -18,7 +18,8 @@ import IconActionButton from '../../components/IconActionButton';
 import RowActions from '../../components/RowActions';
 import EmailPreviewModal from '../../components/EmailPreviewModal';
 import CampaignComposeModal from '../../components/CampaignComposeModal';
-import { UsersIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, SendIcon, MegaphoneIcon } from '../../components/icons';
+import { startOfYearStr, todayStr } from '../../lib/date';
+import { ReportIcon, UsersIcon, DownloadIcon, PlusIcon, PencilIcon, TrashIcon, SendIcon, MegaphoneIcon } from '../../components/icons';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', address: '', notes: '' };
 
@@ -44,6 +45,13 @@ export default function Clients() {
   const { toast } = useToast();
   const canManage = can('clients', 'manage');
   const canSendCampaigns = can('campaigns', 'manage');
+  const canStatement = can('invoices', 'view');
+  const showActions = canManage || canSendCampaigns || canStatement;
+  const [statementClient, setStatementClient] = useState(null); // client whose statement dialog is open
+  const [stmtFrom, setStmtFrom] = useState(startOfYearStr());
+  const [stmtTo, setStmtTo] = useState(todayStr());
+  const [stmtBusy, setStmtBusy] = useState(false);
+  const [stmtError, setStmtError] = useState('');
   const [clients, setClients] = useState([]);
   const [pageInfo, setPageInfo] = useState(null);
   const [page, setPage] = useState(1);
@@ -164,6 +172,24 @@ export default function Clients() {
   // 'active'/'deactivated' clients get no invite action here — a live
   // portal login already exists, and reactivating a deactivated one is a
   // later phase (see CLAUDE.md's client portal rollout plan).
+  async function downloadStatement(e) {
+    e.preventDefault();
+    if (stmtFrom > stmtTo) {
+      setStmtError('The start date must not be after the end date.');
+      return;
+    }
+    setStmtBusy(true);
+    setStmtError('');
+    try {
+      await api.clients.openStatementPdf(statementClient.id, { from: stmtFrom, to: stmtTo }, token);
+      setStatementClient(null);
+    } catch (err) {
+      setStmtError(err.message);
+    } finally {
+      setStmtBusy(false);
+    }
+  }
+
   function rowActions(client) {
     return (
       <>
@@ -183,6 +209,18 @@ export default function Clients() {
             onClick={() => setCampaignClient(client)}
             title="Send email"
             label={`Send email to ${client.name}`}
+          />
+        )}
+        {canStatement && (
+          <IconActionButton
+            icon={ReportIcon}
+            tone="slate"
+            onClick={() => {
+              setStmtError('');
+              setStatementClient(client);
+            }}
+            title="Statement"
+            label={`Statement of account for ${client.name}`}
           />
         )}
         {canManage && <IconActionButton icon={PencilIcon} tone="slate" onClick={() => startEdit(client)} title="Edit" label="Edit client" />}
@@ -253,7 +291,7 @@ export default function Clients() {
       <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="overflow-x-auto">
-            <TableSkeleton rows={5} cols={canManage || canSendCampaigns ? ['w-32', 'w-40', 'w-24', 'w-32', 'w-16'] : ['w-32', 'w-40', 'w-24', 'w-32']} />
+            <TableSkeleton rows={5} cols={showActions ? ['w-32', 'w-40', 'w-24', 'w-32', 'w-16'] : ['w-32', 'w-40', 'w-24', 'w-32']} />
           </div>
         ) : visibleClients.length === 0 ? (
           <EmptyState
@@ -272,7 +310,7 @@ export default function Clients() {
                     <th className="px-4 py-3">Email</th>
                     <th className="px-4 py-3">Phone</th>
                     <th className="px-4 py-3">Address</th>
-                    {(canManage || canSendCampaigns) && <th className="px-4 py-3" />}
+                    {showActions && <th className="px-4 py-3" />}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -289,7 +327,7 @@ export default function Clients() {
                       <td className="max-w-xs truncate px-4 py-3 text-slate-600 dark:text-slate-400" title={client.address || undefined}>
                         {client.address || '—'}
                       </td>
-                      {(canManage || canSendCampaigns) && (
+                      {showActions && (
                         <td className="whitespace-nowrap px-4 py-3">
                           <RowActions>{rowActions(client)}</RowActions>
                         </td>
@@ -323,7 +361,7 @@ export default function Clients() {
                     <dt className="shrink-0 text-slate-500 dark:text-slate-400">Address</dt>
                     <dd className="text-right text-slate-900 dark:text-white">{client.address || '—'}</dd>
                   </div>
-                  {(canManage || canSendCampaigns) && <div className="pt-1"><RowActions fill>{rowActions(client)}</RowActions></div>}
+                  {showActions && <div className="pt-1"><RowActions fill>{rowActions(client)}</RowActions></div>}
                 </MobileListAccordion>
               ))}
             </div>
@@ -333,6 +371,33 @@ export default function Clients() {
 
       {pageInfo && <Pagination page={pageInfo.page} totalPages={pageInfo.totalPages} onChange={setPage} />}
 
+
+      <Modal open={statementClient !== null} onClose={() => setStatementClient(null)} title="Statement of account">
+        <form onSubmit={downloadStatement} className="flex flex-col gap-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Every invoice and payment for <span className="font-medium text-slate-900 dark:text-white">{statementClient?.name}</span> in the period, with a running balance. Earlier activity is rolled into the opening balance.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+              From
+              <input type="date" required value={stmtFrom} onChange={(e) => setStmtFrom(e.target.value)} className="min-h-11 rounded-md border border-slate-300 px-3 text-base dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+              To
+              <input type="date" required value={stmtTo} onChange={(e) => setStmtTo(e.target.value)} className="min-h-11 rounded-md border border-slate-300 px-3 text-base dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2 text-sm">
+            <button type="button" onClick={() => { setStmtFrom(startOfYearStr()); setStmtTo(todayStr()); }} className="rounded-full border border-slate-300 px-3 py-1 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">This year</button>
+            <button type="button" onClick={() => { setStmtFrom('2000-01-01'); setStmtTo(todayStr()); }} className="rounded-full border border-slate-300 px-3 py-1 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">All time</button>
+          </div>
+          {stmtError && <p className="text-sm text-red-600 dark:text-red-400">{stmtError}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setStatementClient(null)} className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">Cancel</button>
+            <button type="submit" disabled={stmtBusy} className="min-h-11 rounded-xl bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60 dark:bg-lagoon-600 dark:hover:bg-lagoon-500">{stmtBusy ? 'Preparing…' : 'Download PDF'}</button>
+          </div>
+        </form>
+      </Modal>
 
       <EmailPreviewModal
         open={emailModal !== null}

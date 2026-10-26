@@ -55,7 +55,7 @@ async function startServer(port) {
     child.kill();
     fs.rmSync(dir, { recursive: true, force: true });
   };
-  return { api, login, db, stop };
+  return { api, login, db, stop, base };
 }
 
 module.exports = { startServer };
