@@ -11,7 +11,7 @@ const EMPTY_RESULTS = { clients: [], quotes: [], invoices: [], expenses: [] };
 // nav link the current user can see — one fast, keyboard-only way to jump
 // to a page or a specific record without touching the mouse.
 export default function CommandPalette() {
-  const { token, can } = useAuth();
+  const { token, can, isUnrestrictedAdmin } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -64,11 +64,11 @@ export default function CommandPalette() {
   const navMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
     const links = [
-      ...BUSINESS_LINKS.filter((link) => !link.module || can(link.module, 'view')),
+      ...BUSINESS_LINKS.filter((link) => (!link.module || can(link.module, 'view')) && (!link.adminOnly || isUnrestrictedAdmin)),
       { to: '/account', label: 'My account', module: null },
     ];
     return links.filter((link) => !q || link.label.toLowerCase().includes(q));
-  }, [query, can]);
+  }, [query, can, isUnrestrictedAdmin]);
 
   const items = useMemo(() => {
     const list = navMatches.map((link) => ({

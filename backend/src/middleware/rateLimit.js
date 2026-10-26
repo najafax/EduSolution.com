@@ -29,6 +29,15 @@ const mfaLimiter = rateLimit({
   handler: jsonHandler('Too many attempts. Please try again in 15 minutes.'),
 });
 
+// Unauthenticated browser error reports. Generous enough for a burst from one
+// crashing page, small enough that it can't be used to fill the table.
+const clientErrorLimiter = rateLimit({
+  ...base,
+  windowMs: 10 * 60 * 1000,
+  limit: 30,
+  handler: jsonHandler('Too many error reports.'),
+});
+
 // Tighter, because each accepted request sends an email — this is the one
 // endpoint an abuser can use to generate outbound mail from your SMTP account.
 const forgotPasswordLimiter = rateLimit({
@@ -95,6 +104,7 @@ module.exports = {
   publicRespondLimiter,
   loginLimiter,
   mfaLimiter,
+  clientErrorLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,
   portalLoginLimiter,

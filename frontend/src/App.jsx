@@ -54,6 +54,7 @@ const Licenses = lazy(() => import('./pages/business/Licenses'));
 const LicenseAnalytics = lazy(() => import('./pages/business/LicenseAnalytics'));
 const Financials = lazy(() => import('./pages/business/Financials'));
 const Reports = lazy(() => import('./pages/business/Reports'));
+const ErrorLog = lazy(() => import('./pages/business/ErrorLog'));
 const ActivityLog = lazy(() => import('./pages/business/ActivityLog'));
 const Import = lazy(() => import('./pages/business/Import'));
 const Users = lazy(() => import('./pages/Users'));
@@ -227,6 +228,7 @@ export default function App() {
 
                 <Route path="/financials" element={<Protected><Financials /></Protected>} />
                 <Route path="/reports" element={<Protected><Reports /></Protected>} />
+                <Route path="/error-log" element={<Protected><ErrorLog /></Protected>} />
                 <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
                 <Route path="/users" element={<Protected><Users /></Protected>} />
                 <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />

@@ -32,6 +32,8 @@ const dealsRoutes = require('./routes/deals');
 const supplierCostsRoutes = require('./routes/supplierCosts');
 const usdAccountRoutes = require('./routes/usdAccount');
 const facebookPostsRoutes = require('./routes/facebookPosts');
+const errorLogRoutes = require('./routes/errorLog');
+const { recordError } = require('./lib/errorLog');
 const { startScheduler } = require('./lib/scheduler');
 
 const app = express();
@@ -55,6 +57,9 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
 // routes/clientPortal.js) needed room for a base64-encoded payment slip —
 // a phone photo of a bank transfer receipt routinely runs 2-5MB before
 // base64 inflates it by another third, well past the old 2mb ceiling.
+// Browser error reports get their own tiny body limit, mounted before the
+// big global parser.
+app.use('/api/client-errors', express.json({ limit: '32kb' }), errorLogRoutes.intake);
 app.use(express.json({ limit: '8mb' }));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -88,6 +93,7 @@ app.use('/api/deals', dealsRoutes);
 app.use('/api/supplier-costs', supplierCostsRoutes);
 app.use('/api/usd-account', usdAccountRoutes);
 app.use('/api/facebook-posts', facebookPostsRoutes);
+app.use('/api/error-log', errorLogRoutes.admin);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
@@ -95,7 +101,36 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
   console.error(err);
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({ error: 'Request too large' });
+  }
+  if (err && err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+  recordError({
+    source: 'server',
+    message: err && err.message,
+    stack: err && err.stack,
+    url: `${req.method} ${req.path}`,
+    method: req.method,
+    userAgent: req.headers['user-agent'],
+    userId: req.user && req.user.id,
+    userName: req.user && req.user.name,
+  });
   res.status(500).json({ error: 'Internal server error' });
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('uncaughtException', err);
+  recordError({ source: 'server', message: `uncaughtException: ${err && err.message}`, stack: err && err.stack });
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('unhandledRejection', reason);
+  recordError({
+    source: 'server',
+    message: `unhandledRejection: ${reason && reason.message ? reason.message : reason}`,
+    stack: reason && reason.stack,
+  });
 });
 
 app.listen(PORT, () => {

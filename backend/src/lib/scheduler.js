@@ -1,4 +1,11 @@
 const cron = require('node-cron');
+const { recordError, pruneErrorLog } = require('./errorLog');
+
+// A whole scheduled job blew up: log it, put it in the error log, alert ops.
+function jobFailed(label, err) {
+  console.error(label, err);
+  recordError({ source: 'job', message: `${label} ${err && err.message}`, stack: err && err.stack });
+}
 const { stampItemCosts } = require('./costSnapshot');
 const { todayStr, addDays, addMonths, addYears, previousMonthRange } = require('./businessDate');
 const crypto = require('crypto');
@@ -412,10 +419,18 @@ async function generateDueRecurringInvoices() {
 }
 
 function startScheduler() {
+  // Daily 05:00: trim the error log (resolved after 30 days, anything after 90).
+  cron.schedule('0 5 * * *', () => {
+    try {
+      pruneErrorLog();
+    } catch (err) {
+      console.error('[error-log] prune failed:', err.message);
+    }
+  });
   // Daily at 07:00 server time: generate any due recurring invoices first,
   // so a newly-generated invoice can't be reminded the same run.
   cron.schedule('0 7 * * *', () => {
-    generateDueRecurringInvoices().catch((err) => console.error('[recurring] job failed:', err));
+    generateDueRecurringInvoices().catch((err) => jobFailed('[recurring] job failed:', err));
   });
   // Daily at 07:30, between the recurring-invoice job above and the
   // reminder jobs below — no SMTP dependency (this doesn't email anyone,
@@ -426,7 +441,7 @@ function startScheduler() {
     try {
       generateLicenseRenewalInvoices();
     } catch (err) {
-      console.error('[license-invoices] job failed:', err);
+      jobFailed('[license-invoices] job failed:', err);
     }
   });
 
@@ -434,21 +449,21 @@ function startScheduler() {
     try {
       expireOverdueQuotes();
     } catch (err) {
-      console.error('[quotes] expire job failed:', err);
+      jobFailed('[quotes] expire job failed:', err);
     }
   });
   // Daily at 08:00 server time.
   cron.schedule('0 8 * * *', () => {
-    runOverdueReminders().catch((err) => console.error('[reminders] job failed:', err));
+    runOverdueReminders().catch((err) => jobFailed('[reminders] job failed:', err));
   });
   // Daily at 08:15, staggered a few minutes after the overdue-invoice job
   // above purely so the two jobs' console/log output don't interleave.
   cron.schedule('15 8 * * *', () => {
-    runLicenseExpiryAlerts().catch((err) => console.error('[license-alerts] job failed:', err));
+    runLicenseExpiryAlerts().catch((err) => jobFailed('[license-alerts] job failed:', err));
   });
   // Daily at 03:00 server time, ahead of the other jobs — see lib/backup.js.
   cron.schedule('0 3 * * *', () => {
-    runBackup().catch((err) => console.error('[backup] job failed:', err));
+    runBackup().catch((err) => jobFailed('[backup] job failed:', err));
   });
   // Daily at 03:30 server time — see lib/dailyEarningsReport.js. This app's
   // production deploy (Render) runs in UTC, which is GMT year-round (GMT
@@ -469,11 +484,11 @@ function startScheduler() {
   // Sundays 04:30 server time — an hour and a half after the nightly backup,
   // so the newest daily file is already there. Only alerts on a problem.
   cron.schedule('30 4 * * 0', () => {
-    verifyLatestBackup().catch((err) => console.error('[backup] verification job failed:', err));
+    verifyLatestBackup().catch((err) => jobFailed('[backup] verification job failed:', err));
   });
 
   cron.schedule('30 3 * * *', () => {
-    runDailyEarningsReport().catch((err) => console.error('[daily-earnings] job failed:', err));
+    runDailyEarningsReport().catch((err) => jobFailed('[daily-earnings] job failed:', err));
   });
   // Nightly automatic profit distribution (off until switched on from the
   // Profit Distribution page) — after the 03:30 daily earnings email.
@@ -482,7 +497,7 @@ function startScheduler() {
       const result = require('../routes/deals').autoDistribute('Automated');
       console.log('[profit-auto] distributed:', (result.distributed || []).length, 'waiting:', (result.waiting || []).length);
     } catch (err) {
-      console.error('[profit-auto] job failed:', err);
+      jobFailed('[profit-auto] job failed:', err);
     }
   });
   // 09:00 on the 1st of each month — after the daily jobs above have had
@@ -490,7 +505,7 @@ function startScheduler() {
   // slow backup can never delay this. node-cron's 5-field expressions
   // support a day-of-month field directly, no extra date-checking needed.
   cron.schedule('0 9 1 * *', () => {
-    runMonthlyReport().catch((err) => console.error('[monthly-report] job failed:', err));
+    runMonthlyReport().catch((err) => jobFailed('[monthly-report] job failed:', err));
   });
   // Weekly, Monday at 09:30 server time — staggered off the monthly-report
   // job's own 09:00 slot purely so console/log output can't interleave on
@@ -498,7 +513,7 @@ function startScheduler() {
   // — see generateWeeklyFacebookDraft()'s own note on why this never
   // auto-publishes.
   cron.schedule('30 9 * * 1', () => {
-    generateWeeklyFacebookDraft().catch((err) => console.error('[facebook] weekly draft job failed:', err));
+    generateWeeklyFacebookDraft().catch((err) => jobFailed('[facebook] weekly draft job failed:', err));
   });
 }
 
