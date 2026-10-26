@@ -41,6 +41,10 @@ before(async () => {
     cwd: path.join(ROOT, 'backend'), env, encoding: 'utf8',
   });
   assert.equal(mk2.status, 0, mk2.stderr);
+  const mk3 = spawnSync('node', ['scripts/create-user.js', '--name', 'Boss', '--email', 'boss@example.test', '--password', PASSWORD, '--role', 'super_admin'], {
+    cwd: path.join(ROOT, 'backend'), env, encoding: 'utf8',
+  });
+  assert.equal(mk3.status, 0, mk3.stderr);
   procs.push(spawn('node', ['src/index.js'], { cwd: path.join(ROOT, 'backend'), env, stdio: 'ignore' }));
   procs.push(spawn('npx', ['vite', 'preview', '--port', '4173', '--strictPort'], { cwd: path.join(ROOT, 'frontend'), env, stdio: 'ignore' }));
   await waitFor('http://localhost:4000/api/auth/me');
@@ -54,9 +58,9 @@ after(async () => {
   fs.rmSync(TMP, { recursive: true, force: true });
 });
 
-async function login(page) {
+async function login(page, email = EMAIL) {
   await page.goto(`${APP}/login`);
-  await page.fill('input[type=email]', EMAIL);
+  await page.fill('input[type=email]', email);
   await page.fill('input[type=password]', PASSWORD);
   await page.click('button[type=submit]');
   await page.waitForURL('**/dashboard');
@@ -194,4 +198,18 @@ test('license renewal invoices: switched on in Settings, drafted from the Licens
   await page.getByText(/Drafted 1 renewal invoice/).waitFor();
   await page.getByText(/Renewal invoice INV-/).first().waitFor();
   await page.close();
+});
+
+test('dashboard shows the cash forecast on desktop and phone without horizontal overflow', async () => {
+  for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+    const ctx = await browser.newContext({ viewport });
+    const page = await ctx.newPage();
+    await login(page, 'boss@example.test');
+    await page.getByText('Cash forecast').first().waitFor();
+    assert.equal(await page.getByText('Next 30 days').count(), 1);
+    assert.equal(await page.getByText('Next 90 days').count(), 1);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(overflow <= 0, `horizontal overflow of ${overflow}px at ${viewport.width}px`);
+    await ctx.close();
+  }
 });

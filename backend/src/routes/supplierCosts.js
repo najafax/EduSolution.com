@@ -258,4 +258,21 @@ router.delete('/settle/:month', manage, (req, res) => {
   res.json({ removed: info.changes });
 });
 
+// Reused by lib/cashForecast.js: USD still to buy for the last 12 months of
+// sold items, and the rate to value it at (last USD purchase, else the USD
+// account's average cost).
+router.computeToPay = function computeToPay() {
+  const rows = resolvedSoldItemRows();
+  const { monthOf } = makeDateHelpers();
+  const ledger = replay().rows;
+  const { recorded, settled } = coveredByMonth(ledger);
+  let toPayUsd = 0;
+  for (const month of monthKeysTrailing(MONTHS_BACK)) {
+    const sum = summarizeRows(rows.filter((r) => monthOf(r.issue_date) === month));
+    toPayUsd += monthStatus(sum.usdCost, recorded.get(month) || 0, settled.get(month) || 0).remainingUsd;
+  }
+  const pos = position(null, ledger);
+  return { toPayUsd: round2(toPayUsd), rate: lastBuyRate(ledger) || pos.avgRate || null };
+};
+
 module.exports = router;
