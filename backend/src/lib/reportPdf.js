@@ -601,6 +601,57 @@ function renderOwnerStatementPdf({ name, records, settings }) {
   return docToBuffer(doc, (d) => addPageFooter(d, settings));
 }
 
+function renderClientStatementPdf({ statement, settings }) {
+  const doc = newDoc();
+  const st = statement;
+  let y = drawReportHeader(doc, { title: 'STATEMENT OF ACCOUNT', subtitle: `${st.client.name} · ${st.from} to ${st.to}`, settings });
+
+  const rows = [
+    { date: st.from, ref: '', description: 'Opening balance', charge: null, payment: null, balance: st.openingBalance },
+    ...st.entries,
+  ];
+  const columns = [
+    { key: 'date', label: 'DATE', x: 0, width: 58 },
+    { key: 'ref', label: 'DOCUMENT', x: 61, width: 75, format: (r) => r.ref || '' },
+    { key: 'description', label: 'DETAILS', x: 139, width: 136 },
+    { key: 'charge', label: 'CHARGES', x: 278, width: 68, align: 'right', format: (r) => (r.charge ? amountOnly(r.charge) : '') },
+    { key: 'payment', label: 'PAYMENTS', x: 349, width: 68, align: 'right', format: (r) => (r.payment ? amountOnly(r.payment) : '') },
+    { key: 'balance', label: 'BALANCE', x: 420, width: 75, align: 'right', format: (r) => signedAmountOnly(r.balance) },
+  ];
+  y = drawReportTable(doc, { columns, rows }, y);
+
+  y = drawSummaryBox(
+    doc,
+    [
+      { label: 'Opening balance', value: signedAmountOnly(st.openingBalance) },
+      { label: 'Charges', value: amountOnly(st.totalCharges) },
+      { label: 'Payments', value: amountOnly(st.totalPayments) },
+      { label: 'Balance due', value: signedAmountOnly(st.closingBalance), bold: true },
+    ],
+    y,
+    { dividerBeforeLast: true },
+  );
+
+  if (st.openInvoices.length > 0) {
+    y += 14;
+    if (y + 80 > PAGE_BOTTOM) {
+      doc.addPage();
+      y = MARGIN;
+    }
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(COLORS.brand).text('OUTSTANDING INVOICES', MARGIN, y, { width: CONTENT_WIDTH });
+    y += 20;
+    const ocolumns = [
+      { key: 'number', label: 'INVOICE #', x: 0, width: 120 },
+      { key: 'due_date', label: 'DUE', x: 123, width: 100 },
+      { key: 'days_overdue', label: 'DAYS OVERDUE', x: 226, width: 100, align: 'right', format: (r) => (r.days_overdue > 0 ? String(r.days_overdue) : '-') },
+      { key: 'balance', label: 'BALANCE', x: 329, width: 166, align: 'right', format: (r) => amountOnly(r.balance) },
+    ];
+    drawReportTable(doc, { columns: ocolumns, rows: st.openInvoices }, y);
+  }
+
+  return docToBuffer(doc, (d) => addPageFooter(d, settings));
+}
+
 function renderReceivablesAgingPdf({ aging, settings }) {
   const doc = newDoc();
   let y = drawReportHeader(doc, { title: 'RECEIVABLES AGING', subtitle: `As of ${aging.asOf}`, settings });
@@ -647,6 +698,7 @@ function renderReceivablesAgingPdf({ aging, settings }) {
 }
 
 module.exports = {
+  renderClientStatementPdf,
   renderReceivablesAgingPdf,
   renderSalesReportPdf,
   renderTaxReportPdf,

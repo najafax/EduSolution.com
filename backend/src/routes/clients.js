@@ -185,6 +185,44 @@ router.post('/', manage, (req, res) => {
   res.status(201).json({ client });
 });
 
+// Staff-only statement of account. Needs both clients:view and invoices:view
+// (it lists invoice and payment detail). ?from= defaults to the start of the
+// business year, ?to= to today; ?from=all starts at the first record.
+function statementFor(req, res) {
+  const { computeStatement } = require('../lib/clientStatement');
+  const { todayStr, businessYear } = require('../lib/businessDate');
+  const RE = /^\d{4}-\d{2}-\d{2}$/;
+  const to = req.query.to || todayStr();
+  const from = req.query.from === 'all' ? '1900-01-01' : req.query.from || `${businessYear()}-01-01`;
+  if (!RE.test(to) || !RE.test(from)) {
+    res.status(400).json({ error: 'from and to must be YYYY-MM-DD' });
+    return null;
+  }
+  if (from > to) {
+    res.status(400).json({ error: 'from must not be after to' });
+    return null;
+  }
+  const statement = computeStatement(req.params.id, from, to);
+  if (!statement) res.status(404).json({ error: 'Client not found' });
+  return statement;
+}
+
+router.get('/:id/statement', view, requirePermission('invoices', 'view'), (req, res) => {
+  const statement = statementFor(req, res);
+  if (statement) res.json({ statement });
+});
+
+router.get('/:id/statement/pdf', view, requirePermission('invoices', 'view'), async (req, res) => {
+  const statement = statementFor(req, res);
+  if (!statement) return;
+  const { renderClientStatementPdf } = require('../lib/reportPdf');
+  const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
+  const buffer = await renderClientStatementPdf({ statement, settings });
+  const slug = statement.client.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'client';
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="statement-${slug}-${statement.to}.pdf"` });
+  res.send(buffer);
+});
+
 router.get('/:id', view, (req, res) => {
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
   if (!client) return res.status(404).json({ error: 'Client not found' });

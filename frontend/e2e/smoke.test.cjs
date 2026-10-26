@@ -58,6 +58,22 @@ after(async () => {
   fs.rmSync(TMP, { recursive: true, force: true });
 });
 
+// One real login for the super admin, reused by later tests: the API rate
+// limits logins (10 per 15 minutes per IP), and this file logs in a lot.
+let bossToken;
+async function loginBoss(page) {
+  if (!bossToken) {
+    const res = await fetch('http://localhost:4000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'boss@example.test', password: PASSWORD }),
+    });
+    bossToken = (await res.json()).token;
+  }
+  await page.addInitScript((t) => localStorage.setItem('edusolution_token', t), bossToken);
+  await page.goto(`${APP}/dashboard`);
+}
+
 async function login(page, email = EMAIL) {
   await page.goto(`${APP}/login`);
   await page.fill('input[type=email]', email);
@@ -193,7 +209,7 @@ test('license renewal invoices: switched on in Settings, drafted from the Licens
   await page.getByText(/saved/i).first().waitFor();
 
   await page.goto(`${APP}/licenses`);
-  await page.getByRole('button', { name: 'More actions' }).first().click();
+  await page.getByRole('button', { name: 'More actions' }).last().click(); // the row menu, after the page menu
   await page.getByText('Create renewal invoices now').click();
   await page.getByText(/Drafted 1 renewal invoice/).waitFor();
   await page.getByText(/Renewal invoice INV-/).first().waitFor();
@@ -204,7 +220,7 @@ test('dashboard shows the cash forecast on desktop and phone without horizontal 
   for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
     const ctx = await browser.newContext({ viewport });
     const page = await ctx.newPage();
-    await login(page, 'boss@example.test');
+    await loginBoss(page);
     await page.getByText('Cash forecast').first().waitFor();
     assert.equal(await page.getByText('Next 30 days').count(), 1);
     assert.equal(await page.getByText('Next 90 days').count(), 1);
@@ -212,4 +228,28 @@ test('dashboard shows the cash forecast on desktop and phone without horizontal 
     assert.ok(overflow <= 0, `horizontal overflow of ${overflow}px at ${viewport.width}px`);
     await ctx.close();
   }
+});
+
+test('client statement: opens from the Clients page and downloads a PDF', async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await loginBoss(page);
+  await page.goto(`${APP}/clients`);
+  await page.getByText('Smoke Test School').first().waitFor();
+  const statementBtn = page.getByRole('button', { name: /Statement of account/ }).first();
+  if (!(await statementBtn.isVisible())) {
+    await page.getByRole('button', { name: 'More actions' }).last().click(); // the row menu, after the page menu
+    await page.getByText('Statement', { exact: true }).first().click();
+  } else {
+    await statementBtn.click();
+  }
+  await page.getByRole('heading', { name: 'Statement of account' }).waitFor();
+  const [response, popup] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/statement/pdf')),
+    page.context().waitForEvent('page'),
+    page.getByRole('button', { name: 'Download PDF' }).click(),
+  ]);
+  assert.equal(response.status(), 200);
+  assert.match(response.headers()['content-type'], /pdf/);
+  await popup.close().catch(() => {});
+  await page.close();
 });
