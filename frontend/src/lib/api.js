@@ -300,6 +300,9 @@ export const api = {
     autoRun: (token) => request('/deals/auto-run', { method: 'POST', token }),
     trueUpPreview: (id, rate, token) => request(`/deals/${id}/true-up-preview?exchange_rate=${encodeURIComponent(rate)}`, { token }),
     trueUp: (id, rate, token) => request(`/deals/${id}/true-up`, { method: 'POST', body: { exchange_rate: rate }, token }),
+    // Adjusting to the real supplier cost (linked, paid supplier invoices).
+    realCostPreview: (id, token) => request(`/deals/${id}/real-cost-preview`, { token }),
+    trueUpReal: (id, token) => request(`/deals/${id}/true-up-real`, { method: 'POST', token }),
   },
 
   // Backs pages/business/SupplierCosts.jsx: the USD & suppliers overview

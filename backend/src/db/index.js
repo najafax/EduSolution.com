@@ -984,6 +984,17 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `);
+// Profit Distribution can use the real supplier cost of its sale (linked
+// supplier invoices, see lib/saleProfit.js) instead of the items x rate
+// estimate. actual_cost_mvr NULL = estimate; cost_basis says how real it is
+// ('estimate' | 'invoiced' | 'actual').
+const dealColsReal = new Set(db.prepare('PRAGMA table_info(deals)').all().map((c) => c.name));
+if (!dealColsReal.has('actual_cost_mvr')) {
+  db.exec(`ALTER TABLE deals ADD COLUMN actual_cost_mvr REAL;`);
+}
+if (!dealColsReal.has('cost_basis')) {
+  db.exec(`ALTER TABLE deals ADD COLUMN cost_basis TEXT NOT NULL DEFAULT 'estimate';`);
+}
 // Supplier invoices: each is a bill from a supplier, paid in full from the
 // USD account (the payment is a usd_transactions row). One supplier invoice
 // can fund several client invoices and vice versa, via supplier_invoice_links

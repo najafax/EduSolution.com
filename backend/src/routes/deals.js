@@ -32,6 +32,8 @@ const { position } = require('../lib/usdLedger');
 // this `deals` table entirely) and its own "Record as expense" action,
 // which is what now feeds the real Expenses currency-exchange category.
 
+const { computeSaleProfits } = require('../lib/saleProfit');
+
 const router = Router();
 router.use(requireAuth);
 const view = requirePermission('financials', 'view');
@@ -51,7 +53,9 @@ function itemsForDeal(dealId) {
 function withComputedDeal(deal) {
   const items = itemsForDeal(deal.id);
   const costUsdTotal = round2(items.reduce((sum, item) => sum + item.quantity * item.cost_price, 0));
-  const costMvr = deal.exchange_rate ? round2(costUsdTotal * deal.exchange_rate) : 0;
+  // A real cost (from linked supplier invoices) replaces the items x rate estimate.
+  const costIsReal = deal.actual_cost_mvr !== null && deal.actual_cost_mvr !== undefined;
+  const costMvr = costIsReal ? round2(deal.actual_cost_mvr) : deal.exchange_rate ? round2(costUsdTotal * deal.exchange_rate) : 0;
   const netProfit = round2(deal.revenue_amount - costMvr);
   // Tax collected on the linked invoice is owed to the tax authority, not
   // profit to split — surfaced so the UI can warn when the revenue figure
@@ -65,6 +69,7 @@ function withComputedDeal(deal) {
     items,
     cost_usd_total: costUsdTotal,
     cost_mvr: costMvr,
+    cost_is_real: costIsReal,
     net_profit: netProfit,
     invoice_tax_amount: invoiceTax,
     invoice_pretax_total: invoicePretax,
@@ -173,7 +178,7 @@ router.get('/', view, (req, res) => {
 
   if (!pageParam) {
     const rows = db.prepare(`SELECT * FROM deals ${where} ORDER BY ${orderBy}`).all(...params);
-    return res.json({ deals: rows.map(withComputedDeal) });
+    return res.json({ deals: rows.map((r) => ({ ...withComputedDeal(r), real_cost: realCostHint(r) })) });
   }
 
   const page = Math.max(1, Number(pageParam) || 1);
@@ -181,7 +186,7 @@ router.get('/', view, (req, res) => {
   const { total } = db.prepare(`SELECT COUNT(*) AS total FROM deals ${where}`).get(...params);
   const rows = db.prepare(`SELECT * FROM deals ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`).all(...params, PAGE_SIZE, offset);
   res.json({
-    deals: rows.map(withComputedDeal),
+    deals: rows.map((r) => ({ ...withComputedDeal(r), real_cost: realCostHint(r) })),
     page,
     pageSize: PAGE_SIZE,
     total,
@@ -361,7 +366,7 @@ function eligibilityError(computedDeal) {
   if (alreadyDistributed) {
     return `This invoice's revenue was already distributed through another record ("${alreadyDistributed.description}").`;
   }
-  if (computedDeal.cost_usd_total > 0 && !(computedDeal.exchange_rate > 0)) {
+  if (!computedDeal.cost_is_real && computedDeal.cost_usd_total > 0 && !(computedDeal.exchange_rate > 0)) {
     return 'Set an exchange rate before distributing — this deal has a supplier cost in USD to convert.';
   }
   if (computedDeal.net_profit <= 0) {
@@ -417,11 +422,22 @@ function autoDistribute(userName = 'Automated') {
     let result = null;
     try {
       db.transaction(() => {
+        // Real cost when supplier invoices are already linked to this sale.
+        const sale = computeSaleProfits({ invoiceId: inv.id }).sales[0];
+        const real = sale && sale.linkedCostMvr > 0 && (sale.basis === 'actual' || sale.basis === 'invoiced') ? sale : null;
         const info = db
           .prepare(
-            `INSERT INTO deals (description, invoice_id, revenue_amount, exchange_rate, created_by_name) VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO deals (description, invoice_id, revenue_amount, exchange_rate, actual_cost_mvr, cost_basis, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?)`,
           )
-          .run(`${inv.number} — ${inv.client_name} (auto)`, inv.id, round2(inv.total - (inv.tax_amount || 0)), costItems.length ? rate : null, userName);
+          .run(
+            `${inv.number} — ${inv.client_name} (auto)`,
+            inv.id,
+            round2(inv.total - (inv.tax_amount || 0)),
+            costItems.length ? rate : null,
+            real ? real.costMvr : null,
+            real ? real.basis : 'estimate',
+            userName,
+          );
         saveDealItems(
           info.lastInsertRowid,
           costItems.map((it) => ({ product_id: it.product_id, description: it.description || 'Item', quantity: it.quantity, cost_price: it.cost_price })),
@@ -464,31 +480,71 @@ function autoDistribute(userName = 'Automated') {
 function planTrueUp(deal, newRate) {
   if (deal.status !== 'distributed') return { error: 'Only a distributed record can be adjusted.' };
   const computed = withComputedDeal(deal);
+  if (computed.cost_is_real) return { error: 'This record already uses the real supplier cost, so there is no rate to adjust.' };
   if (!(computed.cost_usd_total > 0)) return { error: 'This record has no USD supplier cost, so there is no rate to adjust.' };
   if (!(newRate > 0)) return { error: 'exchange_rate must be a positive number' };
   if (!(computed.net_profit > 0)) return { error: 'This record has no profit to scale.' };
   const newCostMvr = round2(computed.cost_usd_total * newRate);
   const newNet = round2(computed.revenue_amount - newCostMvr);
   if (!(newNet > 0)) return { error: `At rate ${newRate} the cost (${newCostMvr.toFixed(2)}) leaves no profit to distribute. Check the rate.` };
-  const scale = newNet / computed.net_profit;
-  const paid = db
-    .prepare(
-      `SELECT taken_by_name AS name, ROUND(SUM(amount), 2) AS paid FROM owner_draws
-       WHERE deal_id = ? AND type = 'profit_distribution' GROUP BY taken_by_name ORDER BY name COLLATE NOCASE`,
-    )
-    .all(deal.id);
-  const rows = paid.map((p) => {
-    const target = round2(p.paid * scale);
-    return { name: p.name, paid: p.paid, target, adjustment: round2(target - p.paid) };
-  });
   return {
     oldRate: deal.exchange_rate,
     newRate,
     oldNet: computed.net_profit,
     newNet,
-    rows,
-    total_adjustment: round2(rows.reduce((s, r) => s + r.adjustment, 0)),
+    ...scaledRows(deal.id, computed.net_profit, newNet),
   };
+}
+
+// Each shareholder's payout so far, scaled by newNet / oldNet.
+function scaledRows(dealId, oldNet, newNet) {
+  const scale = newNet / oldNet;
+  const paid = db
+    .prepare(
+      `SELECT taken_by_name AS name, ROUND(SUM(amount), 2) AS paid FROM owner_draws
+       WHERE deal_id = ? AND type = 'profit_distribution' GROUP BY taken_by_name ORDER BY name COLLATE NOCASE`,
+    )
+    .all(dealId);
+  const rows = paid.map((p) => {
+    const target = round2(p.paid * scale);
+    return { name: p.name, paid: p.paid, target, adjustment: round2(target - p.paid) };
+  });
+  return { rows, total_adjustment: round2(rows.reduce((s, r) => s + r.adjustment, 0)) };
+}
+
+// Adjusting to the REAL supplier cost (lib/saleProfit.js): possible once every
+// supplier invoice for the sale is linked and paid (basis "actual"). Same
+// scaling as the rate adjustment, but the new cost is a known figure, not a
+// guess about a rate.
+function planRealCost(deal) {
+  if (deal.status !== 'distributed') return { error: 'Only a distributed record can be adjusted.' };
+  if (!deal.invoice_id) return { error: 'This record is not linked to an invoice.' };
+  const computed = withComputedDeal(deal);
+  const sale = computeSaleProfits({ invoiceId: deal.invoice_id }).sales[0];
+  if (!sale || !(sale.linkedCostMvr > 0)) return { error: 'No supplier invoice is linked to this sale yet. Link one on USD & suppliers first.' };
+  if (sale.basis !== 'actual') return { error: 'The real cost is not final yet: every supplier invoice for this sale must be linked and paid.' };
+  if (!(computed.net_profit > 0)) return { error: 'This record has no profit to scale.' };
+  const newCost = round2(sale.costMvr);
+  const newNet = round2(computed.revenue_amount - newCost);
+  if (!(newNet > 0)) return { error: `At the real cost (${newCost.toFixed(2)}) there is no profit to distribute.` };
+  if (Math.abs(newCost - computed.cost_mvr) < 0.5 && deal.cost_basis === 'actual') return { error: 'The payout already matches the real cost.' };
+  return {
+    kind: 'real_cost',
+    oldCost: computed.cost_mvr,
+    newCost,
+    oldNet: computed.net_profit,
+    newNet,
+    ...scaledRows(deal.id, computed.net_profit, newNet),
+  };
+}
+
+// Attached to each distributed deal in the list: is a real-cost adjustment
+// available, and what would it change.
+function realCostHint(deal) {
+  if (deal.status !== 'distributed') return null;
+  const plan = planRealCost(deal);
+  if (plan.error) return null;
+  return { newCost: plan.newCost, oldCost: plan.oldCost, newNet: plan.newNet, oldNet: plan.oldNet, total_adjustment: plan.total_adjustment };
 }
 
 router.get('/:id/true-up-preview', view, (req, res) => {
@@ -522,6 +578,40 @@ router.post('/:id/true-up', manage, (req, res) => {
     entityType: 'deal',
     entityId: deal.id,
     entityLabel: `${deal.description}: ${plan.oldRate} → ${plan.newRate} (net adjustment ${plan.total_adjustment.toFixed(2)})`,
+  });
+  res.json({ plan, deal: withComputedDeal(db.prepare('SELECT * FROM deals WHERE id = ?').get(deal.id)) });
+});
+
+router.get('/:id/real-cost-preview', view, (req, res) => {
+  const deal = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
+  if (!deal) return res.status(404).json({ error: 'Deal not found' });
+  const plan = planRealCost(deal);
+  if (plan.error) return res.status(400).json({ error: plan.error });
+  res.json(plan);
+});
+
+router.post('/:id/true-up-real', manage, (req, res) => {
+  const deal = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id);
+  if (!deal) return res.status(404).json({ error: 'Deal not found' });
+  const plan = planRealCost(deal);
+  if (plan.error) return res.status(400).json({ error: plan.error });
+  const today = todayStr();
+  const note = `True-up to real supplier cost ${plan.newCost.toFixed(2)} (was ${plan.oldCost.toFixed(2)}) — ${deal.description}`;
+  db.transaction(() => {
+    for (const r of plan.rows) {
+      if (Math.abs(r.adjustment) < 0.005) continue;
+      db.prepare(
+        `INSERT INTO owner_draws (type, deal_id, taken_by_name, amount, draw_date, notes, created_by_name) VALUES ('profit_distribution', ?, ?, ?, ?, ?, ?)`,
+      ).run(deal.id, r.name, r.adjustment, today, note, req.user.name);
+    }
+    db.prepare(`UPDATE deals SET actual_cost_mvr = ?, cost_basis = 'actual', updated_at = datetime('now') WHERE id = ?`).run(plan.newCost, deal.id);
+  })();
+  logActivity({
+    userName: req.user.name,
+    action: 'adjusted payout to real supplier cost for',
+    entityType: 'deal',
+    entityId: deal.id,
+    entityLabel: `${deal.description}: cost ${plan.oldCost.toFixed(2)} → ${plan.newCost.toFixed(2)} (net adjustment ${plan.total_adjustment.toFixed(2)})`,
   });
   res.json({ plan, deal: withComputedDeal(db.prepare('SELECT * FROM deals WHERE id = ?').get(deal.id)) });
 });

@@ -24,6 +24,7 @@ const PRIMARY_TITLES = [
   'Create quote from this request',
   'Record return',
   'Distribute',
+  'Adjust to real cost',
   'Publish',
   'Email to client',
   'Send reminder',

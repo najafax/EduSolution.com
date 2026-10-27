@@ -15,7 +15,7 @@ import EmptyState from '../../components/EmptyState';
 import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import RowActions from '../../components/RowActions';
-import { BankIcon, PlusIcon, PencilIcon, TrashIcon, XIcon, UsersIcon, RefreshIcon } from '../../components/icons';
+import { BankIcon, PlusIcon, PencilIcon, TrashIcon, XIcon, UsersIcon, RefreshIcon, CheckCircleIcon } from '../../components/icons';
 
 // Internal profit calculator — revenue received (MVR) minus what it cost to
 // buy USD to pay a supplier, split among shareholders by ownership_percent
@@ -57,6 +57,23 @@ function StatusPill({ status }) {
       }`}
     >
       {status === 'distributed' ? 'Distributed' : 'Draft'}
+    </span>
+  );
+}
+
+// Whether a deal's supplier cost is the product-price estimate or the real
+// figure from linked supplier invoices.
+function CostBasisPill({ deal }) {
+  if (!deal.cost_is_real) return null;
+  const actual = deal.cost_basis === 'actual';
+  return (
+    <span
+      title={actual ? 'Cost is final: from paid supplier invoices' : 'Cost is from linked supplier invoices that are not all paid yet'}
+      className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+        actual ? 'bg-lagoon-50 text-lagoon-800 dark:bg-lagoon-950 dark:text-lagoon-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+      }`}
+    >
+      {actual ? 'Real cost' : 'Invoiced cost'}
     </span>
   );
 }
@@ -124,6 +141,10 @@ export default function ProfitDistribution() {
   const [trueUpPlan, setTrueUpPlan] = useState(null);
   const [trueUpError, setTrueUpError] = useState('');
   const [trueUpBusy, setTrueUpBusy] = useState(false);
+  const [realTarget, setRealTarget] = useState(null);
+  const [realPlan, setRealPlan] = useState(null);
+  const [realError, setRealError] = useState('');
+  const [realBusy, setRealBusy] = useState(false);
 
   const { confirm, confirmDialog } = useConfirm();
 
@@ -340,7 +361,7 @@ export default function ProfitDistribution() {
         const ok = await confirm({
           title: 'Turn on automatic distribution?',
           message:
-            'Every night, each invoice fully paid on or after 1 January 2027 (the date profit distribution officially starts) is split among active shareholders by their ownership %. Older invoices are never touched. Supplier cost uses the USD account average rate and can be adjusted to the actual rate afterward.',
+            'Every night, each invoice fully paid on or after 1 January 2027 (the date profit distribution officially starts) is split among active shareholders by their ownership %. Older invoices are never touched. Supplier cost is the real cost from the supplier invoices linked to the sale when there are any, otherwise an estimate at the USD account average rate. Either can be adjusted afterward once the real cost or rate is known.',
           confirmLabel: 'Turn on',
           danger: false,
         });
@@ -409,6 +430,30 @@ export default function ProfitDistribution() {
     }
   }
 
+  function openReal(deal) {
+    setRealTarget(deal);
+    setRealPlan(null);
+    setRealError('');
+    api.deals
+      .realCostPreview(deal.id, token)
+      .then(setRealPlan)
+      .catch((err) => setRealError(err.message));
+  }
+
+  async function submitReal() {
+    setRealBusy(true);
+    try {
+      await api.deals.trueUpReal(realTarget.id, token);
+      toast('Payout adjusted to the real supplier cost.', { type: 'success' });
+      setRealTarget(null);
+      load();
+    } catch (err) {
+      setRealError(err.message);
+    } finally {
+      setRealBusy(false);
+    }
+  }
+
   function rowActions(deal) {
     if (!canManage) return null;
     if (deal.status === 'draft') {
@@ -422,7 +467,16 @@ export default function ProfitDistribution() {
     return (
       <>
         <IconActionButton icon={UsersIcon} tone="lagoon" onClick={() => openView(deal)} title="View split" label="View distribution" />
-        {deal.cost_usd_total > 0 && (
+        {deal.real_cost && (
+          <IconActionButton
+            icon={CheckCircleIcon}
+            tone="emerald"
+            onClick={() => openReal(deal)}
+            title="Adjust to real cost"
+            label="Adjust payout to the real supplier cost"
+          />
+        )}
+        {deal.cost_usd_total > 0 && !deal.cost_is_real && (
           <IconActionButton
             icon={RefreshIcon}
             tone="amber"
@@ -461,8 +515,8 @@ export default function ProfitDistribution() {
               Automatic distribution: {auto.enabled ? `on (invoices paid since ${auto.from})` : 'off'}
             </p>
             <p className="text-slate-500 dark:text-slate-400">
-              Each night, fully paid invoices are split by shareholder %. Cost uses the USD account average rate
-              {auto.usdAverageRate ? ` (now ${auto.usdAverageRate})` : ''}; adjust to the actual rate afterward.
+              Each night, fully paid invoices are split by shareholder %. Cost is the real cost from the supplier invoices linked to the sale; with none linked it
+              uses the USD account average rate{auto.usdAverageRate ? ` (now ${auto.usdAverageRate})` : ''}. Adjust the payout once the real cost is final.
             </p>
           </div>
           <div className="flex gap-2">
@@ -737,6 +791,53 @@ export default function ProfitDistribution() {
         )}
       </Modal>
 
+      <Modal open={Boolean(realTarget)} onClose={() => setRealTarget(null)} title="Adjust payout to real cost" maxWidthClass="max-w-lg">
+        {realTarget && (
+          <div className="grid gap-3">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {realTarget.description}. Every supplier invoice for this sale is now linked and paid, so the cost is final. Each shareholder's payout
+              is scaled to the real profit and the difference is recorded.
+            </p>
+            {realPlan && (
+              <div className="rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-800">
+                <p className="text-slate-600 dark:text-slate-300">
+                  Cost {symbol}{realPlan.oldCost.toFixed(2)} → {symbol}{realPlan.newCost.toFixed(2)}
+                </p>
+                <p className="text-slate-600 dark:text-slate-300">
+                  Net profit {symbol}{realPlan.oldNet.toFixed(2)} → {symbol}{realPlan.newNet.toFixed(2)}
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {realPlan.rows.map((r) => (
+                    <li key={r.name} className="flex justify-between">
+                      <span className="text-slate-800 dark:text-slate-200">{r.name}</span>
+                      <span className={r.adjustment < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                        {r.adjustment >= 0 ? '+' : ''}{r.adjustment.toFixed(2)} (→ {r.target.toFixed(2)})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {realPlan.rows.some((r) => r.adjustment < 0) && (
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">A negative amount means that shareholder was overpaid and owes it back.</p>
+                )}
+              </div>
+            )}
+            {realError && <p className="text-sm text-red-600 dark:text-red-400">{realError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={submitReal}
+                disabled={realBusy || !realPlan}
+                className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60 dark:bg-lagoon-600 dark:hover:bg-lagoon-500"
+              >
+                {realBusy ? 'Saving…' : 'Apply adjustment'}
+              </button>
+              <button onClick={() => setRealTarget(null)} className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 dark:border-slate-600 dark:text-slate-200">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       <Modal open={Boolean(viewTarget)} onClose={() => setViewTarget(null)} title="Distribution" maxWidthClass="max-w-lg">
         {viewTarget && (
           <div className="grid gap-3">
@@ -750,7 +851,7 @@ export default function ProfitDistribution() {
                 </span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>Supplier cost</span>
+                <span>Supplier cost{viewTarget.deal.cost_is_real ? (viewTarget.deal.cost_basis === 'actual' ? ' (real)' : ' (from supplier invoices)') : ' (estimate)'}</span>
                 <span>
                   {symbol}
                   {viewTarget.deal.cost_mvr.toFixed(2)}
@@ -828,6 +929,8 @@ export default function ProfitDistribution() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600 dark:text-slate-400">
                         {deal.cost_mvr ? `${symbol}${deal.cost_mvr.toFixed(2)}` : '—'}
+                        {deal.cost_is_real && <span className="ml-2"><CostBasisPill deal={deal} /></span>}
+                        {deal.real_cost && <p className="text-xs text-emerald-700 dark:text-emerald-400">Real cost {symbol}{deal.real_cost.newCost.toFixed(2)} ready</p>}
                       </td>
                       <td
                         className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
@@ -886,8 +989,14 @@ export default function ProfitDistribution() {
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-slate-500 dark:text-slate-400">Cost</dt>
-                    <dd className="text-slate-900 dark:text-white">{deal.cost_mvr ? `${symbol}${deal.cost_mvr.toFixed(2)}` : '—'}</dd>
+                    <dd className="text-slate-900 dark:text-white">
+                      {deal.cost_mvr ? `${symbol}${deal.cost_mvr.toFixed(2)}` : '—'}
+                      {deal.cost_is_real && <span className="ml-2"><CostBasisPill deal={deal} /></span>}
+                    </dd>
                   </div>
+                  {deal.real_cost && (
+                    <p className="text-xs text-emerald-700 dark:text-emerald-400">Real cost {symbol}{deal.real_cost.newCost.toFixed(2)} is final. Adjust the payout below.</p>
+                  )}
                   {canManage && <div className="pt-1"><RowActions fill>{rowActions(deal)}</RowActions></div>}
                 </MobileListAccordion>
               ))}

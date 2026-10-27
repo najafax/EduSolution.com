@@ -204,3 +204,56 @@ test('profit: nightly auto-distribution by share %, then payout adjusted to the 
   // A rate that wipes out the profit is refused.
   assert.equal((await post(`/deals/${dealId}/true-up`, { exchange_rate: 200 })).status, 400);
 });
+
+test('profit: distribution uses the real supplier cost and can be adjusted once it is final', async () => {
+  const product = (await post('/products', { name: 'RealWidget', unit_price: 1000, cost_price: 10 })).data.product;
+  const inv = (await post('/invoices', {
+    client_id: ctx.client.id, issue_date: today(), due_date: today(),
+    items: [{ description: 'RealWidget', quantity: 5, unit_price: 1000, product_id: product.id }],
+  })).data.invoice; // revenue 5000, estimated cost $50
+  const d = srv.db();
+  d.prepare("UPDATE invoices SET status = 'sent' WHERE id = ?").run(inv.id);
+  d.close();
+  assert.equal((await post(`/invoices/${inv.id}/payments`, { amount: 5000 })).status, 201);
+  const d2 = srv.db();
+  d2.prepare('UPDATE payments SET paid_at = ? WHERE invoice_id = ?').run('2027-01-06', inv.id);
+  d2.close();
+
+  // The supplier billed $60 for this sale (more than the $50 estimate); not paid yet.
+  const si = (await post('/supplier-invoices', {
+    supplier: 'Edupage', number: 'R-1', invoice_date: today(), usd_amount: 60, links: [{ invoice_id: inv.id, usd_amount: 60 }],
+  })).data;
+
+  // The deal is created at the real (invoiced) cost: last buy rate 15 -> 900, net 4100, split 60/40.
+  const run = (await post('/deals/auto-run', {})).data;
+  const made = run.distributed.find((x) => x.net_profit === 4100);
+  assert.ok(made, JSON.stringify(run));
+  let deal = (await get(`/deals/${made.deal_id}`)).data.deal;
+  assert.equal(deal.cost_is_real, true);
+  assert.equal(deal.cost_basis, 'invoiced');
+  assert.equal(deal.cost_mvr, 900);
+  // Not final yet: no adjustment offered, and the rate adjustment is refused.
+  assert.equal((await get(`/deals/${made.deal_id}/real-cost-preview`)).status, 400);
+  assert.equal((await post(`/deals/${made.deal_id}/true-up`, { exchange_rate: 16 })).status, 400);
+
+  // Buy at a different rate, then pay: the ledger books $60 at the new average (15.5) = 930.
+  assert.equal((await post('/usd-account', { type: 'buy', usd_amount: 1000, mvr_amount: 16000, txn_date: today() })).status, 201);
+  assert.equal((await post(`/supplier-invoices/${si.id}/pay`, {})).status, 200);
+  const list = (await get('/deals?page=1')).data.deals;
+  const hint = list.find((x) => x.id === made.deal_id).real_cost;
+  assert.equal(hint.newCost, 930);
+  assert.equal(hint.total_adjustment, -30);
+
+  const preview = (await get(`/deals/${made.deal_id}/real-cost-preview`)).data;
+  assert.equal(preview.newNet, 4070);
+  assert.equal((await post(`/deals/${made.deal_id}/true-up-real`, {})).status, 200);
+  const totals = {};
+  for (const x of (await get(`/deals/${made.deal_id}`)).data.distributions) totals[x.taken_by_name] = Math.round((totals[x.taken_by_name] || 0) * 100 + x.amount * 100) / 100;
+  assert.equal(totals['Auto A'], 2442);
+  assert.equal(totals['Auto B'], 1628);
+  // Done: no further adjustment is offered.
+  assert.equal((await post(`/deals/${made.deal_id}/true-up-real`, {})).status, 400);
+  deal = (await get(`/deals/${made.deal_id}`)).data.deal;
+  assert.equal(deal.cost_basis, 'actual');
+  assert.equal(deal.cost_mvr, 930);
+});
