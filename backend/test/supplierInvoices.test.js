@@ -4,7 +4,7 @@ const { startServer } = require('./helpers');
 
 let srv, boss;
 test.before(async () => {
-  srv = await startServer(6100 + Math.floor(Math.random() * 300));
+  srv = await startServer(6500 + Math.floor(Math.random() * 300));
   boss = await srv.login('boss@test.com', 'Test12345');
 });
 test.after(() => srv.stop());
@@ -125,4 +125,41 @@ test('cash forecast uses real supplier invoices by due date', async () => {
   const d1 = f.buckets[1].supplierOut - before.buckets[1].supplierOut;
   assert.ok(Math.abs(d0 - 100 * rate) < 0.05, `bucket0 ${d0}`);
   assert.ok(Math.abs(d1 - 200 * rate) < 0.05, `bucket1 ${d1}`);
+});
+
+test('profit per sale: actual cost from paid supplier invoices, estimates otherwise', async () => {
+  const profitOf = async (id) => (await get(`/supplier-costs/profit?invoice=${id}`)).data.sales[0];
+  const a = await soldInvoice('Delta', 1000, 2, 40); // revenue 2000, estimate $80
+  let p = await profitOf(a.id);
+  assert.equal(p.revenue, 2000);
+  assert.equal(p.basis, 'estimated');
+  assert.ok(p.costMvr > 0 && p.profit < 2000);
+
+  // Partly covered: $30 linked, the other $50 still estimated.
+  const si = (await post('/supplier-invoices', { supplier: 'Edupage', number: 'D-1', invoice_date: today(), usd_amount: 30, links: [{ invoice_id: a.id, usd_amount: 30 }] })).data;
+  assert.equal((await profitOf(a.id)).basis, 'partly');
+
+  // Fully covered but unpaid -> invoiced; then paid -> actual at the ledger's booked cost.
+  await put(`/supplier-invoices/${si.id}`, { supplier: 'Edupage', number: 'D-1', invoice_date: today(), usd_amount: 80, links: [{ invoice_id: a.id, usd_amount: 80 }] });
+  assert.equal((await profitOf(a.id)).basis, 'invoiced');
+  await post('/usd-account', { type: 'buy', usd_amount: 100, mvr_amount: 1600, txn_date: today() });
+  assert.equal((await post(`/supplier-invoices/${si.id}/pay`, {})).status, 200);
+  const booked = (await get('/usd-account')).data.transactions.find((t) => t.reference === 'D-1').costMvr;
+  p = await profitOf(a.id);
+  assert.equal(p.basis, 'actual');
+  assert.equal(p.costMvr, booked);
+  assert.equal(p.profit, Math.round((2000 - booked) * 100) / 100);
+
+  // Totals add up; a sale with no cost data reports profit = revenue.
+  const plain = (await post('/invoices', {
+    client_id: a.client_id, issue_date: today(), due_date: daysFromNow(5), items: [{ description: 'Consulting', quantity: 1, unit_price: 300 }],
+  })).data.invoice;
+  srv.db().prepare("UPDATE invoices SET status = 'sent' WHERE id = ?").run(plain.id);
+  const np = await profitOf(plain.id);
+  assert.equal(np.basis, 'none');
+  assert.equal(np.profit, 300);
+  const all = (await get('/supplier-costs/profit')).data;
+  assert.equal(all.totals.count, all.sales.length);
+  assert.equal(all.totals.profit, Math.round(all.sales.reduce((s, x) => s + x.profit, 0) * 100) / 100);
+  assert.equal((await get('/supplier-costs/profit?from=nope')).status, 400);
 });

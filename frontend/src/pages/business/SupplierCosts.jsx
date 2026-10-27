@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -8,8 +9,9 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import SupplierInvoiceModal from '../../components/SupplierInvoiceModal';
+import BasisPill from '../../components/BasisPill';
 import { TrendDownIcon, BankIcon, RefreshIcon, CheckCircleIcon, PlusIcon, PencilIcon, TrashIcon, DownloadIcon, ClockIcon } from '../../components/icons';
-import { todayStr } from '../../lib/date';
+import { todayStr, startOfYearStr, startOfMonthStr } from '../../lib/date';
 import { useConfirm } from '../../lib/useConfirm';
 
 // USD & suppliers. A supplier sends a custom invoice; you pay the full
@@ -92,6 +94,8 @@ export default function SupplierCosts() {
   // Supplier invoice modal: { invoice, presetLink } | null
   const [siModal, setSiModal] = useState(null);
   const [trackFrom, setTrackFrom] = useState('');
+  const [profitRange, setProfitRange] = useState('year');
+  const [profit, setProfit] = useState(null);
 
   function load() {
     api.supplierCosts.report(token).then((d) => { setData(d); setTrackFrom(d.trackFrom); }).catch((err) => setError(err.message));
@@ -109,6 +113,12 @@ export default function SupplierCosts() {
       .finally(() => setSettingsLoaded(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, canView]);
+
+  useEffect(() => {
+    if (!canView) return;
+    const from = profitRange === 'year' ? startOfYearStr() : profitRange === 'month' ? startOfMonthStr() : undefined;
+    api.supplierCosts.profit(token, { from }).then(setProfit).catch((err) => setError(err.message));
+  }, [token, canView, profitRange, invoices]);
 
   if (!canView) {
     return <div className="px-4 py-10 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8">You are not authorized to view this page.</div>;
@@ -590,6 +600,106 @@ export default function SupplierCosts() {
             </label>
             <button onClick={saveTrackFrom} disabled={!trackFrom || trackFrom === data.trackFrom} className={`${ACTION_BTN} disabled:opacity-50`}>Save</button>
           </div>
+        )}
+      </div>
+
+      <div className="mt-6 rounded-3xl bg-white dark:border shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Profit per sale</h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Revenue before tax, minus the supplier cost. Cost comes from the supplier invoices linked to each sale; anything not linked yet is estimated.
+            </p>
+          </div>
+          <StatusFilterChips
+            options={[
+              { value: 'month', label: 'This month' },
+              { value: 'year', label: 'This year' },
+              { value: 'all', label: 'All time' },
+            ]}
+            value={profitRange}
+            onChange={setProfitRange}
+          />
+        </div>
+        {!profit ? (
+          <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+        ) : profit.sales.length === 0 ? (
+          <p className="p-5 text-sm text-slate-500 dark:text-slate-400">No sent or paid invoices in this period.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-3 border-b border-slate-100 px-5 py-4 text-sm dark:border-slate-800">
+              <div>
+                <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Revenue</p>
+                <p className="font-semibold text-slate-900 dark:text-white">{symbol}{profit.totals.revenue.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Supplier cost</p>
+                <p className="font-semibold text-slate-900 dark:text-white">{symbol}{profit.totals.costMvr.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Profit</p>
+                <p className={`font-semibold ${profit.totals.profit < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                  {symbol}{profit.totals.profit.toFixed(2)}
+                  {profit.totals.marginPct !== null && <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">{profit.totals.marginPct.toFixed(1)}%</span>}
+                </p>
+              </div>
+            </div>
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+                    <th className="px-5 py-3">Sale</th>
+                    <th className="px-4 py-3 text-right">Revenue</th>
+                    <th className="px-4 py-3 text-right">Cost</th>
+                    <th className="px-4 py-3 text-right">Profit</th>
+                    <th className="px-4 py-3 text-right">Margin</th>
+                    <th className="px-4 py-3">Cost basis</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {profit.sales.map((x) => (
+                    <tr key={x.invoice_id}>
+                      <td className="px-5 py-3">
+                        <Link to={`/invoices/${x.invoice_id}`} className="font-medium text-lagoon-700 hover:underline dark:text-lagoon-400">{x.number}</Link>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{x.client_name} · {x.issue_date}</p>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right dark:text-white">{x.revenue.toFixed(2)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600 dark:text-slate-300">{x.costMvr.toFixed(2)}</td>
+                      <td className={`whitespace-nowrap px-4 py-3 text-right font-medium ${x.profit < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>{x.profit.toFixed(2)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600 dark:text-slate-300">{x.marginPct === null ? '—' : `${x.marginPct.toFixed(1)}%`}</td>
+                      <td className="px-4 py-3"><BasisPill basis={x.basis} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-col gap-2.5 p-4 sm:hidden">
+              {profit.sales.map((x) => (
+                <MobileListAccordion
+                  key={x.invoice_id}
+                  name="sale-profit"
+                  accent={x.profit < 0 ? 'bg-red-500' : x.basis === 'actual' ? 'bg-emerald-500' : 'bg-amber-500'}
+                  summary={
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-900 dark:text-white">{x.number}</p>
+                        <p className="truncate text-slate-500 dark:text-slate-400">{x.client_name}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className={`font-medium ${x.profit < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>{symbol}{x.profit.toFixed(2)}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{x.marginPct === null ? '—' : `${x.marginPct.toFixed(1)}%`}</p>
+                      </div>
+                    </div>
+                  }
+                >
+                  <div className="flex justify-between"><dt className="text-slate-500 dark:text-slate-400">Revenue</dt><dd className="text-slate-900 dark:text-white">{symbol}{x.revenue.toFixed(2)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-slate-500 dark:text-slate-400">Supplier cost</dt><dd className="text-slate-900 dark:text-white">{symbol}{x.costMvr.toFixed(2)}</dd></div>
+                  <div className="flex items-center justify-between"><dt className="text-slate-500 dark:text-slate-400">Cost basis</dt><dd><BasisPill basis={x.basis} /></dd></div>
+                  <Link to={`/invoices/${x.invoice_id}`} className="pt-1 text-sm font-medium text-lagoon-700 dark:text-lagoon-400">Open invoice</Link>
+                </MobileListAccordion>
+              ))}
+            </div>
+          </>
         )}
       </div>
 

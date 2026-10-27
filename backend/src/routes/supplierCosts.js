@@ -63,11 +63,9 @@ function trackFrom() {
   return (row && row.d) || `${todayStr().slice(0, 7)}-01`;
 }
 
-// Client invoices (sent/paid, issued on/after the tracking date, not marked
-// "no supplier invoice needed") whose estimated USD cost is not yet covered
-// by linked supplier invoices.
-function computeAwaiting() {
-  const from = trackFrom();
+// Estimated USD supplier cost per client invoice, from item cost prices, for
+// the invoices matched by `whereSql` (over `invoices i`).
+function estimatedByInvoice(whereSql, params) {
   const nameMap = productCostByName();
   const items = db
     .prepare(
@@ -78,9 +76,9 @@ function computeAwaiting() {
          JOIN invoices i ON i.id = ii.invoice_id
          LEFT JOIN clients c ON c.id = i.client_id
          LEFT JOIN products p ON p.id = ii.product_id
-        WHERE i.status IN ('sent', 'paid') AND i.supplier_cost_done = 0 AND i.issue_date >= ?`,
+        WHERE ${whereSql}`,
     )
-    .all(from || '0000-00-00');
+    .all(...params);
   const byInvoice = new Map();
   for (const r of items) {
     const cost = r.quantity * (resolveCostPrice(r, nameMap) || 0);
@@ -89,6 +87,16 @@ function computeAwaiting() {
     cur.estimatedUsd += cost;
     byInvoice.set(r.invoice_id, cur);
   }
+  return byInvoice;
+}
+router.estimatedByInvoice = estimatedByInvoice;
+
+// Client invoices (sent/paid, issued on/after the tracking date, not marked
+// "no supplier invoice needed") whose estimated USD cost is not yet covered
+// by linked supplier invoices.
+function computeAwaiting() {
+  const from = trackFrom();
+  const byInvoice = estimatedByInvoice("i.status IN ('sent', 'paid') AND i.supplier_cost_done = 0 AND i.issue_date >= ?", [from || '0000-00-00']);
   const linked = new Map(
     db.prepare('SELECT invoice_id, SUM(usd_amount) AS t FROM supplier_invoice_links GROUP BY invoice_id').all().map((r) => [r.invoice_id, r.t]),
   );
@@ -101,6 +109,19 @@ function computeAwaiting() {
   list.sort((a, b) => a.issue_date.localeCompare(b.issue_date) || a.invoice_id - b.invoice_id);
   return list;
 }
+
+// GET /profit?from=&to=&invoice= — real profit per sale (lib/saleProfit.js).
+router.get('/profit', view, (req, res) => {
+  try {
+    const { from, to, invoice } = req.query;
+    if (from && !isValidDate(from)) return res.status(400).json({ error: 'from must be a valid date' });
+    if (to && !isValidDate(to)) return res.status(400).json({ error: 'to must be a valid date' });
+    res.json(require('../lib/saleProfit').computeSaleProfits({ from, to, invoiceId: invoice ? Number(invoice) : null }));
+  } catch (err) {
+    console.error('GET /api/supplier-costs/profit failed:', err);
+    res.status(500).json({ error: 'Failed to load profit per sale' });
+  }
+});
 
 // GET / — everything the USD & suppliers page needs in one call.
 router.get('/', view, (req, res) => {

@@ -307,6 +307,8 @@ export const api = {
   // see routes/supplierCosts.js.
   supplierCosts: {
     report: (token) => request('/supplier-costs', { token }),
+    // Real profit per sale (client invoice): { sales, totals }. See backend lib/saleProfit.js.
+    profit: (token, { from, to, invoice } = {}) => request(`/supplier-costs/profit${qs({ from, to, invoice })}`, { token }),
     setTrackFrom: (date, token) => request('/supplier-costs/track-from', { method: 'PUT', body: { track_from: date }, token }),
     // "No supplier invoice needed" for a sold client invoice (done: false brings it back).
     markDone: (invoiceId, done, token) =>

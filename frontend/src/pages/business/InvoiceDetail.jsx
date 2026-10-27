@@ -11,6 +11,7 @@ import MobileListAccordion from '../../components/MobileListAccordion';
 import IconActionButton from '../../components/IconActionButton';
 import VoidReasonModal from '../../components/VoidReasonModal';
 import RecordPaymentModal from '../../components/RecordPaymentModal';
+import SaleProfitCard from '../../components/SaleProfitCard';
 import { PencilIcon, DownloadIcon, SendIcon, BellIcon, XIcon, TrashIcon, PlusIcon, LinkIcon, CheckCircleIcon, RefreshIcon, ClockIcon } from '../../components/icons';
 import { useConfirm } from '../../lib/useConfirm';
 
@@ -397,6 +398,8 @@ export default function InvoiceDetail() {
           </dl>
         </Accordion>
       </div>
+
+      <SaleProfitCard invoice={invoice} symbol={symbol} />
 
       <div className="mt-6">
         <Accordion title="Items">
