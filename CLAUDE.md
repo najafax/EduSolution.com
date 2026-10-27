@@ -9793,3 +9793,8 @@ Gmail is the sole sender when configured (no Resend/SMTP fallback). If a Gmail s
 - Ledger: sent/paid invoices are charges on their issue date (drafts and voids excluded, same set as receivables aging); payments are credits on their paid date; a payment reversal (negative payment) shows as a charge again. Activity before `from` collapses into the opening balance. The PDF adds a summary box and a list of invoices still outstanding with days overdue.
 - UI: Clients → row action "Statement" → dialog (From/To, "This year", "All time") → PDF opens in a new tab.
 - Tests: `backend/test/clientStatement.test.js` (ledger numbers, PDF, validation, permissions) and an e2e download test. `frontend/e2e` logs the super admin in once via the API (`loginBoss`) because logins are rate limited.
+
+### Multiple client emails (`lib/emails.js`)
+- `clients.email` can hold several addresses, comma-separated (stored normalised as `a@x.com, b@y.com`; no schema change). `normalizeEmails()` validates every address, de-duplicates (case-insensitive) and rejects the save with a 400 naming the bad one; `POST/PUT /clients` and the clients CSV import use it (the import checks duplicates per address, and invoice/quote/licence imports match a client by any of its addresses).
+- `sendMail()` splits `to` and sends one message addressed to all of them, so quotes, invoices, reminders, receipts, licence mails, campaigns and the automated jobs reach every address. The client portal login identity is the **first** address (`primaryEmail()`), used by the invite.
+- UI: Clients form field "Email(s)" with a comma hint. Tests: `backend/test/clientEmails.test.js` and a multi-recipient case in `mailer.test.js`.

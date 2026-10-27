@@ -16,6 +16,7 @@ router.use(requirePermission('import', 'manage'));
 const MAX_ROWS = 5000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const { normalizeEmails, splitEmails } = require('../lib/emails');
 const EXPENSE_CATEGORIES = ['rent', 'utilities', 'supplies', 'salaries', 'shareholder payments', 'marketing', 'software', 'travel', 'other'];
 const PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'cheque', 'other'];
 const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'void'];
@@ -161,11 +162,14 @@ function makeSequencer(nextForYear, prefix) {
 
 function validateClientRow(row, seenEmails, existingEmails) {
   const name = (row.name || '').trim();
-  const email = (row.email || '').trim().toLowerCase();
   if (!name) return { ok: false, message: 'name is required' };
-  if (!email || !EMAIL_RE.test(email)) return { ok: false, message: 'a valid email is required' };
-  if (existingEmails.has(email) || seenEmails.has(email)) {
-    return { ok: false, message: `duplicate: a client with email "${email}" already exists or appears earlier in this file` };
+  const parsed = normalizeEmails((row.email || '').toLowerCase());
+  if (!parsed.ok) return { ok: false, message: parsed.message === 'at least one email is required' ? 'a valid email is required' : parsed.message };
+  const email = parsed.value;
+  for (const e of parsed.list) {
+    if (existingEmails.has(e) || seenEmails.has(e)) {
+      return { ok: false, message: `duplicate: a client with email "${e}" already exists or appears earlier in this file` };
+    }
   }
   return {
     ok: true,
@@ -180,7 +184,7 @@ function validateClientRow(row, seenEmails, existingEmails) {
 }
 
 function processClients(rows, commit) {
-  const existingEmails = new Set(db.prepare('SELECT email FROM clients').all().map((r) => r.email.toLowerCase()));
+  const existingEmails = new Set(db.prepare('SELECT email FROM clients').all().flatMap((r) => splitEmails(r.email.toLowerCase())));
   const seenEmails = new Set();
   const results = [];
   let imported = 0;
@@ -194,7 +198,7 @@ function processClients(rows, commit) {
       results.push({ row: rowNumber, status: 'error', message: outcome.message, preview: row.name || row.email || '' });
       return;
     }
-    seenEmails.add(outcome.values.email);
+    splitEmails(outcome.values.email).forEach((e) => seenEmails.add(e));
     const v = outcome.values;
     if (commit) {
       const result = insert.run(v.name, v.email, v.phone, v.address, v.notes);
@@ -305,7 +309,7 @@ function resolveClient(row, clientsByEmail, clientsByName) {
 function clientMaps() {
   const clients = db.prepare('SELECT id, name, email FROM clients').all();
   return {
-    clientsByEmail: new Map(clients.map((c) => [c.email.toLowerCase(), c])),
+    clientsByEmail: new Map(clients.flatMap((c) => splitEmails(c.email.toLowerCase()).map((e) => [e, c]))),
     clientsByName: new Map(clients.map((c) => [c.name.trim().toLowerCase(), c])),
   };
 }

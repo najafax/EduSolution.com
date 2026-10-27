@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { splitEmails } = require('./emails');
 const { Resend } = require('resend');
 const MailComposer = require('nodemailer/lib/mail-composer');
 const { sendOpsAlert } = require('./opsAlert');
@@ -93,7 +94,8 @@ async function sendViaGmail({ from, to, subject, html, attachments, replyTo }) {
   }
 }
 
-async function sendMail({ to, subject, html, attachments }) {
+async function sendMail({ to: toRaw, subject, html, attachments }) {
+  const to = Array.isArray(toRaw) ? toRaw : splitEmails(toRaw);
   const from = process.env.SMTP_FROM || process.env.GMAIL_FROM || process.env.SMTP_USER;
   const replyTo = replyToAddress();
 

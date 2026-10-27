@@ -261,7 +261,14 @@ export default function Clients() {
             <p className="text-sm text-red-600 dark:text-red-400 sm:col-span-2">{error}</p>
           )}
           <Field label="Client name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} required />
-          <Field label="Email" type="email" value={form.email} onChange={(v) => setForm((f) => ({ ...f, email: v }))} required />
+          <Field
+            label="Email(s)"
+            inputMode="email"
+            hint="Add more than one by separating with commas — quotes and invoices are sent to all of them."
+            value={form.email}
+            onChange={(v) => setForm((f) => ({ ...f, email: v }))}
+            required
+          />
           <Field label="Phone" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} />
           <div className="sm:col-span-2">
             <Field label="Address" value={form.address} onChange={(v) => setForm((f) => ({ ...f, address: v }))} />
@@ -425,17 +432,19 @@ export default function Clients() {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', required = false }) {
+function Field({ label, value, onChange, type = 'text', required = false, hint, inputMode }) {
   return (
     <label className="block">
       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
       <input
         type={type}
+        inputMode={inputMode}
         required={required}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-lagoon-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
       />
+      {hint && <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{hint}</span>}
     </label>
   );
 }

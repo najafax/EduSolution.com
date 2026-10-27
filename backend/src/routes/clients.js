@@ -4,6 +4,7 @@ const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
+const { normalizeEmails, primaryEmail } = require('../lib/emails');
 const { toCsv } = require('../lib/csv');
 const { toXlsxBuffer } = require('../lib/xlsx');
 const { sendMail, textToHtml } = require('../lib/mailer');
@@ -61,7 +62,7 @@ function ensurePortalInvite(client) {
 
   const emailTaken = db
     .prepare('SELECT 1 FROM client_portal_accounts WHERE email = ? AND client_id != ?')
-    .get(client.email, client.id);
+    .get(primaryEmail(client.email), client.id);
   if (emailTaken) {
     const err = new Error('A portal account already uses this email address');
     err.status = 409;
@@ -75,7 +76,7 @@ function ensurePortalInvite(client) {
     // Resending an invite also re-syncs the login email to the client's
     // current one, in case it changed since the first invite went unused.
     db.prepare('UPDATE client_portal_accounts SET email = ?, invite_token = ?, invite_token_expires = ? WHERE id = ?').run(
-      client.email,
+      primaryEmail(client.email),
       token,
       expires,
       account.id,
@@ -85,7 +86,7 @@ function ensurePortalInvite(client) {
 
   const result = db
     .prepare('INSERT INTO client_portal_accounts (client_id, email, invite_token, invite_token_expires) VALUES (?, ?, ?, ?)')
-    .run(client.id, client.email, token, expires);
+    .run(client.id, primaryEmail(client.email), token, expires);
   return db.prepare('SELECT * FROM client_portal_accounts WHERE id = ?').get(result.lastInsertRowid);
 }
 
@@ -177,9 +178,11 @@ router.post('/', manage, (req, res) => {
   if (!name || !email) {
     return res.status(400).json({ error: 'name and email are required' });
   }
+  const emails = normalizeEmails(email);
+  if (!emails.ok) return res.status(400).json({ error: emails.message });
   const result = db
     .prepare('INSERT INTO clients (name, email, phone, address, notes) VALUES (?, ?, ?, ?, ?)')
-    .run(name.trim(), email.trim(), phone, address, notes);
+    .run(name.trim(), emails.value, phone, address, notes);
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid);
   logActivity({ userName: req.user.name, action: 'created', entityType: 'client', entityId: client.id, entityLabel: client.name });
   res.status(201).json({ client });
@@ -294,11 +297,13 @@ router.put('/:id', manage, (req, res) => {
   if (!name || !email) {
     return res.status(400).json({ error: 'name and email are required' });
   }
+  const emails = normalizeEmails(email);
+  if (!emails.ok) return res.status(400).json({ error: emails.message });
 
   db.prepare(
     `UPDATE clients SET name = ?, email = ?, phone = ?, address = ?, notes = ?, updated_at = datetime('now')
      WHERE id = ?`,
-  ).run(name.trim(), email.trim(), phone, address, notes, req.params.id);
+  ).run(name.trim(), emails.value, phone, address, notes, req.params.id);
 
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
   logActivity({ userName: req.user.name, action: 'updated', entityType: 'client', entityId: client.id, entityLabel: client.name });
