@@ -302,15 +302,28 @@ export const api = {
     trueUp: (id, rate, token) => request(`/deals/${id}/true-up`, { method: 'POST', body: { exchange_rate: rate }, token }),
   },
 
-  // Backs pages/business/SupplierCosts.jsx — an automatic, month/year
-  // rollup of how much USD is owed to suppliers, computed straight from
-  // sold invoice line items × each product's own cost_price. See
-  // routes/supplierCosts.js.
+  // Backs pages/business/SupplierCosts.jsx: the USD & suppliers overview
+  // (what is owed, what is waiting for a supplier invoice, what to buy) —
+  // see routes/supplierCosts.js.
   supplierCosts: {
     report: (token) => request('/supplier-costs', { token }),
-    // Marks (part of) a month as already bought, with no expense created.
-    settle: (payload, token) => request('/supplier-costs/settle', { method: 'POST', body: payload, token }),
-    unsettle: (month, token) => request(`/supplier-costs/settle/${month}`, { method: 'DELETE', token }),
+    setTrackFrom: (date, token) => request('/supplier-costs/track-from', { method: 'PUT', body: { track_from: date }, token }),
+    // "No supplier invoice needed" for a sold client invoice (done: false brings it back).
+    markDone: (invoiceId, done, token) =>
+      request(`/supplier-costs/awaiting/${invoiceId}/done`, { method: 'POST', body: { done }, token }),
+  },
+
+  // Supplier invoices, each paid in full from the USD account. See
+  // routes/supplierInvoices.js.
+  supplierInvoices: {
+    list: (token, { status } = {}) => request(`/supplier-invoices${qs({ status })}`, { token }),
+    create: (payload, token) => request('/supplier-invoices', { method: 'POST', body: payload, token }),
+    update: (id, payload, token) => request(`/supplier-invoices/${id}`, { method: 'PUT', body: payload, token }),
+    setLinks: (id, links, token) => request(`/supplier-invoices/${id}/links`, { method: 'PUT', body: { links }, token }),
+    pay: (id, payload, token) => request(`/supplier-invoices/${id}/pay`, { method: 'POST', body: payload || {}, token }),
+    unpay: (id, token) => request(`/supplier-invoices/${id}/unpay`, { method: 'POST', token }),
+    remove: (id, token) => request(`/supplier-invoices/${id}`, { method: 'DELETE', token }),
+    openFile: (id, token) => openPdf(`/supplier-invoices/${id}/file`, token),
   },
 
   // The USD account ledger: opening balance, USD bought, supplier payments,

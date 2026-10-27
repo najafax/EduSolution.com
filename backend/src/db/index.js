@@ -984,6 +984,50 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `);
+// Supplier invoices: each is a bill from a supplier, paid in full from the
+// USD account (the payment is a usd_transactions row). One supplier invoice
+// can fund several client invoices and vice versa, via supplier_invoice_links
+// (each link carries the USD share assigned to that client invoice).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS supplier_invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier TEXT NOT NULL,
+    number TEXT NOT NULL DEFAULT '',
+    invoice_date TEXT NOT NULL,
+    due_date TEXT NOT NULL DEFAULT '',
+    usd_amount REAL NOT NULL,
+    notes TEXT NOT NULL DEFAULT '',
+    file_data TEXT NOT NULL DEFAULT '',
+    file_name TEXT NOT NULL DEFAULT '',
+    file_type TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'unpaid',
+    paid_txn_id INTEGER,
+    paid_at TEXT NOT NULL DEFAULT '',
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_supplier_invoices_status ON supplier_invoices(status, due_date);
+  CREATE TABLE IF NOT EXISTS supplier_invoice_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_invoice_id INTEGER NOT NULL REFERENCES supplier_invoices(id) ON DELETE CASCADE,
+    invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    usd_amount REAL NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_supplier_links_si ON supplier_invoice_links(supplier_invoice_id);
+  CREATE INDEX IF NOT EXISTS idx_supplier_links_inv ON supplier_invoice_links(invoice_id);
+`);
+const invColsSupplier = new Set(db.prepare('PRAGMA table_info(invoices)').all().map((c) => c.name));
+if (!invColsSupplier.has('supplier_cost_done')) {
+  db.exec(`ALTER TABLE invoices ADD COLUMN supplier_cost_done INTEGER NOT NULL DEFAULT 0;`);
+}
+const settingsColsSupplier = new Set(db.prepare('PRAGMA table_info(business_settings)').all().map((c) => c.name));
+if (!settingsColsSupplier.has('supplier_track_from')) {
+  db.exec(`ALTER TABLE business_settings ADD COLUMN supplier_track_from TEXT NOT NULL DEFAULT '';`);
+  // Sales before this date are not expected to produce a supplier invoice we
+  // still wait for (older history was handled before this feature).
+  db.prepare("UPDATE business_settings SET supplier_track_from = strftime('%Y-%m-01', 'now')").run();
+}
 if (!expenseColumns.has('payee_account_number')) {
   db.exec(`ALTER TABLE expenses ADD COLUMN payee_account_number TEXT NOT NULL DEFAULT '';`);
 }

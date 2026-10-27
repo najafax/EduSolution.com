@@ -109,5 +109,30 @@ function profitLossRows(from, to, rows = replay().rows) {
   return out;
 }
 
+function negativeMessage(err) {
+  return `The USD account can't go below zero: it would be short by $${err.shortUsd.toFixed(2)} on ${err.txn.txn_date}.`;
+}
+
+// Runs `mutate` in a transaction, then replays the ledger; if the USD balance
+// would go negative anywhere, the whole change is rolled back and the error
+// message returned instead.
+function applyValidated(mutate) {
+  class Rollback extends Error {}
+  try {
+    return {
+      result: db.transaction(() => {
+        const result = mutate();
+        const { error } = replay();
+        if (error) throw Object.assign(new Rollback(negativeMessage(error)), { rollback: true, short: error });
+        return result;
+      })(),
+    };
+  } catch (err) {
+    if (err.rollback) return { error: err.message, short: err.short };
+    throw err;
+  }
+}
+
 module.exports = {
+  applyValidated, negativeMessage,
   profitLossRows, TYPES, loadTxns, replay, supplierCostMvr, fxResultMvr, mvrCashFlow, position, round2 };

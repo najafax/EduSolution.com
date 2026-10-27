@@ -90,10 +90,18 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
     }
   }
 
-  // Supplier costs owed (USD) at the latest buy rate, treated as due now.
-  const { toPayUsd, rate } = require('../routes/supplierCosts').computeToPay();
-  const supplierMvr = rate ? toPayUsd * rate : 0;
-  buckets[0].supplierOut += supplierMvr;
+  // Supplier costs owed (USD) at the latest buy rate: unpaid supplier invoices
+  // fall in the bucket of their due date (overdue or undated ones are due now);
+  // sales still waiting for their supplier invoice are an estimate, due now.
+  const { toPayUsd, awaitingUsd, invoiced, rate } = require('../routes/supplierCosts').computeToPay();
+  if (rate) {
+    for (const si of invoiced) {
+      const due = !si.due_date || si.due_date < today ? today : si.due_date;
+      const i = bucketOf(due, today);
+      if (i >= 0) buckets[i].supplierOut += si.usd_amount * rate;
+    }
+    buckets[0].supplierOut += awaitingUsd * rate;
+  }
 
   // Supplier cost we expect on income that has not been invoiced yet, in the
   // same bucket as that income. Invoiced items are already in supplierOut.
