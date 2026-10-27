@@ -237,6 +237,16 @@ export default function SupplierCosts() {
     }
   }
 
+  async function handleBringBack(n) {
+    try {
+      await api.supplierCosts.markDone(n.invoice_id, false, token);
+      toast(`${n.number} is waiting for a supplier invoice again.`, { type: 'success' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function saveTrackFrom() {
     try {
       await api.supplierCosts.setTrackFrom(trackFrom, token);
@@ -591,6 +601,25 @@ export default function SupplierCosts() {
               </li>
             ))}
           </ul>
+        )}
+        {data.notNeeded?.length > 0 && (
+          <details className="border-t border-slate-100 px-5 py-3 text-sm dark:border-slate-800">
+            <summary className="cursor-pointer text-xs font-medium text-slate-600 dark:text-slate-300">
+              Marked "not needed" ({data.notNeeded.length})
+            </summary>
+            <ul className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
+              {data.notNeeded.map((n) => (
+                <li key={n.invoice_id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                  <span className="text-slate-800 dark:text-slate-100">
+                    {n.number} <span className="text-slate-500 dark:text-slate-400">· {n.client_name} · {n.issue_date}</span>
+                  </span>
+                  {canManage && (
+                    <button onClick={() => handleBringBack(n)} className={ACTION_BTN}>Bring back</button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
         {canManage && (
           <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 px-5 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">

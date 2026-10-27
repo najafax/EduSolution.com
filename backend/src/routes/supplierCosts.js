@@ -147,6 +147,14 @@ router.get('/', view, (req, res) => {
       overdueUsd,
       awaitingUsd,
       awaiting,
+      notNeeded: db
+        .prepare(
+          `SELECT i.id AS invoice_id, i.number, i.issue_date, c.name AS client_name
+           FROM invoices i JOIN clients c ON c.id = i.client_id
+           WHERE i.supplier_cost_done = 1 AND i.status IN ('sent', 'paid')
+           ORDER BY i.issue_date DESC, i.id DESC LIMIT 50`,
+        )
+        .all(),
       paidThisYearUsd: round2(paidThisYear.t),
       paidThisYearCount: paidThisYear.n,
       // Positive = the account covers every unpaid supplier invoice; negative = USD still to buy.
