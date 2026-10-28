@@ -76,14 +76,14 @@ async function gmailAccessToken() {
   return gmailToken.value;
 }
 
-async function sendViaGmail({ from, to, subject, html, attachments, replyTo }) {
-  const raw = await new MailComposer({ from, to, subject, html, attachments, ...(replyTo && { replyTo }) })
+async function sendViaGmail({ from, to, subject, html, attachments, replyTo, inReplyTo, references, threadId }) {
+  const raw = await new MailComposer({ from, to, subject, html, attachments, ...(replyTo && { replyTo }), ...(inReplyTo && { inReplyTo }), ...(references && { references }) })
     .compile()
     .build();
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
     headers: { Authorization: `Bearer ${await gmailAccessToken()}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw: raw.toString('base64url') }),
+    body: JSON.stringify({ raw: raw.toString('base64url'), ...(threadId && { threadId }) }),
   });
   if (!res.ok) {
     if (res.status === 401) gmailToken = null;
@@ -94,14 +94,15 @@ async function sendViaGmail({ from, to, subject, html, attachments, replyTo }) {
   }
 }
 
-async function sendMail({ to: toRaw, subject, html, attachments }) {
+// inReplyTo/references/threadId keep a reply inside the client's own thread (used by the auto-reply feature).
+async function sendMail({ to: toRaw, subject, html, attachments, inReplyTo, references, threadId }) {
   const to = Array.isArray(toRaw) ? toRaw : splitEmails(toRaw);
   const from = process.env.SMTP_FROM || process.env.GMAIL_FROM || process.env.SMTP_USER;
   const replyTo = replyToAddress();
 
   if (gmailConfigured()) {
     try {
-      await sendViaGmail({ from, to, subject, html, attachments, replyTo });
+      await sendViaGmail({ from, to, subject, html, attachments, replyTo, inReplyTo, references, threadId });
     } catch (err) {
       // Gmail is the sole sender (no fallback): tell the operator, then let the caller see the failure.
       sendOpsAlert(
@@ -134,7 +135,7 @@ async function sendMail({ to: toRaw, subject, html, attachments }) {
     throw error;
   }
 
-  await t.sendMail({ from, to, subject, html, attachments, ...(replyTo && { replyTo }) });
+  await t.sendMail({ from, to, subject, html, attachments, ...(replyTo && { replyTo }), ...(inReplyTo && { inReplyTo }), ...(references && { references }) });
 }
 
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -169,4 +170,4 @@ function isEmailConfigured() {
   return Boolean(gmailConfigured() || process.env.RESEND_API_KEY || process.env.SMTP_HOST);
 }
 
-module.exports = { sendMail, textToHtml, escapeHtml, isEmailConfigured };
+module.exports = { sendMail, textToHtml, escapeHtml, isEmailConfigured, gmailConfigured, gmailAccessToken };

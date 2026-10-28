@@ -33,6 +33,7 @@ const supplierCostsRoutes = require('./routes/supplierCosts');
 const supplierInvoicesRoutes = require('./routes/supplierInvoices');
 const usdAccountRoutes = require('./routes/usdAccount');
 const facebookPostsRoutes = require('./routes/facebookPosts');
+const clientMailRoutes = require('./routes/clientMail');
 const errorLogRoutes = require('./routes/errorLog');
 const { recordError } = require('./lib/errorLog');
 const { startScheduler } = require('./lib/scheduler');
@@ -95,6 +96,7 @@ app.use('/api/supplier-costs', supplierCostsRoutes);
 app.use('/api/supplier-invoices', supplierInvoicesRoutes);
 app.use('/api/usd-account', usdAccountRoutes);
 app.use('/api/facebook-posts', facebookPostsRoutes);
+app.use('/api/client-mail', clientMailRoutes);
 app.use('/api/error-log', errorLogRoutes.admin);
 
 app.use((req, res) => {

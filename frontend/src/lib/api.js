@@ -436,6 +436,19 @@ export const api = {
     failures: (id, token) => request(`/campaigns/${id}/failures`, { token }),
   },
 
+  clientMail: {
+    list: (token, { status = '', page = 1 } = {}) => request(`/client-mail?page=${page}${status ? `&status=${status}` : ''}`, { token }),
+    settings: (token) => request('/client-mail/settings', { token }),
+    saveSettings: (payload, token) => request('/client-mail/settings', { method: 'PUT', body: payload, token }),
+    checkNow: (token) => request('/client-mail/check-now', { method: 'POST', token }),
+    rules: (token) => request('/client-mail/rules', { token }),
+    createRule: (payload, token) => request('/client-mail/rules', { method: 'POST', body: payload, token }),
+    updateRule: (id, payload, token) => request(`/client-mail/rules/${id}`, { method: 'PUT', body: payload, token }),
+    removeRule: (id, token) => request(`/client-mail/rules/${id}`, { method: 'DELETE', token }),
+    send: (id, payload, token) => request(`/client-mail/${id}/send`, { method: 'POST', body: payload, token }),
+    saveDraft: (id, payload, token) => request(`/client-mail/${id}`, { method: 'PUT', body: payload, token }),
+    dismiss: (id, token) => request(`/client-mail/${id}/dismiss`, { method: 'POST', token }),
+  },
   facebookPosts: {
     list: (token, page = 1) => request(`/facebook-posts?page=${page}`, { token }),
     options: (token) => request('/facebook-posts/options', { token }),

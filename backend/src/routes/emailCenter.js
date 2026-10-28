@@ -41,6 +41,7 @@ const TYPE_LABELS = {
   license_expiry_alert: 'Automated license expiry alert',
   campaign: 'Promotional campaign',
   shareholder_daily_earnings: 'Daily earnings report',
+  client_mail_reply: 'Reply to a client email',
 };
 
 router.get('/templates', view, (req, res) => {

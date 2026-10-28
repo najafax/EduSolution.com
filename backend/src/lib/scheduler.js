@@ -419,6 +419,13 @@ async function generateDueRecurringInvoices() {
 }
 
 function startScheduler() {
+  // Every 5 minutes: read new client emails and draft/send auto-replies
+  // (lib/clientMail.js). A no-op while the feature is switched off.
+  cron.schedule('*/5 * * * *', () => {
+    require('./clientMail').checkInbox().catch((err) => {
+      if (err.code !== 'GMAIL_NOT_CONFIGURED') console.error('[client-mail] check failed:', err.message);
+    });
+  });
   // Daily 05:00: trim the error log (resolved after 30 days, anything after 90).
   cron.schedule('0 5 * * *', () => {
     try {
