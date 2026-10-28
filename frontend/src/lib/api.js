@@ -442,6 +442,7 @@ export const api = {
     saveSettings: (payload, token) => request('/client-mail/settings', { method: 'PUT', body: payload, token }),
     checkNow: (token) => request('/client-mail/check-now', { method: 'POST', token }),
     rules: (token) => request('/client-mail/rules', { token }),
+    addStarterRules: (token) => request('/client-mail/rules/starter', { method: 'POST', token }),
     createRule: (payload, token) => request('/client-mail/rules', { method: 'POST', body: payload, token }),
     updateRule: (id, payload, token) => request(`/client-mail/rules/${id}`, { method: 'PUT', body: payload, token }),
     removeRule: (id, token) => request(`/client-mail/rules/${id}`, { method: 'DELETE', token }),

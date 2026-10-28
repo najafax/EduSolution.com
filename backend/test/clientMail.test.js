@@ -125,3 +125,24 @@ test('a client invoice number fills in that invoice\'s details', () => {
   assert.match(v2.overdue_invoices, /INV-2026-0099 — MVR 300\.00 due 2026-01-15/);
   assert.equal(v2.outstanding, 'MVR 300.00');
 });
+
+test('starter rules are added once, never send by themselves, and match the right emails', () => {
+  db.prepare('DELETE FROM client_mail_rules').run();
+  assert.equal(cm.addStarterRules(), cm.STARTER_RULES.length);
+  assert.equal(cm.addStarterRules(), 0, 'adding twice does not duplicate');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM client_mail_rules WHERE auto_send = 1').get().n, 0);
+  const pick = (t) => cm.chooseRule(t).name;
+  assert.equal(pick('About INV-2026-0018\nwhat is this'), 'Question about a specific invoice');
+  assert.equal(pick('What is my balance?'), 'Invoice or payment question');
+  assert.equal(pick('When does our licence expire'), 'License renewal or expiry');
+  assert.equal(pick("I can't access my account"), 'Login or password help');
+  assert.equal(pick('Please send a quotation'), 'Quote or pricing request');
+  assert.equal(pick('See you Tuesday'), 'Everything else (acknowledgement)');
+  // Everything except the invoice-specific rule fills in completely for a client.
+  const c = db.prepare('SELECT id, name FROM clients LIMIT 1').get();
+  for (const r of db.prepare('SELECT * FROM client_mail_rules').all()) {
+    const out = cm.composeReply(r, c, { subject: 'x', body: '' }, { signature: '' }).body;
+    if (r.name === 'Question about a specific invoice') continue;
+    assert.doesNotMatch(out, /\{\{\w+\}\}/, r.name);
+  }
+});

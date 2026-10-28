@@ -201,6 +201,15 @@ export default function ClientMail() {
       setRuleError(err.message);
     }
   }
+  async function handleStarter() {
+    try {
+      const { added } = await api.clientMail.addStarterRules(token);
+      toast(added ? `Added ${added} starter rule${added === 1 ? '' : 's'}. None send automatically.` : 'The starter rules are already there.', { type: 'success' });
+      loadRules();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
   async function handleDeleteRule(rule) {
     if (!(await confirm({ title: `Delete "${rule.name}"?`, message: 'Emails already drafted from it are not affected.', confirmLabel: 'Delete' }))) return;
     try {
@@ -278,17 +287,20 @@ export default function ClientMail() {
               The first rule (top to bottom) whose keywords appear in the email's subject or text is used. A rule with no keywords is the fallback for everything else.
             </p>
             {canManage && (
-              <button type="button" onClick={() => openRule(null)} className={`${PRIMARY} inline-flex items-center gap-1.5`}>
-                <PlusIcon width={16} height={16} />
-                New rule
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={handleStarter} className={BTN}>Add starter rules</button>
+                <button type="button" onClick={() => openRule(null)} className={`${PRIMARY} inline-flex items-center gap-1.5`}>
+                  <PlusIcon width={16} height={16} />
+                  New rule
+                </button>
+              </div>
             )}
           </div>
           <div className="mt-4 rounded-3xl bg-white shadow-sm dark:border dark:border-slate-700 dark:bg-slate-900">
             {!rules ? (
               <p className="p-5 text-sm text-slate-500">Loading…</p>
             ) : rules.length === 0 ? (
-              <EmptyState title="No rules yet" message="Add a fallback rule (no keywords) to acknowledge every client email, then specific ones for invoices, renewals and so on." />
+              <EmptyState title="No rules yet" message={canManage ? 'Click "Add starter rules" for ready-made replies about invoices, renewals, login help, quotes and a general acknowledgement. You can edit them afterwards.' : 'No rules have been set up.'} />
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {rules.map((r) => (

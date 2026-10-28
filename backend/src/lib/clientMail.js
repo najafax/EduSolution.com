@@ -308,4 +308,95 @@ async function checkInbox() {
   }
 }
 
-module.exports = { checkInbox, sendReply, chooseRule, composeReply, buildVars, skipReason, parseMessage, findClient, getSettings, MODES };
+// A ready-made set of rules for the common client questions. Added on request
+// (never automatically), none of them send by themselves until a human ticks
+// "send automatically", and adding twice never duplicates (matched by name).
+const STARTER_RULES = [
+  {
+    name: 'Question about a specific invoice',
+    keywords: 'inv-',
+    sort_order: 1,
+    subject: '',
+    body: `Dear {{client_name}},
+
+Thank you for your email about invoice {{invoice_number}}.
+
+Its current status is: {{invoice_status}}. The balance is {{invoice_balance}}, due on {{invoice_due}}.
+
+If you have already paid, please reply with the payment slip and we will update our records. Otherwise, let us know if anything is unclear.`,
+  },
+  {
+    name: 'Invoice or payment question',
+    keywords: 'invoice, payment, balance, owe, outstanding, receipt, paid, bank transfer',
+    sort_order: 2,
+    subject: '',
+    body: `Dear {{client_name}},
+
+Thank you for your email. Your current outstanding balance with us is {{outstanding}}.
+
+Unpaid invoices:
+{{unpaid_invoices}}
+
+If you have already made a payment, please reply with the payment slip and we will update our records.`,
+  },
+  {
+    name: 'License renewal or expiry',
+    keywords: 'renew, renewal, license, licence, expire, expiry, subscription',
+    sort_order: 3,
+    subject: '',
+    body: `Dear {{client_name}},
+
+Thank you for your email about your license.
+
+Licenses expiring within the next 30 days:
+{{licenses_expiring}}
+
+We will send you the renewal invoice. Once it is paid your license is extended. If you need anything changed first, just reply to this email.`,
+  },
+  {
+    name: 'Login or password help',
+    keywords: 'login, log in, password, cannot access, can\'t access, sign in, locked out, portal',
+    sort_order: 4,
+    subject: '',
+    body: `Dear {{client_name}},
+
+Thank you for your email. You can sign in to your account here:
+{{portal_url}}
+
+If you have forgotten your password, use the "Forgot password" link on that page and a reset link will be sent to you. If that does not work, reply to this email and we will help.`,
+  },
+  {
+    name: 'Quote or pricing request',
+    keywords: 'quote, quotation, price, pricing, cost, proposal, how much',
+    sort_order: 5,
+    subject: '',
+    body: `Dear {{client_name}},
+
+Thank you for your interest. We have received your request for a quote and will prepare it for you shortly.
+
+To help us get it right, please reply with the products or services you need and the quantities.`,
+  },
+  {
+    name: 'Everything else (acknowledgement)',
+    keywords: '',
+    sort_order: 99,
+    subject: '',
+    body: `Dear {{client_name}},
+
+Thank you for your email. We have received it and will get back to you shortly.`,
+  },
+];
+
+function addStarterRules() {
+  const have = new Set(db.prepare('SELECT name FROM client_mail_rules').all().map((r) => r.name));
+  const insert = db.prepare('INSERT INTO client_mail_rules (name, keywords, subject, body, auto_send, active, sort_order) VALUES (@name, @keywords, @subject, @body, 0, 1, @sort_order)');
+  let added = 0;
+  for (const r of STARTER_RULES) {
+    if (have.has(r.name)) continue;
+    insert.run(r);
+    added += 1;
+  }
+  return added;
+}
+
+module.exports = { STARTER_RULES, addStarterRules, checkInbox, sendReply, chooseRule, composeReply, buildVars, skipReason, parseMessage, findClient, getSettings, MODES };

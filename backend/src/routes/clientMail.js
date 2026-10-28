@@ -2,7 +2,7 @@ const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
-const { checkInbox, sendReply, getSettings, MODES } = require('../lib/clientMail');
+const { checkInbox, sendReply, getSettings, addStarterRules, MODES } = require('../lib/clientMail');
 const { gmailConfigured } = require('../lib/mailer');
 
 // Auto-replies to client emails (lib/clientMail.js): settings, keyword rules,
@@ -94,6 +94,12 @@ router.post('/rules', manage, (req, res) => {
     .run(value);
   logActivity({ userName: req.user.name, action: 'created an auto-reply rule', entityType: 'client_mail', entityId: r.lastInsertRowid, entityLabel: value.name });
   res.status(201).json({ rule: db.prepare('SELECT * FROM client_mail_rules WHERE id = ?').get(r.lastInsertRowid) });
+});
+
+router.post('/rules/starter', manage, (req, res) => {
+  const added = addStarterRules();
+  if (added) logActivity({ userName: req.user.name, action: `added ${added} starter auto-reply rule(s)`, entityType: 'client_mail', entityId: null, entityLabel: '' });
+  res.json({ added });
 });
 
 router.put('/rules/:id', manage, (req, res) => {
