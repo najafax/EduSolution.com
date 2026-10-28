@@ -611,55 +611,6 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
-  -- Client auto-replies (lib/clientMail.js). Brand-new tables, plain CREATE.
-  -- One row of settings, the keyword rules that pick a reply template, and one
-  -- row per email read from the Gmail inbox (kept so the same message is never
-  -- answered twice and staff can review drafts).
-  CREATE TABLE IF NOT EXISTS client_mail_settings (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    mode TEXT NOT NULL DEFAULT 'off',
-    enabled_since TEXT,
-    signature TEXT NOT NULL DEFAULT '',
-    last_checked_at TEXT,
-    last_error TEXT NOT NULL DEFAULT ''
-  );
-  INSERT OR IGNORE INTO client_mail_settings (id) VALUES (1);
-
-  CREATE TABLE IF NOT EXISTS client_mail_rules (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    keywords TEXT NOT NULL DEFAULT '',
-    subject TEXT NOT NULL DEFAULT '',
-    body TEXT NOT NULL,
-    auto_send INTEGER NOT NULL DEFAULT 0,
-    active INTEGER NOT NULL DEFAULT 1,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS client_mail (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    gmail_id TEXT NOT NULL UNIQUE,
-    thread_id TEXT NOT NULL DEFAULT '',
-    message_id TEXT NOT NULL DEFAULT '',
-    from_email TEXT NOT NULL,
-    from_name TEXT NOT NULL DEFAULT '',
-    client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
-    subject TEXT NOT NULL DEFAULT '',
-    body_text TEXT NOT NULL DEFAULT '',
-    received_at TEXT NOT NULL DEFAULT (datetime('now')),
-    status TEXT NOT NULL DEFAULT 'draft',
-    ignore_reason TEXT NOT NULL DEFAULT '',
-    rule_id INTEGER,
-    reply_subject TEXT NOT NULL DEFAULT '',
-    reply_body TEXT NOT NULL DEFAULT '',
-    handled_by_name TEXT NOT NULL DEFAULT '',
-    handled_at TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-  CREATE INDEX IF NOT EXISTS idx_client_mail_status ON client_mail(status, id);
-  CREATE INDEX IF NOT EXISTS idx_client_mail_from ON client_mail(from_email, handled_at);
-
   CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_requests_client ON quote_requests(client_id);
   CREATE INDEX IF NOT EXISTS idx_quote_request_items_request ON quote_request_items(quote_request_id);
