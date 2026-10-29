@@ -18,6 +18,21 @@ staff, with granular per-module view/manage grants for staff) — see "Roles
 and permissions" below. Quotes and invoices also have unauthenticated
 client-facing views via a `public_token` link. See "Business module" below.
 
+## Hosting
+
+Production is a single DigitalOcean droplet (`deploy/digitalocean/`): nginx serves
+the built frontend from `/var/www/edusolution-frontend` for
+`www.edusolutionsmaldives.com` (`nginx-web.conf.template`, SPA fallback, `sw.js`/
+`index.html` never cached, bare domain redirects to www) and proxies
+`api.edusolutionsmaldives.com` to the Node backend (`nginx-api.conf.template`).
+Render was used earlier and is gone (`render.yaml` removed; the Render static site
+was suspended). A deploy is `./deploy/digitalocean/deploy.sh` on the droplet: it
+fast-forwards `main`, restarts the backend and builds/publishes the frontend with
+`VITE_API_URL=https://api.edusolutionsmaldives.com` (`FRONTEND=0` skips the
+frontend). Pushing to GitHub does not deploy. The frontend build needs ~1.5GB
+free RAM, so the droplet has a 2GB swapfile. TLS comes from certbot (auto-renews).
+Other docs that still say "Render" describe the history, not the current set-up.
+
 ## Commands
 
 ### Backend (`backend/`)
@@ -69,9 +84,8 @@ backend port in frontend code.
   SQLite driver — no async/await needed for queries) and runs
   `CREATE TABLE IF NOT EXISTS` on startup. Path is `DB_PATH` from env if
   set, else `backend/data.sqlite3` — in production this should point at a
-  persistent disk mount (see `render.yaml`'s `disk`/`DB_PATH` for the
-  Render deployment, or `deploy/digitalocean/` for the alternative
-  self-hosted-on-a-Droplet path — same `DB_PATH` convention, `/var/data`
+  persistent disk mount (see `deploy/digitalocean/` — production runs on a
+  DigitalOcean Droplet, `DB_PATH=/var/data/data.sqlite3` — same `DB_PATH` convention, `/var/data`
   instead of Render's own mount, see that directory's own `README.md` for
   the full migration runbook) so the database survives restarts/redeploys.
   Because `better-sqlite3` is a same-process file database with no network
@@ -8064,7 +8078,7 @@ keeps its existing layout.
   dynamic `© {new Date().getFullYear()} Edu Solutions Pvt Ltd. All rights
   reserved.` — the year computed rather than a literal, so it never goes
   stale — linking `https://www.edusolutionsmaldives.com` (this app's
-  actual own domain, per `render.yaml` — an earlier version of this link
+  actual own domain — an earlier version of this link
   pointed at `edusolutionsmv.com` instead, which turned out to resolve to
   unrelated infrastructure the business doesn't control or pay for, so it
   was corrected to point here), on the other; the

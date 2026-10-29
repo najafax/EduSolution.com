@@ -1,11 +1,13 @@
+> **Update:** the frontend has since moved to this droplet too (see "Hosting the frontend on the droplet" below) and `render.yaml` is gone; the Render wording in the migration notes is historical.
+
 # Migrating the backend (and its SQLite database) to a DigitalOcean Droplet
 
 The backend uses `better-sqlite3` — a synchronous, same-process, file-based
 database (see `backend/src/db/index.js`). There is no network DB server to
 point at a different host: the SQLite file has to live on the same machine
 as the Node process. So "move the database" means moving the whole backend
-service off Render and onto a Droplet; **the frontend stays on Render**
-exactly as it is today (per `render.yaml`, it's a static site that calls
+service off Render and onto a Droplet; **the frontend originally stayed on Render**
+(a static site that called
 `https://api.edusolutionsmaldives.com` directly — it has no idea which
 server answers that domain, so nothing on the frontend side needs to
 change).
@@ -230,7 +232,7 @@ equivalent). DNS propagation can take minutes to a couple of hours
 depending on the record's TTL.
 
 Because the frontend only ever calls its own configured API origin
-(`VITE_API_URL=https://api.edusolutionsmaldives.com` in `render.yaml`) and
+(`VITE_API_URL=https://api.edusolutionsmaldives.com`) and
 never hardcodes an IP or Render-specific hostname, **no frontend rebuild or
 redeploy is needed** — the moment DNS resolves to the droplet, the existing
 frontend starts talking to it.
