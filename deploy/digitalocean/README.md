@@ -329,3 +329,18 @@ anything looks wrong on the droplet before you've decommissioned Render.
 Any writes made on the droplet in the meantime would need to be manually
 reconciled back into Render's copy (or just redone), so don't delay this
 decision once the cutover looks good.
+
+## Hosting the frontend on the droplet (instead of Render)
+
+The React build is plain static files, so nginx on the droplet can serve it.
+
+1. **Swap (if the droplet has ≤2GB RAM)** so `vite build` isn't killed:
+   `fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab`
+2. **Build and publish:** `cd ~/edusolution-backend && ./deploy/digitalocean/deploy.sh`
+   (now also builds the frontend into `/var/www/edusolution-frontend`; use `FRONTEND=0 ./deploy/digitalocean/deploy.sh` for a backend-only deploy).
+3. **nginx:** copy `nginx-web.conf.template` to `/etc/nginx/sites-available/edusolution-web`, enable it, `nginx -t && systemctl reload nginx`.
+4. **DNS:** point `www.edusolutionsmaldives.com` and the bare `edusolutionsmaldives.com` (A records) at the droplet IP (remove the Render CNAME/A records).
+5. **TLS** once DNS resolves: `certbot --nginx -d www.edusolutionsmaldives.com -d edusolutionsmaldives.com`.
+6. `CLIENT_ORIGIN` in `backend/.env` stays `https://www.edusolutionsmaldives.com`.
+
+Installed PWAs pick up the new host automatically (same origin, same service worker URL). Delete the Render static service afterwards.

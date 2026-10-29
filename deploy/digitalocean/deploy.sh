@@ -44,4 +44,24 @@ echo "==> Restarting the backend service"
 sudo_if_needed systemctl restart edusolution-backend
 sudo_if_needed systemctl status edusolution-backend --no-pager -l | head -n 15
 
+# Frontend: built here and served by nginx (nginx-web.conf.template), replacing
+# Render's static site. Skipped when FRONTEND=0 (backend-only deploy).
+# A small droplet needs ~1.5GB free RAM for the build (add swap if it is killed).
+if [ "${FRONTEND:-1}" != "0" ]; then
+  echo "==> Building the frontend"
+  cd ../frontend
+  npm install
+  VITE_API_URL="${VITE_API_URL:-https://api.edusolutionsmaldives.com}" npm run build
+  WEB_ROOT="${WEB_ROOT:-/var/www/edusolution-frontend}"
+  sudo_if_needed mkdir -p "${WEB_ROOT}"
+  # Copy to a fresh sibling directory then swap, so visitors never see a half-written site.
+  sudo_if_needed rm -rf "${WEB_ROOT}.new"
+  sudo_if_needed cp -r dist "${WEB_ROOT}.new"
+  sudo_if_needed chmod -R a+rX "${WEB_ROOT}.new"
+  sudo_if_needed rm -rf "${WEB_ROOT}.old"
+  sudo_if_needed mv "${WEB_ROOT}" "${WEB_ROOT}.old"
+  sudo_if_needed mv "${WEB_ROOT}.new" "${WEB_ROOT}"
+  sudo_if_needed rm -rf "${WEB_ROOT}.old"
+fi
+
 echo "==> Done."
