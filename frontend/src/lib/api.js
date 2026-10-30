@@ -393,6 +393,7 @@ export const api = {
     // identical current-year-scoped figure as one section of its combined
     // response.
     summary: (token, { from, to } = {}) => request(`/financials/summary${qs({ from, to })}`, { token }),
+    cashForecast: (token) => request('/financials/cash-forecast', { token }),
   },
 
   // The single combined fetch behind Dashboard.jsx — replaces what used to

@@ -47,8 +47,8 @@ const SHORTCUTS = [
   { to: '/invoices', label: 'Invoices', module: 'invoices', icon: InvoiceIcon },
   { to: '/recurring-invoices', label: 'Recurring', module: 'recurring_invoices', icon: RefreshIcon },
   { to: '/licenses', label: 'Licenses', module: 'licenses', icon: LicenseIcon },
-  { to: '/expenses', label: 'Expenses', module: 'expenses', icon: ExpenseIcon },
-  { to: '/financials', label: 'Financials', module: 'financials', icon: BankIcon },
+  { to: '/finance?tab=expenses', label: 'Expenses', module: 'expenses', icon: ExpenseIcon },
+  { to: '/finance', label: 'Finance', module: 'financials', icon: BankIcon },
   { to: '/settings', label: 'Settings', module: 'settings', icon: SettingsIcon },
 ];
 
@@ -227,7 +227,7 @@ export default function Dashboard() {
           </Link>
         )}
         {canViewExpenses && exp && (
-          <Link to="/expenses/analytics" className="block">
+          <Link to="/finance?tab=expenses" className="block">
             <KpiCard
               tone="warning"
               icon={<ExpenseIcon width={17} height={17} />}

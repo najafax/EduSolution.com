@@ -22,7 +22,7 @@ export default function More() {
       links: BUSINESS_LINKS.filter(
         (l) =>
           l.group === group &&
-          (!l.module || can(l.module, 'view')) &&
+          (!l.module || can(l.module, 'view') || (l.alsoModule && can(l.alsoModule, 'view'))) &&
           (!l.superAdminOnly || isSuperAdmin) &&
           (!l.adminOnly || isUnrestrictedAdmin),
       ),

@@ -253,3 +253,36 @@ test('client statement: opens from the Clients page and downloads a PDF', async 
   await popup.close().catch(() => {});
   await page.close();
 });
+
+test('finance page: every tab renders, an expense can be added, old URLs redirect (desktop and phone)', async () => {
+  for (const [label, viewport] of [['desktop', { width: 1440, height: 900 }], ['phone', { width: 390, height: 844 }]]) {
+    const page = await browser.newPage({ viewport });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await loginBoss(page);
+    await page.goto(`${APP}/financials`);
+    await page.waitForURL('**/finance');
+    for (const tab of ['Overview', 'Income', 'Expenses', 'Cash & USD', 'Equity']) {
+      await page.getByRole('tab', { name: tab }).click();
+      await page.getByRole('heading', { name: 'Finance' }).waitFor();
+      await page.waitForTimeout(500);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      assert.ok(overflow <= 1, `${label} ${tab} overflows by ${overflow}px`);
+    }
+    await page.goto(`${APP}/finance?tab=expenses`);
+    const unique = `E2E rent ${label}`;
+    await page.getByRole('button', { name: '+ New entry' }).click();
+    await page.getByRole('button', { name: /^Expense/ }).click();
+    await page.locator('form select').selectOption('rent');
+    await page.getByLabel('Description').fill(unique);
+    await page.getByLabel('Amount').fill('1234.5');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByText(unique).first().waitFor();
+    for (const old of ['/expenses', '/supplier-costs', '/receivables']) {
+      await page.goto(`${APP}${old}`);
+      await page.waitForURL('**/finance?tab=*');
+    }
+    assert.deepEqual(errors, [], `${label}: ${errors.join('; ')}`);
+    await page.close();
+  }
+});

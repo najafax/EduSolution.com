@@ -129,7 +129,7 @@ export default function GlobalSearch({ onNavigate, className = 'max-w-xs', autoF
                   {results.expenses.map((ex) => (
                     <button
                       key={`expense-${ex.id}`}
-                      onClick={() => go('/expenses')}
+                      onClick={() => go('/finance?tab=expenses')}
                       className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       <span className="font-medium text-slate-900 dark:text-white">{ex.description}</span>

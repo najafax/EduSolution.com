@@ -26,7 +26,7 @@ const CREATE_ITEMS = [
   { label: 'New invoice', module: 'invoices', to: '/invoices/new', Icon: InvoiceIcon },
   { label: 'New quote', module: 'quotes', to: '/quotes/new', Icon: QuoteIcon },
   { label: 'Add client', module: 'clients', to: '/clients?new=1', Icon: UsersIcon },
-  { label: 'Record expense', module: 'expenses', to: '/expenses?new=1', Icon: ExpenseIcon },
+  { label: 'Record expense', module: 'expenses', to: '/finance?tab=expenses&new=expense', Icon: ExpenseIcon },
 ];
 
 export default function BottomNav() {
