@@ -9851,3 +9851,6 @@ Supersedes the monthly "owed to suppliers" view, month tagging and "already paid
 
 ### Bulk-link sales to a supplier invoice
 - `SupplierInvoiceModal` has an "Add several" button beside "Add" in the links box: a checklist of the sales still awaiting a supplier invoice (`GET /supplier-costs` `awaiting`, minus ones already linked) with Select all; "Add N sales" appends one link per sale at its remaining estimated USD, and fills the bill amount with their total when it is still empty. Frontend only; links are saved by the existing create/update routes.
+
+### Modal height on desktop
+- `Modal.jsx` panel is capped at `100dvh - 2rem` from `sm:` up (it used to be uncapped inside a scrolling, flex-centred backdrop, which clipped the title and the Save/Cancel row of any tall form). The header stays fixed and `.modal-body` scrolls, same as the phone sheet.

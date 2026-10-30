@@ -46,7 +46,7 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/20 backdrop-blur-sm sm:items-center sm:overflow-y-auto sm:px-4 sm:py-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/20 backdrop-blur-sm sm:items-center sm:px-4 sm:py-4"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) onClose?.();
           }}
@@ -56,7 +56,7 @@ export default function Modal({ open, onClose, title, children, maxWidthClass = 
           transition={{ duration: 0.15 }}
         >
           <motion.div
-            className={`modal-panel flex max-h-[92dvh] w-full flex-col rounded-t-[28px] bg-white shadow-xl sm:max-h-none sm:rounded-3xl dark:bg-slate-900 ${maxWidthClass}`}
+            className={`modal-panel flex max-h-[92dvh] w-full flex-col rounded-t-[28px] bg-white shadow-xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-3xl dark:bg-slate-900 ${maxWidthClass}`}
             initial={{ opacity: 0, scale: 0.98, y: 24 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 24 }}
