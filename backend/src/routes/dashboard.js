@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { todayStr, businessYear, addDays } = require('../lib/businessDate');
+const { todayStr, businessYear, addDays, BOOKS_START } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { hasPermission } = require('../lib/permissions');
@@ -83,11 +83,11 @@ router.get('/overview', (req, res) => {
                       ROUND(invoices.total - invoices.amount_paid, 2) AS balance_due,
                       clients.name AS client_name
                FROM invoices JOIN clients ON clients.id = invoices.client_id
-               WHERE invoices.status = 'sent' AND invoices.due_date < ? AND (invoices.total - invoices.amount_paid) > 0
+               WHERE invoices.status = 'sent' AND invoices.due_date < ? AND (invoices.total - invoices.amount_paid) > 0 AND invoices.issue_date >= ?
                ORDER BY invoices.due_date ASC
                LIMIT 4`,
             )
-            .all(today())
+            .all(today(), BOOKS_START)
         : [];
 
     // Mirrors licenses.js's own statusWhere('expiring_soon'): status='active'

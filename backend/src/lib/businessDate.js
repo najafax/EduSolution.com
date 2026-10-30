@@ -61,4 +61,8 @@ function previousMonthRange(now = new Date()) {
   return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10), label: first };
 }
 
-module.exports = { todayStr, businessYear, addDays, addMonths, addYears, yesterdayStr, recentMonthKeys, previousMonthRange };
+// Books start here: period figures (net profit, totals, reports defaults) never
+// count anything dated earlier.
+const BOOKS_START = '2025-01-01';
+
+module.exports = { BOOKS_START, todayStr, businessYear, addDays, addMonths, addYears, yesterdayStr, recentMonthKeys, previousMonthRange };

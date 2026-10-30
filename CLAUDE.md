@@ -9854,3 +9854,6 @@ Supersedes the monthly "owed to suppliers" view, month tagging and "already paid
 
 ### Modal height on desktop
 - `Modal.jsx` panel is capped at `100dvh - 2rem` from `sm:` up (it used to be uncapped inside a scrolling, flex-centred backdrop, which clipped the title and the Save/Cancel row of any tall form). The header stays fixed and `.modal-body` scrolls, same as the phone sheet.
+
+### Books start January 2025
+- `lib/businessDate.js` `BOOKS_START = '2025-01-01'`. `computeSummary()` (Finance overview and the main dashboard) clamps any range, including "All time", to start there, so net profit, totals, expenses, draws and contributions ignore earlier data; the dashboard's overdue list only shows invoices issued from that date. The bank balance still follows Settings → starting balance + starting balance date (set the date to 2025-01-01 and the opening balance as of then).

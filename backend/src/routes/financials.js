@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const usdLedger = require('../lib/usdLedger');
-const { todayStr, recentMonthKeys } = require('../lib/businessDate');
+const { todayStr, recentMonthKeys, BOOKS_START } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 
@@ -20,6 +20,10 @@ const recentMonths = recentMonthKeys;
 // net profit, etc. — a second time. `from`/`to` are both optional exactly
 // as they are on the route below.
 function computeSummary(from, to) {
+  // Nothing before BOOKS_START counts: an open-ended or earlier range starts there.
+  if (!(DATE_RE.test(from || '') && DATE_RE.test(to || '') && from <= to)) { from = BOOKS_START; to = today(); }
+  else if (from < BOOKS_START) from = BOOKS_START;
+  if (from > to) to = from;
   const filtered = DATE_RE.test(from || '') && DATE_RE.test(to || '') && from <= to;
   const dateFilter = filtered ? ' AND issue_date BETWEEN ? AND ?' : '';
   const dateArgs = filtered ? [from, to] : [];
