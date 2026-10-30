@@ -9848,3 +9848,6 @@ Supersedes the monthly "owed to suppliers" view, month tagging and "already paid
 ### Supplier payment links
 - `supplier_invoices.payment_url` (optional, http/https only, validated server-side) holds the link the supplier sent. The app has no payment gateway: the Cash tab shows "Open payment link (domain)" (new tab, `noopener noreferrer`) and the primary button becomes "Mark paid", which runs the existing USD-account payment. Payments are USD only.
 - `POST /supplier-invoices/:id/pay` also accepts an optional `usd_charged`; when it differs from the bill, that amount is what leaves the USD account and is stored in `amount_charged` (cleared on undo). No UI for it yet (no fees today).
+
+### Bulk-link sales to a supplier invoice
+- `SupplierInvoiceModal` has an "Add several" button beside "Add" in the links box: a checklist of the sales still awaiting a supplier invoice (`GET /supplier-costs` `awaiting`, minus ones already linked) with Select all; "Add N sales" appends one link per sale at its remaining estimated USD, and fills the bill amount with their total when it is still empty. Frontend only; links are saved by the existing create/update routes.

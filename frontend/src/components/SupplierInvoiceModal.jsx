@@ -38,6 +38,9 @@ export default function SupplierInvoiceModal({ open, onClose, token, invoice, pr
   const [removeFile, setRemoveFile] = useState(false);
   const [clientInvoices, setClientInvoices] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [awaiting, setAwaiting] = useState([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [picked, setPicked] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -46,6 +49,8 @@ export default function SupplierInvoiceModal({ open, onClose, token, invoice, pr
     setError('');
     setFile(null);
     setRemoveFile(false);
+    setBulkOpen(false);
+    setPicked({});
     if (invoice) {
       setForm({
         supplier: invoice.supplier,
@@ -64,6 +69,10 @@ export default function SupplierInvoiceModal({ open, onClose, token, invoice, pr
     api.invoices
       .list(token)
       .then((d) => setClientInvoices((d.invoices || []).filter((i) => i.status !== 'void' && i.status !== 'draft')))
+      .catch(() => {});
+    api.supplierCosts
+      .report(token)
+      .then((d) => setAwaiting(d.awaiting || []))
       .catch(() => {});
     api.supplierInvoices
       .list(token)
@@ -85,6 +94,19 @@ export default function SupplierInvoiceModal({ open, onClose, token, invoice, pr
   function addLink() {
     // Offer what is still unassigned as the starting amount.
     setLinks((ls) => [...ls, { invoice_id: '', usd_amount: unassigned > 0 ? unassigned.toFixed(2) : '' }]);
+  }
+
+  const linkedIds = new Set(links.map((l) => String(l.invoice_id)));
+  const available = awaiting.filter((a) => !linkedIds.has(String(a.invoice_id)));
+  const pickedList = available.filter((a) => picked[a.invoice_id]);
+  const pickedTotal = pickedList.reduce((s, a) => s + num(a.remainingUsd), 0);
+  function addPicked() {
+    if (!pickedList.length) return;
+    setLinks((ls) => [...ls, ...pickedList.map((a) => ({ invoice_id: String(a.invoice_id), usd_amount: num(a.remainingUsd).toFixed(2) }))]);
+    // A new bill with no amount yet takes the total of the sales it covers.
+    setForm((f) => (num(f.usd_amount) > 0 ? f : { ...f, usd_amount: (assigned + pickedTotal).toFixed(2) }));
+    setPicked({});
+    setBulkOpen(false);
   }
 
   async function pickFile(e) {
@@ -208,14 +230,49 @@ export default function SupplierInvoiceModal({ open, onClose, token, invoice, pr
         <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Which client invoices is this for?</p>
-            <button type="button" onClick={addLink} className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700">
-              <PlusIcon width={14} height={14} />
-              Add
-            </button>
+            <div className="flex gap-1.5">
+              {!paid && available.length > 0 && (
+                <button type="button" onClick={() => setBulkOpen((o) => !o)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700">
+                  Add several
+                </button>
+              )}
+              <button type="button" onClick={addLink} className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700">
+                <PlusIcon width={14} height={14} />
+                Add
+              </button>
+            </div>
           </div>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             Split the amount across as many sales as it covers. This gives the real cost of each sale. You can leave it empty and link it later.
           </p>
+          {bulkOpen && (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-600 dark:bg-slate-900">
+              <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                <span>Sales still waiting for a supplier invoice</span>
+                <button
+                  type="button"
+                  className="font-medium text-lagoon-700 hover:underline dark:text-lagoon-300"
+                  onClick={() => setPicked(pickedList.length === available.length ? {} : Object.fromEntries(available.map((a) => [a.invoice_id, true])))}
+                >
+                  {pickedList.length === available.length ? 'Clear' : 'Select all'}
+                </button>
+              </div>
+              <ul className="max-h-56 overflow-y-auto">
+                {available.map((a) => (
+                  <li key={a.invoice_id}>
+                    <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded px-1 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <input type="checkbox" checked={Boolean(picked[a.invoice_id])} onChange={(e) => setPicked((p) => ({ ...p, [a.invoice_id]: e.target.checked }))} />
+                      <span className="min-w-0 flex-1 truncate text-slate-800 dark:text-slate-100">{a.number} · {a.client_name}</span>
+                      <span className="shrink-0 text-slate-600 dark:text-slate-300">{usd(a.remainingUsd)}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <button type="button" disabled={!pickedList.length} onClick={addPicked} className="mt-2 min-h-9 w-full rounded-md bg-slate-900 px-3 text-sm font-medium text-white disabled:opacity-50 dark:bg-lagoon-600">
+                {pickedList.length ? `Add ${pickedList.length} sale${pickedList.length > 1 ? 's' : ''} (${usd(pickedTotal)})` : 'Tick the sales to add'}
+              </button>
+            </div>
+          )}
           {links.length > 0 && (
             <ul className="mt-3 grid gap-2">
               {links.map((l, i) => (
