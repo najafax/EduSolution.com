@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { todayStr } = require('../lib/businessDate');
 const { isValidDate, round2 } = require('../lib/validate');
 const { applyValidated } = require('../lib/usdLedger');
@@ -161,13 +160,6 @@ router.post('/', manage, (req, res) => {
     if (lk.links) saveLinks(newId, lk.links);
     return newId;
   })();
-  logActivity({
-    userName: req.user.name,
-    action: 'recorded supplier invoice from',
-    entityType: 'supplier_invoice',
-    entityId: id,
-    entityLabel: `${parsed.supplier} ${parsed.number} ($${parsed.usd_amount.toFixed(2)})`.replace(/\s+/g, ' '),
-  });
   res.status(201).json({ id });
 });
 
@@ -197,13 +189,6 @@ router.put('/:id', manage, (req, res) => {
       if (assigned > parsed.usd_amount + 0.005) throw Object.assign(new Error('The amount is less than what is already linked to client invoices'), { status: 400 });
     }
   })();
-  logActivity({
-    userName: req.user.name,
-    action: 'updated supplier invoice from',
-    entityType: 'supplier_invoice',
-    entityId: existing.id,
-    entityLabel: `${parsed.supplier} ${parsed.number}`.trim(),
-  });
   res.json({ ok: true });
 });
 
@@ -216,13 +201,6 @@ router.put('/:id/links', manage, (req, res) => {
   if (lk.error) return res.status(400).json({ error: lk.error });
   if (!lk.links) return res.status(400).json({ error: 'links is required' });
   db.transaction(() => saveLinks(existing.id, lk.links))();
-  logActivity({
-    userName: req.user.name,
-    action: 'linked supplier invoice to client invoices:',
-    entityType: 'supplier_invoice',
-    entityId: existing.id,
-    entityLabel: `${existing.supplier} ${existing.number}`.trim(),
-  });
   res.json({ ok: true });
 });
 
@@ -250,13 +228,6 @@ router.post('/:id/pay', manage, (req, res) => {
       shortUsd: short ? short.shortUsd : null,
     });
   }
-  logActivity({
-    userName: req.user.name,
-    action: 'paid supplier invoice from',
-    entityType: 'supplier_invoice',
-    entityId: si.id,
-    entityLabel: `${si.supplier} ${si.number} ($${si.usd_amount.toFixed(2)})`.replace(/\s+/g, ' '),
-  });
   res.json({ ok: true, txnId: result });
 });
 
@@ -270,13 +241,6 @@ router.post('/:id/unpay', manage, (req, res) => {
     db.prepare("UPDATE supplier_invoices SET status = 'unpaid', paid_txn_id = NULL, paid_at = '', updated_at = datetime('now') WHERE id = ?").run(si.id);
   });
   if (error) return res.status(409).json({ error: `Can't undo this payment. ${error}` });
-  logActivity({
-    userName: req.user.name,
-    action: 'undid payment of supplier invoice from',
-    entityType: 'supplier_invoice',
-    entityId: si.id,
-    entityLabel: `${si.supplier} ${si.number}`.trim(),
-  });
   res.json({ ok: true });
 });
 
@@ -285,13 +249,6 @@ router.delete('/:id', manage, (req, res) => {
   if (!si) return res.status(404).json({ error: 'Supplier invoice not found' });
   if (si.status === 'paid') return res.status(409).json({ error: 'A paid supplier invoice cannot be deleted. Undo the payment first.' });
   db.prepare('DELETE FROM supplier_invoices WHERE id = ?').run(si.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'deleted supplier invoice from',
-    entityType: 'supplier_invoice',
-    entityId: si.id,
-    entityLabel: `${si.supplier} ${si.number}`.trim(),
-  });
   res.json({ ok: true });
 });
 

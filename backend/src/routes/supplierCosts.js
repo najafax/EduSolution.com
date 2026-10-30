@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { replay, position } = require('../lib/usdLedger');
 const { todayStr, addDays } = require('../lib/businessDate');
 const { isValidDate } = require('../lib/validate');
@@ -176,7 +175,6 @@ router.put('/track-from', manage, (req, res) => {
   const d = req.body && req.body.track_from;
   if (!isValidDate(d)) return res.status(400).json({ error: 'Choose a valid date' });
   db.prepare('UPDATE business_settings SET supplier_track_from = ? WHERE id = 1').run(d);
-  logActivity({ userName: req.user.name, action: 'set supplier-invoice tracking start to', entityType: 'supplier_invoice', entityId: null, entityLabel: d });
   res.json({ trackFrom: d });
 });
 
@@ -187,13 +185,6 @@ router.post('/awaiting/:invoiceId/done', manage, (req, res) => {
   if (!inv) return res.status(404).json({ error: 'Invoice not found' });
   const done = req.body && req.body.done === false ? 0 : 1;
   db.prepare('UPDATE invoices SET supplier_cost_done = ? WHERE id = ?').run(done, inv.id);
-  logActivity({
-    userName: req.user.name,
-    action: done ? 'marked no supplier invoice needed for' : 'is waiting for a supplier invoice for',
-    entityType: 'invoice',
-    entityId: inv.id,
-    entityLabel: inv.number,
-  });
   res.json({ ok: true });
 });
 

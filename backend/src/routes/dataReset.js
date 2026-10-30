@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 
 const router = Router();
 // Deliberately requireAdmin rather than requirePermission — this bulk-
@@ -41,7 +40,6 @@ const CATEGORIES = {
   capital_contributions: ['capital_contributions'],
   owner_draws: ['owner_draws'],
   products: ['products'],
-  activity: ['activity_log'],
   campaigns: ['campaigns'],
   quote_requests: ['quote_request_items', 'quote_requests'],
 };
@@ -67,7 +65,6 @@ const TABLE_ORDER = [
   'clients',
   'products',
   'campaigns',
-  'activity_log',
 ];
 
 router.post('/', (req, res) => {
@@ -139,13 +136,6 @@ router.post('/', (req, res) => {
   // Logged after the clear (not before) so this entry survives even when
   // activity_log itself was one of the tables just wiped — it becomes the
   // first fresh entry, documenting the reset for anyone auditing later.
-  logActivity({
-    userName: req.user.name,
-    action: 'reset',
-    entityType: 'business data',
-    entityId: null,
-    entityLabel: clearedSummary || 'nothing — every table was already empty',
-  });
 
   res.json({ cleared: before });
 });

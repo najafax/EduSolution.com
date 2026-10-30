@@ -36,7 +36,6 @@ export const BUSINESS_LINKS = [
   { to: '/recurring-invoices', label: 'Recurring', module: 'recurring_invoices', group: 'Sales & clients' },
   { to: '/licenses', label: 'Licenses', module: 'licenses', group: 'Operations' },
   { to: '/finance', label: 'Finance', module: 'financials', alsoModule: 'expenses', group: 'Finance' },
-  { to: '/activity', label: 'Activity', module: 'activity', group: 'Operations' },
   { to: '/error-log', label: 'Error log', module: 'settings', group: 'Admin', adminOnly: true },
   { to: '/users', label: 'Users', module: 'users', group: 'Admin' },
   { to: '/email-center', label: 'Email center', module: 'email_center', group: 'Admin' },

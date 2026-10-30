@@ -3,7 +3,6 @@ const { round2: roundCents, dateError } = require('../lib/validate');
 const db = require('../db');
 const { businessYear } = require('../lib/businessDate');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
 const { toXlsxBuffer } = require('../lib/xlsx');
 
@@ -247,7 +246,6 @@ router.post('/', manage, (req, res) => {
     .run(category, description.trim(), roundCents(amount), expense_date, payee.trim(), notes);
 
   const expense = db.prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'created', entityType: 'expense', entityId: expense.id, entityLabel: expense.description });
   res.status(201).json({ expense });
 });
 
@@ -273,7 +271,6 @@ router.put('/:id', manage, (req, res) => {
   );
 
   const expense = db.prepare('SELECT * FROM expenses WHERE id = ?').get(req.params.id);
-  logActivity({ userName: req.user.name, action: 'updated', entityType: 'expense', entityId: expense.id, entityLabel: expense.description });
   res.json({ expense });
 });
 
@@ -282,7 +279,6 @@ router.delete('/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Expense not found' });
 
   db.prepare('DELETE FROM expenses WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'expense', entityId: existing.id, entityLabel: existing.description });
   res.status(204).end();
 });
 

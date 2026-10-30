@@ -10,7 +10,6 @@ const { nextQuoteNumber, nextInvoiceNumber } = require('../lib/numbering');
 const { renderQuotePdf } = require('../lib/pdf');
 const { sendMail, textToHtml } = require('../lib/mailer');
 const { quoteSendEmail } = require('../lib/emailTemplates');
-const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
 const { toXlsxBuffer } = require('../lib/xlsx');
@@ -182,7 +181,9 @@ router.get('/analytics', view, (req, res) => {
     const quotes = db
       .prepare('SELECT id, client_id, status, issue_date, total, client_responded_at, updated_at FROM quotes')
       .all();
-    const convertedEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'quote' AND action = 'converted to invoice'").all();
+    const convertedEvents = db
+      .prepare('SELECT i.created_at AS created_at FROM quotes q JOIN invoices i ON i.id = q.converted_invoice_id')
+      .all();
 
     const decidedAt = (q) => q.client_responded_at || q.updated_at;
     const currentYear = businessYear();
@@ -307,7 +308,6 @@ router.post('/', manage, (req, res) => {
     );
 
   saveItems(result.lastInsertRowid, totals.items);
-  logActivity({ userName: req.user.name, action: 'created', entityType: 'quote', entityId: result.lastInsertRowid, entityLabel: number });
 
   res.status(201).json(getQuoteWithItems(result.lastInsertRowid));
 });
@@ -378,7 +378,6 @@ router.put('/:id', manage, (req, res) => {
   );
 
   saveItems(req.params.id, totals.items);
-  logActivity({ userName: req.user.name, action: 'updated', entityType: 'quote', entityId: Number(req.params.id), entityLabel: existing.number });
 
   res.json(getQuoteWithItems(req.params.id));
 });
@@ -415,7 +414,6 @@ router.post('/:id/void', manage, (req, res) => {
   }
 
   db.prepare(`UPDATE quotes SET status = 'void', void_reason = ?, updated_at = datetime('now') WHERE id = ?`).run(reason, req.params.id);
-  logActivity({ userName: req.user.name, action: 'voided', entityType: 'quote', entityId: existing.id, entityLabel: `${existing.number} — ${reason}` });
   res.json(getQuoteWithItems(req.params.id));
 });
 
@@ -498,7 +496,6 @@ router.post('/:id/send', manage, async (req, res) => {
   if (data.quote.status === 'draft') {
     db.prepare(`UPDATE quotes SET status = 'sent', updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
   }
-  logActivity({ userName: req.user.name, action: 'sent', entityType: 'quote', entityId: data.quote.id, entityLabel: data.quote.number });
   logEmail({ type: 'quote_send', to: data.client.email, subject, sentByName: req.user.name, entityType: 'quote', entityId: data.quote.id, entityLabel: data.quote.number });
   res.json(getQuoteWithItems(req.params.id));
 });
@@ -565,7 +562,6 @@ router.post('/:id/convert-to-invoice', manage, requirePermission('invoices', 'ma
   });
   const { lastInsertRowid, number: invoiceNumber } = convert();
 
-  logActivity({ userName: req.user.name, action: 'converted to invoice', entityType: 'quote', entityId: data.quote.id, entityLabel: data.quote.number });
 
   res.status(201).json({ invoiceId: lastInsertRowid, invoiceNumber });
 });

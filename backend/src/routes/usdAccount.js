@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { todayStr } = require('../lib/businessDate');
 const { TYPES, replay, position, round2, applyValidated, negativeMessage } = require('../lib/usdLedger');
 
@@ -93,13 +92,6 @@ router.post('/', manage, (req, res) => {
         .lastInsertRowid,
   );
   if (error) return res.status(400).json({ error });
-  logActivity({
-    userName: req.user.name,
-    action: `recorded USD account entry (${TYPE_LABELS[parsed.type]}) for`,
-    entityType: 'usd_account',
-    entityId: result,
-    entityLabel: `$${parsed.usd_amount.toFixed(2)} on ${parsed.txn_date}`,
-  });
   res.status(201).json({ id: result });
 });
 
@@ -118,13 +110,6 @@ router.put('/:id', manage, (req, res) => {
       .run(parsed.txn_date, parsed.usd_amount, parsed.mvr_amount, parsed.payee, parsed.reference, parsed.notes, existing.id),
   );
   if (error) return res.status(400).json({ error });
-  logActivity({
-    userName: req.user.name,
-    action: `updated USD account entry (${TYPE_LABELS[existing.type]}) for`,
-    entityType: 'usd_account',
-    entityId: existing.id,
-    entityLabel: `$${parsed.usd_amount.toFixed(2)} on ${parsed.txn_date}`,
-  });
   res.json({ ok: true });
 });
 
@@ -135,13 +120,6 @@ router.delete('/:id', manage, (req, res) => {
   if (lockedBy) return res.status(409).json({ error: lockedMessage(lockedBy) });
   const { error } = applyValidated(() => db.prepare('DELETE FROM usd_transactions WHERE id = ?').run(existing.id));
   if (error) return res.status(409).json({ error: `Can't delete this entry. ${error}` });
-  logActivity({
-    userName: req.user.name,
-    action: `deleted USD account entry (${TYPE_LABELS[existing.type]}) for`,
-    entityType: 'usd_account',
-    entityId: existing.id,
-    entityLabel: `$${existing.usd_amount.toFixed(2)} on ${existing.txn_date}`,
-  });
   res.json({ ok: true });
 });
 

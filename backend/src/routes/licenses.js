@@ -5,7 +5,6 @@ const { requireAuth, requirePermission } = require('../middleware/auth');
 const { sendMail, textToHtml } = require('../lib/mailer');
 const { licenseRemindEmail } = require('../lib/emailTemplates');
 const { renderLicenseRenewalEmail } = require('../lib/licenseRenewalEmail');
-const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
 const { toXlsxBuffer } = require('../lib/xlsx');
@@ -251,11 +250,11 @@ router.get('/analytics', view, (req, res) => {
   try {
     const licenses = db.prepare('SELECT id, client_id, billing_cycle, amount, start_date FROM licenses').all();
     const renewals = db.prepare('SELECT license_id, renewed_at FROM license_renewals').all();
-    const billingChanges = db
-      .prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'changed billing cycle'")
-      .all();
-    const cancellations = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'cancelled'").all();
-    const reactivations = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'license' AND action = 'reactivated'").all();
+    // The activity log is gone, so these three history counts can no longer be
+    // derived; cancelled licenses are counted by their last update instead.
+    const billingChanges = [];
+    const cancellations = db.prepare("SELECT updated_at AS created_at FROM licenses WHERE status = 'cancelled'").all();
+    const reactivations = [];
 
     const amountByLicenseId = new Map(licenses.map((l) => [l.id, l.amount]));
     const currentYear = businessYear();
@@ -369,7 +368,6 @@ router.post('/', manage, (req, res) => {
     .run(client_id, name.trim(), billing_cycle, Number(amount), start_date, expiry_date, url.trim(), notes, req.user.name);
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(result.lastInsertRowid));
-  logActivity({ userName: req.user.name, action: 'created', entityType: 'license', entityId: license.id, entityLabel: `${license.name} (${client.name})` });
   res.status(201).json({ license });
 });
 
@@ -470,7 +468,6 @@ router.put('/:id', manage, (req, res) => {
   })();
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id));
-  logActivity({ userName: req.user.name, action: 'updated', entityType: 'license', entityId: license.id, entityLabel: `${license.name} (${client.name})` });
 
   // Distinct, structured entries on top of the generic 'updated' one above —
   // GET /analytics counts these by exact action string to report billing-
@@ -480,39 +477,11 @@ router.put('/:id', manage, (req, res) => {
   // correction already covers (and supersedes) whatever happened to
   // expiry_date in the same edit.
   if (startDateChanged) {
-    logActivity({
-      userName: req.user.name,
-      action: 'corrected start date',
-      entityType: 'license',
-      entityId: license.id,
-      entityLabel: `${license.name} (${client.name}): ${existing.start_date} → ${start_date}` + (historyRowsRecalculated > 0 ? ` (${historyRowsRecalculated} renewal record${historyRowsRecalculated === 1 ? '' : 's'} recalculated to match)` : ''),
-    });
   } else if (expiryChanged) {
-    logActivity({
-      userName: req.user.name,
-      action: 'corrected expiry date',
-      entityType: 'license',
-      entityId: license.id,
-      entityLabel: `${license.name} (${client.name}): ${existing.expiry_date} → ${expiry_date}`,
-    });
   }
   if (existing.billing_cycle !== billing_cycle) {
-    logActivity({
-      userName: req.user.name,
-      action: 'changed billing cycle',
-      entityType: 'license',
-      entityId: license.id,
-      entityLabel: `${license.name} (${client.name}): ${existing.billing_cycle} → ${billing_cycle}`,
-    });
   }
   if (existing.status !== nextStatus) {
-    logActivity({
-      userName: req.user.name,
-      action: nextStatus === 'cancelled' ? 'cancelled' : 'reactivated',
-      entityType: 'license',
-      entityId: license.id,
-      entityLabel: `${license.name} (${client.name})`,
-    });
   }
 
   res.json({ license });
@@ -523,7 +492,6 @@ router.delete('/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'License not found' });
 
   db.prepare('DELETE FROM licenses WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'license', entityId: existing.id, entityLabel: existing.name });
   res.status(204).end();
 });
 
@@ -556,7 +524,6 @@ router.post('/:id/renew', manage, (req, res) => {
   const nextExpiry = renewLicense(existing, req.user.name, amount);
 
   const license = withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id));
-  logActivity({ userName: req.user.name, action: 'renewed', entityType: 'license', entityId: license.id, entityLabel: `${existing.name} (${existing.client_name}) → ${nextExpiry}` });
   res.json({ license });
 });
 
@@ -604,7 +571,6 @@ router.post('/:id/remind', manage, async (req, res) => {
   }
 
   db.prepare(`UPDATE licenses SET last_reminder_sent_at = datetime('now') WHERE id = ?`).run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'sent renewal reminder for', entityType: 'license', entityId: row.id, entityLabel: `${row.name} (${client.name})` });
   logEmail({ type: 'license_remind', to: client.email, subject, sentByName: req.user.name, entityType: 'license', entityId: row.id, entityLabel: row.name });
   res.json({ license: withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id)) });
 });
@@ -657,7 +623,6 @@ router.post('/:id/renewal-confirm', manage, async (req, res) => {
   }
 
   db.prepare(`UPDATE licenses SET last_renewal_confirmation_sent_at = datetime('now') WHERE id = ?`).run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'sent renewal confirmation for', entityType: 'license', entityId: row.id, entityLabel: `${row.name} (${client.name})` });
   logEmail({ type: 'license_renewal_confirm', to, subject, sentByName: req.user.name, entityType: 'license', entityId: row.id, entityLabel: row.name });
   res.json({ license: withComputed(db.prepare('SELECT * FROM licenses WHERE id = ?').get(req.params.id)) });
 });

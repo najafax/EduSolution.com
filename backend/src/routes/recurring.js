@@ -2,7 +2,6 @@ const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { computeTotals } = require('../lib/totals');
-const { logActivity } = require('../lib/activity');
 
 const router = Router();
 router.use(requireAuth);
@@ -115,13 +114,6 @@ router.post('/', manage, (req, res) => {
     .run(client_id, frequency, notes, totals.discountType, totals.discountValue, totals.taxRate, Number(due_in_days), next_run_date);
 
   saveItems(result.lastInsertRowid, totals.items);
-  logActivity({
-    userName: req.user.name,
-    action: 'created',
-    entityType: 'recurring invoice',
-    entityId: result.lastInsertRowid,
-    entityLabel: `${client.name} (${frequency})`,
-  });
 
   res.status(201).json(getWithItems(result.lastInsertRowid));
 });
@@ -177,7 +169,6 @@ router.put('/:id', manage, (req, res) => {
   );
 
   saveItems(req.params.id, totals.items);
-  logActivity({ userName: req.user.name, action: 'updated', entityType: 'recurring invoice', entityId: Number(req.params.id), entityLabel: client.name });
 
   res.json(getWithItems(req.params.id));
 });
@@ -187,7 +178,6 @@ router.delete('/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Recurring invoice not found' });
 
   db.prepare('DELETE FROM recurring_invoices WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'recurring invoice', entityId: existing.id, entityLabel: '' });
   res.status(204).end();
 });
 

@@ -2,7 +2,6 @@ const { Router } = require('express');
 const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { normalizeEmails, primaryEmail } = require('../lib/emails');
 const { toCsv } = require('../lib/csv');
@@ -184,7 +183,6 @@ router.post('/', manage, (req, res) => {
     .prepare('INSERT INTO clients (name, email, phone, address, notes) VALUES (?, ?, ?, ?, ?)')
     .run(name.trim(), emails.value, phone, address, notes);
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'created', entityType: 'client', entityId: client.id, entityLabel: client.name });
   res.status(201).json({ client });
 });
 
@@ -284,7 +282,6 @@ router.post('/:id/portal-invite', manage, async (req, res) => {
     return res.status(status).json({ error: err.message });
   }
 
-  logActivity({ userName: req.user.name, action: 'invited to portal', entityType: 'client', entityId: client.id, entityLabel: client.name });
   logEmail({ type: 'portal_invite', to: account.email, subject, sentByName: req.user.name, entityType: 'client', entityId: client.id, entityLabel: client.name });
   res.json({ message: 'Invite sent.', portal_status: portalStatusOf(account) });
 });
@@ -306,7 +303,6 @@ router.put('/:id', manage, (req, res) => {
   ).run(name.trim(), emails.value, phone, address, notes, req.params.id);
 
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
-  logActivity({ userName: req.user.name, action: 'updated', entityType: 'client', entityId: client.id, entityLabel: client.name });
   res.json({ client });
 });
 
@@ -328,7 +324,6 @@ router.delete('/:id', manage, (req, res) => {
   }
 
   db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'client', entityId: existing.id, entityLabel: existing.name });
   res.status(204).end();
 });
 

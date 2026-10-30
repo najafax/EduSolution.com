@@ -9,7 +9,6 @@ const { sendMail, textToHtml, isEmailConfigured } = require('./mailer');
 const { renderDailyEarningsPdf } = require('./reportPdf');
 const { shareholderDailyEarningsEmail } = require('./emailTemplates');
 const { logEmail } = require('./emailLog');
-const { logActivity } = require('./activity');
 // computeSummary() is routes/financials.js's own GET /summary computation,
 // exported for exactly this kind of in-process reuse (routes/dashboard.js
 // already calls it the same way) — called with no from/to here so it
@@ -127,13 +126,6 @@ async function runDailyEarningsReport(dateStr = yesterday()) {
   }
 
   if (sent > 0) {
-    logActivity({
-      userName: 'Automated',
-      action: 'sent daily earnings report to',
-      entityType: 'shareholder',
-      entityId: null,
-      entityLabel: `${sent} shareholder(s) for ${date}`,
-    });
   }
 
   console.log(`[daily-earnings] Sent ${sent} daily earnings email(s) for ${date}`);

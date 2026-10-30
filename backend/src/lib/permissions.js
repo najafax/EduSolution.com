@@ -14,7 +14,6 @@ const MODULES = [
   'recurring_invoices',
   'licenses',
   'financials',
-  'activity',
   'settings',
   'users',
   'import',

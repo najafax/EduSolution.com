@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { runDailyEarningsReport } = require('../lib/dailyEarningsReport');
 
 // The recipient list behind the automated daily-earnings email (see
@@ -63,7 +62,6 @@ router.post('/', manage, (req, res) => {
     .prepare('INSERT INTO shareholders (name, email, active, ownership_percent) VALUES (?, ?, ?, ?)')
     .run(name.trim(), email.trim(), active ? 1 : 0, Number(ownership_percent) || 0);
   const shareholder = db.prepare('SELECT * FROM shareholders WHERE id = ?').get(info.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'added', entityType: 'shareholder', entityId: shareholder.id, entityLabel: shareholder.name });
   res.status(201).json({ shareholder });
 });
 
@@ -90,7 +88,6 @@ router.put('/:id', manage, (req, res) => {
     req.params.id,
   );
   const shareholder = db.prepare('SELECT * FROM shareholders WHERE id = ?').get(req.params.id);
-  logActivity({ userName: req.user.name, action: 'updated', entityType: 'shareholder', entityId: shareholder.id, entityLabel: shareholder.name });
   res.json({ shareholder });
 });
 
@@ -99,7 +96,6 @@ router.delete('/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Shareholder not found' });
 
   db.prepare('DELETE FROM shareholders WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'shareholder', entityId: existing.id, entityLabel: existing.name });
   res.json({ ok: true });
 });
 

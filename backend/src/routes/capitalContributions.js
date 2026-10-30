@@ -2,7 +2,6 @@ const { Router } = require('express');
 const { round2: roundCents, dateError } = require('../lib/validate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
 const { toXlsxBuffer } = require('../lib/xlsx');
 
@@ -148,13 +147,6 @@ router.post('/', manage, (req, res) => {
     .run(contributor_name.trim(), roundCents(amount), contribution_date, notes, req.user.name);
 
   const contribution = db.prepare('SELECT * FROM capital_contributions WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({
-    userName: req.user.name,
-    action: 'recorded capital contribution from',
-    entityType: 'capital_contribution',
-    entityId: contribution.id,
-    entityLabel: `${contribution.contributor_name} (${contribution.amount})`,
-  });
   res.status(201).json({ contribution });
 });
 
@@ -171,13 +163,6 @@ router.put('/:id', manage, (req, res) => {
   ).run(contributor_name.trim(), roundCents(amount), contribution_date, notes, req.params.id);
 
   const contribution = db.prepare('SELECT * FROM capital_contributions WHERE id = ?').get(req.params.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'updated capital contribution from',
-    entityType: 'capital_contribution',
-    entityId: contribution.id,
-    entityLabel: `${contribution.contributor_name} (${contribution.amount})`,
-  });
   res.json({ contribution });
 });
 
@@ -186,13 +171,6 @@ router.delete('/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Capital contribution not found' });
 
   db.prepare('DELETE FROM capital_contributions WHERE id = ?').run(req.params.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'deleted capital contribution from',
-    entityType: 'capital_contribution',
-    entityId: existing.id,
-    entityLabel: `${existing.contributor_name} (${existing.amount})`,
-  });
   res.status(204).end();
 });
 

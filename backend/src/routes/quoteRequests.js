@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 
 // Gated on the existing `quotes` permission rather than a new MODULES
 // entry — a quote request is a precursor to a real quote at the exact same
@@ -101,13 +100,6 @@ router.post('/:id/decline', manage, (req, res) => {
   ).run(note, req.user.name, request.id);
 
   const client = db.prepare('SELECT name FROM clients WHERE id = ?').get(request.client_id);
-  logActivity({
-    userName: req.user.name,
-    action: 'declined a quote request from',
-    entityType: 'quote_request',
-    entityId: request.id,
-    entityLabel: client.name,
-  });
 
   res.json({ request: getRequestWithClient(request.id) });
 });
@@ -137,13 +129,6 @@ router.post('/:id/link-quote', manage, (req, res) => {
   ).run(quote.id, req.user.name, request.id);
 
   const client = db.prepare('SELECT name FROM clients WHERE id = ?').get(request.client_id);
-  logActivity({
-    userName: req.user.name,
-    action: 'approved a quote request from',
-    entityType: 'quote_request',
-    entityId: request.id,
-    entityLabel: `${client.name} → ${quote.number}`,
-  });
 
   res.json({ request: getRequestWithClient(request.id) });
 });

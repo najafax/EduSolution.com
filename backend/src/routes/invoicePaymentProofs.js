@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 
 // Staff-side handling of client-uploaded payment proofs. Mounted by
 // routes/invoices.js at /:id/payment-proofs, so it inherits that router's
@@ -65,13 +64,6 @@ router.post('/:proofId/reject', manage, (req, res) => {
   db.prepare(
     `UPDATE payment_proofs SET status = 'rejected', review_note = ?, reviewed_by_name = ?, reviewed_at = datetime('now') WHERE id = ?`,
   ).run(note, req.user.name, proof.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'rejected a payment proof for',
-    entityType: 'invoice',
-    entityId: Number(req.params.id),
-    entityLabel: invoice.number,
-  });
   res.json({ message: 'Payment proof rejected.' });
 });
 
@@ -81,13 +73,6 @@ router.delete('/:proofId', manage, (req, res) => {
   const proof = db.prepare('SELECT * FROM payment_proofs WHERE id = ? AND invoice_id = ?').get(req.params.proofId, req.params.id);
   if (!proof) return res.status(404).json({ error: 'Payment proof not found' });
   db.prepare('DELETE FROM payment_proofs WHERE id = ?').run(proof.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'deleted a payment proof for',
-    entityType: 'invoice',
-    entityId: Number(req.params.id),
-    entityLabel: invoice.number,
-  });
   res.status(204).end();
 });
 

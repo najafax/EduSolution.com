@@ -3,7 +3,6 @@ const db = require('../db');
 const { computeTotals } = require('./totals');
 const { nextInvoiceNumber } = require('./numbering');
 const { stampItemCosts } = require('./costSnapshot');
-const { logActivity } = require('./activity');
 const { todayStr, addDays } = require('./businessDate');
 
 // A license that lapsed longer ago than this without being invoiced is assumed
@@ -104,13 +103,6 @@ function generateLicenseRenewalInvoices({ userName = 'Automated' } = {}) {
         return { invoiceId, number };
       });
       const { invoiceId, number } = make();
-      logActivity({
-        userName,
-        action: 'drafted a renewal invoice for',
-        entityType: 'license',
-        entityId: license.id,
-        entityLabel: `${license.name} (${license.client_name}) — ${number}`,
-      });
       created.push({ license_id: license.id, name: license.name, client: license.client_name, invoice_id: invoiceId, number });
     } catch (err) {
       console.error(`[license-invoices] Failed for license #${license.id}:`, err.message);

@@ -15,7 +15,6 @@ const {
 const { sendMail } = require('../lib/mailer');
 const { renderQuotePdf, renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
 const { clientForClient, invoiceForClient, quoteForClient } = require('../lib/clientView');
-const { logActivity } = require('../lib/activity');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
 const { notifyStaffOfPaymentProof } = require('../lib/paymentProofNotify');
 
@@ -345,13 +344,6 @@ router.post('/quotes/:id/respond', requireClientAuth, (req, res) => {
      WHERE id = ?`,
   ).run(response, response, data.quote.id);
 
-  logActivity({
-    userName: data.client.name,
-    action: `${response} (client)`,
-    entityType: 'quote',
-    entityId: data.quote.id,
-    entityLabel: data.quote.number,
-  });
 
   if (response === 'accepted') {
     const updated = getClientQuote(req.clientAccount.client_id, req.params.id).quote;
@@ -452,13 +444,6 @@ router.post('/invoices/:id/payment-proof', requireClientAuth, (req, res) => {
     .prepare('INSERT INTO payment_proofs (invoice_id, file_data, file_name, file_type, note) VALUES (?, ?, ?, ?, ?)')
     .run(invoice.id, fileData, String(fileName).slice(0, 255), fileType, (note || '').trim().slice(0, 1000));
 
-  logActivity({
-    userName: req.clientAccount.client_name,
-    action: 'uploaded a payment proof for (client)',
-    entityType: 'invoice',
-    entityId: invoice.id,
-    entityLabel: invoice.number,
-  });
 
   // Never awaited — a slow or failed staff notification should never delay
   // or break the client's own upload response, same reasoning
@@ -626,13 +611,6 @@ router.post('/quote-requests', requireClientAuth, (req, res) => {
     return db.prepare('SELECT * FROM quote_requests WHERE id = ?').get(result.lastInsertRowid);
   })();
 
-  logActivity({
-    userName: req.clientAccount.client_name,
-    action: 'requested a quote (client)',
-    entityType: 'quote_request',
-    entityId: request.id,
-    entityLabel: req.clientAccount.client_name,
-  });
   res.status(201).json({ request: { ...request, items: getRequestItems(request.id) } });
 });
 

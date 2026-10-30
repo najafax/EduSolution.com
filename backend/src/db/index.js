@@ -299,16 +299,6 @@ db.exec(`
     sort_order INTEGER NOT NULL DEFAULT 0
   );
 
-  CREATE TABLE IF NOT EXISTS activity_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_name TEXT NOT NULL,
-    action TEXT NOT NULL,
-    entity_type TEXT NOT NULL,
-    entity_id INTEGER,
-    entity_label TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
   CREATE TABLE IF NOT EXISTS email_templates (
     type TEXT PRIMARY KEY,
     subject TEXT NOT NULL,
@@ -621,7 +611,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON quote_items(quote_id);
   CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id);
   CREATE INDEX IF NOT EXISTS idx_recurring_items ON recurring_invoice_items(recurring_invoice_id);
-  CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at);
   CREATE INDEX IF NOT EXISTS idx_email_log_created ON email_log(created_at);
   CREATE INDEX IF NOT EXISTS idx_licenses_client ON licenses(client_id);
   CREATE INDEX IF NOT EXISTS idx_licenses_expiry ON licenses(expiry_date);
@@ -716,7 +705,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_owner_draws_date ON owner_draws(draw_date);
   CREATE INDEX IF NOT EXISTS idx_license_renewals_license ON license_renewals(license_id);
   CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status);
-  CREATE INDEX IF NOT EXISTS idx_activity_entity ON activity_log(entity_type, action);
 `);
 
 // Lightweight migration for columns added to `users` after this table
@@ -1391,5 +1379,8 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_error_log_seen ON error_log(last_seen_at);
 `);
+
+// The activity log was removed; drop its table (and indexes) from older databases.
+db.exec('DROP TABLE IF EXISTS activity_log');
 
 module.exports = db;

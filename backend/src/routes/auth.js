@@ -6,7 +6,6 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { loginLimiter, mfaLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rateLimit');
 const totp = require('../lib/totp');
-const { logActivity } = require('../lib/activity');
 const { sendMail } = require('../lib/mailer');
 const { effectivePermissions } = require('../lib/permissions');
 const { createSession, revokeOtherSessions } = require('../lib/sessions');
@@ -159,7 +158,6 @@ router.post('/login/mfa', mfaLimiter, (req, res) => {
   const used = checkSecondFactor(user, code);
   if (!used) return res.status(401).json({ error: 'That code is not valid. Check the code and try again.' });
   if (used === 'recovery') {
-    logActivity({ userName: user.name, action: 'signed in with a recovery code', entityType: 'user', entityId: user.id, entityLabel: user.email });
   }
   res.json(startSession(user, req));
 });
@@ -188,7 +186,6 @@ router.post('/2fa/enable', requireAuth, (req, res) => {
     JSON.stringify(hashes),
     user.id,
   );
-  logActivity({ userName: user.name, action: 'turned on two-step verification', entityType: 'user', entityId: user.id, entityLabel: user.email });
   res.json({ recoveryCodes: codes });
 });
 
@@ -220,7 +217,6 @@ router.post('/2fa/disable', requireAuth, mfaLimiter, async (req, res) => {
   const user = await requirePasswordAndCode(req, res);
   if (!user) return;
   db.prepare(`UPDATE users SET totp_enabled = 0, totp_secret = '', totp_last_step = 0, totp_recovery = '[]' WHERE id = ?`).run(user.id);
-  logActivity({ userName: user.name, action: 'turned off two-step verification', entityType: 'user', entityId: user.id, entityLabel: user.email });
   res.json({ message: 'Two-step verification is off.' });
 });
 

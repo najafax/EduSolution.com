@@ -2,7 +2,6 @@ const { Router } = require('express');
 const { round2: roundCents, dateError } = require('../lib/validate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { toCsv } = require('../lib/csv');
 const { toXlsxBuffer } = require('../lib/xlsx');
 const { renderOwnerStatementPdf } = require('../lib/reportPdf');
@@ -245,13 +244,6 @@ router.post('/:id/returns', manage, (req, res) => {
     )
     .run('return', draw.id, draw.taken_by_name, amountNum, draw_date, notes, req.user.name);
 
-  logActivity({
-    userName: req.user.name,
-    action: 'recorded a return against',
-    entityType: 'owner_draw',
-    entityId: draw.id,
-    entityLabel: `${draw.taken_by_name} (${amountNum.toFixed(2)} against a draw of ${draw.amount.toFixed(2)})`,
-  });
 
   const updatedDraw = withComputedDraw(db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(draw.id));
   const returns = db
@@ -364,13 +356,6 @@ router.post('/', manage, (req, res) => {
     .run(type, taken_by_name.trim(), roundCents(amount), draw_date, notes, req.user.name);
 
   const draw = withComputedDraw(db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(result.lastInsertRowid));
-  logActivity({
-    userName: req.user.name,
-    action: type === 'return' ? 'recorded a return from' : 'recorded a draw for',
-    entityType: 'owner_draw',
-    entityId: draw.id,
-    entityLabel: `${draw.taken_by_name} (${draw.amount})`,
-  });
   res.status(201).json({ draw });
 });
 
@@ -447,13 +432,6 @@ router.put('/:id', manage, (req, res) => {
   ).run(type, taken_by_name.trim(), amountNum, draw_date, notes, req.params.id);
 
   const draw = withComputedDraw(db.prepare('SELECT * FROM owner_draws WHERE id = ?').get(req.params.id));
-  logActivity({
-    userName: req.user.name,
-    action: type === 'return' ? 'updated a return from' : 'updated a draw for',
-    entityType: 'owner_draw',
-    entityId: draw.id,
-    entityLabel: `${draw.taken_by_name} (${draw.amount})`,
-  });
   res.json({ draw });
 });
 
@@ -482,13 +460,6 @@ router.delete('/:id', manage, (req, res) => {
   }
 
   db.prepare('DELETE FROM owner_draws WHERE id = ?').run(req.params.id);
-  logActivity({
-    userName: req.user.name,
-    action: existing.type === 'return' ? 'deleted a return from' : 'deleted a draw for',
-    entityType: 'owner_draw',
-    entityId: existing.id,
-    entityLabel: `${existing.taken_by_name} (${existing.amount})`,
-  });
   res.status(204).end();
 });
 

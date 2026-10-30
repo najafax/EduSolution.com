@@ -3,7 +3,6 @@ const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { CLIENT_ITEM_COLUMNS } = require('../lib/costSnapshot');
 const { renderQuotePdf, renderInvoicePdf } = require('../lib/pdf');
-const { logActivity } = require('../lib/activity');
 const { publicRespondLimiter } = require('../middleware/rateLimit');
 const { clientForClient, invoiceForClient, quoteForClient } = require('../lib/clientView');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
@@ -95,13 +94,6 @@ router.post('/quotes/:token/respond', publicRespondLimiter, (req, res) => {
      WHERE id = ?`,
   ).run(response, response, data.quote.id);
 
-  logActivity({
-    userName: data.client.name,
-    action: `${response} (client)`,
-    entityType: 'quote',
-    entityId: data.quote.id,
-    entityLabel: data.quote.number,
-  });
 
   if (response === 'accepted') {
     const updated = getQuoteByToken(req.params.token).quote;

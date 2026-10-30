@@ -99,7 +99,6 @@ const RESET_CATEGORIES = [
   { key: 'expenses', label: 'Expenses' },
   { key: 'capital_contributions', label: 'Capital contributions' },
   { key: 'products', label: 'Product catalog' },
-  { key: 'activity', label: 'Activity log' },
   { key: 'campaigns', label: 'Campaigns' },
   { key: 'quote_requests', label: 'Quote requests' },
 ];

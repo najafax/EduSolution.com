@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { createDraft, listOptions } = require('../lib/facebookPostDraft');
 const facebook = require('../lib/facebook');
 
@@ -69,13 +68,6 @@ router.post('/generate', manage, async (req, res) => {
     return res.status(500).json({ error: 'Failed to generate a draft — please try again.' });
   }
 
-  logActivity({
-    userName: req.user.name,
-    action: 'generated a Facebook post draft',
-    entityType: 'facebook_post',
-    entityId: post.id,
-    entityLabel: post.content.slice(0, 60),
-  });
   res.status(201).json({ post: shapePost(post) });
 });
 
@@ -117,13 +109,6 @@ router.put('/:id', manage, (req, res) => {
   );
 
   const post = db.prepare('SELECT * FROM facebook_posts WHERE id = ?').get(req.params.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'edited Facebook post draft',
-    entityType: 'facebook_post',
-    entityId: post.id,
-    entityLabel: post.content.slice(0, 60),
-  });
   res.json({ post: shapePost(post) });
 });
 
@@ -156,13 +141,6 @@ router.post('/:id/publish', manage, async (req, res) => {
   ).run(fbPostId, req.params.id);
 
   const post = db.prepare('SELECT * FROM facebook_posts WHERE id = ?').get(req.params.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'published a Facebook post',
-    entityType: 'facebook_post',
-    entityId: post.id,
-    entityLabel: post.content.slice(0, 60),
-  });
   res.json({ post: shapePost(post) });
 });
 
@@ -178,13 +156,6 @@ router.delete('/:id', manage, (req, res) => {
   }
 
   db.prepare('DELETE FROM facebook_posts WHERE id = ?').run(req.params.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'discarded Facebook post draft',
-    entityType: 'facebook_post',
-    entityId: existing.id,
-    entityLabel: existing.content.slice(0, 60),
-  });
   res.status(204).end();
 });
 

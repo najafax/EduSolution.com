@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { sendMail, textToHtml } = require('../lib/mailer');
 const { renderTemplate } = require('../lib/emailTemplates');
@@ -147,13 +146,6 @@ router.post('/', manage, async (req, res) => {
     insertAll(failures);
   }
 
-  logActivity({
-    userName: req.user.name,
-    action: 'sent campaign',
-    entityType: 'campaign',
-    entityId: campaign.lastInsertRowid,
-    entityLabel: `"${subject.trim()}" to ${sentCount} of ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}`,
-  });
 
   res.status(201).json({
     campaign: db.prepare('SELECT * FROM campaigns WHERE id = ?').get(campaign.lastInsertRowid),

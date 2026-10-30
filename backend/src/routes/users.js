@@ -3,7 +3,6 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { MODULES, SENSITIVE_MODULES, isAdminRole, getPermissions, setPermissions } = require('../lib/permissions');
-const { logActivity } = require('../lib/activity');
 const { notifyOfAdminTierChange } = require('../lib/adminChangeNotify');
 
 const router = Router();
@@ -140,7 +139,6 @@ router.post('/', manage, async (req, res) => {
   if (permissions) setPermissions(result.lastInsertRowid, permissions);
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'created', entityType: 'user', entityId: user.id, entityLabel: `${user.name} (${role})` });
   // Distinct, separately-searchable audit entry whenever the newly created
   // account starts out admin-tier — the generic 'created' entry above
   // already covers every account, but "a brand-new admin/super_admin
@@ -152,13 +150,6 @@ router.post('/', manage, async (req, res) => {
   // account's own creator (see notifyOfAdminTierChange's own recipient
   // filter).
   if (isAdminRole(role)) {
-    logActivity({
-      userName: req.user.name,
-      action: 'created admin-tier account',
-      entityType: 'user',
-      entityId: user.id,
-      entityLabel: `${user.name} (${role})`,
-    });
     notifyOfAdminTierChange({ user, actorId: req.user.id, actorName: req.user.name, wasNew: true }).catch((err) =>
       console.error('[admin-change] notify failed:', err.message),
     );
@@ -206,7 +197,6 @@ router.put('/:id', manage, (req, res) => {
   if (permissions) setPermissions(existing.id, permissions);
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(existing.id);
-  logActivity({ userName: req.user.name, action: 'updated', entityType: 'user', entityId: user.id, entityLabel: user.name });
 
   // Structured admin-tier change tracking, on top of the generic 'updated'
   // entry above — same convention routes/licenses.js's PUT /:id already
@@ -222,41 +212,13 @@ router.put('/:id', manage, (req, res) => {
   const leftAdminTier = isAdminRole(existing.role) && !isAdminRole(nextRole);
   const changedAdminTier = isAdminRole(existing.role) && isAdminRole(nextRole) && existing.role !== nextRole;
   if (becameAdminTier) {
-    logActivity({
-      userName: req.user.name,
-      action: 'promoted to admin-tier account',
-      entityType: 'user',
-      entityId: user.id,
-      entityLabel: `${user.name} (${nextRole})`,
-    });
     notifyOfAdminTierChange({ user, actorId: req.user.id, actorName: req.user.name, wasNew: false }).catch((err) =>
       console.error('[admin-change] notify failed:', err.message),
     );
   } else if (leftAdminTier) {
-    logActivity({
-      userName: req.user.name,
-      action: 'demoted from admin-tier account',
-      entityType: 'user',
-      entityId: user.id,
-      entityLabel: `${user.name} (was ${existing.role})`,
-    });
   } else if (changedAdminTier) {
-    logActivity({
-      userName: req.user.name,
-      action: nextRole === 'super_admin' ? 'promoted to super admin' : 'demoted to admin',
-      entityType: 'user',
-      entityId: user.id,
-      entityLabel: user.name,
-    });
   }
   if (nextRole === 'admin' && Boolean(existing.restricted) !== nextRestricted) {
-    logActivity({
-      userName: req.user.name,
-      action: nextRestricted ? 'restricted admin account' : 'removed restriction from admin account',
-      entityType: 'user',
-      entityId: user.id,
-      entityLabel: user.name,
-    });
   }
 
   res.json({ user: publicUser(user), permissions: getPermissions(user.id) });
@@ -277,15 +239,7 @@ router.post('/:id/reset-password', manage, async (req, res) => {
     `UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL, password_changed_at = datetime('now') WHERE id = ?`,
   ).run(passwordHash, existing.id);
 
-  logActivity({ userName: req.user.name, action: 'reset password for', entityType: 'user', entityId: existing.id, entityLabel: existing.name });
   if (isAdminRole(existing.role)) {
-    logActivity({
-      userName: req.user.name,
-      action: 'reset password for admin-tier account',
-      entityType: 'user',
-      entityId: existing.id,
-      entityLabel: `${existing.name} (${existing.role})`,
-    });
   }
   res.status(204).end();
 });
@@ -302,7 +256,6 @@ router.post('/:id/reset-2fa', manage, (req, res) => {
 
   db.prepare(`UPDATE users SET totp_enabled = 0, totp_secret = '', totp_last_step = 0, totp_recovery = '[]' WHERE id = ?`).run(existing.id);
   db.prepare(`UPDATE sessions SET revoked_at = datetime('now') WHERE user_id = ? AND revoked_at IS NULL`).run(existing.id);
-  logActivity({ userName: req.user.name, action: 'reset two-step verification for', entityType: 'user', entityId: existing.id, entityLabel: existing.name });
   res.status(204).end();
 });
 
@@ -322,15 +275,7 @@ router.delete('/:id', manage, (req, res) => {
   }
 
   db.prepare('DELETE FROM users WHERE id = ?').run(existing.id);
-  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'user', entityId: existing.id, entityLabel: existing.name });
   if (isAdminRole(existing.role)) {
-    logActivity({
-      userName: req.user.name,
-      action: 'deleted admin-tier account',
-      entityType: 'user',
-      entityId: existing.id,
-      entityLabel: `${existing.name} (${existing.role})`,
-    });
   }
   res.status(204).end();
 });

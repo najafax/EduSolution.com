@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 
 const router = Router();
 router.use(requireAuth);
@@ -60,7 +59,6 @@ router.post('/', manage, (req, res) => {
     )
     .run(name.trim(), description, priceNum, taxNum, costNum, visible_in_portal ? 1 : 0);
   const product = db.prepare('SELECT * FROM products WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'created', entityType: 'product', entityId: product.id, entityLabel: product.name });
   res.status(201).json({ product });
 });
 
@@ -86,7 +84,6 @@ router.put('/:id', manage, (req, res) => {
   ).run(name.trim(), description, priceNum, taxNum, costNum, visible_in_portal ? 1 : 0, req.params.id);
 
   const product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
-  logActivity({ userName: req.user.name, action: 'updated', entityType: 'product', entityId: product.id, entityLabel: product.name });
   res.json({ product });
 });
 
@@ -95,7 +92,6 @@ router.delete('/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Product not found' });
 
   db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'product', entityId: existing.id, entityLabel: existing.name });
   res.status(204).end();
 });
 

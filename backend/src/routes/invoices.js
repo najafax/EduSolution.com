@@ -10,7 +10,6 @@ const { nextInvoiceNumber, nextReceiptNumber } = require('../lib/numbering');
 const { renderInvoicePdf, renderReceiptPdf } = require('../lib/pdf');
 const { sendMail, textToHtml } = require('../lib/mailer');
 const { invoiceSendEmail, invoiceRemindEmail, receiptSendEmail } = require('../lib/emailTemplates');
-const { logActivity } = require('../lib/activity');
 const { logEmail } = require('../lib/emailLog');
 const { toCsv } = require('../lib/csv');
 const { toXlsxBuffer } = require('../lib/xlsx');
@@ -245,7 +244,7 @@ router.get('/analytics', view, (req, res) => {
   try {
     const invoices = db.prepare('SELECT id, client_id, status, issue_date, total, amount_paid FROM invoices').all();
     const payments = db.prepare('SELECT invoice_id, amount, paid_at FROM payments').all();
-    const voidEvents = db.prepare("SELECT created_at FROM activity_log WHERE entity_type = 'invoice' AND action = 'voided'").all();
+    const voidEvents = db.prepare("SELECT updated_at AS created_at FROM invoices WHERE status = 'void'").all();
 
     const currentYear = businessYear();
     // See routes/expenses.js's own GET /analytics for why this can't be a
@@ -368,7 +367,6 @@ router.post('/', manage, (req, res) => {
     );
 
   saveItems(result.lastInsertRowid, totals.items);
-  logActivity({ userName: req.user.name, action: 'created', entityType: 'invoice', entityId: result.lastInsertRowid, entityLabel: number });
 
   res.status(201).json(getInvoiceWithItems(result.lastInsertRowid));
 });
@@ -446,7 +444,6 @@ router.put('/:id', manage, (req, res) => {
   );
 
   saveItems(req.params.id, totals.items);
-  logActivity({ userName: req.user.name, action: 'updated', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: existing.number });
 
   res.json(getInvoiceWithItems(req.params.id));
 });
@@ -496,7 +493,6 @@ router.post('/:id/void', manage, (req, res) => {
   db.prepare(
     `UPDATE invoices SET status = 'void', void_reason = ?, void_previous_status = ?, updated_at = datetime('now') WHERE id = ?`,
   ).run(reason, existing.status, req.params.id);
-  logActivity({ userName: req.user.name, action: 'voided', entityType: 'invoice', entityId: existing.id, entityLabel: `${existing.number} — ${reason}` });
   res.json(getInvoiceWithItems(req.params.id));
 });
 
@@ -528,13 +524,6 @@ router.post('/:id/recover', manage, (req, res) => {
   db.prepare(
     `UPDATE invoices SET status = ?, void_reason = '', void_previous_status = NULL, updated_at = datetime('now') WHERE id = ?`,
   ).run(restoredStatus, req.params.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'recovered',
-    entityType: 'invoice',
-    entityId: existing.id,
-    entityLabel: existing.void_reason ? `${existing.number} — was void: ${existing.void_reason}` : existing.number,
-  });
   res.json(getInvoiceWithItems(req.params.id));
 });
 
@@ -567,13 +556,6 @@ router.post('/:id/reminder-hold', manage, (req, res) => {
 
   db.prepare(`UPDATE invoices SET reminder_hold_until = ?, reminder_hold_note = ?, updated_at = datetime('now') WHERE id = ?`)
     .run(holdUntil, note, req.params.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'held reminders for',
-    entityType: 'invoice',
-    entityId: existing.id,
-    entityLabel: note ? `${existing.number} until ${holdUntil} — ${note}` : `${existing.number} until ${holdUntil}`,
-  });
   res.json(getInvoiceWithItems(req.params.id));
 });
 
@@ -586,7 +568,6 @@ router.delete('/:id/reminder-hold', manage, (req, res) => {
 
   db.prepare(`UPDATE invoices SET reminder_hold_until = NULL, reminder_hold_note = '', updated_at = datetime('now') WHERE id = ?`)
     .run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'cleared reminder hold for', entityType: 'invoice', entityId: existing.id, entityLabel: existing.number });
   res.json(getInvoiceWithItems(req.params.id));
 });
 
@@ -659,7 +640,6 @@ router.post('/:id/send', manage, async (req, res) => {
   if (data.invoice.status === 'draft') {
     db.prepare(`UPDATE invoices SET status = 'sent', updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
   }
-  logActivity({ userName: req.user.name, action: 'sent', entityType: 'invoice', entityId: data.invoice.id, entityLabel: data.invoice.number });
   logEmail({ type: 'invoice_send', to: data.client.email, subject, sentByName: req.user.name, entityType: 'invoice', entityId: data.invoice.id, entityLabel: data.invoice.number });
   res.json(getInvoiceWithItems(req.params.id));
 });
@@ -699,7 +679,6 @@ router.post('/:id/remind', manage, async (req, res) => {
   }
 
   db.prepare(`UPDATE invoices SET last_reminder_sent_at = datetime('now') WHERE id = ?`).run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'sent reminder for', entityType: 'invoice', entityId: data.invoice.id, entityLabel: data.invoice.number });
   logEmail({ type: 'invoice_remind', to: data.client.email, subject, sentByName: req.user.name, entityType: 'invoice', entityId: data.invoice.id, entityLabel: data.invoice.number });
   res.json(getInvoiceWithItems(req.params.id));
 });
@@ -748,7 +727,6 @@ router.post('/:id/payments', manage, (req, res) => {
     );
 
     const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(result.lastInsertRowid);
-    logActivity({ userName: req.user.name, action: 'recorded payment for', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: `${data.invoice.number} (${receiptNumber})` });
 
   // Auto-renew any of this client's active *or cancelled* licenses that
   // this invoice was actually billing for — matched by a line item
@@ -801,22 +779,8 @@ router.post('/:id/payments', manage, (req, res) => {
         const wasCancelled = license.status === 'cancelled';
         if (wasCancelled) {
           db.prepare(`UPDATE licenses SET status = 'active', updated_at = datetime('now') WHERE id = ?`).run(license.id);
-          logActivity({
-            userName: req.user.name,
-            action: 'reactivated',
-            entityType: 'license',
-            entityId: license.id,
-            entityLabel: `${license.name} (${data.client.name}) — via invoice payment`,
-          });
         }
         const nextExpiry = renewLicense(license, req.user.name, amountByDescription.get(key));
-        logActivity({
-          userName: req.user.name,
-          action: 'auto-renewed via invoice payment for',
-          entityType: 'license',
-          entityId: license.id,
-          entityLabel: `${license.name} (${data.client.name}) → ${nextExpiry}`,
-        });
         autoRenewedLicenses.push({ id: license.id, name: license.name, expiry_date: nextExpiry, reactivated: wasCancelled });
       }
     }
@@ -856,7 +820,6 @@ router.post('/:id/payments/:paymentId/reverse', manage, (req, res) => {
     const newAmountPaid = Math.max(roundCents(data.invoice.amount_paid - original.amount), 0);
     const newStatus = data.invoice.status === 'paid' && newAmountPaid < data.invoice.total ? 'sent' : data.invoice.status;
     db.prepare(`UPDATE invoices SET amount_paid = ?, status = ?, updated_at = datetime('now') WHERE id = ?`).run(newAmountPaid, newStatus, original.invoice_id);
-    logActivity({ userName: req.user.name, action: 'reversed payment for', entityType: 'invoice', entityId: Number(req.params.id), entityLabel: `${data.invoice.number} (${original.receipt_number}) — ${reason}` });
   });
   reverse();
   res.json(getInvoiceWithItems(req.params.id));

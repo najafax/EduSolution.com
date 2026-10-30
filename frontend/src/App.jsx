@@ -47,7 +47,6 @@ const RecurringInvoices = lazy(() => import('./pages/business/RecurringInvoices'
 const Licenses = lazy(() => import('./pages/business/Licenses'));
 const LicenseAnalytics = lazy(() => import('./pages/business/LicenseAnalytics'));
 const ErrorLog = lazy(() => import('./pages/business/ErrorLog'));
-const ActivityLog = lazy(() => import('./pages/business/ActivityLog'));
 const Import = lazy(() => import('./pages/business/Import'));
 const Users = lazy(() => import('./pages/Users'));
 const MyAccount = lazy(() => import('./pages/MyAccount'));
@@ -221,7 +220,6 @@ export default function App() {
                 <Route path="/licenses" element={<Protected><Licenses /></Protected>} />
                 <Route path="/licenses/analytics" element={<Protected><LicenseAnalytics /></Protected>} />
                 <Route path="/error-log" element={<Protected><ErrorLog /></Protected>} />
-                <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
                 <Route path="/users" element={<Protected><Users /></Protected>} />
                 <Route path="/email-center" element={<Protected><EmailCenter /></Protected>} />
                 <Route path="/website-content" element={<Protected><Website /></Protected>} />

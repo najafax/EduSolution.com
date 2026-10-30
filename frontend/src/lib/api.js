@@ -377,9 +377,6 @@ export const api = {
     resolve: (id, token) => request(`/error-log/${id}/resolve`, { method: 'POST', token }),
     resolveAll: (token) => request('/error-log/resolve-all', { method: 'POST', token }),
   },
-  activity: {
-    list: (token, page = 1) => request(`/activity?page=${page}`, { token }),
-  },
 
   search: {
     query: (token, q) => request(`/search?q=${encodeURIComponent(q)}`, { token }),

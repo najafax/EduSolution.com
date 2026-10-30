@@ -2,7 +2,6 @@ const { Router } = require('express');
 const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 const { position } = require('../lib/usdLedger');
 
 // Internal profit-distribution calculator — never surfaced to a client, not
@@ -146,13 +145,6 @@ router.put('/auto-settings', manage, (req, res) => {
   // switching it on again while already on keeps the original start date.
   const next = enabled ? effectiveAutoFrom(current || todayStr()) : '';
   db.prepare('UPDATE business_settings SET auto_profit_from = ? WHERE id = 1').run(next);
-  logActivity({
-    userName: req.user.name,
-    action: enabled ? 'turned on automatic profit distribution' : 'turned off automatic profit distribution',
-    entityType: 'deal',
-    entityId: null,
-    entityLabel: next ? `from ${next}` : '',
-  });
   res.json({ enabled: Boolean(next), from: next || null });
 });
 
@@ -247,7 +239,6 @@ router.post('/', manage, (req, res) => {
   const dealId = insertDeal();
 
   const deal = withComputedDeal(db.prepare('SELECT * FROM deals WHERE id = ?').get(dealId));
-  logActivity({ userName: req.user.name, action: 'created', entityType: 'deal', entityId: deal.id, entityLabel: deal.description });
   res.status(201).json({ deal });
 });
 
@@ -279,7 +270,6 @@ router.put('/:id', manage, (req, res) => {
   updateDeal();
 
   const deal = withComputedDeal(db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id));
-  logActivity({ userName: req.user.name, action: 'updated', entityType: 'deal', entityId: deal.id, entityLabel: deal.description });
   res.json({ deal });
 });
 
@@ -291,7 +281,6 @@ router.delete('/:id', manage, (req, res) => {
   }
 
   db.prepare('DELETE FROM deals WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted', entityType: 'deal', entityId: existing.id, entityLabel: existing.description });
   res.status(204).end();
 });
 
@@ -459,13 +448,6 @@ function autoDistribute(userName = 'Automated') {
   }
 
   if (distributed.length > 0) {
-    logActivity({
-      userName,
-      action: 'auto-distributed profit for',
-      entityType: 'deal',
-      entityId: null,
-      entityLabel: `${distributed.length} invoice(s) (net ${round2(distributed.reduce((s, d) => s + d.net_profit, 0)).toFixed(2)})`,
-    });
   }
   return { distributed, waiting };
 }
@@ -572,13 +554,6 @@ router.post('/:id/true-up', manage, (req, res) => {
     }
     db.prepare(`UPDATE deals SET exchange_rate = ?, updated_at = datetime('now') WHERE id = ?`).run(plan.newRate, deal.id);
   })();
-  logActivity({
-    userName: req.user.name,
-    action: 'adjusted payout to actual rate for',
-    entityType: 'deal',
-    entityId: deal.id,
-    entityLabel: `${deal.description}: ${plan.oldRate} → ${plan.newRate} (net adjustment ${plan.total_adjustment.toFixed(2)})`,
-  });
   res.json({ plan, deal: withComputedDeal(db.prepare('SELECT * FROM deals WHERE id = ?').get(deal.id)) });
 });
 
@@ -606,13 +581,6 @@ router.post('/:id/true-up-real', manage, (req, res) => {
     }
     db.prepare(`UPDATE deals SET actual_cost_mvr = ?, cost_basis = 'actual', updated_at = datetime('now') WHERE id = ?`).run(plan.newCost, deal.id);
   })();
-  logActivity({
-    userName: req.user.name,
-    action: 'adjusted payout to real supplier cost for',
-    entityType: 'deal',
-    entityId: deal.id,
-    entityLabel: `${deal.description}: cost ${plan.oldCost.toFixed(2)} → ${plan.newCost.toFixed(2)} (net adjustment ${plan.total_adjustment.toFixed(2)})`,
-  });
   res.json({ plan, deal: withComputedDeal(db.prepare('SELECT * FROM deals WHERE id = ?').get(deal.id)) });
 });
 

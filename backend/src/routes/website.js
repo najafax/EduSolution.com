@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
-const { logActivity } = require('../lib/activity');
 
 // The staff-side CMS behind the public marketing site (see routes/public.js's
 // GET /site) — six small resources (posts, testimonials, services, team,
@@ -77,7 +76,6 @@ router.post('/posts', manage, (req, res) => {
     .run(title.trim(), body, category, status, req.user.name);
 
   const post = db.prepare('SELECT * FROM website_posts WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'created website post', entityType: 'website_post', entityId: post.id, entityLabel: post.title });
   res.status(201).json({ post });
 });
 
@@ -98,7 +96,6 @@ router.put('/posts/:id', manage, (req, res) => {
   ).run(title.trim(), body, category, status, req.params.id);
 
   const post = db.prepare('SELECT * FROM website_posts WHERE id = ?').get(req.params.id);
-  logActivity({ userName: req.user.name, action: 'updated website post', entityType: 'website_post', entityId: post.id, entityLabel: post.title });
   res.json({ post });
 });
 
@@ -107,7 +104,6 @@ router.delete('/posts/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Post not found' });
 
   db.prepare('DELETE FROM website_posts WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted website post', entityType: 'website_post', entityId: existing.id, entityLabel: existing.title });
   res.status(204).end();
 });
 
@@ -138,13 +134,6 @@ router.post('/testimonials', manage, (req, res) => {
     .run(quote.trim(), author_name, author_role, category, status, Number(display_order) || 0, req.user.name);
 
   const testimonial = db.prepare('SELECT * FROM website_testimonials WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({
-    userName: req.user.name,
-    action: 'added website testimonial from',
-    entityType: 'website_testimonial',
-    entityId: testimonial.id,
-    entityLabel: testimonial.author_name || testimonial.quote.slice(0, 40),
-  });
   res.status(201).json({ testimonial });
 });
 
@@ -161,13 +150,6 @@ router.put('/testimonials/:id', manage, (req, res) => {
   ).run(quote.trim(), author_name, author_role, category, status, Number(display_order) || 0, req.params.id);
 
   const testimonial = db.prepare('SELECT * FROM website_testimonials WHERE id = ?').get(req.params.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'updated website testimonial from',
-    entityType: 'website_testimonial',
-    entityId: testimonial.id,
-    entityLabel: testimonial.author_name || testimonial.quote.slice(0, 40),
-  });
   res.json({ testimonial });
 });
 
@@ -176,13 +158,6 @@ router.delete('/testimonials/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Testimonial not found' });
 
   db.prepare('DELETE FROM website_testimonials WHERE id = ?').run(req.params.id);
-  logActivity({
-    userName: req.user.name,
-    action: 'deleted website testimonial from',
-    entityType: 'website_testimonial',
-    entityId: existing.id,
-    entityLabel: existing.author_name || existing.quote.slice(0, 40),
-  });
   res.status(204).end();
 });
 
@@ -213,7 +188,6 @@ router.post('/services', manage, (req, res) => {
     .run(title.trim(), description, icon, visible ? 1 : 0, Number(display_order) || 0);
 
   const service = db.prepare('SELECT * FROM website_services WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'added website service', entityType: 'website_service', entityId: service.id, entityLabel: service.title });
   res.status(201).json({ service });
 });
 
@@ -230,7 +204,6 @@ router.put('/services/:id', manage, (req, res) => {
   ).run(title.trim(), description, icon, visible ? 1 : 0, Number(display_order) || 0, req.params.id);
 
   const service = db.prepare('SELECT * FROM website_services WHERE id = ?').get(req.params.id);
-  logActivity({ userName: req.user.name, action: 'updated website service', entityType: 'website_service', entityId: service.id, entityLabel: service.title });
   res.json({ service });
 });
 
@@ -239,7 +212,6 @@ router.delete('/services/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Service not found' });
 
   db.prepare('DELETE FROM website_services WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted website service', entityType: 'website_service', entityId: existing.id, entityLabel: existing.title });
   res.status(204).end();
 });
 
@@ -275,7 +247,6 @@ router.post('/team', manage, (req, res) => {
     .run(name.trim(), role, photo, visible ? 1 : 0, Number(display_order) || 0);
 
   const member = db.prepare('SELECT * FROM website_team_members WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'added website team member', entityType: 'website_team_member', entityId: member.id, entityLabel: member.name });
   res.status(201).json({ member });
 });
 
@@ -304,7 +275,6 @@ router.put('/team/:id', manage, (req, res) => {
   );
 
   const member = db.prepare('SELECT * FROM website_team_members WHERE id = ?').get(req.params.id);
-  logActivity({ userName: req.user.name, action: 'updated website team member', entityType: 'website_team_member', entityId: member.id, entityLabel: member.name });
   res.json({ member });
 });
 
@@ -313,7 +283,6 @@ router.delete('/team/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Team member not found' });
 
   db.prepare('DELETE FROM website_team_members WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted website team member', entityType: 'website_team_member', entityId: existing.id, entityLabel: existing.name });
   res.status(204).end();
 });
 
@@ -341,7 +310,6 @@ router.post('/gallery', manage, (req, res) => {
     .run(image, caption, visible ? 1 : 0, Number(display_order) || 0);
 
   const item = db.prepare('SELECT * FROM website_gallery WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'added website gallery image', entityType: 'website_gallery', entityId: item.id, entityLabel: item.caption || `Image #${item.id}` });
   res.status(201).json({ item });
 });
 
@@ -361,7 +329,6 @@ router.put('/gallery/:id', manage, (req, res) => {
   );
 
   const item = db.prepare('SELECT * FROM website_gallery WHERE id = ?').get(req.params.id);
-  logActivity({ userName: req.user.name, action: 'updated website gallery image', entityType: 'website_gallery', entityId: item.id, entityLabel: item.caption || `Image #${item.id}` });
   res.json({ item });
 });
 
@@ -370,7 +337,6 @@ router.delete('/gallery/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Gallery image not found' });
 
   db.prepare('DELETE FROM website_gallery WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted website gallery image', entityType: 'website_gallery', entityId: existing.id, entityLabel: existing.caption || `Image #${existing.id}` });
   res.status(204).end();
 });
 
@@ -404,7 +370,6 @@ router.post('/videos', manage, (req, res) => {
     .run(title.trim(), description, video_url.trim(), category, visible ? 1 : 0, Number(display_order) || 0);
 
   const video = db.prepare('SELECT * FROM website_videos WHERE id = ?').get(result.lastInsertRowid);
-  logActivity({ userName: req.user.name, action: 'added website video', entityType: 'website_video', entityId: video.id, entityLabel: video.title });
   res.status(201).json({ video });
 });
 
@@ -421,7 +386,6 @@ router.put('/videos/:id', manage, (req, res) => {
   ).run(title.trim(), description, video_url.trim(), category, visible ? 1 : 0, Number(display_order) || 0, req.params.id);
 
   const video = db.prepare('SELECT * FROM website_videos WHERE id = ?').get(req.params.id);
-  logActivity({ userName: req.user.name, action: 'updated website video', entityType: 'website_video', entityId: video.id, entityLabel: video.title });
   res.json({ video });
 });
 
@@ -430,7 +394,6 @@ router.delete('/videos/:id', manage, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Video not found' });
 
   db.prepare('DELETE FROM website_videos WHERE id = ?').run(req.params.id);
-  logActivity({ userName: req.user.name, action: 'deleted website video', entityType: 'website_video', entityId: existing.id, entityLabel: existing.title });
   res.status(204).end();
 });
 

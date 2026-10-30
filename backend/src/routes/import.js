@@ -5,7 +5,6 @@ const { requireAuth, requirePermission } = require('../middleware/auth');
 const { parseCsv } = require('../lib/csv');
 const { computeTotals } = require('../lib/totals');
 const { invoiceNumberForYear, quoteNumberForYear, receiptNumberForYear } = require('../lib/numbering');
-const { logActivity } = require('../lib/activity');
 const { advanceExpiry } = require('../lib/licenseRenewal');
 const { isValidDate } = require('../lib/validate');
 
@@ -1038,13 +1037,6 @@ router.post('/:type', (req, res) => {
       type === 'invoices' && outcome.paymentsImported > 0
         ? `${outcome.imported} invoices (${outcome.paymentsImported} with payment history)`
         : `${outcome.imported} ${type}`;
-    logActivity({
-      userName: req.user.name,
-      action: 'bulk imported',
-      entityType: type,
-      entityId: null,
-      entityLabel: `${label} from CSV`,
-    });
   }
 
   res.json({
