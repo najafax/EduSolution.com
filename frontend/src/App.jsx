@@ -5,6 +5,7 @@ import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
 import Footer from './components/Footer';
 import BottomNav from './components/BottomNav';
+import UpdateBanner from './components/UpdateBanner';
 import ProtectedRoute from './components/ProtectedRoute';
 import IdleTimeoutMonitor from './components/IdleTimeoutMonitor';
 import CommandPalette from './components/CommandPalette';
@@ -244,6 +245,7 @@ export default function App() {
         </div>
       </div>
       {!isPortalRoute && !isMarketingRoute && user && <BottomNav />}
+      <UpdateBanner />
     </div>
   );
 }

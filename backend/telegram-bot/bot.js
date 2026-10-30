@@ -76,6 +76,9 @@ if (ALLOWED_IDS.size === 0) {
 // Repo layout: this file lives at <repo>/backend/telegram-bot/bot.js.
 const BACKEND_DIR = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const FRONTEND_DIR = path.join(REPO_ROOT, 'frontend');
+const WEB_ROOT = process.env.WEB_ROOT || '/var/www/edusolution-frontend';
+const FRONTEND_API_URL = process.env.VITE_API_URL || 'https://api.edusolutionsmaldives.com';
 
 // Loaded after dotenv has configured DB_PATH above, so db/index.js (which
 // reads process.env.DB_PATH at require time) opens the real production
@@ -138,9 +141,9 @@ async function sendLong(chatId, text) {
   if (chunk.trim()) await bot.api.sendMessage({ chat_id: chatId, text: chunk });
 }
 
-async function runCmd(cmd) {
+async function runCmd(cmd, timeoutMs = 30000) {
   try {
-    const { stdout, stderr } = await execAsync(cmd, { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
+    const { stdout, stderr } = await execAsync(cmd, { timeout: timeoutMs, maxBuffer: 5 * 1024 * 1024 });
     return { ok: true, output: (stdout || stderr || '').trim() };
   } catch (err) {
     return { ok: false, output: (err.stdout || err.stderr || err.message || String(err)).trim() };
@@ -535,10 +538,23 @@ async function doDeploy(chatId) {
     { label: 'git checkout main', cmd: `git -C "${REPO_ROOT}" checkout main` },
     { label: 'git merge --ff-only', cmd: `git -C "${REPO_ROOT}" merge --ff-only origin/main` },
     { label: 'npm install', cmd: `cd "${BACKEND_DIR}" && npm install --omit=dev` },
+    // The website is static files served by nginx, so a deploy that only
+    // restarts the backend never shows a frontend change. Same steps as
+    // deploy/digitalocean/deploy.sh (build, then swap the published folder).
+    { label: 'frontend npm install', cmd: `cd "${FRONTEND_DIR}" && npm install`, timeoutMs: 300000 },
+    { label: 'frontend build', cmd: `cd "${FRONTEND_DIR}" && VITE_API_URL="${FRONTEND_API_URL}" npm run build`, timeoutMs: 600000 },
+    {
+      label: 'publish frontend',
+      cmd: `mkdir -p "${WEB_ROOT}" && rm -rf "${WEB_ROOT}.new" && cp -r "${FRONTEND_DIR}/dist" "${WEB_ROOT}.new" && chmod -R a+rX "${WEB_ROOT}.new" && rm -rf "${WEB_ROOT}.old" && mv "${WEB_ROOT}" "${WEB_ROOT}.old" && mv "${WEB_ROOT}.new" "${WEB_ROOT}" && rm -rf "${WEB_ROOT}.old"`,
+    },
   ];
   for (const step of steps) {
+    if (step.label === 'frontend npm install') {
+      // eslint-disable-next-line no-await-in-loop
+      await bot.api.sendMessage({ chat_id: chatId, text: 'Building the website (about a minute)…' });
+    }
     // eslint-disable-next-line no-await-in-loop
-    const { ok, output } = await runCmd(step.cmd);
+    const { ok, output } = await runCmd(step.cmd, step.timeoutMs);
     if (!ok) {
       // eslint-disable-next-line no-await-in-loop
       await sendLong(chatId, `❌ ${step.label} failed:\n${output}`);
@@ -594,7 +610,7 @@ bot.command('restart', (ctx) =>
   }));
 
 bot.command('deploy', (ctx) =>
-  ctx.reply('Pull latest `main` and restart the backend?', {
+  ctx.reply('Pull latest `main`, rebuild the website and restart the backend?', {
     parse_mode: 'Markdown',
     reply_markup: CONFIRM_KEYBOARD('deploy_confirm', 'Yes, deploy'),
   }));

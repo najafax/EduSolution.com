@@ -8,6 +8,7 @@ import { AuthProvider } from './context/AuthContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { installGlobalErrorReporting } from './lib/reportError.js'
+import { setUpdateReady } from './lib/appUpdate.js'
 import { applyFontSize, getFontSize } from './lib/fontSize.js'
 
 applyFontSize(getFontSize());
@@ -59,12 +60,23 @@ window.addEventListener('vite:preloadError', () => {
 // otherwise pick on its own.
 const SW_UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
-registerSW({
+// registerType is 'prompt' (vite.config.js): a new version downloads in the
+// background and waits. onNeedRefresh shows the "A new version is ready"
+// banner (components/UpdateBanner.jsx); tapping Update calls updateSW(true),
+// which activates the new service worker and reloads. Checks run hourly, when
+// the tab/app comes back to the foreground, and shortly after opening.
+const updateSW = registerSW({
+  onNeedRefresh() {
+    setUpdateReady(updateSW);
+  },
   onRegisteredSW(_swUrl, registration) {
     if (!registration) return;
-    setInterval(() => {
-      registration.update().catch(() => {});
-    }, SW_UPDATE_CHECK_INTERVAL_MS);
+    const check = () => registration.update().catch(() => {});
+    setInterval(check, SW_UPDATE_CHECK_INTERVAL_MS);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') check();
+    });
+    setTimeout(check, 5000);
   },
 });
 

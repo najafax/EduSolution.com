@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: [
         'favicon.svg',
         'favicon-32x32.png',
@@ -63,6 +63,10 @@ export default defineConfig({
         // The API is served from a different origin in production and
         // should always hit the network, never be cached by the service worker.
         navigateFallbackDenylist: [/^\/api\//],
+        // With registerType 'prompt' the new worker only waits for the Update
+        // tap; clientsClaim lets it take over the open page once activated so
+        // the page reloads onto the new version.
+        clientsClaim: true,
       },
     }),
   ],

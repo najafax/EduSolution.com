@@ -9777,6 +9777,10 @@ One page at `/finance` (`?tab=overview|income|expenses|cash|equity`) replaced th
 - Dropped with the old pages (backend still supports them): CSV import on Expenses, Excel exports, expense year-over-year analytics, manual creation/editing of profit-distribution records (sharing is automatic only), the Shareholders "send yesterday's report now" button.
 - Test: `frontend/e2e/smoke.test.cjs` opens every tab on desktop and phone (no horizontal overflow), adds an expense, and follows old URLs.
 
+### Update prompt + bot deploy
+- The service worker uses `registerType: 'prompt'` (`vite.config.js`). When a new build is downloaded, `main.jsx` calls `lib/appUpdate.js` `setUpdateReady()` and `components/UpdateBanner.jsx` shows "A new version is ready" with an Update button. `installUpdate()` posts `SKIP_WAITING` to the waiting worker and reloads on `controllerchange` (or after 3s). The app checks for a new version hourly, on tab focus and 5s after load.
+- The Telegram bot's `/deploy` now also installs frontend deps, builds with `VITE_API_URL` and publishes `dist` to `WEB_ROOT` (default `/var/www/edusolution-frontend`), like `deploy.sh`. The bot's own code only changes after its self-restart, so the first `/deploy` after this update may still use the old steps; run it twice or use `deploy.sh`.
+
 ### Hardening pass
 - `.github/workflows/ci.yml` runs backend tests and frontend lint + build on every push to main and every PR.
 - There is **no manual profit-distribution route** any more (`POST /deals/:id/distribute` and `/distribute-all` were removed): only the nightly `autoDistribute()` distributes, so the 2027-01-01 floor can't be bypassed. `FloatingActionButton` was deleted (it had been a no-op since the Studio shell). `nodemailer` is v10 (security fix).
