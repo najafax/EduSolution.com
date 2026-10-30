@@ -273,11 +273,17 @@ export default function SupplierInvoiceModal({ open, onClose, token, invoice, pr
               </button>
             </div>
           )}
+          {total > 0 && (
+            <p className={`mt-2 text-xs font-medium ${over ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`}>
+              {usd(assigned)} assigned of {usd(total)}
+              {over ? ' — too much' : unassigned > 0 ? ` · ${usd(unassigned)} not assigned yet` : ' · fully assigned'}
+            </p>
+          )}
           {links.length > 0 && (
-            <ul className="mt-3 grid gap-2">
+            <ul className="mt-2 grid max-h-60 gap-1 overflow-y-auto pr-1">
               {links.map((l, i) => (
                 <li key={i} className="grid grid-cols-[1fr_6.5rem_auto] items-end gap-2">
-                  <div>
+                  <div className="[&_input]:!min-h-9 [&_input]:!py-1">
                     <SearchableSelect options={options} value={l.invoice_id} onChange={(v) => setLink(i, { invoice_id: v })} placeholder="Client invoice…" />
                   </div>
                   <input
@@ -287,25 +293,19 @@ export default function SupplierInvoiceModal({ open, onClose, token, invoice, pr
                     aria-label="USD for this invoice"
                     value={l.usd_amount}
                     onChange={(e) => setLink(i, { usd_amount: e.target.value })}
-                    className="min-h-11 w-full rounded-md border border-slate-300 px-2 py-2 text-base dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    className="min-h-9 w-full rounded-md border border-slate-300 px-2 py-1 text-base dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                   />
                   <button
                     type="button"
                     aria-label="Remove link"
                     onClick={() => setLinks((ls) => ls.filter((_, idx) => idx !== i))}
-                    className="flex h-11 w-9 items-center justify-center rounded-md text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                    className="flex h-9 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
                   >
                     <TrashIcon width={16} height={16} />
                   </button>
                 </li>
               ))}
             </ul>
-          )}
-          {total > 0 && (
-            <p className={`mt-2 text-xs ${over ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`}>
-              {usd(assigned)} assigned of {usd(total)}
-              {over ? ' — too much' : unassigned > 0 ? ` · ${usd(unassigned)} not assigned yet` : ' · fully assigned'}
-            </p>
           )}
         </div>
 
