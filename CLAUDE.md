@@ -9864,3 +9864,6 @@ Supersedes the monthly "owed to suppliers" view, month tagging and "already paid
 ### Delete old invoices and quotes (`POST /api/data-reset/before`)
 - Unrestricted-admin only, like the rest of the Danger Zone. Body `{ before: 'YYYY-MM-DD', confirm: 'DELETE', dryRun? }`. Deletes every invoice and quote with `issue_date < before` plus their items, payments, payment proofs and supplier-invoice links; clears links from surviving rows (`deals.invoice_id`, `licenses.renewal_invoice_*`, `quotes.converted_invoice_id`, `invoices.quote_id`, `quote_requests.quote_id`). Clients, licenses, finance data and payments of kept invoices are untouched. Payments on deleted invoices leave bank balance/net profit with them.
 - UI: Import → "Delete old invoices and quotes" (date input, preview counts, type DELETE). Test: `backend/test/oldRecordsReset.test.js`.
+
+### Supplier tracking date removed
+- "Sales waiting for a supplier invoice" now covers every sent/paid sale from the books start (`BOOKS_START`, 2025-01-01) onward; `supplier_track_from` is no longer applied (`trackFrom()` returns `BOOKS_START`; the setting and `PUT /supplier-costs/track-from` remain but have no effect). The "Only sales issued from…" note on the Cash tab is gone.

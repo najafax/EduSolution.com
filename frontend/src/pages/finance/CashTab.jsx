@@ -175,7 +175,6 @@ export default function CashTab({ token, can, entry, clearEntry }) {
                 </Detail>
               </Row>
             ))}
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Only sales issued from {over?.trackFrom || '…'} onward are tracked.</p>
           </Card>
 
           <Card title="USD ledger">

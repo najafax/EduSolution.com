@@ -2,7 +2,7 @@ const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { replay, position } = require('../lib/usdLedger');
-const { todayStr, addDays } = require('../lib/businessDate');
+const { todayStr, addDays, BOOKS_START } = require('../lib/businessDate');
 const { isValidDate } = require('../lib/validate');
 
 // USD owed to suppliers, built on supplier invoices (routes/supplierInvoices.js).
@@ -56,10 +56,10 @@ function lastBuyRate(ledgerRows) {
   return b ? b.mvr_amount / b.usd_amount : null;
 }
 
+// Every sale since the books start is tracked; the old per-business
+// supplier_track_from setting is no longer applied (column kept, unused).
 function trackFrom() {
-  const row = db.prepare('SELECT supplier_track_from AS d FROM business_settings WHERE id = 1').get();
-  // Not set yet (fresh install): only this month's sales count.
-  return (row && row.d) || `${todayStr().slice(0, 7)}-01`;
+  return BOOKS_START;
 }
 
 // Estimated USD supplier cost per client invoice, from item cost prices, for
