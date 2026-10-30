@@ -233,6 +233,119 @@ function DangerZone({ token }) {
   );
 }
 
+// Deletes every invoice and quote issued before a cutoff date, with their
+// payments, items and proofs. Preview first, then type DELETE.
+function OldRecordsReset({ token }) {
+  const [before, setBefore] = useState('2026-01-01');
+  const [preview, setPreview] = useState(null);
+  const [confirmText, setConfirmText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState(null);
+  const { confirm, confirmDialog } = useConfirm();
+
+  async function handlePreview() {
+    setBusy(true);
+    setError('');
+    setResult(null);
+    try {
+      setPreview(await api.dataReset.before(before, undefined, true, token));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (
+      !(await confirm({
+        title: `Delete everything before ${before}?`,
+        message: `This permanently deletes ${preview.invoices} invoices (with ${preview.payments} payments) and ${preview.quotes} quotes. This cannot be undone.`,
+        confirmLabel: 'Delete',
+      }))
+    )
+      return;
+    setBusy(true);
+    setError('');
+    try {
+      setResult(await api.dataReset.before(before, CONFIRM_PHRASE, false, token));
+      setPreview(null);
+      setConfirmText('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-6 rounded-lg border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-950/40">
+      <h2 className="text-sm font-semibold text-red-900 dark:text-red-300">Delete old invoices and quotes</h2>
+      <p className="mt-1 text-sm text-red-800 dark:text-red-400">
+        Permanently deletes every invoice and quote issued before the date below, together with their payments,
+        line items and payment proofs. Everything else is kept. Take a backup first. This cannot be undone.
+      </p>
+      <label className="mt-4 block max-w-xs">
+        <span className="text-sm font-medium text-red-900 dark:text-red-300">Issued before</span>
+        <input
+          type="date"
+          value={before}
+          onChange={(e) => {
+            setBefore(e.target.value);
+            setPreview(null);
+          }}
+          className="mt-1 min-h-11 w-full rounded-md border border-red-300 px-3 py-2 text-base dark:border-red-700 dark:bg-slate-900 dark:text-white"
+        />
+      </label>
+      <button
+        onClick={handlePreview}
+        disabled={!before || busy}
+        className="mt-3 min-h-11 rounded-md border border-red-400 px-4 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950"
+      >
+        Preview what will be deleted
+      </button>
+      {preview && (
+        <div className="mt-3 text-sm text-red-900 dark:text-red-300">
+          <p>
+            {preview.invoices} invoices, {preview.payments} payments, {preview.invoice_items} invoice lines and{' '}
+            {preview.quotes} quotes issued before {preview.before}.
+          </p>
+          <label className="mt-3 block max-w-xs">
+            <span className="font-medium">Type {CONFIRM_PHRASE} to confirm</span>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder={CONFIRM_PHRASE}
+              className="mt-1 min-h-11 w-full rounded-md border border-red-300 px-3 py-2 text-base dark:border-red-700 dark:bg-slate-900 dark:text-white"
+            />
+          </label>
+          <button
+            onClick={handleDelete}
+            disabled={confirmText !== CONFIRM_PHRASE || busy}
+            className="mt-3 min-h-11 rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+          >
+            {busy ? 'Deleting…' : 'Delete these records'}
+          </button>
+        </div>
+      )}
+      {error && <p className="mt-3 text-sm text-red-700 dark:text-red-400">{error}</p>}
+      {result && (
+        <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
+          Deleted:{' '}
+          {Object.entries(result.cleared)
+            .filter(([, n]) => n > 0)
+            .map(([t, n]) => `${n} ${t.replace(/_/g, ' ')}`)
+            .join(', ') || 'nothing'}
+          .
+        </p>
+      )}
+      {confirmDialog}
+    </div>
+  );
+}
+
 export default function Import() {
   const { token, can, isUnrestrictedAdmin } = useAuth();
   const canManage = can('import', 'manage');
@@ -403,6 +516,7 @@ export default function Import() {
       )}
 
       {isUnrestrictedAdmin && <DangerZone token={token} />}
+      {isUnrestrictedAdmin && <OldRecordsReset token={token} />}
     </div>
   );
 }

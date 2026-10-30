@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const db = require('../db');
+const { isValidDate } = require('../lib/validate');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = Router();
@@ -151,6 +152,78 @@ router.post('/', (req, res) => {
   // first fresh entry, documenting the reset for anyone auditing later.
 
   res.json({ cleared: before });
+});
+
+// Date-cutoff delete: every invoice and quote issued before `before`, with
+// the rows that belong to them (items, payments, payment proofs, supplier
+// links). Everything else is kept; links from surviving rows are cleared.
+// `dryRun: true` only reports the counts.
+router.post('/before', (req, res) => {
+  const { confirm, before, dryRun } = req.body || {};
+  if (!dryRun && confirm !== CONFIRM_PHRASE) {
+    return res.status(400).json({ error: `Type "${CONFIRM_PHRASE}" to confirm` });
+  }
+  if (!isValidDate(before)) {
+    return res.status(400).json({ error: 'A valid cutoff date (YYYY-MM-DD) is required' });
+  }
+
+  const invoiceIds = db.prepare('SELECT id FROM invoices WHERE issue_date < ?').all(before).map((r) => r.id);
+  const quoteIds = db.prepare('SELECT id FROM quotes WHERE issue_date < ?').all(before).map((r) => r.id);
+
+  // Chunked IN (...) lists stay under SQLite's variable limit.
+  const inChunks = (ids) => {
+    const out = [];
+    for (let i = 0; i < ids.length; i += 500) out.push(ids.slice(i, i + 500));
+    return out;
+  };
+  const run = (sql, ids) => {
+    let n = 0;
+    for (const chunk of inChunks(ids)) {
+      n += db.prepare(sql.replace('(?)', `(${chunk.map(() => '?').join(',')})`)).run(...chunk).changes;
+    }
+    return n;
+  };
+  const count = (sql, ids) => {
+    let n = 0;
+    for (const chunk of inChunks(ids)) {
+      n += db.prepare(sql.replace('(?)', `(${chunk.map(() => '?').join(',')})`)).get(...chunk).c;
+    }
+    return n;
+  };
+
+  if (dryRun) {
+    return res.json({
+      before,
+      invoices: invoiceIds.length,
+      invoice_items: count('SELECT COUNT(*) AS c FROM invoice_items WHERE invoice_id IN (?)', invoiceIds),
+      payments: count('SELECT COUNT(*) AS c FROM payments WHERE invoice_id IN (?)', invoiceIds),
+      quotes: quoteIds.length,
+    });
+  }
+
+  const cleared = {};
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      cleared.invoice_items = run('DELETE FROM invoice_items WHERE invoice_id IN (?)', invoiceIds);
+      cleared.payments = run('DELETE FROM payments WHERE invoice_id IN (?)', invoiceIds);
+      cleared.payment_proofs = run('DELETE FROM payment_proofs WHERE invoice_id IN (?)', invoiceIds);
+      cleared.supplier_invoice_links = run('DELETE FROM supplier_invoice_links WHERE invoice_id IN (?)', invoiceIds);
+      run('UPDATE deals SET invoice_id = NULL WHERE invoice_id IN (?)', invoiceIds);
+      run('UPDATE licenses SET renewal_invoice_id = NULL, renewal_invoice_for = \'\' WHERE renewal_invoice_id IN (?)', invoiceIds);
+      run('UPDATE quotes SET converted_invoice_id = NULL WHERE converted_invoice_id IN (?)', invoiceIds);
+      cleared.invoices = run('DELETE FROM invoices WHERE id IN (?)', invoiceIds);
+
+      run('UPDATE invoices SET quote_id = NULL WHERE quote_id IN (?)', quoteIds);
+      run('UPDATE quote_requests SET quote_id = NULL WHERE quote_id IN (?)', quoteIds);
+      cleared.quote_items = run('DELETE FROM quote_items WHERE quote_id IN (?)', quoteIds);
+      cleared.quotes = run('DELETE FROM quotes WHERE id IN (?)', quoteIds);
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+
+  res.json({ before, cleared });
 });
 
 module.exports = router;

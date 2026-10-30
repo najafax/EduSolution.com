@@ -9860,3 +9860,7 @@ Supersedes the monthly "owed to suppliers" view, month tagging and "already paid
 
 ### Finance reset
 - Danger Zone (Import page, unrestricted admins) has a "Finance" category (`routes/dataReset.js`): clears expenses, capital contributions, owner draws and profit payouts, deals, shareholders, USD account, supplier invoices/links/settlements, and sets the starting balance and its date to 0/blank. Invoice payments, invoices, clients etc. are not touched. Test: `backend/test/financeReset.test.js`.
+
+### Delete old invoices and quotes (`POST /api/data-reset/before`)
+- Unrestricted-admin only, like the rest of the Danger Zone. Body `{ before: 'YYYY-MM-DD', confirm: 'DELETE', dryRun? }`. Deletes every invoice and quote with `issue_date < before` plus their items, payments, payment proofs and supplier-invoice links; clears links from surviving rows (`deals.invoice_id`, `licenses.renewal_invoice_*`, `quotes.converted_invoice_id`, `invoices.quote_id`, `quote_requests.quote_id`). Clients, licenses, finance data and payments of kept invoices are untouched. Payments on deleted invoices leave bank balance/net profit with them.
+- UI: Import → "Delete old invoices and quotes" (date input, preview counts, type DELETE). Test: `backend/test/oldRecordsReset.test.js`.

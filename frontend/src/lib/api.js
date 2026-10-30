@@ -408,6 +408,7 @@ export const api = {
 
   dataReset: {
     run: (confirm, categories, token) => request('/data-reset', { method: 'POST', body: { confirm, categories }, token }),
+    before: (before, confirm, dryRun, token) => request('/data-reset/before', { method: 'POST', body: { before, confirm, dryRun }, token }),
   },
 
   reports: {
