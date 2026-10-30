@@ -15,17 +15,13 @@ import {
   InvoiceIcon,
   RefreshIcon,
   LicenseIcon,
-  ExpenseIcon,
   BankIcon,
-  ReportIcon,
   HistoryIcon,
   SendIcon,
   SettingsIcon,
   LogoutIcon,
   GlobeIcon,
-  TrendDownIcon,
   FacebookIcon,
-  ClockIcon,
   AlertTriangleIcon,
 } from './icons';
 
@@ -41,18 +37,10 @@ export const LINK_ICONS = {
   '/products': ProductIcon,
   '/quotes': QuoteIcon,
   '/quote-requests': InboxIcon,
+  '/finance': BankIcon,
   '/invoices': InvoiceIcon,
   '/recurring-invoices': RefreshIcon,
   '/licenses': LicenseIcon,
-  '/expenses': ExpenseIcon,
-  '/capital-contributions': UsersIcon,
-  '/owner-draws': BankIcon,
-  '/financials': BankIcon,
-  '/shareholders': UsersIcon,
-  '/profit-distribution': BankIcon,
-  '/supplier-costs': TrendDownIcon,
-  '/receivables': ClockIcon,
-  '/reports': ReportIcon,
   '/activity': HistoryIcon,
   '/error-log': AlertTriangleIcon,
   '/users': UsersIcon,
@@ -120,7 +108,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }) {
   if (!user) return null;
 
   const visibleLinks = BUSINESS_LINKS.filter(
-    (link) => (!link.module || can(link.module, 'view')) && (!link.adminOnly || isUnrestrictedAdmin),
+    (link) => (!link.module || can(link.module, 'view') || (link.alsoModule && can(link.alsoModule, 'view'))) && (!link.adminOnly || isUnrestrictedAdmin),
   );
   // Grouped by Navbar.jsx's own `group` field (see that file's note) —
   // a group is only rendered at all once it actually has a visible link,

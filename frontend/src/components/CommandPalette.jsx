@@ -64,7 +64,7 @@ export default function CommandPalette() {
   const navMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
     const links = [
-      ...BUSINESS_LINKS.filter((link) => (!link.module || can(link.module, 'view')) && (!link.adminOnly || isUnrestrictedAdmin)),
+      ...BUSINESS_LINKS.filter((link) => (!link.module || can(link.module, 'view') || (link.alsoModule && can(link.alsoModule, 'view'))) && (!link.adminOnly || isUnrestrictedAdmin)),
       { to: '/account', label: 'My account', module: null },
     ];
     return links.filter((link) => !q || link.label.toLowerCase().includes(q));
@@ -87,7 +87,7 @@ export default function CommandPalette() {
       list.push({ key: `invoice-${inv.id}`, label: inv.number, sublabel: `Invoice — ${inv.client_name}`, onSelect: () => go(`/invoices/${inv.id}`) });
     }
     for (const ex of results.expenses) {
-      list.push({ key: `expense-${ex.id}`, label: ex.description, sublabel: `Expense — ${ex.category}`, onSelect: () => go('/expenses') });
+      list.push({ key: `expense-${ex.id}`, label: ex.description, sublabel: `Expense — ${ex.category}`, onSelect: () => go('/finance?tab=expenses') });
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps

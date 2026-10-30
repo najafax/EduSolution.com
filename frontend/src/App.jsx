@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
@@ -28,17 +28,10 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const PublicQuote = lazy(() => import('./pages/PublicQuote'));
 const PublicInvoice = lazy(() => import('./pages/PublicInvoice'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Finance = lazy(() => import('./pages/finance/Finance'));
 const More = lazy(() => import('./pages/More'));
 const Clients = lazy(() => import('./pages/business/Clients'));
 const Products = lazy(() => import('./pages/business/Products'));
-const Expenses = lazy(() => import('./pages/business/Expenses'));
-const ExpenseAnalytics = lazy(() => import('./pages/business/ExpenseAnalytics'));
-const CapitalContributions = lazy(() => import('./pages/business/CapitalContributions'));
-const OwnerDraws = lazy(() => import('./pages/business/OwnerDraws'));
-const Shareholders = lazy(() => import('./pages/business/Shareholders'));
-const ProfitDistribution = lazy(() => import('./pages/business/ProfitDistribution'));
-const SupplierCosts = lazy(() => import('./pages/business/SupplierCosts'));
-const ReceivablesAging = lazy(() => import('./pages/business/ReceivablesAging'));
 const Settings = lazy(() => import('./pages/business/Settings'));
 const Quotes = lazy(() => import('./pages/business/Quotes'));
 const QuoteRequests = lazy(() => import('./pages/business/QuoteRequests'));
@@ -52,8 +45,6 @@ const InvoiceAnalytics = lazy(() => import('./pages/business/InvoiceAnalytics'))
 const RecurringInvoices = lazy(() => import('./pages/business/RecurringInvoices'));
 const Licenses = lazy(() => import('./pages/business/Licenses'));
 const LicenseAnalytics = lazy(() => import('./pages/business/LicenseAnalytics'));
-const Financials = lazy(() => import('./pages/business/Financials'));
-const Reports = lazy(() => import('./pages/business/Reports'));
 const ErrorLog = lazy(() => import('./pages/business/ErrorLog'));
 const ActivityLog = lazy(() => import('./pages/business/ActivityLog'));
 const Import = lazy(() => import('./pages/business/Import'));
@@ -198,14 +189,6 @@ export default function App() {
                 <Route path="/clients" element={<Protected><Clients /></Protected>} />
                 <Route path="/campaigns" element={<Protected><Campaigns /></Protected>} />
                 <Route path="/products" element={<Protected><Products /></Protected>} />
-                <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
-                <Route path="/expenses/analytics" element={<Protected><ExpenseAnalytics /></Protected>} />
-                <Route path="/capital-contributions" element={<Protected><CapitalContributions /></Protected>} />
-                <Route path="/owner-draws" element={<Protected><OwnerDraws /></Protected>} />
-                <Route path="/shareholders" element={<Protected><Shareholders /></Protected>} />
-                <Route path="/profit-distribution" element={<Protected><ProfitDistribution /></Protected>} />
-                <Route path="/supplier-costs" element={<Protected><SupplierCosts /></Protected>} />
-                <Route path="/receivables" element={<Protected><ReceivablesAging /></Protected>} />
                 <Route path="/settings" element={<Protected><Settings /></Protected>} />
                 <Route path="/import" element={<Protected><Import /></Protected>} />
 
@@ -216,6 +199,17 @@ export default function App() {
                 <Route path="/quotes/:id" element={<Protected><QuoteDetail /></Protected>} />
                 <Route path="/quotes/:id/edit" element={<Protected><QuoteForm /></Protected>} />
 
+                <Route path="/finance" element={<Protected><Finance /></Protected>} />
+                <Route path="/expenses" element={<Navigate to="/finance?tab=expenses" replace />} />
+                <Route path="/expenses/analytics" element={<Navigate to="/finance?tab=expenses" replace />} />
+                <Route path="/capital-contributions" element={<Navigate to="/finance?tab=equity" replace />} />
+                <Route path="/owner-draws" element={<Navigate to="/finance?tab=equity" replace />} />
+                <Route path="/shareholders" element={<Navigate to="/finance?tab=equity" replace />} />
+                <Route path="/profit-distribution" element={<Navigate to="/finance?tab=equity" replace />} />
+                <Route path="/supplier-costs" element={<Navigate to="/finance?tab=cash" replace />} />
+                <Route path="/receivables" element={<Navigate to="/finance?tab=income" replace />} />
+                <Route path="/financials" element={<Navigate to="/finance" replace />} />
+                <Route path="/reports" element={<Navigate to="/finance" replace />} />
                 <Route path="/invoices" element={<Protected><Invoices /></Protected>} />
                 <Route path="/invoices/analytics" element={<Protected><InvoiceAnalytics /></Protected>} />
                 <Route path="/invoices/new" element={<Protected><InvoiceForm /></Protected>} />
@@ -225,9 +219,6 @@ export default function App() {
                 <Route path="/recurring-invoices" element={<Protected><RecurringInvoices /></Protected>} />
                 <Route path="/licenses" element={<Protected><Licenses /></Protected>} />
                 <Route path="/licenses/analytics" element={<Protected><LicenseAnalytics /></Protected>} />
-
-                <Route path="/financials" element={<Protected><Financials /></Protected>} />
-                <Route path="/reports" element={<Protected><Reports /></Protected>} />
                 <Route path="/error-log" element={<Protected><ErrorLog /></Protected>} />
                 <Route path="/activity" element={<Protected><ActivityLog /></Protected>} />
                 <Route path="/users" element={<Protected><Users /></Protected>} />
