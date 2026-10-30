@@ -9857,3 +9857,6 @@ Supersedes the monthly "owed to suppliers" view, month tagging and "already paid
 
 ### Books start January 2025
 - `lib/businessDate.js` `BOOKS_START = '2025-01-01'`. `computeSummary()` (Finance overview and the main dashboard) clamps any range, including "All time", to start there, so net profit, totals, expenses, draws and contributions ignore earlier data; the dashboard's overdue list only shows invoices issued from that date. The bank balance still follows Settings → starting balance + starting balance date (set the date to 2025-01-01 and the opening balance as of then).
+
+### Finance reset
+- Danger Zone (Import page, unrestricted admins) has a "Finance" category (`routes/dataReset.js`): clears expenses, capital contributions, owner draws and profit payouts, deals, shareholders, USD account, supplier invoices/links/settlements, and sets the starting balance and its date to 0/blank. Invoice payments, invoices, clients etc. are not touched. Test: `backend/test/financeReset.test.js`.

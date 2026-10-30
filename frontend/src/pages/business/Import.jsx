@@ -96,6 +96,11 @@ const RESET_CATEGORIES = [
   { key: 'invoices', label: 'Invoices & payments' },
   { key: 'recurring', label: 'Recurring invoice templates' },
   { key: 'licenses', label: 'Licenses' },
+  {
+    key: 'finance',
+    label: 'Finance (everything on the Finance page)',
+    hint: 'Expenses, capital, owner draws, shareholders, profit sharing, USD account, supplier invoices and the starting balance. Invoice payments are not touched.',
+  },
   { key: 'expenses', label: 'Expenses' },
   { key: 'capital_contributions', label: 'Capital contributions' },
   { key: 'products', label: 'Product catalog' },

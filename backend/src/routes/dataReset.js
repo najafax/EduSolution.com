@@ -39,6 +39,9 @@ const CATEGORIES = {
   expenses: ['expenses'],
   capital_contributions: ['capital_contributions'],
   owner_draws: ['owner_draws'],
+  // Everything on the Finance page except invoice payments (those belong to the
+  // invoices). Also zeroes the starting balance below.
+  finance: ['expenses', 'capital_contributions', 'owner_draws', 'deal_items', 'deals', 'shareholders', 'supplier_invoice_links', 'supplier_invoices', 'supplier_cost_settlements', 'usd_transactions'],
   products: ['products'],
   campaigns: ['campaigns'],
   quote_requests: ['quote_request_items', 'quote_requests'],
@@ -62,6 +65,13 @@ const TABLE_ORDER = [
   'expenses',
   'capital_contributions',
   'owner_draws',
+  'deal_items',
+  'deals',
+  'shareholders',
+  'supplier_invoice_links',
+  'supplier_invoices',
+  'supplier_cost_settlements',
+  'usd_transactions',
   'clients',
   'products',
   'campaigns',
@@ -101,6 +111,9 @@ router.post('/', (req, res) => {
       // these carry a REFERENCES constraint, see db/index.js) left dangling
       // when one side of a soft link is cleared without the other, so a
       // surviving row never points at an id that no longer exists.
+      if (selected.includes('finance')) {
+        db.prepare("UPDATE business_settings SET starting_balance = 0, starting_balance_date = '' WHERE id = 1").run();
+      }
       if (tablesToClear.has('quotes') && !tablesToClear.has('invoices')) {
         db.prepare('UPDATE invoices SET quote_id = NULL WHERE quote_id IS NOT NULL').run();
       }
