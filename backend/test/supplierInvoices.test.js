@@ -163,3 +163,22 @@ test('profit per sale: actual cost from paid supplier invoices, estimates otherw
   assert.equal(all.totals.profit, Math.round(all.sales.reduce((s, x) => s + x.profit, 0) * 100) / 100);
   assert.equal((await get('/supplier-costs/profit?from=nope')).status, 400);
 });
+
+test('supplier invoice: payment link validated; optional amount charged overrides the cost', async () => {
+  const base = { supplier: 'LinkCo', number: 'L-1', invoice_date: today(), usd_amount: 50 };
+  assert.equal((await post('/supplier-invoices', { ...base, payment_url: 'javascript:alert(1)' })).status, 400);
+  assert.equal((await post('/supplier-invoices', { ...base, payment_url: 'ftp://x.test/pay' })).status, 400);
+  const created = await post('/supplier-invoices', { ...base, payment_url: 'https://pay.example.com/i/123' });
+  assert.equal(created.status, 201);
+  const row = () => get('/supplier-invoices?status=unpaid').then((r) => r.data.supplierInvoices.find((x) => x.id === created.data.id));
+  assert.equal((await row()).payment_url, 'https://pay.example.com/i/123');
+  await post('/usd-account', { type: 'buy', usd_amount: 100, mvr_amount: 1600, txn_date: today() });
+  assert.equal((await post(`/supplier-invoices/${created.data.id}/pay`, { usd_charged: -1 })).status, 400);
+  assert.equal((await post(`/supplier-invoices/${created.data.id}/pay`, { usd_charged: 52.5 })).status, 200);
+  const paid = (await get('/supplier-invoices?status=paid')).data.supplierInvoices.find((x) => x.id === created.data.id);
+  assert.equal(paid.amount_charged, 52.5);
+  const t = srv.db().prepare('SELECT usd_amount FROM usd_transactions WHERE id = ?').get(paid.paid_txn_id);
+  assert.equal(t.usd_amount, 52.5);
+  assert.equal((await post(`/supplier-invoices/${created.data.id}/unpay`, {})).status, 200);
+  assert.equal((await row()).amount_charged, null);
+});

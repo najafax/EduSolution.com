@@ -1016,6 +1016,16 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_supplier_links_si ON supplier_invoice_links(supplier_invoice_id);
   CREATE INDEX IF NOT EXISTS idx_supplier_links_inv ON supplier_invoice_links(invoice_id);
 `);
+// Supplier invoices: the supplier's payment link, and the USD actually charged
+// when it differs from the bill (optional, only set when paying).
+const supplierInvoiceColumns = new Set(db.prepare('PRAGMA table_info(supplier_invoices)').all().map((c) => c.name));
+if (!supplierInvoiceColumns.has('payment_url')) {
+  db.exec(`ALTER TABLE supplier_invoices ADD COLUMN payment_url TEXT NOT NULL DEFAULT '';`);
+}
+if (!supplierInvoiceColumns.has('amount_charged')) {
+  db.exec(`ALTER TABLE supplier_invoices ADD COLUMN amount_charged REAL;`);
+}
+
 const invColsSupplier = new Set(db.prepare('PRAGMA table_info(invoices)').all().map((c) => c.name));
 if (!invColsSupplier.has('supplier_cost_done')) {
   db.exec(`ALTER TABLE invoices ADD COLUMN supplier_cost_done INTEGER NOT NULL DEFAULT 0;`);

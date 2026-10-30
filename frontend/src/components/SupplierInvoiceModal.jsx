@@ -32,7 +32,7 @@ function fileToDataUri(file) {
 // a supplier invoice" list.
 export default function SupplierInvoiceModal({ open, onClose, token, invoice, presetLink, onSaved }) {
   const paid = invoice?.status === 'paid';
-  const [form, setForm] = useState({ supplier: '', number: '', invoice_date: '', due_date: '', usd_amount: '', notes: '' });
+  const [form, setForm] = useState({ supplier: '', number: '', invoice_date: '', due_date: '', usd_amount: '', notes: '', payment_url: '' });
   const [links, setLinks] = useState([]);
   const [file, setFile] = useState(null); // { data, name } | null (new file)
   const [removeFile, setRemoveFile] = useState(false);
@@ -54,10 +54,11 @@ export default function SupplierInvoiceModal({ open, onClose, token, invoice, pr
         due_date: invoice.due_date,
         usd_amount: String(invoice.usd_amount),
         notes: invoice.notes,
+        payment_url: invoice.payment_url || '',
       });
       setLinks(invoice.links.map((l) => ({ invoice_id: String(l.invoice_id), usd_amount: String(l.usd_amount) })));
     } else {
-      setForm({ supplier: '', number: '', invoice_date: todayStr(), due_date: '', usd_amount: presetLink ? String(presetLink.usd_amount) : '', notes: '' });
+      setForm({ supplier: '', number: '', invoice_date: todayStr(), due_date: '', usd_amount: presetLink ? String(presetLink.usd_amount) : '', notes: '', payment_url: '' });
       setLinks(presetLink ? [{ invoice_id: String(presetLink.invoice_id), usd_amount: String(presetLink.usd_amount) }] : []);
     }
     api.invoices
@@ -250,6 +251,13 @@ export default function SupplierInvoiceModal({ open, onClose, token, invoice, pr
             </p>
           )}
         </div>
+
+        {!paid && (
+          <label className="block">
+            <span className={LABEL}>Payment link (optional)</span>
+            <input type="url" value={form.payment_url} onChange={(e) => setForm((f) => ({ ...f, payment_url: e.target.value }))} placeholder="https://…" className={INPUT} />
+          </label>
+        )}
 
         {!paid && (
           <label className="block">

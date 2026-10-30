@@ -21,7 +21,7 @@ const FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const FILE_MAX_BYTES = 6 * 1024 * 1024;
 const DATA_URI_RE = /^data:([a-z]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/;
 
-const COLS = 'id, supplier, number, invoice_date, due_date, usd_amount, notes, file_name, file_type, status, paid_txn_id, paid_at, created_by_name, created_at';
+const COLS = 'id, supplier, number, invoice_date, due_date, usd_amount, notes, file_name, file_type, status, paid_txn_id, paid_at, payment_url, amount_charged, created_by_name, created_at';
 
 function linksFor(ids) {
   if (!ids.length) return new Map();
@@ -69,6 +69,13 @@ function parseBody(body, { partial = false } = {}) {
   const usd = Number(body.usd_amount);
   if (!Number.isFinite(usd) || usd <= 0) return { error: 'USD amount must be a positive number' };
   void partial;
+  const paymentUrl = String(body.payment_url || '').trim();
+  if (paymentUrl) {
+    let u;
+    try { u = new URL(paymentUrl); } catch { u = null; }
+    if (!u || (u.protocol !== 'http:' && u.protocol !== 'https:')) return { error: 'The payment link must be a web address starting with http:// or https://' };
+    if (paymentUrl.length > 2000) return { error: 'The payment link is too long' };
+  }
   return {
     supplier,
     number: String(body.number || '').trim(),
@@ -76,6 +83,7 @@ function parseBody(body, { partial = false } = {}) {
     due_date: dueDate,
     usd_amount: round2(usd),
     notes: String(body.notes || '').trim(),
+    payment_url: paymentUrl,
   };
 }
 
@@ -152,10 +160,10 @@ router.post('/', manage, (req, res) => {
   const id = db.transaction(() => {
     const newId = db
       .prepare(
-        `INSERT INTO supplier_invoices (supplier, number, invoice_date, due_date, usd_amount, notes, file_data, file_name, file_type, created_by_name)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO supplier_invoices (supplier, number, invoice_date, due_date, usd_amount, notes, payment_url, file_data, file_name, file_type, created_by_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(parsed.supplier, parsed.number, parsed.invoice_date, parsed.due_date, parsed.usd_amount, parsed.notes, file.data, file.name, file.type, req.user.name)
+      .run(parsed.supplier, parsed.number, parsed.invoice_date, parsed.due_date, parsed.usd_amount, parsed.notes, parsed.payment_url, file.data, file.name, file.type, req.user.name)
       .lastInsertRowid;
     if (lk.links) saveLinks(newId, lk.links);
     return newId;
@@ -179,9 +187,9 @@ router.put('/:id', manage, (req, res) => {
   }
   db.transaction(() => {
     db.prepare(
-      `UPDATE supplier_invoices SET supplier = ?, number = ?, invoice_date = ?, due_date = ?, usd_amount = ?, notes = ?,
+      `UPDATE supplier_invoices SET supplier = ?, number = ?, invoice_date = ?, due_date = ?, usd_amount = ?, notes = ?, payment_url = ?,
          file_data = ?, file_name = ?, file_type = ?, updated_at = datetime('now') WHERE id = ?`,
-    ).run(parsed.supplier, parsed.number, parsed.invoice_date, parsed.due_date, parsed.usd_amount, parsed.notes, file.data, file.name, file.type, existing.id);
+    ).run(parsed.supplier, parsed.number, parsed.invoice_date, parsed.due_date, parsed.usd_amount, parsed.notes, parsed.payment_url, file.data, file.name, file.type, existing.id);
     if (lk.links) saveLinks(existing.id, lk.links);
     else {
       // Amount shrank below what was already assigned: refuse rather than silently trim.
@@ -212,14 +220,24 @@ router.post('/:id/pay', manage, (req, res) => {
   const date = (req.body && req.body.txn_date) || todayStr();
   if (!isValidDate(date)) return res.status(400).json({ error: 'Payment date must be a valid date' });
   if (date > todayStr()) return res.status(400).json({ error: 'Payment date cannot be in the future' });
+  // Optional: the USD actually charged, when it differs from the bill
+  // (fees, rounding). Defaults to the invoice amount.
+  let charged = null;
+  if (req.body && req.body.usd_charged !== undefined && req.body.usd_charged !== null && req.body.usd_charged !== '') {
+    charged = Number(req.body.usd_charged);
+    if (!Number.isFinite(charged) || charged <= 0) return res.status(400).json({ error: 'The amount charged must be a positive number' });
+    charged = round2(charged);
+    if (Math.abs(charged - si.usd_amount) < 0.005) charged = null;
+  }
+  const payUsd = charged === null ? si.usd_amount : charged;
   const { result, error, short } = applyValidated(() => {
     const txnId = db
       .prepare(
         `INSERT INTO usd_transactions (txn_date, type, usd_amount, mvr_amount, payee, reference, notes, created_by_name)
          VALUES (?, 'supplier_payment', ?, 0, ?, ?, ?, ?)`,
       )
-      .run(date, si.usd_amount, si.supplier, si.number, `Supplier invoice #${si.id}`, req.user.name).lastInsertRowid;
-    db.prepare("UPDATE supplier_invoices SET status = 'paid', paid_txn_id = ?, paid_at = ?, updated_at = datetime('now') WHERE id = ?").run(txnId, date, si.id);
+      .run(date, payUsd, si.supplier, si.number, `Supplier invoice #${si.id}`, req.user.name).lastInsertRowid;
+    db.prepare("UPDATE supplier_invoices SET status = 'paid', paid_txn_id = ?, paid_at = ?, amount_charged = ?, updated_at = datetime('now') WHERE id = ?").run(txnId, date, charged, si.id);
     return txnId;
   });
   if (error) {
@@ -238,7 +256,7 @@ router.post('/:id/unpay', manage, (req, res) => {
   if (si.status !== 'paid') return res.status(409).json({ error: 'This supplier invoice is not paid.' });
   const { error } = applyValidated(() => {
     if (si.paid_txn_id) db.prepare('DELETE FROM usd_transactions WHERE id = ?').run(si.paid_txn_id);
-    db.prepare("UPDATE supplier_invoices SET status = 'unpaid', paid_txn_id = NULL, paid_at = '', updated_at = datetime('now') WHERE id = ?").run(si.id);
+    db.prepare("UPDATE supplier_invoices SET status = 'unpaid', paid_txn_id = NULL, paid_at = '', amount_charged = NULL, updated_at = datetime('now') WHERE id = ?").run(si.id);
   });
   if (error) return res.status(409).json({ error: `Can't undo this payment. ${error}` });
   res.json({ ok: true });

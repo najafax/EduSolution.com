@@ -79,8 +79,8 @@ export default function CashTab({ token, can, entry, clearEntry }) {
   }
 
   async function pay(s) {
-    if (!(await confirm({ title: `Pay ${s.supplier}?`, message: `${usd(s.usd_amount)} comes out of the USD account today, in full.`, confirmLabel: 'Pay', danger: false }))) return;
-    act(() => api.supplierInvoices.pay(s.id, { date: todayStr() }, token), 'Supplier paid.');
+    if (!(await confirm({ title: `Pay ${s.supplier}?`, message: `${usd(s.usd_amount)} comes out of the USD account today, in full.${s.payment_url ? ' Only do this after you have paid through the supplier\'s link.' : ''}`, confirmLabel: 'Pay', danger: false }))) return;
+    act(() => api.supplierInvoices.pay(s.id, { txn_date: todayStr() }, token), 'Supplier paid.');
   }
   async function unpay(s) {
     if (!(await confirm({ title: 'Undo this payment?', message: `${usd(s.usd_amount)} goes back into the USD account.`, confirmLabel: 'Undo payment' }))) return;
@@ -150,7 +150,12 @@ export default function CashTab({ token, can, entry, clearEntry }) {
                 ['Invoice date', s.invoice_date], ['Funds sales', s.links.length ? s.links.map((l) => l.number || `#${l.invoice_id}`).join(', ') : 'none linked'],
                 ['Not assigned', usd(s.unassigned_usd)], ...(s.status === 'paid' ? [['Paid on', s.paid_at]] : []),
               ]}>
-                {canManage && s.status === 'unpaid' && <Btn tone="primary" onClick={() => pay(s)}>Pay in full</Btn>}
+                {s.status === 'unpaid' && s.payment_url && (
+                  <a href={s.payment_url} target="_blank" rel="noopener noreferrer" title={s.payment_url} className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800">
+                    Open payment link ({(() => { try { return new URL(s.payment_url).hostname; } catch { return 'link'; } })()})
+                  </a>
+                )}
+                {canManage && s.status === 'unpaid' && <Btn tone="primary" onClick={() => pay(s)}>{s.payment_url ? 'Mark paid' : 'Pay in full'}</Btn>}
                 {canManage && s.status === 'paid' && <Btn onClick={() => unpay(s)}>Undo payment</Btn>}
                 {canManage && <Btn onClick={() => setSiModal({ invoice: s })}>{s.status === 'paid' ? 'Links' : 'Edit'}</Btn>}
                 {s.has_file && <Btn onClick={() => api.supplierInvoices.openFile(s.id, token).catch((e) => toast(e.message, { type: 'error' }))}>View file</Btn>}
