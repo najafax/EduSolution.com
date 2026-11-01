@@ -9867,3 +9867,8 @@ Supersedes the monthly "owed to suppliers" view, month tagging and "already paid
 
 ### Supplier tracking date removed
 - "Sales waiting for a supplier invoice" now covers every sent/paid sale from the books start (`BOOKS_START`, 2025-01-01) onward; `supplier_track_from` is no longer applied (`trackFrom()` returns `BOOKS_START`; the setting and `PUT /supplier-costs/track-from` remain but have no effect). The "Only sales issued from…" note on the Cash tab is gone.
+
+### Forecast payouts, period comparison, test ports
+- `lib/cashForecast.js` now also subtracts estimated shareholder profit payouts (`payoutsOut` per bucket, `profitSharing: { on, from, sharePct }` on the response): only when automatic profit sharing is on, only for income landing on/after its start date (never before 2027-01-01, `deals.effectiveAutoFrom`), as total active ownership % × income × (1 − estimated supplier cost share). Owner draws are still not forecast.
+- Finance Overview has a "This year and all time" table (two `GET /financials/summary` calls) and a note that the bank balance follows the all-time column.
+- `test/helpers.js` `startServer()` ignores the requested port and picks a free one (fixes a CI flake from random-port clashes).
