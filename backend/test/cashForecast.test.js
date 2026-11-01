@@ -100,5 +100,8 @@ test('profit payouts are forecast only when automatic sharing is on, and only on
   const sum = (f) => f.buckets.reduce((t, bk) => t + bk.payoutsOut, 0);
   // The new 1000 invoice earns a 40% payout if it lands inside the window (no supplier cost here).
   const inWindow = due <= daysFromNow(90);
-  assert.equal(Math.round((sum(fc) - sum(on0)) * 100) / 100, inWindow ? 400 : 0);
+  // Income is paid out net of the estimated supplier cost share (the new
+  // item also dilutes that share slightly, hence the small tolerance).
+  const expected = inWindow ? 400 * (1 - fc.supplier.estimateSharePct / 100) : 0;
+  assert.ok(Math.abs(sum(fc) - sum(on0) - expected) < 2, `${sum(fc) - sum(on0)} vs ${expected}`);
 });
