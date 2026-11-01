@@ -34,6 +34,9 @@ export default function OverviewTab({ token, can, range, periodLabel, goTab }) {
   const symbol = useSymbol(token);
   const { data: s, error } = useLoader(() => api.financials.summary(token, range), [token, range.from, range.to]);
   const { data: fc } = useLoader(() => api.financials.cashForecast(token).catch(() => null), [token]);
+  const yr = new Date().getFullYear();
+  const { data: thisYear } = useLoader(() => api.financials.summary(token, { from: `${yr}-01-01`, to: new Date().toISOString().slice(0, 10) }).catch(() => null), [token]);
+  const { data: allTime } = useLoader(() => api.financials.summary(token, {}).catch(() => null), [token]);
   const { data: sup } = useLoader(() => api.supplierCosts.report(token).catch(() => null), [token]);
 
   if (error) return <p className="text-red-600 dark:text-red-400">{error}</p>;
@@ -52,6 +55,39 @@ export default function OverviewTab({ token, can, range, periodLabel, goTab }) {
         <Stat label="Bank" value={m(s.bankBalance)} sub={`As of ${s.bankBalanceAsOf}`} tone={s.bankBalance < 0 ? 'neg' : undefined} />
         <Stat label="USD account" value={usd(s.usdBalance)} sub={s.usdAvgRate ? `Avg cost ${s.usdAvgRate.toFixed(2)}` : 'No USD yet'} />
       </div>
+
+      {thisYear && allTime && (
+        <Card title="This year and all time">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <th className="py-1.5 pr-3"></th>
+                  <th className="py-1.5 pr-3 text-right">This year</th>
+                  <th className="py-1.5 text-right">All time</th>
+                </tr>
+              </thead>
+              <tbody className="text-slate-900 dark:text-white">
+                {[
+                  ['Revenue (cash received)', (x) => x.cashRevenue],
+                  ['Supplier costs', (x) => -x.supplierCosts],
+                  ['Operating expenses', (x) => -x.totalExpenses],
+                  ['Net profit', (x) => x.netProfit, true],
+                ].map(([label, f, strong]) => (
+                  <tr key={label} className={`border-t border-slate-100 dark:border-slate-800 ${strong ? 'font-bold' : ''}`}>
+                    <td className="py-2 pr-3">{label}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{full(symbol, f(thisYear))}</td>
+                    <td className="py-2 text-right tabular-nums">{full(symbol, f(allTime))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            The bank balance ({m(s.bankBalance)}) is a running total of all payments since the books started, so it follows the all-time column, not this year.
+          </p>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         <div className="flex min-w-0 flex-col gap-4">
@@ -106,7 +142,7 @@ export default function OverviewTab({ token, can, range, periodLabel, goTab }) {
                 ))}
               </div>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                Starts from today’s bank balance. {fc.overdue.count > 0 ? `${fc.overdue.count} overdue invoice(s) (${full(symbol, fc.overdue.amount)}) are not counted. ` : ''}Owner draws and profit payouts are not forecast.
+                Starts from today’s bank balance. {fc.overdue.count > 0 ? `${fc.overdue.count} overdue invoice(s) (${full(symbol, fc.overdue.amount)}) are not counted. ` : ''}Owner draws are not forecast. Profit payouts are estimated only when automatic profit sharing is on.
               </p>
             </Card>
           )}

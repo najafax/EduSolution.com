@@ -585,4 +585,5 @@ router.post('/:id/true-up-real', manage, (req, res) => {
 });
 
 router.autoDistribute = autoDistribute;
+router.effectiveAutoFrom = effectiveAutoFrom;
 module.exports = router;

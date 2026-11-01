@@ -8,7 +8,20 @@ const Database = require('better-sqlite3');
 
 const ROOT = path.join(__dirname, '..');
 
-async function startServer(port) {
+// A port the OS says is free right now, so parallel test files never collide.
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const srv = require('net').createServer();
+    srv.once('error', reject);
+    srv.listen(0, () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+async function startServer(requestedPort) {
+  const port = await freePort(); // the requested number is only a hint
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'edu-test-'));
   const dbPath = path.join(dir, 'test.sqlite3');
   const env = {

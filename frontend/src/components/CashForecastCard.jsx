@@ -12,6 +12,7 @@ const OUT_ROWS = [
   ['supplierOut', 'Supplier costs owed'],
   ['supplierEstOut', 'Supplier costs (estimated)'],
   ['expensesOut', 'Typical expenses'],
+  ['payoutsOut', 'Shareholder payouts (estimated)'],
 ];
 
 export default function CashForecastCard({ forecast, symbol }) {
@@ -81,7 +82,14 @@ export default function CashForecastCard({ forecast, symbol }) {
             last 12 months.
           </li>
         )}
-        <li>Typical expenses are the average of the last 90 days. Owner draws and payouts are not forecast.</li>
+        <li>Typical expenses are the average of the last 90 days. Owner draws are not forecast.</li>
+        {forecast.profitSharing && forecast.profitSharing.on ? (
+          <li>
+            Shareholder payouts assume {forecast.profitSharing.sharePct}% of the profit on income received from {forecast.profitSharing.from} onward is paid out by automatic profit sharing.
+          </li>
+        ) : (
+          <li>Profit payouts are not included because automatic profit sharing is off.</li>
+        )}
       </ul>
     </section>
   );

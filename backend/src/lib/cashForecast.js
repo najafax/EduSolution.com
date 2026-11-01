@@ -6,7 +6,9 @@
 //   out: USD still owed to suppliers (valued at the latest buy rate) due now,
 //        an estimate of supplier cost on income not yet invoiced (recurring
 //        invoices and licence renewals, at the last 12 months' cost share),
-//        plus a typical month of expenses (average of the last 90 days)
+//        plus a typical month of expenses (average of the last 90 days), and
+//        — only when automatic profit sharing is on — the shareholders' share
+//        of the profit on income received on/after its start date
 // Overdue invoices are reported separately and NOT counted as scheduled cash
 // in, because when (or whether) they pay is unknowable.
 const db = require('./../db');
@@ -32,11 +34,26 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
     supplierOut: 0,
     supplierEstOut: 0,
     expensesOut: 0,
+    payoutBase: 0,
+    payoutsOut: 0,
   }));
+  // Automatic profit sharing: it only pays out on invoices paid on/after its
+  // start date (never before 2027-01-01), so only income landing from then on
+  // creates a payout.
+  const autoFrom = require('../routes/deals').effectiveAutoFrom(
+    (db.prepare('SELECT auto_profit_from AS f FROM business_settings WHERE id = 1').get() || {}).f,
+  );
+  const sharePct = autoFrom
+    ? db.prepare('SELECT COALESCE(SUM(ownership_percent), 0) AS t FROM shareholders WHERE active = 1 AND ownership_percent > 0').get().t
+    : 0;
   const add = (date, key, amount) => {
     if (!(amount > 0)) return;
-    const i = bucketOf(date < today ? today : date, today);
-    if (i >= 0) buckets[i][key] += amount;
+    const when = date < today ? today : date;
+    const i = bucketOf(when, today);
+    if (i >= 0) {
+      buckets[i][key] += amount;
+      if (sharePct > 0 && when >= autoFrom) buckets[i].payoutBase += amount;
+    }
   };
 
   // Unpaid sent invoices.
@@ -116,10 +133,15 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
   const typicalMonth = spent / 3;
   buckets.forEach((b) => (b.expensesOut += typicalMonth));
 
+  // Shareholders' share of the profit on income received from the sharing
+  // start date: income less its estimated supplier cost, times total ownership.
+  const margin = Math.max(0, 1 - costShare);
+  for (const b of buckets) b.payoutsOut = b.payoutBase * margin * Math.min(sharePct, 100) / 100;
+
   let running = openingBalance;
   const out = buckets.map((b) => {
     const cashIn = b.invoicesIn + b.recurringIn + b.licensesIn;
-    const cashOut = b.supplierOut + b.supplierEstOut + b.expensesOut;
+    const cashOut = b.supplierOut + b.supplierEstOut + b.expensesOut + b.payoutsOut;
     running += cashIn - cashOut;
     return {
       days: b.days,
@@ -129,6 +151,7 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
       supplierOut: round2(b.supplierOut),
       supplierEstOut: round2(b.supplierEstOut),
       expensesOut: round2(b.expensesOut),
+      payoutsOut: round2(b.payoutsOut),
       cashIn: round2(cashIn),
       cashOut: round2(cashOut),
       net: round2(cashIn - cashOut),
@@ -143,6 +166,7 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
     overdue: { amount: round2(overdueAmount), count: overdueCount },
     supplier: { toPayUsd, rate: rate ? round2(rate * 10000) / 10000 : null, estimateSharePct: round2(costShare * 100) },
     typicalMonthlyExpenses: round2(typicalMonth),
+    profitSharing: { on: Boolean(autoFrom), from: autoFrom || null, sharePct: round2(sharePct) },
     lowestBalance: round2(Math.min(openingBalance, ...out.map((b) => b.projectedBalance))),
   };
 }

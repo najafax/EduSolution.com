@@ -74,3 +74,31 @@ test('supplier cost is estimated on income that is not invoiced yet', async () =
   assert.ok(f.buckets[0].supplierEstOut > 0);
   assert.ok(Math.abs(f.buckets[0].supplierEstOut - income * f.supplier.estimateSharePct / 100) < 0.05);
 });
+
+test('profit payouts are forecast only when automatic sharing is on, and only on income from its start date', async () => {
+  const off = (await srv.api('GET', '/financials/cash-forecast', null, boss)).data;
+  assert.equal(off.profitSharing.on, false);
+  assert.ok(off.buckets.every((b) => b.payoutsOut === 0));
+
+  assert.equal((await post('/shareholders', { name: 'Sh', email: 'sh@x.com', active: true, ownership_percent: 40 })).status, 201);
+  assert.equal((await srv.api('PUT', '/deals/auto-settings', { enabled: true }, boss)).status, 200);
+  const on0 = (await srv.api('GET', '/financials/cash-forecast', null, boss)).data;
+  assert.equal(on0.profitSharing.on, true);
+  assert.equal(on0.profitSharing.sharePct, 40);
+  const start = on0.profitSharing.from; // never before 2027-01-01
+
+  const client = (await post('/clients', { name: 'Late Ltd', email: 'l@x.com' })).data.client;
+  const due = start > daysFromNow(5) ? start : daysFromNow(5);
+  const inv = (await post('/invoices', { client_id: client.id, issue_date: daysFromNow(-1), due_date: due, items: [{ description: 'X', quantity: 1, unit_price: 1000 }] })).data;
+  const id = (inv.invoice || inv).id;
+  await srv.api('POST', `/invoices/${id}/send`, {}, boss).catch(() => {});
+  const d = srv.db();
+  d.prepare("UPDATE invoices SET status = 'sent' WHERE id = ?").run(id);
+  d.close();
+
+  const fc = (await srv.api('GET', '/financials/cash-forecast', null, boss)).data;
+  const sum = (f) => f.buckets.reduce((t, bk) => t + bk.payoutsOut, 0);
+  // The new 1000 invoice earns a 40% payout if it lands inside the window (no supplier cost here).
+  const inWindow = due <= daysFromNow(90);
+  assert.equal(Math.round((sum(fc) - sum(on0)) * 100) / 100, inWindow ? 400 : 0);
+});
