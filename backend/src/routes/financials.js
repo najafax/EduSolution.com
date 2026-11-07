@@ -13,6 +13,43 @@ const monthKey = (dateStr) => dateStr.slice(0, 7); // 'YYYY-MM'
 
 const recentMonths = recentMonthKeys;
 
+// Every figure behind the bank balance: the opening balance plus everything
+// dated from `sinceDate` through `asOf` ('0000-00-00' = no lower cutoff).
+// Also used to calibrate the opening balance to a known real balance.
+function bankFlows(startingBalance, sinceDate, asOf, ledgerRows) {
+  const sum = (table, col, extra = '') =>
+    db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM ${table} WHERE ${col} >= ? AND ${col} <= ?${extra}`).get(sinceDate, asOf).total;
+  const paymentsIn = sum('payments', 'paid_at');
+  const contributions = sum('capital_contributions', 'contribution_date');
+  const expenses = sum('expenses', 'expense_date');
+  const draws = sum('owner_draws', 'draw_date', " AND type = 'draw'");
+  const returns = sum('owner_draws', 'draw_date', " AND type = 'return'");
+  const distributions = sum('owner_draws', 'draw_date', " AND type = 'profit_distribution'");
+  let usdBuys = 0;
+  let usdSells = 0;
+  for (const r of ledgerRows) {
+    if (r.txn_date < sinceDate || r.txn_date > asOf) continue;
+    if (r.type === 'buy') usdBuys += r.mvr_amount;
+    else if (r.type === 'sell') usdSells += r.mvr_amount;
+  }
+  const r2 = (n) => Math.round(n * 100) / 100;
+  const total = r2(startingBalance + paymentsIn + contributions + returns + usdSells - expenses - draws - distributions - usdBuys);
+  return {
+    startingBalance: r2(startingBalance),
+    sinceDate: sinceDate === '0000-00-00' ? '' : sinceDate,
+    asOf,
+    paymentsIn: r2(paymentsIn),
+    contributions: r2(contributions),
+    returns: r2(returns),
+    usdSells: r2(usdSells),
+    expenses: r2(expenses),
+    draws: r2(draws),
+    distributions: r2(distributions),
+    usdBuys: r2(usdBuys),
+    total,
+  };
+}
+
 // The whole GET /summary computation, pulled out into a plain function so
 // routes/dashboard.js's combined overview endpoint can call it in-process
 // (a direct function call, not a second HTTP round-trip) rather than
@@ -142,29 +179,9 @@ function computeSummary(from, to) {
   const startingBalance = openingRow.starting_balance || 0;
   // Only transactions on/after the starting-balance date count (blank = no cutoff).
   const sinceDate = openingRow.starting_balance_date || '0000-00-00';
-  const sum = (table, col, extra = '') =>
-    db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM ${table} WHERE ${col} >= ? AND ${col} <= ?${extra}`).get(sinceDate, asOf).total;
-  const paidThroughAsOf = sum('payments', 'paid_at');
-  const expensesThroughAsOf = sum('expenses', 'expense_date');
-  const contributionsThroughAsOf = sum('capital_contributions', 'contribution_date');
-  const drawsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'draw'");
-  const returnsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'return'");
-  const distributionsThroughAsOf = sum('owner_draws', 'draw_date', " AND type = 'profit_distribution'");
-  // MVR cash moved by the USD account: buys go out, conversions back come in.
-  const usdCashFlow = usdLedger.mvrCashFlow(sinceDate === '0000-00-00' ? null : sinceDate, asOf, ledgerRows);
+  const bank = bankFlows(startingBalance, sinceDate, asOf, ledgerRows);
+  const bankBalance = bank.total;
   const usdPosition = usdLedger.position(asOf, ledgerRows);
-  const bankBalance =
-    Math.round(
-      (startingBalance +
-        usdCashFlow +
-        paidThroughAsOf +
-        contributionsThroughAsOf -
-        expensesThroughAsOf -
-        drawsThroughAsOf +
-        returnsThroughAsOf -
-        distributionsThroughAsOf) *
-        100,
-    ) / 100;
 
   // Deliberately NOT scoped to the period filter — this widget is titled
   // "Revenue, last 6 months" on Financials.jsx, a fixed trailing window
@@ -229,6 +246,7 @@ function computeSummary(from, to) {
     totalOwnerReturns: Math.round(totalOwnerReturns * 100) / 100,
     totalOwnerDistributions: Math.round(totalOwnerDistributions * 100) / 100,
     bankBalance,
+    bankBreakdown: bank,
     bankBalanceAsOf: asOf,
     startingBalanceDate: openingRow.starting_balance_date || '',
     quoteCounts,
@@ -265,6 +283,23 @@ router.get('/cash-forecast', requirePermission('financials', 'view'), (req, res)
     console.error('GET /api/financials/cash-forecast failed:', err);
     res.status(500).json({ error: 'Failed to build the cash forecast' });
   }
+});
+
+// Set the bank balance to a known real figure: the opening balance is
+// recomputed so that the balance at the end of `as_of` (default today) is
+// exactly `actual_balance`. Everything dated after it then adds on as usual;
+// anything before `as_of` stops counting toward the bank balance (profit
+// figures are unaffected).
+router.post('/bank-balance/calibrate', requirePermission('financials', 'manage'), (req, res) => {
+  const actual = Number(req.body && req.body.actual_balance);
+  if (!Number.isFinite(actual)) return res.status(400).json({ error: 'actual_balance must be a number' });
+  const asOf = (req.body && req.body.as_of) || today();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf) || asOf > today()) return res.status(400).json({ error: 'as_of must be a valid date, not in the future' });
+  const ledgerRows = usdLedger.replay().rows;
+  const flows = bankFlows(0, asOf, asOf, ledgerRows); // activity on that day itself, without any opening balance
+  const starting = Math.round((actual - flows.total) * 100) / 100;
+  db.prepare('UPDATE business_settings SET starting_balance = ?, starting_balance_date = ? WHERE id = 1').run(starting, asOf);
+  res.json({ ok: true, startingBalance: starting, startingBalanceDate: asOf, bankBalance: computeSummary().bankBalance });
 });
 
 module.exports = router;

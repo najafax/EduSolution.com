@@ -391,6 +391,7 @@ export const api = {
     // response.
     summary: (token, { from, to } = {}) => request(`/financials/summary${qs({ from, to })}`, { token }),
     cashForecast: (token) => request('/financials/cash-forecast', { token }),
+    calibrateBank: (payload, token) => request('/financials/bank-balance/calibrate', { method: 'POST', body: payload, token }),
   },
 
   // The single combined fetch behind Dashboard.jsx — replaces what used to

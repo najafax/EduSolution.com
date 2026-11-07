@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../lib/useConfirm';
 import { api } from '../../lib/api';
 import { money } from '../../lib/money';
 import RevenueTrendChart from '../../components/RevenueTrendChart';
-import { Card, Pill, Empty, full, usd, useLoader, useSymbol } from './ui';
+import { Card, Pill, Empty, INPUT, LABEL, full, usd, useLoader, useSymbol } from './ui';
 
 // Overview: the profit-and-loss in statement form, the bank and USD
 // positions, what needs attention, and the 30/60/90-day cash forecast.
@@ -30,9 +33,79 @@ function Line({ label, value, strong, indent, onClick, tone }) {
   return onClick ? <button type="button" onClick={onClick} className={`${cls} hover:text-lagoon-700`}>{body}</button> : <div className={cls}>{body}</div>;
 }
 
+
+// Where the bank balance comes from, line by line, plus a way to set it to
+// the real balance from the bank (it re-anchors the opening balance).
+function BankBreakdown({ s, symbol, token, canManage, onChanged }) {
+  const b = s.bankBreakdown;
+  const { toast } = useToast();
+  const { confirm, confirmDialog } = useConfirm();
+  const [actual, setActual] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!b) return null;
+  const rows = [
+    [b.sinceDate ? `Opening balance (as of ${b.sinceDate})` : 'Opening balance', b.startingBalance, true],
+    ['+ Payments received', b.paymentsIn],
+    ['+ Owner contributions', b.contributions],
+    ['+ Owner returns', b.returns],
+    ['+ USD sold back to MVR', b.usdSells],
+    ['− Expenses', -b.expenses],
+    ['− Owner draws', -b.draws],
+    ['− Profit payouts', -b.distributions],
+    ['− MVR spent buying USD', -b.usdBuys],
+  ];
+  async function calibrate(e) {
+    e.preventDefault();
+    const value = Number(actual);
+    if (actual === '' || !Number.isFinite(value)) return;
+    const ok = await confirm({
+      title: 'Set the bank balance?',
+      message: `The bank balance will read exactly ${full(symbol, value)} from today. Earlier transactions stop counting toward the bank balance (profit figures are not affected); new ones add on from here.`,
+      confirmLabel: 'Set balance',
+      danger: false,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await api.financials.calibrateBank({ actual_balance: value }, token);
+      toast(`Bank balance set to ${full(symbol, value)}`);
+      setActual('');
+      onChanged();
+    } catch (err) {
+      toast(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Card title="How the bank balance is calculated">
+      {rows.map(([label, v, strong]) => (
+        <Line key={label} label={label} value={full(symbol, v)} strong={strong} tone={!strong && v < 0 ? 'neg' : undefined} />
+      ))}
+      <Line strong label={`Bank balance (as of ${b.asOf})`} value={full(symbol, b.total)} tone={b.total < 0 ? 'neg' : 'pos'} />
+      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+        It is a running total of what is recorded in the app. If it differs from your real bank balance, a payment, expense or USD purchase is missing or recorded twice, or the opening balance is wrong.
+      </p>
+      {canManage && (
+        <form onSubmit={calibrate} className="mt-4 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <label className="min-w-[10rem] flex-1">
+            <span className={LABEL}>My actual bank balance today</span>
+            <input className={INPUT} type="number" step="0.01" value={actual} onChange={(e) => setActual(e.target.value)} placeholder="e.g. 4250" />
+          </label>
+          <button type="submit" disabled={busy || actual === ''} className="min-h-11 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white disabled:opacity-50 dark:bg-lagoon-600">
+            {busy ? 'Setting…' : 'Set to this balance'}
+          </button>
+        </form>
+      )}
+      {confirmDialog}
+    </Card>
+  );
+}
+
 export default function OverviewTab({ token, can, range, periodLabel, goTab }) {
   const symbol = useSymbol(token);
-  const { data: s, error } = useLoader(() => api.financials.summary(token, range), [token, range.from, range.to]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const { data: s, error } = useLoader(() => api.financials.summary(token, range), [token, range.from, range.to, reloadKey]);
   const { data: fc } = useLoader(() => api.financials.cashForecast(token).catch(() => null), [token]);
   const yr = new Date().getFullYear();
   const { data: thisYear } = useLoader(() => api.financials.summary(token, { from: `${yr}-01-01`, to: new Date().toISOString().slice(0, 10) }).catch(() => null), [token]);
@@ -55,6 +128,8 @@ export default function OverviewTab({ token, can, range, periodLabel, goTab }) {
         <Stat label="Bank" value={m(s.bankBalance)} sub={`As of ${s.bankBalanceAsOf}`} tone={s.bankBalance < 0 ? 'neg' : undefined} />
         <Stat label="USD account" value={usd(s.usdBalance)} sub={s.usdAvgRate ? `Avg cost ${s.usdAvgRate.toFixed(2)}` : 'No USD yet'} />
       </div>
+
+      <BankBreakdown s={s} symbol={symbol} token={token} canManage={can('financials', 'manage')} onChanged={() => setReloadKey((k) => k + 1)} />
 
       {thisYear && allTime && (
         <Card title="This year and all time">
