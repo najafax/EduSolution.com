@@ -9876,3 +9876,6 @@ Supersedes the monthly "owed to suppliers" view, month tagging and "already paid
 ### Bank balance breakdown + calibration
 - `routes/financials.js` `bankFlows(startingBalance, sinceDate, asOf, ledgerRows)` is the one place the bank balance is summed; `computeSummary()` returns it as `bankBreakdown` (opening balance, payments, contributions, returns, USD sold, expenses, draws, profit payouts, MVR spent buying USD, total). Finance → Overview shows it as "How the bank balance is calculated".
 - `POST /api/financials/bank-balance/calibrate` (`financials:manage`, body `{ actual_balance, as_of? }`) sets `starting_balance` and `starting_balance_date` so the balance at the end of `as_of` (default today) is exactly the real figure; later activity adds on. Earlier transactions stop counting toward the bank balance only (profit is unaffected). UI: "My actual bank balance today" on the Overview card. Test: `backend/test/bankCalibrate.test.js`.
+
+### Supplier cut-off date (supersedes "Supplier tracking date removed")
+- `supplierCosts.trackFrom()` applies `business_settings.supplier_track_from` again (never earlier than `BOOKS_START`; blank = books start). Sales issued before it are not "waiting for a supplier invoice" and drop out of the supplier-owed part of the cash forecast. Set from Finance → Cash → "Only sales issued from" (`PUT /supplier-costs/track-from`).

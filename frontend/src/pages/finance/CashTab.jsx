@@ -24,11 +24,13 @@ export default function CashTab({ token, can, entry, clearEntry }) {
   const { data: si, reload: reloadSi } = useLoader(() => api.supplierInvoices.list(token), [token]);
   const [siFilter, setSiFilter] = useState('unpaid');
   const [openId, setOpenId] = useState(null);
+  const [trackDate, setTrackDate] = useState('');
   const [txn, setTxn] = useState(null);
   const [busy, setBusy] = useState(false);
   const [txnError, setTxnError] = useState('');
   const [siModal, setSiModal] = useState(null); // { invoice?, presetLink? }
 
+  useEffect(() => { if (over && over.trackFrom) setTrackDate(over.trackFrom); }, [over]);
   const reloadAll = () => (reloadSum(), reloadAcct(), reloadOver(), reloadSi());
 
   useEffect(() => {
@@ -167,6 +169,15 @@ export default function CashTab({ token, can, entry, clearEntry }) {
 
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Sales waiting for a supplier invoice">
+            {over && (
+              <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+                <span>Only sales issued from</span>
+                <input type="date" className={INPUT + ' !w-auto'} value={trackDate} onChange={(e) => setTrackDate(e.target.value)} />
+                {canManage && trackDate && trackDate !== over.trackFrom && (
+                  <Btn tone="primary" onClick={() => act(() => api.supplierCosts.setTrackFrom(trackDate, token), 'Cut-off date saved.')}>Save</Btn>
+                )}
+              </div>
+            )}
             {!over ? <Empty>Loading…</Empty> : over.awaiting.length === 0 ? <Empty>Every tracked sale has its supplier invoice.</Empty> : over.awaiting.map((a) => (
               <Row key={a.invoice_id} title={`${a.number} · ${a.client_name}`} sub={`Issued ${a.issue_date}`} amount={`~${usd(a.remainingUsd)}`} open={openId === `aw${a.invoice_id}`} onClick={() => setOpenId(openId === `aw${a.invoice_id}` ? null : `aw${a.invoice_id}`)}>
                 <Detail pairs={[['Estimated cost', usd(a.estimatedUsd)], ['Already linked', usd(a.linkedUsd)]]}>

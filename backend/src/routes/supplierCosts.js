@@ -56,10 +56,13 @@ function lastBuyRate(ledgerRows) {
   return b ? b.mvr_amount / b.usd_amount : null;
 }
 
-// Every sale since the books start is tracked; the old per-business
-// supplier_track_from setting is no longer applied (column kept, unused).
+// Sales issued before business_settings.supplier_track_from (never earlier
+// than the books start) are not expected to produce a supplier invoice we are
+// still waiting for. Blank = from the books start.
 function trackFrom() {
-  return BOOKS_START;
+  const row = db.prepare('SELECT supplier_track_from AS d FROM business_settings WHERE id = 1').get();
+  const d = row && row.d;
+  return d && isValidDate(d) && d > BOOKS_START ? d : BOOKS_START;
 }
 
 // Estimated USD supplier cost per client invoice, from item cost prices, for

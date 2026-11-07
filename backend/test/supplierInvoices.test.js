@@ -103,6 +103,16 @@ test('sales before the tracking date are ignored; validation; permissions', asyn
   assert.equal(o.awaiting.find((x) => x.invoice_id === c.id), undefined);
   assert.equal((await put('/supplier-costs/track-from', { track_from: 'soon' })).status, 400);
 
+  // The cut-off date hides recent sales too.
+  const d = await soldInvoice('Delta', 400, 1, 25);
+  assert.ok((await get('/supplier-costs')).data.awaiting.find((x) => x.invoice_id === d.id));
+  const cutoff = '2999-01-01';
+  assert.equal((await put('/supplier-costs/track-from', { track_from: cutoff })).status, 200);
+  const after = (await get('/supplier-costs')).data;
+  assert.equal(after.trackFrom, cutoff);
+  assert.equal(after.awaiting.find((x) => x.invoice_id === d.id), undefined);
+  await put('/supplier-costs/track-from', { track_from: '2025-01-01' });
+
   assert.equal((await post('/supplier-invoices', { supplier: '', usd_amount: 5 })).status, 400);
   assert.equal((await post('/supplier-invoices', { supplier: 'X', usd_amount: -5 })).status, 400);
   assert.equal((await post('/supplier-invoices', { supplier: 'X', usd_amount: 5, file_data: 'data:text/plain;base64,aGk=' })).status, 400);
