@@ -252,6 +252,17 @@ export default function Settings() {
               </label>
             </div>
             <Field
+              label="Books start date"
+              type="date"
+              value={form.books_start || ''}
+              onChange={(v) => setForm((f) => ({ ...f, books_start: v }))}
+            />
+            <span className="-mt-1 block text-xs text-slate-500 dark:text-slate-400">
+              Your fresh start. Profit, revenue, expenses and the "sales waiting for a supplier invoice" list only count from this
+              date; the bank balance does too unless a starting balance date is set below. Nothing is deleted: older invoices,
+              quotes and payments stay exactly as they are. Leave blank for the default (1 Jan 2025).
+            </span>
+            <Field
               label="Starting balance date (optional)"
               type="date"
               value={form.starting_balance_date || ''}

@@ -121,6 +121,11 @@ export default function OverviewTab({ token, can, range, periodLabel, goTab }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {s.booksStart && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Finance figures count from {s.booksStart}. Older invoices, quotes and payments are kept but left out here. Change this in Settings → Financial.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Stat hero label={`Net profit · ${periodLabel}`} value={m(s.netProfit)} sub={margin === null ? 'No revenue yet' : `${margin}% margin`} tone={s.netProfit < 0 ? 'neg' : undefined} />
         <Stat label="Revenue" value={m(s.cashRevenue)} sub="Cash received" />

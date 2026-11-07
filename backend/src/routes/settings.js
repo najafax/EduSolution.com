@@ -4,6 +4,7 @@ const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { isConfigured: isBackupConfigured, listBackups } = require('../lib/backup');
+const { isValidDate } = require('../lib/validate');
 
 const router = Router();
 router.use(requireAuth);
@@ -142,6 +143,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     starting_balance = 0,
     starting_balance_date = '',
     license_invoice_lead_days,
+    books_start,
   } = req.body || {};
 
   const timeoutNum = Number(session_timeout_minutes);
@@ -157,6 +159,14 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     leadDays = Number(license_invoice_lead_days);
     if (!Number.isInteger(leadDays) || leadDays < 0 || leadDays > 90) {
       return res.status(400).json({ error: 'license_invoice_lead_days must be a whole number from 0 (off) to 90' });
+    }
+  }
+  // Omitted = leave the saved value alone; blank = back to the default floor.
+  let booksStartVal = null;
+  if (books_start !== undefined) {
+    booksStartVal = String(books_start || '').trim();
+    if (booksStartVal && !isValidDate(booksStartVal)) {
+      return res.status(400).json({ error: 'books_start must be a valid date (YYYY-MM-DD) or blank' });
     }
   }
   const startingBalanceNum = Number(starting_balance);
@@ -183,7 +193,8 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
      SET business_name = ?, email = ?, phone = ?, address = ?, tax_id = ?, currency_symbol = ?, bank_details = ?,
          session_timeout_minutes = ?, signature_image = ?, stamp_image = ?, logo_image = ?, signatory_name = ?,
          pdf_template = ?, starting_balance = ?, starting_balance_date = ?,
-         license_invoice_lead_days = COALESCE(?, license_invoice_lead_days), updated_at = datetime('now')
+         license_invoice_lead_days = COALESCE(?, license_invoice_lead_days),
+         books_start = COALESCE(?, books_start), updated_at = datetime('now')
      WHERE id = 1`,
   ).run(
     business_name,
@@ -202,6 +213,7 @@ router.put('/', requirePermission('settings', 'manage'), (req, res) => {
     startingBalanceNum,
     startingBalanceDate,
     leadDays,
+    booksStartVal,
   );
 
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();

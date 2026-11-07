@@ -151,7 +151,7 @@ router.get('/bank-balance/pdf', async (req, res) => {
   const startingBalance = settingsRow.starting_balance || 0;
   // Transactions dated before the starting-balance date are already inside
   // the starting balance, so they never count (blank = no cutoff).
-  const sinceDate = settingsRow.starting_balance_date || '0000-00-00';
+  const sinceDate = settingsRow.starting_balance_date || require('../lib/booksStart').booksStart();
   const before = (table, col, extra = '') =>
     db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM ${table} WHERE ${col} >= ? AND ${col} < ?${extra}`).get(sinceDate, range.from).total;
   const paidBefore = before('payments', 'paid_at');

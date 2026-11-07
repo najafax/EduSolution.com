@@ -1037,6 +1037,15 @@ if (!settingsColsSupplier.has('supplier_track_from')) {
   // still wait for (older history was handled before this feature).
   db.prepare("UPDATE business_settings SET supplier_track_from = strftime('%Y-%m-01', 'now')").run();
 }
+// The single "books start date" (see lib/booksStart.js). Blank = the fixed
+// 2025-01-01 floor. An established database (it already has invoices) is moved
+// to 2026-01-01 once, when the column is first added; a brand-new one stays blank.
+if (!settingsColsSupplier.has('books_start')) {
+  db.exec(`ALTER TABLE business_settings ADD COLUMN books_start TEXT NOT NULL DEFAULT '';`);
+  if (db.prepare('SELECT COUNT(*) AS c FROM invoices').get().c > 0) {
+    db.prepare("UPDATE business_settings SET books_start = '2026-01-01'").run();
+  }
+}
 if (!expenseColumns.has('payee_account_number')) {
   db.exec(`ALTER TABLE expenses ADD COLUMN payee_account_number TEXT NOT NULL DEFAULT '';`);
 }

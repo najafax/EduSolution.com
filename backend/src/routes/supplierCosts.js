@@ -2,7 +2,8 @@ const { Router } = require('express');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { replay, position } = require('../lib/usdLedger');
-const { todayStr, addDays, BOOKS_START } = require('../lib/businessDate');
+const { todayStr, addDays } = require('../lib/businessDate');
+const { booksStart } = require('../lib/booksStart');
 const { isValidDate } = require('../lib/validate');
 
 // USD owed to suppliers, built on supplier invoices (routes/supplierInvoices.js).
@@ -56,13 +57,14 @@ function lastBuyRate(ledgerRows) {
   return b ? b.mvr_amount / b.usd_amount : null;
 }
 
-// Sales issued before business_settings.supplier_track_from (never earlier
-// than the books start) are not expected to produce a supplier invoice we are
-// still waiting for. Blank = from the books start.
+// Sales issued before the books start date are never "waiting for a supplier
+// invoice". business_settings.supplier_track_from can push the cut-off later
+// than that (it never moves it earlier).
 function trackFrom() {
+  const start = booksStart();
   const row = db.prepare('SELECT supplier_track_from AS d FROM business_settings WHERE id = 1').get();
   const d = row && row.d;
-  return d && isValidDate(d) && d > BOOKS_START ? d : BOOKS_START;
+  return d && isValidDate(d) && d > start ? d : start;
 }
 
 // Estimated USD supplier cost per client invoice, from item cost prices, for

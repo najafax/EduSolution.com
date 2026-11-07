@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const usdLedger = require('../lib/usdLedger');
-const { todayStr, recentMonthKeys, BOOKS_START } = require('../lib/businessDate');
+const { todayStr, recentMonthKeys } = require('../lib/businessDate');
+const { booksStart } = require('../lib/booksStart');
 const db = require('../db');
 const { requireAuth, requirePermission } = require('../middleware/auth');
 
@@ -57,9 +58,10 @@ function bankFlows(startingBalance, sinceDate, asOf, ledgerRows) {
 // net profit, etc. — a second time. `from`/`to` are both optional exactly
 // as they are on the route below.
 function computeSummary(from, to) {
-  // Nothing before BOOKS_START counts: an open-ended or earlier range starts there.
-  if (!(DATE_RE.test(from || '') && DATE_RE.test(to || '') && from <= to)) { from = BOOKS_START; to = today(); }
-  else if (from < BOOKS_START) from = BOOKS_START;
+  // Nothing before the books start date counts: an open-ended or earlier range starts there.
+  const start = booksStart();
+  if (!(DATE_RE.test(from || '') && DATE_RE.test(to || '') && from <= to)) { from = start; to = today(); }
+  else if (from < start) from = start;
   if (from > to) to = from;
   const filtered = DATE_RE.test(from || '') && DATE_RE.test(to || '') && from <= to;
   const dateFilter = filtered ? ' AND issue_date BETWEEN ? AND ?' : '';
@@ -177,8 +179,9 @@ function computeSummary(from, to) {
   const asOf = filtered ? to : today();
   const openingRow = db.prepare('SELECT starting_balance, starting_balance_date FROM business_settings WHERE id = 1').get() || {};
   const startingBalance = openingRow.starting_balance || 0;
-  // Only transactions on/after the starting-balance date count (blank = no cutoff).
-  const sinceDate = openingRow.starting_balance_date || '0000-00-00';
+  // Only transactions on/after the starting-balance date count; with no such date
+  // set, the books start date is the cutoff (the starting balance is then the balance at that date).
+  const sinceDate = openingRow.starting_balance_date || start;
   const bank = bankFlows(startingBalance, sinceDate, asOf, ledgerRows);
   const bankBalance = bank.total;
   const usdPosition = usdLedger.position(asOf, ledgerRows);
@@ -249,6 +252,7 @@ function computeSummary(from, to) {
     bankBreakdown: bank,
     bankBalanceAsOf: asOf,
     startingBalanceDate: openingRow.starting_balance_date || '',
+    booksStart: start,
     quoteCounts,
     invoiceCounts,
     monthlyTrend,
