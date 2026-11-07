@@ -123,18 +123,28 @@ test('sales before the tracking date are ignored; validation; permissions', asyn
   assert.equal((await srv.api('GET', '/supplier-invoices')).status, 401);
 });
 
-test('cash forecast uses real supplier invoices by due date', async () => {
+test('cash forecast uses real supplier invoices by due date, after USD already held', async () => {
   srv.db().prepare('DELETE FROM supplier_invoices').run();
   const before = (await get('/financials/cash-forecast')).data;
+  const ov = (await get('/supplier-costs')).data;
+  const bal = Math.max(0, ov.usdAccount.balanceUsd || 0);
+  const awaitingUsd = ov.awaitingUsd || 0;
   await post('/supplier-invoices', { supplier: 'Soon', invoice_date: today(), due_date: daysFromNow(10), usd_amount: 100 });
   await post('/supplier-invoices', { supplier: 'Later', invoice_date: today(), due_date: daysFromNow(45), usd_amount: 200 });
   const f = (await get('/financials/cash-forecast')).data;
   const rate = f.supplier.rate;
   assert.ok(rate > 0);
-  const d0 = f.buckets[0].supplierOut - before.buckets[0].supplierOut;
-  const d1 = f.buckets[1].supplierOut - before.buckets[1].supplierOut;
-  assert.ok(Math.abs(d0 - 100 * rate) < 0.05, `bucket0 ${d0}`);
-  assert.ok(Math.abs(d1 - 200 * rate) < 0.05, `bucket1 ${d1}`);
+  // USD on hand pays the earliest bills first, then the sales still awaiting a bill.
+  let held = bal;
+  const cover = (usd) => { const u = Math.min(held, usd); held -= u; return usd - u; };
+  const soon = cover(100);
+  const later = cover(200);
+  const awaitNeed = cover(awaitingUsd);
+  const exp0 = (soon + awaitNeed) * rate;
+  const exp1 = later * rate;
+  assert.ok(Math.abs(f.buckets[0].supplierOut - exp0) < 0.1, `bucket0 ${f.buckets[0].supplierOut} vs ${exp0}`);
+  assert.ok(Math.abs(f.buckets[1].supplierOut - exp1) < 0.1, `bucket1 ${f.buckets[1].supplierOut} vs ${exp1}`);
+  assert.ok(f.buckets[0].supplierOut <= before.buckets[0].supplierOut + 100 * rate + 0.1);
 });
 
 test('profit per sale: actual cost from paid supplier invoices, estimates otherwise', async () => {

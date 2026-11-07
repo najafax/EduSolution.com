@@ -201,7 +201,7 @@ router.computeToPay = function computeToPay() {
   const invoiced = db.prepare("SELECT usd_amount, due_date FROM supplier_invoices WHERE status = 'unpaid'").all();
   const awaitingUsd = round2(computeAwaiting().reduce((s, a) => s + a.remainingUsd, 0));
   const invoicedUsd = round2(invoiced.reduce((s, r) => s + r.usd_amount, 0));
-  return { toPayUsd: round2(invoicedUsd + awaitingUsd), invoicedUsd, awaitingUsd, invoiced, rate: lastBuyRate(ledger) || pos.avgRate || null };
+  return { toPayUsd: round2(invoicedUsd + awaitingUsd), invoicedUsd, awaitingUsd, invoiced, balanceUsd: pos.balanceUsd || 0, rate: lastBuyRate(ledger) || pos.avgRate || null };
 };
 
 // Reused by lib/cashForecast.js: how many USD of supplier cost each MVR of

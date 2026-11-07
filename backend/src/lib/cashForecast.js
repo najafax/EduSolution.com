@@ -110,14 +110,24 @@ function computeCashForecast({ openingBalance = 0, today = todayStr() } = {}) {
   // Supplier costs owed (USD) at the latest buy rate: unpaid supplier invoices
   // fall in the bucket of their due date (overdue or undated ones are due now);
   // sales still waiting for their supplier invoice are an estimate, due now.
-  const { toPayUsd, awaitingUsd, invoiced, rate } = require('../routes/supplierCosts').computeToPay();
+  const { toPayUsd, awaitingUsd, invoiced, rate, balanceUsd } = require('../routes/supplierCosts').computeToPay();
   if (rate) {
-    for (const si of invoiced) {
+    // USD already held in the USD account pays suppliers first (earliest due
+    // first), so only the part it can't cover needs MVR from the bank.
+    let held = Math.max(0, balanceUsd || 0);
+    const cover = (usd) => {
+      const used = Math.min(held, usd);
+      held -= used;
+      return usd - used;
+    };
+    const sorted = [...invoiced].sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+    for (const si of sorted) {
       const due = !si.due_date || si.due_date < today ? today : si.due_date;
       const i = bucketOf(due, today);
-      if (i >= 0) buckets[i].supplierOut += si.usd_amount * rate;
+      const need = cover(si.usd_amount);
+      if (i >= 0) buckets[i].supplierOut += need * rate;
     }
-    buckets[0].supplierOut += awaitingUsd * rate;
+    buckets[0].supplierOut += cover(awaitingUsd) * rate;
   }
 
   // Supplier cost we expect on income that has not been invoiced yet, in the

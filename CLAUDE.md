@@ -9879,3 +9879,4 @@ Supersedes the monthly "owed to suppliers" view, month tagging and "already paid
 
 ### Supplier cut-off date (supersedes "Supplier tracking date removed")
 - `supplierCosts.trackFrom()` applies `business_settings.supplier_track_from` again (never earlier than `BOOKS_START`; blank = books start). Sales issued before it are not "waiting for a supplier invoice" and drop out of the supplier-owed part of the cash forecast. Set from Finance → Cash → "Only sales issued from" (`PUT /supplier-costs/track-from`).
+- Cash forecast: USD already held in the USD account now pays unpaid supplier invoices (earliest due first) and then the sales awaiting a supplier invoice, so only the shortfall is projected as MVR leaving the bank (`computeToPay()` returns `balanceUsd`).
