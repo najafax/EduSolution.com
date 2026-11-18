@@ -76,8 +76,8 @@ async function gmailAccessToken() {
   return gmailToken.value;
 }
 
-async function sendViaGmail({ from, to, subject, html, attachments, replyTo }) {
-  const raw = await new MailComposer({ from, to, subject, html, attachments, ...(replyTo && { replyTo }) })
+async function sendViaGmail({ from, to, cc, subject, html, attachments, replyTo }) {
+  const raw = await new MailComposer({ from, to, ...(cc.length && { cc }), subject, html, attachments, ...(replyTo && { replyTo }) })
     .compile()
     .build();
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
@@ -94,14 +94,19 @@ async function sendViaGmail({ from, to, subject, html, attachments, replyTo }) {
   }
 }
 
+// A string `to` (a client's email field, possibly "a@x.com, b@y.com") goes to
+// the first address with every other address on Cc. An array `to` is an
+// explicit recipient list and stays all in To.
 async function sendMail({ to: toRaw, subject, html, attachments }) {
-  const to = Array.isArray(toRaw) ? toRaw : splitEmails(toRaw);
+  const list = Array.isArray(toRaw) ? toRaw : splitEmails(toRaw);
+  const to = Array.isArray(toRaw) ? list : list.slice(0, 1);
+  const cc = Array.isArray(toRaw) ? [] : list.slice(1);
   const from = process.env.SMTP_FROM || process.env.GMAIL_FROM || process.env.SMTP_USER;
   const replyTo = replyToAddress();
 
   if (gmailConfigured()) {
     try {
-      await sendViaGmail({ from, to, subject, html, attachments, replyTo });
+      await sendViaGmail({ from, to, cc, subject, html, attachments, replyTo });
     } catch (err) {
       // Gmail is the sole sender (no fallback): tell the operator, then let the caller see the failure.
       sendOpsAlert(
@@ -116,7 +121,7 @@ async function sendMail({ to: toRaw, subject, html, attachments }) {
   const resend = getResendClient();
 
   if (resend) {
-    const { error } = await resend.emails.send({ from, to, subject, html, attachments, ...(replyTo && { replyTo }) });
+    const { error } = await resend.emails.send({ from, to, ...(cc.length && { cc }), subject, html, attachments, ...(replyTo && { replyTo }) });
     if (error) {
       const err = new Error(error.message || 'Resend failed to send the email.');
       err.code = error.name || 'RESEND_ERROR';
@@ -134,7 +139,7 @@ async function sendMail({ to: toRaw, subject, html, attachments }) {
     throw error;
   }
 
-  await t.sendMail({ from, to, subject, html, attachments, ...(replyTo && { replyTo }) });
+  await t.sendMail({ from, to, ...(cc.length && { cc }), subject, html, attachments, ...(replyTo && { replyTo }) });
 }
 
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };

@@ -1,3 +1,4 @@
+const { primaryEmail } = require('./emails');
 const PDFDocument = require('pdfkit');
 
 const MARGIN = 50;
@@ -256,7 +257,7 @@ function drawBillTo(doc, { client, dueLabel, dueValue }, y) {
   doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.brand).text('BILL TO', MARGIN + 16, y);
 
   doc.font('Helvetica-Bold').fontSize(11).fillColor(COLORS.heading).text(client.name, MARGIN, y + 16, { width: leftWidth });
-  const clientDetail = [client.email, client.address].filter(Boolean).join('\n');
+  const clientDetail = [primaryEmail(client.email), client.address].filter(Boolean).join('\n');
   doc.font('Helvetica').fontSize(9).fillColor(COLORS.body).text(clientDetail, MARGIN, y + 32, { width: leftWidth });
   const leftHeight = 32 + (clientDetail ? doc.heightOfString(clientDetail, { width: leftWidth }) : 0);
 
@@ -280,7 +281,7 @@ function drawInfoColumns(doc, { client, metaRows }, y) {
 
   doc.font('Helvetica').fontSize(9).fillColor(COLORS.muted).text('BILL TO', leftX, y);
   doc.font('Helvetica-Bold').fontSize(11).fillColor(COLORS.heading).text(client.name, leftX, y + 14, { width: leftWidth });
-  const clientDetail = [client.email, client.address].filter(Boolean).join('\n');
+  const clientDetail = [primaryEmail(client.email), client.address].filter(Boolean).join('\n');
   doc.font('Helvetica').fontSize(9).fillColor(COLORS.body).text(clientDetail, leftX, y + 30, { width: leftWidth });
   const leftHeight = 30 + (clientDetail ? doc.heightOfString(clientDetail, { width: leftWidth }) : 0);
 
@@ -686,7 +687,7 @@ function drawMinimalBillTo(doc, { client, dueLabel, dueValue }, y) {
   const leftWidth = 240;
   doc.font('Helvetica').fontSize(8.5).fillColor(MINIMAL_COLORS.muted).text('BILL TO', MARGIN, y);
   doc.font('Helvetica-Bold').fontSize(10.5).fillColor(MINIMAL_COLORS.heading).text(client.name, MARGIN, y + 13, { width: leftWidth });
-  const clientDetail = [client.email, client.address].filter(Boolean).join('\n');
+  const clientDetail = [primaryEmail(client.email), client.address].filter(Boolean).join('\n');
   doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.body).text(clientDetail, MARGIN, y + 28, { width: leftWidth });
   const leftHeight = 28 + (clientDetail ? doc.heightOfString(clientDetail, { width: leftWidth }) : 0);
 
@@ -704,7 +705,7 @@ function drawMinimalInfoColumns(doc, { client, metaRows }, y) {
 
   doc.font('Helvetica').fontSize(8.5).fillColor(MINIMAL_COLORS.muted).text('BILL TO', MARGIN, y);
   doc.font('Helvetica-Bold').fontSize(10.5).fillColor(MINIMAL_COLORS.heading).text(client.name, MARGIN, y + 13, { width: leftWidth });
-  const clientDetail = [client.email, client.address].filter(Boolean).join('\n');
+  const clientDetail = [primaryEmail(client.email), client.address].filter(Boolean).join('\n');
   doc.font('Helvetica').fontSize(9).fillColor(MINIMAL_COLORS.body).text(clientDetail, MARGIN, y + 28, { width: leftWidth });
   const leftHeight = 28 + (clientDetail ? doc.heightOfString(clientDetail, { width: leftWidth }) : 0);
 

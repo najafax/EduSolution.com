@@ -26,11 +26,12 @@ test('Gmail API mailer builds a MIME message and posts it with a refreshed token
       attachments: [{ filename: 'inv.pdf', content: Buffer.from('%PDF-1.4') }],
     });
     await sendMail({ to: 'client@example.com', subject: 'Second', html: '<p>x</p>' });
-    // A client with several addresses: one message, addressed to all of them.
+    // A client with several addresses: first one in To, the rest on Cc.
     await sendMail({ to: 'a@example.com, b@example.com', subject: 'Multi', html: '<p>x</p>' });
     const multi = calls.filter((c) => String(c.url).includes('messages/send')).pop();
     const multiMime = Buffer.from(JSON.parse(multi.opts.body).raw, 'base64url').toString();
-    assert.match(multiMime, /To: a@example.com, b@example.com/);
+    assert.match(multiMime, /To: a@example.com\r?\n/);
+    assert.match(multiMime, /Cc: b@example.com/);
     assert.equal(calls.filter((c) => String(c.url).includes('oauth2')).length, 1, 'token cached');
     const send = calls.find((c) => String(c.url).includes('messages/send'));
     assert.equal(send.opts.headers.Authorization, 'Bearer tok');
