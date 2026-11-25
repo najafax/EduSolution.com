@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import StatusFilterChips from '../../components/StatusFilterChips';
 import { PostsSection } from './website/PostsSection';
@@ -7,6 +8,7 @@ import { ServicesSection } from './website/ServicesSection';
 import { TeamSection } from './website/TeamSection';
 import { GallerySection } from './website/GallerySection';
 import { VideosSection } from './website/VideosSection';
+import { EnquiriesSection } from './website/EnquiriesSection';
 
 // The staff-side CMS behind the public marketing site (routes/website.js /
 // GET /api/public/site) — six small resources, switched by tab rather than
@@ -18,6 +20,7 @@ import { VideosSection } from './website/VideosSection';
 // machinery every other business list page carries (SearchInput,
 // useDebouncedValue, Pagination) isn't worth it here.
 const TABS = [
+  { value: 'enquiries', label: 'Enquiries' },
   { value: 'posts', label: 'News & announcements' },
   { value: 'testimonials', label: 'Testimonials' },
   { value: 'services', label: 'Services' },
@@ -34,7 +37,8 @@ export default function Website() {
   const { token, can } = useAuth();
   const canView = can('website', 'view');
   const canManage = can('website', 'manage');
-  const [tab, setTab] = useState('posts');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState(TABS.some((t) => t.value === params.get('tab')) ? params.get('tab') : 'posts');
 
   if (!canView) {
     return (
@@ -54,6 +58,7 @@ export default function Website() {
         <StatusFilterChips options={TABS} value={tab} onChange={setTab} />
       </div>
 
+      {tab === 'enquiries' && <EnquiriesSection token={token} canManage={canManage} canCreateClient={can('clients', 'manage')} />}
       {tab === 'posts' && <PostsSection token={token} canManage={canManage} />}
       {tab === 'testimonials' && <TestimonialsSection token={token} canManage={canManage} />}
       {tab === 'services' && <ServicesSection token={token} canManage={canManage} />}

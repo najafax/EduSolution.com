@@ -475,6 +475,7 @@ export const api = {
     respondQuote: (publicToken, response) =>
       request(`/public/quotes/${publicToken}/respond`, { method: 'POST', body: { response } }),
     getInvoice: (publicToken) => request(`/public/invoices/${publicToken}`),
+    sendEnquiry: (payload) => request('/public/enquiries', { method: 'POST', body: payload }),
     openQuotePdf: (publicToken) => openPdf(`/public/quotes/${publicToken}/pdf`),
     openInvoicePdf: (publicToken) => openPdf(`/public/invoices/${publicToken}/pdf`),
     // The public marketing site's one combined content fetch — posts,
@@ -487,6 +488,11 @@ export const api = {
   // — six small resources, each following the plain list/create/update/
   // remove shape every other simple resource in this app uses.
   website: {
+    enquiries: {
+      list: (token, { status } = {}) => request(`/website/enquiries${qs({ status })}`, { token }),
+      setStatus: (id, status, token) => request(`/website/enquiries/${id}/status`, { method: 'PUT', body: { status }, token }),
+      createClient: (id, token) => request(`/website/enquiries/${id}/create-client`, { method: 'POST', token }),
+    },
     posts: {
       list: (token) => request('/website/posts', { token }),
       create: (payload, token) => request('/website/posts', { method: 'POST', body: payload, token }),

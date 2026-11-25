@@ -397,4 +397,49 @@ router.delete('/videos/:id', manage, (req, res) => {
   res.status(204).end();
 });
 
+// ---- enquiries (from the public enquiry form, see routes/public.js) --------
+const ENQUIRY_STATUSES = ['new', 'contacted', 'closed'];
+
+router.get('/enquiries', view, (req, res) => {
+  const status = ENQUIRY_STATUSES.includes(req.query.status) ? req.query.status : null;
+  const rows = db
+    .prepare(
+      `SELECT e.*, c.name AS client_name FROM website_enquiries e LEFT JOIN clients c ON c.id = e.client_id
+        ${status ? 'WHERE e.status = ?' : ''} ORDER BY (e.status = 'new') DESC, e.created_at DESC, e.id DESC LIMIT 300`,
+    )
+    .all(...(status ? [status] : []));
+  const newCount = db.prepare("SELECT COUNT(*) AS n FROM website_enquiries WHERE status = 'new'").get().n;
+  res.json({ enquiries: rows, newCount });
+});
+
+router.put('/enquiries/:id/status', manage, (req, res) => {
+  const status = req.body && req.body.status;
+  if (!ENQUIRY_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+  const info = db
+    .prepare("UPDATE website_enquiries SET status = ?, handled_by_name = ?, handled_at = datetime('now') WHERE id = ?")
+    .run(status, req.user.name, req.params.id);
+  if (!info.changes) return res.status(404).json({ error: 'Enquiry not found' });
+  res.json({ enquiry: db.prepare('SELECT * FROM website_enquiries WHERE id = ?').get(req.params.id) });
+});
+
+// Turns an enquiry into a client record (needs clients:manage as well).
+router.post('/enquiries/:id/create-client', manage, requirePermission('clients', 'manage'), (req, res) => {
+  const enquiry = db.prepare('SELECT * FROM website_enquiries WHERE id = ?').get(req.params.id);
+  if (!enquiry) return res.status(404).json({ error: 'Enquiry not found' });
+  if (enquiry.client_id) return res.status(409).json({ error: 'A client was already created from this enquiry' });
+  const clientName = enquiry.organisation || enquiry.name;
+  const notes = `From website enquiry (${enquiry.created_at}): contact ${enquiry.name}.${enquiry.message ? `\n${enquiry.message}` : ''}`;
+  const create = db.transaction(() => {
+    const r = db
+      .prepare('INSERT INTO clients (name, email, phone, notes) VALUES (?, ?, ?, ?)')
+      .run(clientName, enquiry.email, enquiry.phone, notes);
+    db.prepare(
+      "UPDATE website_enquiries SET client_id = ?, status = 'contacted', handled_by_name = ?, handled_at = datetime('now') WHERE id = ?",
+    ).run(r.lastInsertRowid, req.user.name, enquiry.id);
+    return r.lastInsertRowid;
+  });
+  const clientId = create();
+  res.status(201).json({ clientId, enquiry: db.prepare('SELECT * FROM website_enquiries WHERE id = ?').get(enquiry.id) });
+});
+
 module.exports = router;

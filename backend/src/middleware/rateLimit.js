@@ -100,7 +100,17 @@ const publicRespondLimiter = rateLimit({
   handler: jsonHandler('Too many attempts. Please try again later.'),
 });
 
+// The public website enquiry form is an unauthenticated write that also
+// sends an email, so it gets its own tight per-IP bucket.
+const enquiryLimiter = rateLimit({
+  ...base,
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  handler: jsonHandler('Too many requests from this connection. Please try again later or call us.'),
+});
+
 module.exports = {
+  enquiryLimiter,
   publicRespondLimiter,
   loginLimiter,
   mfaLimiter,

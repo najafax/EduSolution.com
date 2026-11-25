@@ -1,20 +1,29 @@
 import { useEffect, useState } from 'react';
 import MarketingLayout from './MarketingLayout';
 import { api } from '../../lib/api';
+import EnquiryForm from '../../components/EnquiryForm';
 
 export default function MarketingContact() {
   const [settings, setSettings] = useState(null);
+  const [siteKey, setSiteKey] = useState('');
 
   useEffect(() => {
     api.public
       .getSiteContent()
-      .then((data) => setSettings(data.settings || {}))
+      .then((data) => {
+        setSettings(data.settings || {});
+        setSiteKey(data.turnstileSiteKey || '');
+      })
       .catch(() => setSettings({}));
   }, []);
 
   const phone = settings?.phone?.trim();
   const email = settings?.email?.trim();
   const address = settings?.address?.trim();
+  // wa.me wants digits with the country code; a bare 7-digit Maldives number
+  // gets 960 in front.
+  const waDigits = (phone || '').replace(/\D/g, '');
+  const waNumber = waDigits.length === 7 ? `960${waDigits}` : waDigits.length >= 10 ? waDigits : '';
   const hasAnyDetail = Boolean(phone || email || address);
 
   return (
@@ -27,6 +36,20 @@ export default function MarketingContact() {
         <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">
           Reach out and we'll help you find the right fit — EduPage, the Business Suite, or both.
         </p>
+      </div>
+
+      <div className="mx-auto max-w-3xl px-4 pb-8 sm:px-6 lg:px-8">
+        <EnquiryForm turnstileSiteKey={siteKey} />
+        {waNumber && (
+          <a
+            href={`https://wa.me/${waNumber}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 flex min-h-11 items-center justify-center rounded-xl bg-emerald-600 px-6 text-sm font-bold text-white hover:bg-emerald-500"
+          >
+            Chat on WhatsApp
+          </a>
+        )}
       </div>
 
       <div className="mx-auto max-w-3xl px-4 pb-20 sm:px-6 lg:px-8">

@@ -70,6 +70,7 @@ export default function MyAccount() {
   const [notifyQuoteResponses, setNotifyQuoteResponses] = useState(Boolean(user?.notifyQuoteResponses));
   const [notifyMonthlyReport, setNotifyMonthlyReport] = useState(Boolean(user?.notifyMonthlyReport));
   const [notifyPaymentProofs, setNotifyPaymentProofs] = useState(Boolean(user?.notifyPaymentProofs));
+  const [notifyEnquiries, setNotifyEnquiries] = useState(Boolean(user?.notifyEnquiries));
   const [notifyAdminChanges, setNotifyAdminChanges] = useState(Boolean(user?.notifyAdminChanges));
   const [prefsError, setPrefsError] = useState('');
   const [prefsSuccess, setPrefsSuccess] = useState('');
@@ -169,10 +170,10 @@ export default function MyAccount() {
     setPrefsSubmitting(true);
     try {
       await api.updatePreferences(
-        { notifyOverdue, notifyQuoteResponses, notifyMonthlyReport, notifyPaymentProofs, notifyAdminChanges },
+        { notifyOverdue, notifyQuoteResponses, notifyMonthlyReport, notifyPaymentProofs, notifyAdminChanges, notifyEnquiries },
         token,
       );
-      updateUser({ ...user, notifyOverdue, notifyQuoteResponses, notifyMonthlyReport, notifyPaymentProofs, notifyAdminChanges });
+      updateUser({ ...user, notifyOverdue, notifyQuoteResponses, notifyMonthlyReport, notifyPaymentProofs, notifyAdminChanges, notifyEnquiries });
       setPrefsSuccess('Preferences saved.');
     } catch (err) {
       setPrefsError(err.message);
@@ -401,6 +402,15 @@ export default function MyAccount() {
             className="h-4 w-4 rounded border-slate-300"
           />
           <span className="text-sm text-slate-700 dark:text-slate-300">Email me when a client uploads a payment proof</span>
+        </label>
+        <label className="mt-2 flex min-h-11 items-center gap-2">
+          <input
+            type="checkbox"
+            checked={notifyEnquiries}
+            onChange={(e) => setNotifyEnquiries(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300"
+          />
+          <span className="text-sm text-slate-700 dark:text-slate-300">Email me when someone sends a website enquiry</span>
         </label>
         {/* Only meaningful for a super admin — a plain admin/staff can't
             reach the Users page actions that would ever trigger this (see

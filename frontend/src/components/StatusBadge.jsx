@@ -33,6 +33,10 @@ const COLORS = {
   // reuses the same emerald "this is real and live" meaning as
   // 'published'/'active'/'paid' above; 'draft' above already covers the
   // not-yet-published state.
+  // Website enquiries only: 'new' needs attention (amber), 'contacted' / 'closed'
+  // fall back to the default slate or reuse emerald.
+  new: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
+  contacted: 'bg-lagoon-100 text-lagoon-700 dark:bg-lagoon-950 dark:text-lagoon-400',
   posted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
 };
 

@@ -654,6 +654,25 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_facebook_posts_status ON facebook_posts(status, created_at);
   CREATE INDEX IF NOT EXISTS idx_website_videos_visible ON website_videos(visible);
 
+  -- Walkthrough requests from the public website's enquiry form (routes/public.js
+  -- POST /enquiries, reviewed in the Website content > Enquiries tab).
+  CREATE TABLE IF NOT EXISTS website_enquiries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    organisation TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL,
+    phone TEXT NOT NULL DEFAULT '',
+    interest TEXT NOT NULL DEFAULT 'unsure',
+    message TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'new',
+    client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+    handled_by_name TEXT NOT NULL DEFAULT '',
+    handled_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_website_enquiries_status ON website_enquiries(status, created_at);
+  CREATE INDEX IF NOT EXISTS idx_website_enquiries_email ON website_enquiries(email, created_at);
+
   -- A single internal profit calculation: money received (MVR) for a job or
   -- product sale, netted against what it actually cost to buy USD to pay a
   -- supplier, with the remainder split among active shareholders by their
@@ -1105,6 +1124,9 @@ if (!userColumns.has('notify_monthly_report')) {
 // an invoice via the portal (see lib/paymentProofNotify.js and
 // routes/clientPortal.js's own POST /invoices/:id/payment-proof) — after
 // `users` already had real accounts.
+if (!userColumns.has('notify_enquiries')) {
+  db.exec(`ALTER TABLE users ADD COLUMN notify_enquiries INTEGER NOT NULL DEFAULT 0;`);
+}
 if (!userColumns.has('notify_payment_proofs')) {
   db.exec(`ALTER TABLE users ADD COLUMN notify_payment_proofs INTEGER NOT NULL DEFAULT 0;`);
 }

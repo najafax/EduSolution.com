@@ -58,6 +58,7 @@ function publicUser(user) {
     notifyQuoteResponses: Boolean(user.notify_quote_responses),
     notifyMonthlyReport: Boolean(user.notify_monthly_report),
     notifyPaymentProofs: Boolean(user.notify_payment_proofs),
+    notifyEnquiries: Boolean(user.notify_enquiries),
     notifyAdminChanges: Boolean(user.notify_admin_changes),
     avatarImage: user.avatar_image || '',
     twoFactorEnabled: Boolean(user.totp_enabled),
@@ -394,20 +395,21 @@ router.put('/preferences', requireAuth, (req, res) => {
   const existing = db
     .prepare(
       `SELECT notify_overdue, notify_quote_responses, notify_monthly_report, notify_payment_proofs,
-              notify_admin_changes FROM users WHERE id = ?`,
+              notify_admin_changes, notify_enquiries FROM users WHERE id = ?`,
     )
     .get(req.user.id);
-  const { notifyOverdue, notifyQuoteResponses, notifyMonthlyReport, notifyPaymentProofs, notifyAdminChanges } =
+  const { notifyOverdue, notifyQuoteResponses, notifyMonthlyReport, notifyPaymentProofs, notifyAdminChanges, notifyEnquiries } =
     req.body || {};
   db.prepare(
     `UPDATE users SET notify_overdue = ?, notify_quote_responses = ?, notify_monthly_report = ?,
-       notify_payment_proofs = ?, notify_admin_changes = ? WHERE id = ?`,
+       notify_payment_proofs = ?, notify_admin_changes = ?, notify_enquiries = ? WHERE id = ?`,
   ).run(
     (notifyOverdue ?? existing.notify_overdue) ? 1 : 0,
     (notifyQuoteResponses ?? existing.notify_quote_responses) ? 1 : 0,
     (notifyMonthlyReport ?? existing.notify_monthly_report) ? 1 : 0,
     (notifyPaymentProofs ?? existing.notify_payment_proofs) ? 1 : 0,
     (notifyAdminChanges ?? existing.notify_admin_changes) ? 1 : 0,
+    (notifyEnquiries ?? existing.notify_enquiries) ? 1 : 0,
     req.user.id,
   );
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);

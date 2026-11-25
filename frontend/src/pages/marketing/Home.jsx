@@ -205,16 +205,12 @@ export default function Home() {
         <p className="mx-auto mt-3 max-w-md text-slate-300">
           Book a short walkthrough and we'll show you exactly how EduPage or the Business Suite would fit your team.
         </p>
-        {content?.settings?.email ? (
-          <a
-            href={`mailto:${content.settings.email}`}
-            className="mt-6 inline-block min-h-11 rounded-xl bg-white px-6 py-3 text-sm font-bold text-lagoon-900 hover:bg-lagoon-50"
-          >
-            Book a walkthrough
-          </a>
-        ) : (
-          <p className="mt-6 text-sm text-lagoon-200">{content?.settings?.phone || ''}</p>
-        )}
+        <Link
+          to="/contact"
+          className="mt-6 inline-block min-h-11 rounded-xl bg-white px-6 py-3 text-sm font-bold text-lagoon-900 hover:bg-lagoon-50"
+        >
+          Book a walkthrough
+        </Link>
       </div>
     </MarketingLayout>
   );

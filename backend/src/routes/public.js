@@ -3,7 +3,9 @@ const { todayStr } = require('../lib/businessDate');
 const db = require('../db');
 const { CLIENT_ITEM_COLUMNS } = require('../lib/costSnapshot');
 const { renderQuotePdf, renderInvoicePdf } = require('../lib/pdf');
-const { publicRespondLimiter } = require('../middleware/rateLimit');
+const { publicRespondLimiter, enquiryLimiter } = require('../middleware/rateLimit');
+const { EMAIL_RE } = require('../lib/emails');
+const { INTERESTS, turnstileEnabled, verifyTurnstile, notifyEnquiry } = require('../lib/enquiry');
 const { clientForClient, invoiceForClient, quoteForClient } = require('../lib/clientView');
 const { notifyStaffOfQuoteAccepted } = require('../lib/quoteAcceptedNotify');
 
@@ -178,7 +180,58 @@ router.get('/site', (req, res) => {
     .all();
   const settings = db.prepare('SELECT * FROM business_settings WHERE id = 1').get();
 
-  res.json({ posts, testimonials, services, team, gallery, videos, settings: settings ? publicSettings(settings) : null });
+  res.json({
+    posts,
+    testimonials,
+    services,
+    team,
+    gallery,
+    videos,
+    settings: settings ? publicSettings(settings) : null,
+    turnstileSiteKey: turnstileEnabled() ? process.env.TURNSTILE_SITE_KEY : '',
+  });
+});
+
+// Website enquiry form (walkthrough request). Unauthenticated write, so:
+// per-IP limiter, hidden honeypot field, minimum fill time, at most 3 per
+// address per day, and an optional Turnstile challenge. A bot that trips the
+// honeypot or the timer gets the same "ok" answer a person would, so it
+// learns nothing about why it was dropped.
+router.post('/enquiries', enquiryLimiter, async (req, res) => {
+  const b = req.body || {};
+  const text = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
+
+  if (text(b.website, 200)) return res.json({ ok: true });
+  const filledFor = Date.now() - Number(b.t);
+  if (!Number.isFinite(filledFor) || filledFor < 3000) return res.json({ ok: true });
+
+  const name = text(b.name, 120);
+  const email = text(b.email, 200).toLowerCase();
+  const organisation = text(b.organisation, 160);
+  const phone = text(b.phone, 40);
+  const message = text(b.message, 2000);
+  const interest = Object.prototype.hasOwnProperty.call(INTERESTS, b.interest) ? b.interest : 'unsure';
+
+  if (!name) return res.status(400).json({ error: 'Please enter your name.' });
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
+
+  if (!(await verifyTurnstile(b.turnstileToken, req.ip))) {
+    return res.status(400).json({ error: 'Spam check failed. Please reload the page and try again.' });
+  }
+
+  const recent = db
+    .prepare("SELECT COUNT(*) AS n FROM website_enquiries WHERE email = ? AND created_at > datetime('now', '-1 day')")
+    .get(email).n;
+  if (recent >= 3) {
+    return res.status(429).json({ error: 'We already have your requests. We will be in touch shortly.' });
+  }
+
+  const info = db
+    .prepare('INSERT INTO website_enquiries (name, organisation, email, phone, interest, message) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(name, organisation, email, phone, interest, message);
+  res.json({ ok: true });
+  const enquiry = db.prepare('SELECT * FROM website_enquiries WHERE id = ?').get(info.lastInsertRowid);
+  notifyEnquiry(enquiry).catch((err) => console.error('enquiry notify failed', err.message));
 });
 
 module.exports = router;
