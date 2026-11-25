@@ -9888,3 +9888,6 @@ Supersedes the monthly "owed to suppliers" view, month tagging and "already paid
 
 ### Cc for clients with several emails
 - `sendMail()` with a string `to` (a client's email field) sends to the first address and puts the rest on Cc; an array `to` is an explicit list and stays all in To. Quote/invoice/receipt PDFs print only the first address (`primaryEmail()`). Test: `backend/test/mailer.test.js`.
+
+## Working agreement: research before recommending app changes
+When the user asks what to change, add or improve in the app (recommendations, not a specific bug fix or a precise edit they spelled out), first search the web for the latest industry developments relevant to it (school/education software, licence and subscription billing, invoicing and finance tooling, Maldives payments and banking, security practice), then give recommendations that cite what was found and tie each one to how the app works today. Say so when sources are thin, dated or conflicting. Build nothing until the user approves.
