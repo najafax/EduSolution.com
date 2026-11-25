@@ -1,24 +1,37 @@
-# nginx static hosting for the React frontend (replaces Render's static site)
-# on www.edusolutionsmaldives.com (+ the bare domain, redirected to www).
+# nginx static hosting for the React frontend.
+# Main site: www.edusolutionsmv.com (bare edusolutionsmv.com redirects to www).
+# The old edusolutionsmaldives.com names redirect to it, path kept, so links
+# already sent to clients (/q/..., /i/...) keep working.
 # Files live in /var/www/edusolution-frontend, written by deploy.sh.
 # Install as:
 #   sudo cp nginx-web.conf.template /etc/nginx/sites-available/edusolution-web
 #   sudo ln -s /etc/nginx/sites-available/edusolution-web /etc/nginx/sites-enabled/
 #   sudo nginx -t && sudo systemctl reload nginx
-#   sudo certbot --nginx -d www.edusolutionsmaldives.com -d edusolutionsmaldives.com
-# (run certbot only after DNS for both names points at this droplet)
+#   sudo certbot --nginx -d www.edusolutionsmv.com -d edusolutionsmv.com
+# (run certbot only after DNS for both new names points at this droplet; the
+# old domain's certificate stays as certbot already set it up)
+# The live file on the droplet was rewritten by certbot: when moving, edit that
+# file or re-copy this one and re-run certbot, then check `nginx -t`.
 
 server {
     listen 80;
     listen [::]:80;
-    server_name edusolutionsmaldives.com;
-    return 301 https://www.edusolutionsmaldives.com$request_uri;
+    server_name edusolutionsmv.com;
+    return 301 https://www.edusolutionsmv.com$request_uri;
+}
+
+# Old domain -> new domain (keeps the path).
+server {
+    listen 80;
+    listen [::]:80;
+    server_name edusolutionsmaldives.com www.edusolutionsmaldives.com;
+    return 301 https://www.edusolutionsmv.com$request_uri;
 }
 
 server {
     listen 80;
     listen [::]:80;
-    server_name www.edusolutionsmaldives.com;
+    server_name www.edusolutionsmv.com;
 
     root /var/www/edusolution-frontend;
     index index.html;

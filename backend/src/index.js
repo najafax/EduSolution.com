@@ -49,7 +49,14 @@ app.set('trust proxy', 1);
 // get this from Render's CDN, but this Node API service doesn't compress
 // its own responses unless told to.
 app.use(compression());
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
+// CLIENT_ORIGIN is the main site (also used to build emailed links).
+// CORS_EXTRA_ORIGINS (optional, comma-separated) lets another origin call the
+// API too, e.g. an old domain whose installed PWA is still open after a move.
+const corsOrigins = [
+  process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  ...(process.env.CORS_EXTRA_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),
+];
+app.use(cors({ origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins }));
 // Default 100kb is too small for PUT /api/settings once it carries the
 // signature/stamp images (see routes/settings.js) — 2mb comfortably covers
 // two base64-encoded 400KB images plus the rest of the settings payload.
