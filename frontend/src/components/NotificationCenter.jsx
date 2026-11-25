@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationsContext';
-import { AlertTriangleIcon, LicenseIcon, InboxIcon, BellIcon, ChevronRightIcon } from './icons';
+import { AlertTriangleIcon, LicenseIcon, InboxIcon, MailIcon, BellIcon, ChevronRightIcon } from './icons';
 
 // How many items each category shows before "+more" — a display concern
 // local to this component, not imported from Dashboard.jsx's own identical
@@ -62,8 +62,17 @@ export default function NotificationCenter({ className = '', align = 'right' }) 
   // CSS breakpoints decide which is *visible*, not React — so without this
   // shared context each instance used to run its own independent fetch;
   // see NotificationsContext.jsx's own top-of-file note).
-  const { overdueInvoices, expiringLicenses, pendingRequests, refresh, canViewInvoices, canViewLicenses, canViewQuotes } =
-    useNotifications();
+  const {
+    overdueInvoices,
+    expiringLicenses,
+    pendingRequests,
+    unreadInbox,
+    refresh,
+    canViewInvoices,
+    canViewLicenses,
+    canViewQuotes,
+    canViewInbox,
+  } = useNotifications();
 
   // Re-fetch every time the panel is opened, so a tab left open a while
   // doesn't keep showing counts from whenever it last loaded.
@@ -80,9 +89,9 @@ export default function NotificationCenter({ className = '', align = 'right' }) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  if (!canViewInvoices && !canViewLicenses && !canViewQuotes) return null;
+  if (!canViewInvoices && !canViewLicenses && !canViewQuotes && !canViewInbox) return null;
 
-  const total = overdueInvoices.length + expiringLicenses.length + pendingRequests.length;
+  const total = overdueInvoices.length + expiringLicenses.length + pendingRequests.length + unreadInbox;
 
   function go(path) {
     setOpen(false);
@@ -134,6 +143,25 @@ export default function NotificationCenter({ className = '', align = 'right' }) 
         badge: 'New',
         to: '/quote-requests',
       })),
+    },
+    {
+      key: 'inbox',
+      title: 'Unread messages',
+      tone: 'lagoon',
+      Icon: MailIcon,
+      all: '/inbox',
+      rows:
+        unreadInbox > 0
+          ? [
+              {
+                id: 'unread',
+                title: `${unreadInbox} unread message${unreadInbox === 1 ? '' : 's'}`,
+                sub: 'Client replies to info@edusolutionsmv.com',
+                badge: 'New',
+                to: '/inbox',
+              },
+            ]
+          : [],
     },
   ].filter((sec) => sec.rows.length > 0);
 

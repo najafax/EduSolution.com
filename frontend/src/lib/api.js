@@ -430,6 +430,18 @@ export const api = {
     log: (token, page = 1) => request(`/email-center/log?page=${page}`, { token }),
   },
 
+  inbox: {
+    list: (token, { status, q, page } = {}) => request(`/inbox${qs({ status, q, page })}`, { token }),
+    unreadCount: (token) => request('/inbox/unread-count', { token }),
+    get: (id, token) => request(`/inbox/${id}`, { token }),
+    setRead: (id, read, token) => request(`/inbox/${id}/read`, { method: 'POST', body: { read }, token }),
+    setArchived: (id, archived, token) => request(`/inbox/${id}/archive`, { method: 'POST', body: { archived }, token }),
+    reload: (id, token) => request(`/inbox/${id}/reload`, { method: 'POST', token }),
+    setClient: (id, clientId, token) => request(`/inbox/${id}/client`, { method: 'POST', body: { client_id: clientId || null }, token }),
+    reply: (id, message, token) => request(`/inbox/${id}/reply`, { method: 'POST', body: { message }, token }),
+    downloadAttachment: (id, att, token) => downloadFile(`/inbox/${id}/attachments/${encodeURIComponent(att.id)}`, token, att.filename),
+  },
+
   campaigns: {
     list: (token, page = 1) => request(`/campaigns?page=${page}`, { token }),
     send: (payload, token) => request('/campaigns', { method: 'POST', body: payload, token }),

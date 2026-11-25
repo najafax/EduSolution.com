@@ -318,6 +318,33 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- Incoming mail for info@edusolutionsmv.com, received by Resend and posted
+  -- to /api/webhooks/resend (routes/inboxWebhook.js). The in-app inbox
+  -- (routes/inbox.js) reads this. resend_email_id is unique so a retried
+  -- webhook can never create a second copy. Messages are archived, never
+  -- deleted. Brand-new table, so a plain CREATE TABLE IF NOT EXISTS.
+  CREATE TABLE IF NOT EXISTS inbound_emails (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    resend_email_id TEXT NOT NULL UNIQUE,
+    from_email TEXT NOT NULL DEFAULT '',
+    from_name TEXT NOT NULL DEFAULT '',
+    to_emails TEXT NOT NULL DEFAULT '',
+    subject TEXT NOT NULL DEFAULT '',
+    text_body TEXT NOT NULL DEFAULT '',
+    html_body TEXT NOT NULL DEFAULT '',
+    message_id TEXT NOT NULL DEFAULT '',
+    attachments TEXT NOT NULL DEFAULT '[]',
+    client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+    body_loaded INTEGER NOT NULL DEFAULT 0,
+    body_error TEXT NOT NULL DEFAULT '',
+    is_read INTEGER NOT NULL DEFAULT 0,
+    archived INTEGER NOT NULL DEFAULT 0,
+    replied_at TEXT,
+    replied_by_name TEXT NOT NULL DEFAULT '',
+    received_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS licenses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL REFERENCES clients(id),
@@ -612,6 +639,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id);
   CREATE INDEX IF NOT EXISTS idx_recurring_items ON recurring_invoice_items(recurring_invoice_id);
   CREATE INDEX IF NOT EXISTS idx_email_log_created ON email_log(created_at);
+  CREATE INDEX IF NOT EXISTS idx_inbound_emails_received ON inbound_emails(archived, received_at);
+  CREATE INDEX IF NOT EXISTS idx_inbound_emails_client ON inbound_emails(client_id);
   CREATE INDEX IF NOT EXISTS idx_licenses_client ON licenses(client_id);
   CREATE INDEX IF NOT EXISTS idx_licenses_expiry ON licenses(expiry_date);
   CREATE INDEX IF NOT EXISTS idx_payment_proofs_invoice ON payment_proofs(invoice_id);

@@ -52,6 +52,7 @@ const Users = lazy(() => import('./pages/Users'));
 const MyAccount = lazy(() => import('./pages/MyAccount'));
 const EmailCenter = lazy(() => import('./pages/EmailCenter'));
 const Campaigns = lazy(() => import('./pages/business/Campaigns'));
+const Inbox = lazy(() => import('./pages/business/Inbox'));
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'));
 const Website = lazy(() => import('./pages/business/Website'));
 const FacebookPosts = lazy(() => import('./pages/business/FacebookPosts'));
@@ -188,6 +189,7 @@ export default function App() {
 
                 <Route path="/clients" element={<Protected><Clients /></Protected>} />
                 <Route path="/campaigns" element={<Protected><Campaigns /></Protected>} />
+                <Route path="/inbox" element={<Protected><Inbox /></Protected>} />
                 <Route path="/products" element={<Protected><Products /></Protected>} />
                 <Route path="/settings" element={<Protected><Settings /></Protected>} />
                 <Route path="/import" element={<Protected><Import /></Protected>} />

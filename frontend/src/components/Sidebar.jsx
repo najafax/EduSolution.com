@@ -12,6 +12,7 @@ import {
   ProductIcon,
   QuoteIcon,
   InboxIcon,
+  MailIcon,
   InvoiceIcon,
   RefreshIcon,
   LicenseIcon,
@@ -32,6 +33,7 @@ import {
 export const LINK_ICONS = {
   '/dashboard': HomeIcon,
   '/clients': UsersIcon,
+  '/inbox': MailIcon,
   '/campaigns': MegaphoneIcon,
   '/products': ProductIcon,
   '/quotes': QuoteIcon,

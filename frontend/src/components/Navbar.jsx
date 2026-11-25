@@ -28,6 +28,7 @@ export const GROUP_ORDER = ['Overview', 'Sales & clients', 'Finance', 'Operation
 export const BUSINESS_LINKS = [
   { to: '/dashboard', label: 'Dashboard', module: null, group: 'Overview' },
   { to: '/clients', label: 'Clients', module: 'clients', group: 'Sales & clients' },
+  { to: '/inbox', label: 'Inbox', module: 'email_center', group: 'Sales & clients' },
   { to: '/campaigns', label: 'Campaigns', module: 'campaigns', group: 'Sales & clients' },
   { to: '/products', label: 'Products', module: 'products', group: 'Sales & clients' },
   { to: '/quotes', label: 'Quotes', module: 'quotes', group: 'Sales & clients' },

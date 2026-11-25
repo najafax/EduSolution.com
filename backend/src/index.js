@@ -33,6 +33,8 @@ const supplierInvoicesRoutes = require('./routes/supplierInvoices');
 const usdAccountRoutes = require('./routes/usdAccount');
 const facebookPostsRoutes = require('./routes/facebookPosts');
 const errorLogRoutes = require('./routes/errorLog');
+const inboxRoutes = require('./routes/inbox');
+const resendWebhook = require('./routes/inboxWebhook');
 const { recordError } = require('./lib/errorLog');
 const { startScheduler } = require('./lib/scheduler');
 
@@ -67,6 +69,8 @@ app.use(cors({ origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins }
 // Browser error reports get their own tiny body limit, mounted before the
 // big global parser.
 app.use('/api/client-errors', express.json({ limit: '32kb' }), errorLogRoutes.intake);
+// Resend's inbound-email webhook needs the raw bytes to check its signature.
+app.post('/api/webhooks/resend', express.raw({ type: '*/*', limit: '2mb' }), resendWebhook);
 app.use(express.json({ limit: '8mb' }));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -92,6 +96,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/data-reset', dataResetRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/email-center', emailCenterRoutes);
+app.use('/api/inbox', inboxRoutes);
 app.use('/api/campaigns', campaignsRoutes);
 app.use('/api/website', websiteRoutes);
 app.use('/api/shareholders', shareholdersRoutes);

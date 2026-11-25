@@ -23,10 +23,12 @@ export function NotificationsProvider({ children }) {
   const [overdueInvoices, setOverdueInvoices] = useState([]);
   const [expiringLicenses, setExpiringLicenses] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [unreadInbox, setUnreadInbox] = useState(0);
 
   const canViewInvoices = can('invoices', 'view');
   const canViewLicenses = can('licenses', 'view');
   const canViewQuotes = can('quotes', 'view');
+  const canViewInbox = can('email_center', 'view');
 
   const refresh = useCallback(() => {
     if (canViewInvoices) {
@@ -49,7 +51,13 @@ export function NotificationsProvider({ children }) {
         .then(({ requests }) => setPendingRequests(requests))
         .catch(() => {});
     }
-  }, [token, canViewInvoices, canViewLicenses, canViewQuotes]);
+    if (canViewInbox) {
+      api.inbox
+        .unreadCount(token)
+        .then(({ count }) => setUnreadInbox(count))
+        .catch(() => {});
+    }
+  }, [token, canViewInvoices, canViewLicenses, canViewQuotes, canViewInbox]);
 
   useEffect(refresh, [refresh]);
 
@@ -59,10 +67,12 @@ export function NotificationsProvider({ children }) {
         overdueInvoices,
         expiringLicenses,
         pendingRequests,
+        unreadInbox,
         refresh,
         canViewInvoices,
         canViewLicenses,
         canViewQuotes,
+        canViewInbox,
       }}
     >
       {children}

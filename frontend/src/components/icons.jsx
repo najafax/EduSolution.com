@@ -88,6 +88,29 @@ export function InboxIcon(props) {
   );
 }
 
+// An envelope — the in-app Inbox (client replies to info@ mail).
+export function MailIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="4.5" width="14" height="11" rx="1.8" strokeLinejoin="round" />
+      <path d="m3.8 5.6 6.2 4.7 6.2-4.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// A paperclip — attachments on an inbox message.
+export function PaperclipIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path
+        d="m16 9.2-5.6 5.6a3.4 3.4 0 0 1-4.8-4.8l5.9-5.9a2.3 2.3 0 0 1 3.2 3.2L8.9 13.1a1.1 1.1 0 0 1-1.6-1.6l5.3-5.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 // A document with a small bar-chart mark — used on Reports.jsx's report
 // cards (sales/tax/P&L/expense reports are all "a document with numbers
 // in it", distinct from InvoiceIcon's folded-corner receipt shape).
