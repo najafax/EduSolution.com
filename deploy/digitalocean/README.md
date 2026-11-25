@@ -8,14 +8,14 @@ point at a different host: the SQLite file has to live on the same machine
 as the Node process. So "move the database" means moving the whole backend
 service off Render and onto a Droplet; **the frontend originally stayed on Render**
 (a static site that called
-`https://api.edusolutionsmaldives.com` directly — it has no idea which
+`https://api.edusolutionsmv.com` directly — it has no idea which
 server answers that domain, so nothing on the frontend side needs to
 change).
 
 This directory has the files this runbook installs:
 - `provision.sh` — one-time droplet bootstrap (Node, nginx, certbot, ufw, app user)
 - `edusolution-backend.service` — the systemd unit that replaces Render's "web service"
-- `nginx-api.conf.template` — reverse proxy + TLS termination for `api.edusolutionsmaldives.com`
+- `nginx-api.conf.template` — reverse proxy + TLS termination for `api.edusolutionsmv.com`
 - `deploy.sh` — what you run for every future deploy (replaces Render's autoDeploy)
 
 ## 0. Before you start
@@ -23,7 +23,7 @@ This directory has the files this runbook installs:
 Gather these:
 - A DigitalOcean account with billing set up.
 - Admin access to the DNS for `edusolutionsmaldives.com` (wherever
-  `api.edusolutionsmaldives.com`'s A record currently points — likely
+  `api.edusolutionsmv.com`'s A record currently points — likely
   Render's DNS instructions, or your registrar/Cloudflare).
 - Your production `JWT_SECRET`, SMTP credentials, and (if configured)
   `BACKUP_S3_*` values — from Render's dashboard → edusolution-backend →
@@ -212,7 +212,7 @@ sudo nginx -t && sudo systemctl reload nginx
 You need the DNS record pointed at the droplet **before** requesting a
 certificate (see step 7), then:
 ```bash
-sudo certbot --nginx -d api.edusolutionsmaldives.com
+sudo certbot --nginx -d api.edusolutionsmv.com
 ```
 Certbot rewrites the nginx config to add the 443/TLS block and HTTP→HTTPS
 redirect, and installs its own renewal timer (`systemctl list-timers |
@@ -226,13 +226,13 @@ correctly with no code change needed.
 
 ## 7. DNS cutover
 
-In your DNS provider, change `api.edusolutionsmaldives.com`'s record to
+In your DNS provider, change `api.edusolutionsmv.com`'s record to
 point at `<DROPLET_IP>` (an A record, or update Render's DNS instructions'
 equivalent). DNS propagation can take minutes to a couple of hours
 depending on the record's TTL.
 
 Because the frontend only ever calls its own configured API origin
-(`VITE_API_URL=https://api.edusolutionsmaldives.com`) and
+(`VITE_API_URL=https://api.edusolutionsmv.com`) and
 never hardcodes an IP or Render-specific hostname, **no frontend rebuild or
 redeploy is needed** — the moment DNS resolves to the droplet, the existing
 frontend starts talking to it.
@@ -257,7 +257,7 @@ no lost data:
 
 ## 8. Verify
 
-- `curl -sI https://api.edusolutionsmaldives.com/api/auth/me` → should
+- `curl -sI https://api.edusolutionsmv.com/api/auth/me` → should
   return `401` (not a connection error, not a cert warning).
 - Load `https://www.edusolutionsmaldives.com` (the real frontend) and log
   in — confirm existing accounts/data are all there (this is why step 4's
@@ -326,7 +326,7 @@ this directory.
 
 Since Render's service and disk are untouched until you explicitly shut
 them down in step 7.6, rolling back is just flipping the DNS record for
-`api.edusolutionsmaldives.com` back to Render's address — do this if
+`api.edusolutionsmv.com` back to Render's address — do this if
 anything looks wrong on the droplet before you've decommissioned Render.
 Any writes made on the droplet in the meantime would need to be manually
 reconciled back into Render's copy (or just redone), so don't delay this

@@ -111,7 +111,7 @@ ongoing problem doesn't re-alert you every 5 minutes:
 
 - `edusolution-backend` or `nginx` stops being active (and a recovery
   message once it's back).
-- The public API (`https://api.edusolutionsmaldives.com/...`) stops
+- The public API (`https://api.edusolutionsmv.com/...`) stops
   responding (and recovers).
 - The database stops answering a plain `SELECT 1` (and recovers) — this is
   checked against the exact same SQLite connection the backend process

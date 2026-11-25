@@ -83,7 +83,7 @@ conventions.
 
 Production runs entirely on one DigitalOcean droplet: nginx serves the built
 React frontend at `www.edusolutionsmaldives.com` and proxies
-`api.edusolutionsmaldives.com` to the Node backend (systemd) with the SQLite
+`api.edusolutionsmv.com` to the Node backend (systemd) with the SQLite
 database in `/var/data`. There is no Render service any more. Set-up, deploys,
 DNS and TLS are documented in
 [`deploy/digitalocean/README.md`](./deploy/digitalocean/README.md); every deploy is

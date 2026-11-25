@@ -1,10 +1,10 @@
 # nginx reverse proxy for api.edusolutionsmv.com (and, during the move, the old
-# api.edusolutionsmaldives.com) -> the local Node
+# api.edusolutionsmv.com) -> the local Node
 # backend (systemd service on 127.0.0.1:4000). Install as:
 #   sudo cp nginx-api.conf.template /etc/nginx/sites-available/edusolution-api
 #   sudo ln -s /etc/nginx/sites-available/edusolution-api /etc/nginx/sites-enabled/
 #   sudo nginx -t && sudo systemctl reload nginx
-#   sudo certbot --nginx -d api.edusolutionsmv.com -d api.edusolutionsmaldives.com
+#   sudo certbot --nginx -d api.edusolutionsmv.com
 # certbot will rewrite this file in place to add the TLS (443) server block
 # and the HTTP->HTTPS redirect — the server_name below just needs to match
 # the real domain before you run it.
@@ -12,7 +12,7 @@
 server {
     listen 80;
     listen [::]:80;
-    server_name api.edusolutionsmv.com api.edusolutionsmaldives.com;
+    server_name api.edusolutionsmv.com;
 
     # Payment-proof uploads can run a few MB (see backend's own 8mb JSON
     # body limit in index.js) — nginx's own default (1m) would reject them
