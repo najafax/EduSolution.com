@@ -17,7 +17,7 @@ function isConfigured() {
 // single-page app with no per-page <meta> tags, so Facebook can't build a
 // rich link card from it — the tutorial's thumbnail is attached to the post
 // as a real photo instead and this link just goes in the text.
-const LINK_BASE = (process.env.FACEBOOK_LINK_BASE || 'https://www.edusolutionsmaldives.com').replace(/\/+$/, '');
+const LINK_BASE = (process.env.FACEBOOK_LINK_BASE || 'https://www.edusolutionsmv.com').replace(/\/+$/, '');
 
 // Each draft is written from one of these angles. Rotating through them
 // (see pickPostType) is what stops every click of "Generate draft" from

@@ -51,7 +51,7 @@ if [ "${FRONTEND:-1}" != "0" ]; then
   echo "==> Building the frontend"
   cd ../frontend
   npm install
-  VITE_API_URL="${VITE_API_URL:-https://api.edusolutionsmaldives.com}" npm run build
+  VITE_API_URL="${VITE_API_URL:-https://api.edusolutionsmv.com}" npm run build
   WEB_ROOT="${WEB_ROOT:-/var/www/edusolution-frontend}"
   sudo_if_needed mkdir -p "${WEB_ROOT}"
   # Copy to a fresh sibling directory then swap, so visitors never see a half-written site.

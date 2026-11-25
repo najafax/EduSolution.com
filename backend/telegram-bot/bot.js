@@ -40,7 +40,7 @@ const ALLOWED_IDS = new Set(
     .map((s) => s.trim())
     .filter(Boolean),
 );
-const API_DOMAIN = process.env.TELEGRAM_API_DOMAIN || 'api.edusolutionsmaldives.com';
+const API_DOMAIN = process.env.TELEGRAM_API_DOMAIN || 'api.edusolutionsmv.com';
 const SERVICE_NAME = process.env.TELEGRAM_BACKEND_SERVICE || 'edusolution-backend';
 const BOT_SERVICE = process.env.TELEGRAM_BOT_SERVICE || 'telegram-bot';
 // Same default src/index.js itself falls back to — the backend's own loopback
@@ -78,7 +78,7 @@ const BACKEND_DIR = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const FRONTEND_DIR = path.join(REPO_ROOT, 'frontend');
 const WEB_ROOT = process.env.WEB_ROOT || '/var/www/edusolution-frontend';
-const FRONTEND_API_URL = process.env.VITE_API_URL || 'https://api.edusolutionsmaldives.com';
+const FRONTEND_API_URL = process.env.VITE_API_URL || 'https://api.edusolutionsmv.com';
 
 // Loaded after dotenv has configured DB_PATH above, so db/index.js (which
 // reads process.env.DB_PATH at require time) opens the real production
