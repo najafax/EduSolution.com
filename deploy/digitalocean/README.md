@@ -22,7 +22,7 @@ This directory has the files this runbook installs:
 
 Gather these:
 - A DigitalOcean account with billing set up.
-- Admin access to the DNS for `edusolutionsmaldives.com` (wherever
+- Admin access to the DNS for `edusolutionsmv.com` (wherever
   `api.edusolutionsmv.com`'s A record currently points — likely
   Render's DNS instructions, or your registrar/Cloudflare).
 - Your production `JWT_SECRET`, SMTP credentials, and (if configured)
@@ -95,7 +95,7 @@ dashboard, not regenerated):
 ```
 PORT=4000
 JWT_SECRET=<same value as on Render>
-CLIENT_ORIGIN=https://www.edusolutionsmaldives.com
+CLIENT_ORIGIN=https://www.edusolutionsmv.com
 DB_PATH=/var/data/data.sqlite3
 SMTP_HOST=...
 SMTP_PORT=587
@@ -259,7 +259,7 @@ no lost data:
 
 - `curl -sI https://api.edusolutionsmv.com/api/auth/me` → should
   return `401` (not a connection error, not a cert warning).
-- Load `https://www.edusolutionsmaldives.com` (the real frontend) and log
+- Load `https://www.edusolutionsmv.com` (the real frontend) and log
   in — confirm existing accounts/data are all there (this is why step 4's
   snapshot matters: it's the same database, not a fresh one).
 - Check that scheduled jobs are registered:
@@ -341,8 +341,8 @@ The React build is plain static files, so nginx on the droplet can serve it.
 2. **Build and publish:** `cd ~/edusolution-backend && ./deploy/digitalocean/deploy.sh`
    (now also builds the frontend into `/var/www/edusolution-frontend`; use `FRONTEND=0 ./deploy/digitalocean/deploy.sh` for a backend-only deploy).
 3. **nginx:** copy `nginx-web.conf.template` to `/etc/nginx/sites-available/edusolution-web`, enable it, `nginx -t && systemctl reload nginx`.
-4. **DNS:** point `www.edusolutionsmaldives.com` and the bare `edusolutionsmaldives.com` (A records) at the droplet IP (remove the Render CNAME/A records).
-5. **TLS** once DNS resolves: `certbot --nginx -d www.edusolutionsmaldives.com -d edusolutionsmaldives.com`.
-6. `CLIENT_ORIGIN` in `backend/.env` stays `https://www.edusolutionsmaldives.com`.
+4. **DNS:** point `www.edusolutionsmv.com` and the bare `edusolutionsmv.com` (A records) at the droplet IP (remove the Render CNAME/A records).
+5. **TLS** once DNS resolves: `certbot --nginx -d www.edusolutionsmv.com -d edusolutionsmv.com`.
+6. `CLIENT_ORIGIN` in `backend/.env` stays `https://www.edusolutionsmv.com`.
 
 Installed PWAs pick up the new host automatically (same origin, same service worker URL). Delete the Render static service afterwards.
