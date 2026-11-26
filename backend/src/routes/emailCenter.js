@@ -41,6 +41,8 @@ const TYPE_LABELS = {
   license_expiry_alert: 'Automated license expiry alert',
   campaign: 'Promotional campaign',
   inbox_reply: 'Inbox reply',
+  inbox_compose: 'Inbox message',
+  inbox_forward: 'Inbox forward',
   shareholder_daily_earnings: 'Daily earnings report',
 };
 

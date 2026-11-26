@@ -345,6 +345,30 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- Everything staff send from the Inbox (new mail, replies, forwards): the
+  -- Sent folder and the "conversation" view. Brand-new tables, plain CREATE.
+  CREATE TABLE IF NOT EXISTS sent_emails (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL DEFAULT 'compose',
+    to_emails TEXT NOT NULL DEFAULT '',
+    cc_emails TEXT NOT NULL DEFAULT '',
+    bcc_emails TEXT NOT NULL DEFAULT '',
+    subject TEXT NOT NULL DEFAULT '',
+    text_body TEXT NOT NULL DEFAULT '',
+    in_reply_to_id INTEGER REFERENCES inbound_emails(id) ON DELETE SET NULL,
+    client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+    sent_by_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS sent_email_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sent_email_id INTEGER NOT NULL REFERENCES sent_emails(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+    size INTEGER NOT NULL DEFAULT 0,
+    data BLOB NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS licenses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL REFERENCES clients(id),
@@ -641,6 +665,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_email_log_created ON email_log(created_at);
   CREATE INDEX IF NOT EXISTS idx_inbound_emails_received ON inbound_emails(archived, received_at);
   CREATE INDEX IF NOT EXISTS idx_inbound_emails_client ON inbound_emails(client_id);
+  CREATE INDEX IF NOT EXISTS idx_sent_emails_created ON sent_emails(created_at);
+  CREATE INDEX IF NOT EXISTS idx_sent_emails_client ON sent_emails(client_id);
+  CREATE INDEX IF NOT EXISTS idx_sent_email_files_mail ON sent_email_files(sent_email_id);
   CREATE INDEX IF NOT EXISTS idx_licenses_client ON licenses(client_id);
   CREATE INDEX IF NOT EXISTS idx_licenses_expiry ON licenses(expiry_date);
   CREATE INDEX IF NOT EXISTS idx_payment_proofs_invoice ON payment_proofs(invoice_id);
@@ -1127,6 +1154,24 @@ if (!userColumns.has('notify_monthly_report')) {
 if (!userColumns.has('notify_enquiries')) {
   db.exec(`ALTER TABLE users ADD COLUMN notify_enquiries INTEGER NOT NULL DEFAULT 0;`);
 }
+if (!userColumns.has('email_signature')) {
+  db.exec(`ALTER TABLE users ADD COLUMN email_signature TEXT NOT NULL DEFAULT '';`);
+}
+
+// Inbox folders and threading: spam/trash flags, who was copied, and the
+// References header (so a reply can continue the sender's conversation).
+// inbound_emails already holds real messages, so these are guarded ALTERs.
+const inboundColumns = new Set(db.prepare('PRAGMA table_info(inbound_emails)').all().map((c) => c.name));
+for (const [name, ddl] of [
+  ['spam', 'INTEGER NOT NULL DEFAULT 0'],
+  ['trashed', 'INTEGER NOT NULL DEFAULT 0'],
+  ['trashed_at', 'TEXT'],
+  ['cc_emails', "TEXT NOT NULL DEFAULT ''"],
+  ['references_hdr', "TEXT NOT NULL DEFAULT ''"],
+]) {
+  if (!inboundColumns.has(name)) db.exec(`ALTER TABLE inbound_emails ADD COLUMN ${name} ${ddl};`);
+}
+
 if (!userColumns.has('notify_payment_proofs')) {
   db.exec(`ALTER TABLE users ADD COLUMN notify_payment_proofs INTEGER NOT NULL DEFAULT 0;`);
 }

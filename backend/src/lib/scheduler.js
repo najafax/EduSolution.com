@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { recordError, pruneErrorLog } = require('./errorLog');
+const { purgeOldTrash } = require('./inbox');
 
 // A whole scheduled job blew up: log it, put it in the error log, alert ops.
 function jobFailed(label, err) {
@@ -425,6 +426,11 @@ function startScheduler() {
       pruneErrorLog();
     } catch (err) {
       console.error('[error-log] prune failed:', err.message);
+    }
+    try {
+      purgeOldTrash();
+    } catch (err) {
+      console.error('[inbox] trash clean-up failed:', err.message);
     }
   });
   // Daily at 07:00 server time: generate any due recurring invoices first,

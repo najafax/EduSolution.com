@@ -119,18 +119,21 @@ function ingestMetadata(data) {
   if (existing) return { row: existing, created: false };
 
   const from = parseAddress(data.from);
-  const to = (Array.isArray(data.to) ? data.to : [data.to]).filter(Boolean).map((t) => parseAddress(t).email || String(t));
+  const addressList = (v) => (Array.isArray(v) ? v : [v]).filter(Boolean).map((t) => parseAddress(t).email || String(t));
+  const to = addressList(data.to);
+  const cc = addressList(data.cc);
   const info = db
     .prepare(
       `INSERT OR IGNORE INTO inbound_emails
-         (resend_email_id, from_email, from_name, to_emails, subject, message_id, attachments, client_id, received_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
+         (resend_email_id, from_email, from_name, to_emails, cc_emails, subject, message_id, attachments, client_id, received_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
     )
     .run(
       resendId,
       from.email,
       from.name,
       to.join(', '),
+      cc.join(', '),
       String(data.subject || ''),
       String(data.message_id || ''),
       JSON.stringify(normaliseAttachments(data.attachments)),
@@ -161,6 +164,8 @@ async function loadBody(id) {
          from_email = ?, from_name = CASE WHEN from_name = '' THEN ? ELSE from_name END,
          subject = CASE WHEN subject = '' THEN ? ELSE subject END,
          message_id = CASE WHEN message_id = '' THEN ? ELSE message_id END,
+         cc_emails = CASE WHEN cc_emails = '' THEN ? ELSE cc_emails END,
+         references_hdr = ?,
          client_id = COALESCE(client_id, ?),
          attachments = COALESCE(?, attachments)
        WHERE id = ?`,
@@ -171,6 +176,8 @@ async function loadBody(id) {
       from.name,
       String(d.subject || ''),
       String(d.message_id || headers['message-id'] || headers['Message-ID'] || ''),
+      (Array.isArray(d.cc) ? d.cc : [d.cc]).filter(Boolean).map((a) => parseAddress(a).email).filter(Boolean).join(', '),
+      String(headers.references || headers.References || '').replace(/\s+/g, ' ').trim(),
       matchClientId(fromEmail),
       attachments ? JSON.stringify(attachments) : null,
       id,
@@ -205,4 +212,11 @@ async function fetchAttachment(row, attachmentId) {
   };
 }
 
-module.exports = { verifySignature, parseAddress, htmlToText, matchClientId, ingestMetadata, loadBody, fetchAttachment };
+// Messages left in trash for 30 days are removed for good (daily job).
+function purgeOldTrash(days = 30) {
+  return db
+    .prepare("DELETE FROM inbound_emails WHERE trashed = 1 AND trashed_at IS NOT NULL AND trashed_at < datetime('now', ?)")
+    .run(`-${Number(days)} days`).changes;
+}
+
+module.exports = { purgeOldTrash, verifySignature, parseAddress, htmlToText, matchClientId, ingestMetadata, loadBody, fetchAttachment };
