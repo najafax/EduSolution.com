@@ -22,7 +22,7 @@ export function Checkout() {
   const cart = useCart();
   const nav = useNavigate();
   const shownAt = useRef(Date.now());
-  const [f, setF] = useState({ name: '', phone: '', email: '', island: '', boat: '', address: '', notes: '', payment_method: 'cod', website: '' });
+  const [f, setF] = useState({ name: '', phone: '', email: '', island: '', boat: '', address: '', notes: '', payment_method: settings.has_bank_details ? 'bank_transfer' : 'purchase_order', po_number: '', website: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const cur = settings.currency;
@@ -69,8 +69,8 @@ export function Checkout() {
   }
 
   const methods = [
-    ['cod', 'Pay on delivery', 'Pay in cash when your order arrives.'],
-    ...(settings.has_bank_details ? [['bank_transfer', 'Bank transfer', 'We show our account details after you order.']] : []),
+    ...(settings.has_bank_details ? [['bank_transfer', 'Bank transfer', 'We show our account details after you order. We dispatch once payment is received.']] : []),
+    ['purchase_order', 'Purchase order (organisations)', 'For schools and government offices: we deliver once we receive your purchase order.'],
     ...(settings.card_enabled ? [['card', 'Card', 'We send you a secure payment link to pay by card.']] : []),
   ];
 
@@ -103,6 +103,9 @@ export function Checkout() {
               </label>
             ))}
           </div>
+          {f.payment_method === 'purchase_order' && (
+            <Field label="PO number (optional)" hint="Not ready yet? Send the PO to us by email or WhatsApp after ordering, quoting your order number."><input className={input} value={f.po_number} onChange={set('po_number')} /></Field>
+          )}
         </div>
 
         <aside className="h-fit space-y-4 rounded-3xl bg-white p-5 shadow-sm sm:p-6 lg:sticky lg:top-28">
@@ -158,7 +161,7 @@ export function OrderPage() {
   const idx = STEPS.findIndex(([s]) => s === o.status);
   const wa = whatsappLink(settings.whatsapp, `Hi, about my order ${o.number}.`);
   const payNote = {
-    cod: 'Pay in cash when your order is delivered.',
+    purchase_order: 'We deliver once we receive your purchase order. Please send it to us quoting your order number.',
     bank_transfer: 'Please transfer the total to the account below and send us the slip, quoting your order number.',
     card: 'We will send you a secure card payment link shortly.',
   }[o.payment_method];

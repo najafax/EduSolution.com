@@ -7,7 +7,7 @@ const { businessYear } = require('./businessDate');
 
 const STOCK_STATUSES = ['in_stock', 'low', 'on_request', 'out'];
 const ORDER_STATUSES = ['new', 'confirmed', 'packed', 'dispatched', 'delivered', 'cancelled'];
-const PAYMENT_METHODS = ['cod', 'bank_transfer', 'card'];
+const PAYMENT_METHODS = ['bank_transfer', 'purchase_order', 'card'];
 const PAYMENT_STATUSES = ['unpaid', 'paid', 'refunded'];
 const PROMO_THEMES = ['ember', 'ocean', 'forest', 'ink'];
 

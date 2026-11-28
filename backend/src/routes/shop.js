@@ -565,7 +565,7 @@ router.post('/orders/:id/create-invoice', manage, requirePermission('invoices', 
            subtotal, discount_amount, tax_rate, tax_amount, total, public_token, created_by_name, po_number)
          VALUES (?, ?, 'draft', ?, ?, ?, 'percentage', 0, ?, 0, 0, 0, ?, ?, ?, ?)`,
       )
-      .run(number, client.id, today, today, `Shop order ${order.number}. Deliver to ${order.island}${order.boat ? `, boat ${order.boat}` : ''}.`, t.subtotal, t.total, newToken(), req.user.name, order.number);
+      .run(number, client.id, today, today, `Shop order ${order.number}. Deliver to ${order.island}${order.boat ? `, boat ${order.boat}` : ''}.`, t.subtotal, t.total, newToken(), req.user.name, order.po_number || '');
     const ins = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, amount, sort_order, product_id) VALUES (?, ?, ?, ?, ?, ?, NULL)');
     t.items.forEach((i, idx) => ins.run(inv.lastInsertRowid, i.description, i.quantity, i.unit_price, i.amount, idx));
     stampItemCosts(inv.lastInsertRowid);

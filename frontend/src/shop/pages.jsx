@@ -102,7 +102,7 @@ export function Home() {
         {[
           ['Boat & island delivery', 'We deliver to the boat or island you choose'],
           ['Genuine warranty', settings.warranty_note || 'Brand warranty on every appliance'],
-          ['Pay your way', settings.card_enabled ? 'Cash, bank transfer or card' : 'Cash on delivery or bank transfer'],
+          ['Pay your way', settings.card_enabled ? 'Bank transfer, purchase order or card' : 'Bank transfer or purchase order'],
           ['Real people', 'Call or WhatsApp us, any time you need help'],
         ].map(([t, d]) => (
           <div key={t} className="rounded-2xl bg-white px-4 py-4 shadow-sm">

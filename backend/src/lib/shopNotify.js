@@ -3,7 +3,7 @@ const { sendMail, isEmailConfigured, escapeHtml } = require('./mailer');
 const { splitEmails, EMAIL_RE } = require('./emails');
 
 const money = (n) => `MVR ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-const PAYMENT_LABELS = { cod: 'Cash on delivery', bank_transfer: 'Bank transfer', card: 'Card payment link' };
+const PAYMENT_LABELS = { cod: 'Cash on delivery', purchase_order: 'Purchase order', bank_transfer: 'Bank transfer', card: 'Card payment link' };
 
 function itemsTable(items) {
   const rows = items

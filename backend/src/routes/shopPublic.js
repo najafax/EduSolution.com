@@ -237,8 +237,8 @@ router.post('/orders', shopOrderLimiter, (req, res) => {
   if (!island) return res.status(400).json({ error: 'Please tell us which island to deliver to.' });
 
   const settings = db.prepare('SELECT * FROM shop_settings WHERE id = 1').get();
-  const method = String(b.payment_method || 'cod');
-  if (!['cod', 'bank_transfer', 'card'].includes(method)) return res.status(400).json({ error: 'Choose how you would like to pay.' });
+  const method = String(b.payment_method || 'bank_transfer');
+  if (!['bank_transfer', 'purchase_order', 'card'].includes(method)) return res.status(400).json({ error: 'Choose how you would like to pay.' });
   if (method === 'card' && !settings.card_enabled) return res.status(400).json({ error: 'Card payment is not available right now.' });
 
   const lines = Array.isArray(b.items) ? b.items.slice(0, 30) : [];
@@ -269,10 +269,10 @@ router.post('/orders', shopOrderLimiter, (req, res) => {
     const info = db
       .prepare(
         `INSERT INTO shop_orders (number, public_token, customer_name, phone, email, island, address, boat, notes,
-           payment_method, subtotal, total)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           payment_method, po_number, subtotal, total)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(number, token, name, phone, email, island, address, boat, notes, method, subtotal, subtotal);
+      .run(number, token, name, phone, email, island, address, boat, notes, method, method === 'purchase_order' ? text(b.po_number, 60) : '', subtotal, subtotal);
     const ins = db.prepare(
       'INSERT INTO shop_order_items (order_id, product_id, sku, name, unit_price, quantity, amount) VALUES (?, ?, ?, ?, ?, ?, ?)',
     );
@@ -304,6 +304,7 @@ router.get('/orders/:token', (req, res) => {
       number: order.number,
       status: order.status,
       payment_method: order.payment_method,
+      po_number: order.po_number,
       payment_status: order.payment_status,
       customer_name: order.customer_name,
       island: order.island,

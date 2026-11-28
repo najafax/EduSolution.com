@@ -8,7 +8,7 @@ import StatusFilterChips from '../../../components/StatusFilterChips';
 import { AREA, BTN, BTN2, INPUT, Field } from './common';
 
 const STATUSES = ['new', 'confirmed', 'packed', 'dispatched', 'delivered', 'cancelled'];
-const PAY = { cod: 'Pay on delivery', bank_transfer: 'Bank transfer', card: 'Card' };
+const PAY = { cod: 'Pay on delivery (old)', purchase_order: 'Purchase order', bank_transfer: 'Bank transfer', card: 'Card' };
 const TONE = { new: 'bg-red-100 text-red-700', confirmed: 'bg-sky-100 text-sky-700', packed: 'bg-indigo-100 text-indigo-700', dispatched: 'bg-amber-100 text-amber-800', delivered: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-slate-200 text-slate-600' };
 
 function OrderModal({ token, id, canManage, canInvoice, onClose, onChanged }) {
@@ -35,7 +35,7 @@ function OrderModal({ token, id, canManage, canInvoice, onClose, onChanged }) {
         <div><b>{o.customer_name}</b> · <a className="text-lagoon-700 underline" href={`tel:${o.phone}`}>{o.phone}</a>{o.email && <> · {o.email}</>}</div>
         <div>Deliver to <b>{o.island}</b>{o.boat && <> · boat/harbour: <b>{o.boat}</b></>}{o.address && <> · {o.address}</>}</div>
         {o.notes && <div className="rounded-lg bg-amber-50 p-2 text-slate-800">Customer note: {o.notes}</div>}
-        <div>Payment: <b>{PAY[o.payment_method]}</b></div>
+        <div>Payment: <b>{PAY[o.payment_method]}</b>{o.po_number && <> · PO number: <b>{o.po_number}</b></>}</div>
       </div>
       <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
         {d.items.map((i) => <div key={i.id} className="flex justify-between gap-3 px-3 py-2"><span>{i.quantity} × {i.name} <span className="text-xs text-slate-500">({i.sku})</span></span><b>{Number(i.amount).toLocaleString()}</b></div>)}
