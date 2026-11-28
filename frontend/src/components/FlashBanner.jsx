@@ -9,6 +9,15 @@ export const AD_BG = {
   ink: 'from-[#2A3350] to-[#0A0D18]',
 };
 
+// "Ends Sat 12 Dec, 11:59 pm" - the written end date shown next to every countdown.
+export function endsLabel(endsAt) {
+  const d = new Date(endsAt);
+  if (!endsAt || Number.isNaN(d.getTime())) return '';
+  const day = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  const time = d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return `Ends ${day}, ${time}`;
+}
+
 export function timeLeft(endsAt, now) {
   const ms = new Date(endsAt).getTime() - now;
   if (!Number.isFinite(ms) || ms <= 0) return '';
@@ -50,7 +59,7 @@ export default function FlashBanner() {
       <span className="ad-flash rounded bg-white px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-slate-900">⚡ {p.badge}</span>
       <b className="font-display font-extrabold">{p.title}</b>
       {p.subtitle && <span className="text-white/85">{p.subtitle}</span>}
-      {timer && <span className="ad-tick rounded bg-black/30 px-1.5 py-0.5 font-bold tabular-nums">⏱ {timer}</span>}
+      {timer && <span className="ad-tick rounded bg-black/30 px-1.5 py-0.5 font-bold tabular-nums">⏱ {timer} · {endsLabel(p.ends_at)}</span>}
       <span className="font-extrabold underline underline-offset-4">{p.cta_label} <span className="ad-arrow">→</span></span>
       <span className="text-white/40">✦</span>
     </span>

@@ -15,6 +15,7 @@ const {
 // Unauthenticated storefront API (mounted at /api/public/shop). Read-only
 // except POST /orders, which is rate limited, honeypotted, and builds the
 // order entirely from live server-side prices.
+const unsubscribe = require('../lib/unsubscribe');
 const router = Router();
 const PAGE_SIZE = 24;
 
@@ -312,9 +313,24 @@ router.get('/orders/:token', (req, res) => {
       total: order.total,
       created_at: order.created_at,
       bank_details: order.payment_method === 'bank_transfer' ? settings.bank_details || biz.bank_details || '' : '',
+      payment_link: order.payment_method === 'card' && order.payment_status === 'unpaid' ? order.payment_link : '',
     },
     items,
   });
+});
+
+// Unsubscribe from shop sale emails. Called by the /unsubscribe page (JSON body
+// { c, t, undo? }) and by mail apps' one-click List-Unsubscribe (POST with c/t in
+// the query string). The token is an HMAC of the client id (lib/unsubscribe.js).
+router.post('/unsubscribe', (req, res) => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  const c = b.c ?? req.query.c;
+  const t = b.t ?? req.query.t;
+  if (!unsubscribe.verify(c, t)) return res.status(400).json({ error: 'This unsubscribe link is not valid.' });
+  const client = db.prepare('SELECT id FROM clients WHERE id = ?').get(Number(c));
+  if (!client) return res.status(400).json({ error: 'This unsubscribe link is not valid.' });
+  db.prepare('UPDATE clients SET promo_unsubscribed = ? WHERE id = ?').run(b.undo ? 0 : 1, client.id);
+  res.json({ ok: true, unsubscribed: !b.undo });
 });
 
 module.exports = router;

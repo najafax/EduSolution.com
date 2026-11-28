@@ -14,16 +14,24 @@ const TONE = { new: 'bg-red-100 text-red-700', confirmed: 'bg-sky-100 text-sky-7
 function OrderModal({ token, id, canManage, canInvoice, onClose, onChanged }) {
   const { toast } = useToast();
   const [d, setD] = useState(null);
-  const [f, setF] = useState({ status: 'new', payment_status: 'unpaid', staff_notes: '' });
+  const [f, setF] = useState({ status: 'new', payment_status: 'unpaid', staff_notes: '', payment_link: '' });
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    api.shop.order(id, token).then((r) => { setD(r); setF({ status: r.order.status, payment_status: r.order.payment_status, staff_notes: r.order.staff_notes || '' }); });
+    api.shop.order(id, token).then((r) => { setD(r); setF({ status: r.order.status, payment_status: r.order.payment_status, staff_notes: r.order.staff_notes || '', payment_link: r.order.payment_link || '' }); });
   }, [id, token]);
   if (!d) return <p className="py-10 text-center text-sm text-slate-500">Loading…</p>;
   const o = d.order;
   async function save() {
     setBusy(true);
     try { await api.shop.updateOrder(id, f, token); toast('Order updated', { type: 'success' }); onChanged(); onClose(); } catch (e) { toast(e.message, { type: 'error' }); } finally { setBusy(false); }
+  }
+  async function emailLink() {
+    setBusy(true);
+    try {
+      await api.shop.updateOrder(id, f, token);
+      await api.shop.sendPaymentLink(id, token);
+      toast('Payment link emailed to the customer', { type: 'success' });
+    } catch (e) { toast(e.message, { type: 'error' }); } finally { setBusy(false); }
   }
   async function invoice() {
     setBusy(true);
@@ -45,6 +53,16 @@ function OrderModal({ token, id, canManage, canInvoice, onClose, onChanged }) {
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Order status"><select className={INPUT} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Field>
           <Field label="Payment"><select className={INPUT} value={f.payment_status} onChange={(e) => setF({ ...f, payment_status: e.target.value })}><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="refunded">Refunded</option></select></Field>
+          {o.payment_method === 'card' && (
+            <Field label="Card payment link (from your BML merchant portal)" className="sm:col-span-2">
+              <input className={INPUT} type="url" placeholder="https://…" value={f.payment_link} onChange={(e) => setF({ ...f, payment_link: e.target.value })} />
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <button type="button" disabled={busy || !f.payment_link} onClick={emailLink} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold disabled:opacity-50">Save &amp; email link to customer</button>
+                {f.payment_link && o.phone && <a className="text-xs text-lagoon-700 underline" target="_blank" rel="noreferrer" href={`https://wa.me/${String(o.phone).replace(/\D/g, '').replace(/^(\d{7})$/, '960$1')}?text=${encodeURIComponent(`Hello ${o.customer_name}, you can pay for order ${o.number} by card here: ${f.payment_link}`)}`}>Send by WhatsApp</a>}
+                <span className="text-xs text-slate-500">The customer also sees a "Pay by card" button on their order page.</span>
+              </div>
+            </Field>
+          )}
           <Field label="Staff notes (private)" className="sm:col-span-2"><textarea rows={3} className={AREA} value={f.staff_notes} onChange={(e) => setF({ ...f, staff_notes: e.target.value })} /></Field>
         </div>
       )}

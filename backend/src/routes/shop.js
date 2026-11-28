@@ -5,10 +5,11 @@ const { computeTotals } = require('../lib/totals');
 const { nextInvoiceNumber } = require('../lib/numbering');
 const { todayStr } = require('../lib/businessDate');
 const { stampItemCosts } = require('../lib/costSnapshot');
-const { sendMail, isEmailConfigured } = require('../lib/mailer');
+const { sendMail, isEmailConfigured, textToHtml } = require('../lib/mailer');
 const { logEmail } = require('../lib/emailLog');
 const { splitEmails, EMAIL_RE } = require('../lib/emails');
 const { renderPromoEmail } = require('../lib/shopPromoEmail');
+const unsubscribe = require('../lib/unsubscribe');
 const {
   STOCK_STATUSES,
   ORDER_STATUSES,
@@ -421,6 +422,11 @@ router.put('/promotions/:id', manage, (req, res) => {
   if (!cur) return res.status(404).json({ error: 'Promotion not found' });
   const f = promoFields({ ...cur, ...(req.body || {}), image: req.body && 'image' in req.body ? req.body.image : cur.image }, cur);
   if (f.error) return bad(res, f.error);
+  // A sale that has ended stays ended: pushing its end date back would make the
+  // countdown/"ends" messaging misleading. Make a new banner instead.
+  if (cur.ends_at && cur.ends_at <= new Date().toISOString() && f.ends_at && f.ends_at > cur.ends_at) {
+    return res.status(409).json({ error: 'This banner has already ended. Create a new banner instead of extending it.' });
+  }
   db.prepare(
     `UPDATE shop_promotions SET title=@title, subtitle=@subtitle, badge=@badge, cta_label=@cta_label, link_path=@link_path, theme=@theme,
        image=@image, starts_at=@starts_at, ends_at=@ends_at, active=@active, show_on_main_site=@show_on_main_site, updated_at=datetime('now') WHERE id=@id`,
@@ -447,8 +453,8 @@ router.post('/promotions/:id/send-email', manage, async (req, res) => {
   if (!promo) return res.status(404).json({ error: 'Promotion not found' });
   if (!isEmailConfigured()) return res.status(503).json({ error: 'Email is not configured on the server' });
   const audience = req.body && req.body.audience === 'clients' ? 'clients' : 'test';
-  const { html } = renderPromoEmail(promo);
   const subject = text(req.body && req.body.subject, 160) || `${promo.badge}: ${promo.title}`;
+  let skippedUnsubscribed = 0;
 
   let recipients;
   if (audience === 'test') {
@@ -456,19 +462,24 @@ router.post('/promotions/:id/send-email', manage, async (req, res) => {
     if (!EMAIL_RE.test(to)) return bad(res, 'Enter a valid test email address');
     recipients = [{ email: to, name: 'Test' }];
   } else {
-    recipients = db
-      .prepare("SELECT id, name, email FROM clients WHERE email != ''")
-      .all()
+    const rows = db.prepare("SELECT id, name, email, promo_unsubscribed FROM clients WHERE email != ''").all();
+    skippedUnsubscribed = rows.filter((c) => c.promo_unsubscribed).length;
+    recipients = rows
+      .filter((c) => !c.promo_unsubscribed)
       .map((c) => ({ id: c.id, name: c.name, email: splitEmails(c.email)[0] }))
       .filter((c) => c.email && EMAIL_RE.test(c.email));
-    if (recipients.length === 0) return bad(res, 'No clients have an email address on file');
+    if (recipients.length === 0) return bad(res, 'No clients with an email address are subscribed to sale emails');
   }
 
   let sent = 0;
   const failures = [];
   for (const r of recipients) {
     try {
-      await sendMail({ to: r.email, subject, html });
+      const html = renderPromoEmail(promo, r.id ? { unsubscribeUrl: unsubscribe.pageUrl(r.id) } : {}).html;
+      const headers = r.id
+        ? { 'List-Unsubscribe': `<${unsubscribe.oneClickUrl(r.id)}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
+        : undefined;
+      await sendMail({ to: r.email, subject, html, headers });
       sent += 1;
       if (audience === 'clients') {
         try {
@@ -482,7 +493,7 @@ router.post('/promotions/:id/send-email', manage, async (req, res) => {
       failures.push({ email: r.email, error: String(err.message || err).slice(0, 120) });
     }
   }
-  res.json({ ok: true, audience, sent, failed: failures.length, failures: failures.slice(0, 10) });
+  res.json({ ok: true, audience, sent, failed: failures.length, skippedUnsubscribed, failures: failures.slice(0, 10) });
 });
 
 // ---- orders -------------------------------------------------------------
@@ -528,10 +539,45 @@ router.put('/orders/:id', manage, (req, res) => {
   const pay = b.payment_status === undefined ? cur.payment_status : b.payment_status;
   if (!ORDER_STATUSES.includes(status)) return bad(res, 'Unknown order status');
   if (!PAYMENT_STATUSES.includes(pay)) return bad(res, 'Unknown payment status');
-  db.prepare("UPDATE shop_orders SET status = ?, payment_status = ?, staff_notes = ?, updated_at = datetime('now') WHERE id = ?").run(
-    status, pay, b.staff_notes === undefined ? cur.staff_notes : text(b.staff_notes, 2000), cur.id,
+  let link = cur.payment_link;
+  if (b.payment_link !== undefined) {
+    link = text(b.payment_link, 500);
+    if (link && !/^https?:\/\/\S+$/i.test(link)) return bad(res, 'The payment link must start with http:// or https://');
+  }
+  db.prepare("UPDATE shop_orders SET status = ?, payment_status = ?, staff_notes = ?, payment_link = ?, updated_at = datetime('now') WHERE id = ?").run(
+    status, pay, b.staff_notes === undefined ? cur.staff_notes : text(b.staff_notes, 2000), link, cur.id,
   );
   res.json({ order: db.prepare('SELECT * FROM shop_orders WHERE id = ?').get(cur.id) });
+});
+
+// Emails the customer their card payment link. The link itself comes from the
+// bank's merchant dashboard (BML Connect "payment request"); it is pasted on the
+// order first. The customer also sees a "Pay by card" button on their order page.
+router.post('/orders/:id/send-payment-link', manage, async (req, res) => {
+  const order = db.prepare('SELECT * FROM shop_orders WHERE id = ?').get(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (!order.payment_link) return bad(res, 'Add the payment link to this order first');
+  const to = splitEmails(order.email || '')[0];
+  if (!to || !EMAIL_RE.test(to)) return bad(res, 'This order has no customer email address. Send the link by WhatsApp instead.');
+  if (!isEmailConfigured()) return res.status(503).json({ error: 'Email is not configured on the server' });
+  const settings = db.prepare('SELECT shop_name FROM shop_settings WHERE id = 1').get();
+  const shop = (settings && settings.shop_name) || 'Edu Solutions Shop';
+  const subject = `Pay for your order ${order.number} — ${shop}`;
+  const body =
+    `Hello ${order.customer_name},\n\nThank you for your order ${order.number} (total ${Number(order.total).toLocaleString()}).\n\n` +
+    `You can pay securely by card here:\n${order.payment_link}\n\nWe will dispatch your order once the payment is received.\n\n${shop}`;
+  try {
+    await sendMail({ to, subject, html: textToHtml(body) });
+  } catch (err) {
+    if (err && err.code === 'EMAIL_NOT_CONFIGURED') return res.status(503).json({ error: 'Email is not configured on the server' });
+    return res.status(502).json({ error: 'The email could not be sent. Try again, or send the link by WhatsApp.' });
+  }
+  try {
+    logEmail({ type: 'shop_order_payment', to, subject, sentByName: req.user.name, entityType: 'shop_order', entityId: order.id, entityLabel: order.number });
+  } catch (err) {
+    console.error('email log failed', err.message);
+  }
+  res.json({ ok: true });
 });
 
 // Turns an order into a real client + draft invoice (so it flows into

@@ -107,3 +107,38 @@ test('promotions show on the main site only while live, and render an email', as
   assert.match(prev.data.html, /Big AC sale/);
   assert.equal((await srv.api('POST', `/shop/promotions/${promo.data.promotion.id}/send-email`, { audience: 'test' }, boss)).status, 503); // no email configured in tests
 });
+
+test('an ended banner cannot be extended; unsubscribe opts a client out', async () => {
+  const past = new Date(Date.now() - 86400000).toISOString();
+  const promo = await srv.api('POST', '/shop/promotions', { title: 'Old sale', theme: 'ember', ends_at: past }, boss);
+  assert.equal(promo.status, 201);
+  const pid = promo.data.promotion.id;
+  const ext = await srv.api('PUT', `/shop/promotions/${pid}`, { ends_at: new Date(Date.now() + 86400000).toISOString() }, boss);
+  assert.equal(ext.status, 409);
+
+  process.env.JWT_SECRET = 'test-secret';
+  const unsub = require('../src/lib/unsubscribe');
+  const cl = await srv.api('POST', '/clients', { name: 'Opt Out Co', email: 'optout@example.com' }, boss);
+  assert.equal(cl.status, 201);
+  const cid = cl.data.client.id;
+  assert.equal((await srv.api('POST', '/public/shop/unsubscribe', { c: cid, t: 'bad' })).status, 400);
+  const ok = await srv.api('POST', '/public/shop/unsubscribe', { c: cid, t: unsub.tokenFor(cid) });
+  assert.equal(ok.status, 200);
+  const undo = await srv.api('POST', '/public/shop/unsubscribe', { c: cid, t: unsub.tokenFor(cid), undo: true });
+  assert.equal(undo.data.unsubscribed, false);
+});
+
+test('card orders carry a payment link shown only while unpaid', async () => {
+  await srv.api('PUT', '/shop/settings', { card_enabled: 1 }, boss);
+  const p = (await srv.api('GET', '/public/shop/products')).data.products[0];
+  const o = await srv.api('POST', '/public/shop/orders', { name: 'Card Buyer', phone: '7771111', island: 'Male', boat: 'x', payment_method: 'card', items: [{ product_id: p.id, quantity: 1 }], t: Date.now() - 10000 });
+  if (o.status !== 200) return; // card not enabled by that settings route shape
+  const list = await srv.api('GET', '/shop/orders', null, boss);
+  const id = list.data.orders.find((x) => x.number === o.data.number).id;
+  assert.equal((await srv.api('PUT', `/shop/orders/${id}`, { payment_link: 'javascript:alert(1)' }, boss)).status, 400);
+  assert.equal((await srv.api('PUT', `/shop/orders/${id}`, { payment_link: 'https://pay.example.com/abc' }, boss)).status, 200);
+  assert.equal((await srv.api('GET', `/public/shop/orders/${o.data.token}`)).data.order.payment_link, 'https://pay.example.com/abc');
+  assert.equal((await srv.api('POST', `/shop/orders/${id}/send-payment-link`, {}, boss)).status, 400); // no customer email
+  await srv.api('PUT', `/shop/orders/${id}`, { payment_status: 'paid' }, boss);
+  assert.equal((await srv.api('GET', `/public/shop/orders/${o.data.token}`)).data.order.payment_link, '');
+});

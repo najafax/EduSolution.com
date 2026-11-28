@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { AD_BG, timeLeft } from './FlashBanner';
+import { AD_BG, timeLeft, endsLabel } from './FlashBanner';
 
 const SHOP = 'https://shop.edusolutionsmv.com';
 const API = `${import.meta.env.VITE_API_URL || ''}/api/public/shop`;
@@ -48,7 +48,7 @@ export default function FlashHeroBanner() {
             <span className="ad-flash inline-block rounded bg-white px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-slate-900">⚡ {promo.badge}</span>
             <div className="mt-1 font-display text-lg font-extrabold leading-tight sm:text-2xl">{promo.title}</div>
             {promo.subtitle && <div className="hidden text-sm text-white/85 sm:block">{promo.subtitle}</div>}
-            {timer && <div className="ad-tick mt-1 inline-block rounded bg-black/30 px-2 py-0.5 text-xs font-bold tabular-nums sm:text-sm">⏱ Ends in {timer}</div>}
+            {timer && <div className="ad-tick mt-1 inline-block rounded bg-black/30 px-2 py-0.5 text-xs font-bold tabular-nums sm:text-sm">⏱ Ends in {timer} · {endsLabel(promo.ends_at)}</div>}
           </div>
           {shown.length > 0 && (
             <div className="hidden gap-2 sm:flex">

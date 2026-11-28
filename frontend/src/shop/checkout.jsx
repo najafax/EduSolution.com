@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { shopApi, money } from './shopApi.js';
 import { useCart } from './cart.jsx';
 import { useShop } from './ShopApp.jsx';
@@ -48,8 +48,8 @@ export function Checkout() {
     );
   }
 
-  async function submit(e) {
-    e.preventDefault();
+  async function submit(e, viaWhatsapp = false) {
+    if (e) e.preventDefault();
     setError('');
     setBusy(true);
     try {
@@ -59,8 +59,12 @@ export function Checkout() {
         t: shownAt.current,
       });
       if (!r.token) throw new Error('We could not place your order. Please try again.');
+      const lines = cart.lines.map((l) => `${l.qty} × ${l.name}`).join('\n');
+      const wa = viaWhatsapp
+        ? whatsappLink(settings.whatsapp, `Hi, I just placed order ${r.number} (${money(cart.total, cur)}):\n${lines}\nDelivery: ${f.island}${f.boat ? `, ${f.boat}` : ''}. Name: ${f.name}.`)
+        : '';
       cart.clear();
-      nav(`/order/${r.token}`, { replace: true, state: { fresh: true } });
+      nav(`/order/${r.token}`, { replace: true, state: { fresh: true, wa } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -133,6 +137,11 @@ export function Checkout() {
           <button disabled={busy} className="w-full rounded-xl py-4 font-display text-base font-extrabold text-white transition hover:brightness-110 disabled:opacity-60" style={{ background: EMBER }}>
             {busy ? 'Placing your order…' : 'Place order'}
           </button>
+          {whatsappLink(settings.whatsapp) && (
+            <button type="button" disabled={busy} onClick={(ev) => { const form = ev.currentTarget.closest('form'); if (form && !form.reportValidity()) return; submit(null, true); }} className="w-full rounded-xl border-2 border-emerald-600 py-3.5 font-display text-sm font-extrabold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">
+              Place order &amp; send it on WhatsApp
+            </button>
+          )}
           <p className="text-center text-xs text-slate-500">By ordering you agree to our <Link to="/terms" className="underline">terms of sale</Link>.</p>
         </aside>
       </form>
@@ -159,11 +168,13 @@ export function OrderPage() {
   const o = data.order;
   const cur = settings.currency;
   const idx = STEPS.findIndex(([s]) => s === o.status);
+  const loc = useLocation();
   const wa = whatsappLink(settings.whatsapp, `Hi, about my order ${o.number}.`);
+  const sentWa = loc.state && loc.state.wa;
   const payNote = {
     purchase_order: 'We deliver once we receive your purchase order. Please send it to us quoting your order number.',
     bank_transfer: 'Please transfer the total to the account below and send us the slip, quoting your order number.',
-    card: 'We will send you a secure card payment link shortly.',
+    card: o.payment_link ? 'Pay securely by card using the button below.' : 'We will send you a secure card payment link shortly.',
   }[o.payment_method];
 
   return (
@@ -202,10 +213,14 @@ export function OrderPage() {
         <div className="rounded-2xl bg-[#F6F1E9] p-4 text-sm text-slate-700">
           <div className="font-bold text-[#0B1B3A]">Payment · {o.payment_status === 'paid' ? 'Paid' : 'Not paid yet'}</div>
           <p className="mt-1">{payNote}</p>
+          {o.payment_link && o.payment_status !== 'paid' && (
+            <a href={o.payment_link} target="_blank" rel="noreferrer" className="mt-3 inline-block rounded-xl px-6 py-3 font-display text-sm font-extrabold text-white" style={{ background: EMBER }}>Pay by card →</a>
+          )}
           {o.bank_details && <pre className="mt-3 whitespace-pre-wrap rounded-xl bg-white p-3 font-sans text-sm text-slate-800">{o.bank_details}</pre>}
         </div>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link to="/products" className="rounded-xl bg-[#0B1B3A] px-5 py-3 font-display text-sm font-extrabold text-white">Keep shopping</Link>
+          {sentWa && <a href={sentWa} target="_blank" rel="noreferrer" className="rounded-xl bg-emerald-600 px-5 py-3 font-display text-sm font-extrabold text-white">Send this order on WhatsApp</a>}
           {wa && <a href={wa} target="_blank" rel="noreferrer" className="rounded-xl border border-emerald-600 px-5 py-3 font-display text-sm font-extrabold text-emerald-700">Message us on WhatsApp</a>}
         </div>
       </div>

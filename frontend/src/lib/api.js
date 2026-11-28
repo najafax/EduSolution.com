@@ -523,6 +523,7 @@ export const api = {
     updatePromotion: (id, payload, token) => request(`/shop/promotions/${id}`, { method: 'PUT', body: payload, token }),
     removePromotion: (id, token) => request(`/shop/promotions/${id}`, { method: 'DELETE', token }),
     promoEmailPreview: (id, token) => request(`/shop/promotions/${id}/email-preview`, { token }),
+    sendPaymentLink: (id, token) => request(`/shop/orders/${id}/send-payment-link`, { method: 'POST', body: {}, token }),
     promoSendEmail: (id, payload, token) => request(`/shop/promotions/${id}/send-email`, { method: 'POST', body: payload, token }),
     orders: (token, { status, q, page } = {}) => request(`/shop/orders${qs({ status, q, page })}`, { token }),
     order: (id, token) => request(`/shop/orders/${id}`, { token }),
@@ -530,6 +531,7 @@ export const api = {
     createInvoice: (id, token) => request(`/shop/orders/${id}/create-invoice`, { method: 'POST', body: {}, token }),
   },
   publicShopSale: () => request('/public/shop/products?sale=1&sort=featured'),
+  shopUnsubscribe: (payload) => request('/public/shop/unsubscribe', { method: 'POST', body: payload }),
   publicPromotions: () => request('/public/shop/promotions?main=1'),
   website: {
     enquiries: {

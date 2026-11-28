@@ -32,7 +32,7 @@ function endsLabel(iso) {
 // Table-based, inline-styled email with the promotion banner on top and up to
 // four on-sale products below. Product pictures are plain <img> links to the
 // public image endpoint (email clients load remote images; nothing is attached).
-function renderPromoEmail(promo) {
+function renderPromoEmail(promo, opts = {}) {
   const t = THEMES[promo.theme] || THEMES.ember;
   const shop = shopBase();
   const link = `${shop}${promo.link_path && promo.link_path.startsWith('/') ? promo.link_path : '/sale'}`;
@@ -68,6 +68,9 @@ function renderPromoEmail(promo) {
     .map((pair) => `<tr>${pair.join('')}${pair.length === 1 ? '<td width="50%"></td>' : ''}</tr>`)
     .join('');
 
+  const unsub = opts.unsubscribeUrl
+    ? `<a href="${escapeHtml(opts.unsubscribeUrl)}" style="color:#6B7280;text-decoration:underline">Unsubscribe</a> from sale emails.`
+    : `<span style="text-decoration:underline">Unsubscribe</span> from sale emails.`;
   const html =
     `<table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6"><tr><td align="center" style="padding:16px">` +
     `<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:16px;overflow:hidden;font-family:Arial,sans-serif">` +
@@ -81,7 +84,7 @@ function renderPromoEmail(promo) {
     (cards ? `<tr><td style="padding:12px 12px 4px"><table width="100%" cellpadding="0" cellspacing="0">${cards}</table></td></tr>` : '') +
     `<tr><td style="padding:8px 28px 28px;text-align:center"><a href="${link}" style="display:inline-block;background:#10131A;color:#fff;font:700 15px Arial,sans-serif;text-decoration:none;padding:13px 24px;border-radius:99px">See all offers</a></td></tr>` +
     `<tr><td style="background:#F9FAFB;padding:16px 28px;font:12px/1.5 Arial,sans-serif;color:#6B7280;text-align:center">` +
-    `${escapeHtml(settings.shop_name || 'Edu Solutions Shop')} &middot; Delivery to the boat you choose.<br>You are receiving this because you are a customer of Edu Solutions. Reply to this email to stop receiving offers.</td></tr>` +
+    `${escapeHtml(settings.shop_name || 'Edu Solutions Shop')} &middot; Delivery to the boat you choose.<br>You are receiving this because you are a client of Edu Solutions. ${unsub}</td></tr>` +
     `</table></td></tr></table>`;
   return { html, products: products.length };
 }

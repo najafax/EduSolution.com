@@ -31,6 +31,7 @@ const PublicInvoice = lazy(() => import('./pages/PublicInvoice'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Finance = lazy(() => import('./pages/finance/Finance'));
 const More = lazy(() => import('./pages/More'));
+const Unsubscribe = lazy(() => import('./pages/Unsubscribe'));
 const Clients = lazy(() => import('./pages/business/Clients'));
 const Products = lazy(() => import('./pages/business/Products'));
 const Settings = lazy(() => import('./pages/business/Settings'));
@@ -93,7 +94,7 @@ export default function App() {
   // mean nothing to an outside visitor and would be actively confusing to
   // show here. Fixed set, exact match — these are top-level pages, not a
   // route subtree the way /portal/* is, so a prefix check isn't right here.
-  const MARKETING_ROUTES = new Set(['/', '/services', '/tutorials', '/testimonials', '/news', '/about', '/contact']);
+  const MARKETING_ROUTES = new Set(['/', '/services', '/tutorials', '/testimonials', '/news', '/about', '/contact', '/unsubscribe']);
   const isMarketingRoute = MARKETING_ROUTES.has(location.pathname);
 
   return (
@@ -179,6 +180,7 @@ export default function App() {
                 <Route path="/news" element={<MarketingNews />} />
                 <Route path="/about" element={<MarketingAbout />} />
                 <Route path="/contact" element={<MarketingContact />} />
+                <Route path="/unsubscribe" element={<Unsubscribe />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />

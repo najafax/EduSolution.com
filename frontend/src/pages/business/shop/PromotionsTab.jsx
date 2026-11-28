@@ -55,7 +55,7 @@ export default function PromotionsTab({ token, canManage }) {
     setBusy(true);
     try {
       const r = await api.shop.promoSendEmail(mail.promo.id, { audience, test_to: testTo }, token);
-      toast(`${r.sent} sent${r.failed ? `, ${r.failed} failed` : ''}`, { type: r.failed ? 'error' : 'success' });
+      toast(`${r.sent} sent${r.failed ? `, ${r.failed} failed` : ''}${r.skippedUnsubscribed ? `, ${r.skippedUnsubscribed} skipped (unsubscribed)` : ''}`, { type: r.failed ? 'error' : 'success' });
     } catch (e) { toast(e.message, { type: 'error' }); } finally { setBusy(false); }
   }
   const live = (p) => p.active && (!p.starts_at || p.starts_at <= new Date().toISOString()) && (!p.ends_at || p.ends_at > new Date().toISOString());

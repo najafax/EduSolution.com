@@ -41,6 +41,7 @@ const TYPE_LABELS = {
   license_expiry_alert: 'Automated license expiry alert',
   campaign: 'Promotional campaign',
   shop_promo: 'Shop flash-sale email',
+  shop_order_payment: 'Shop card payment link',
   inbox_reply: 'Inbox reply',
   inbox_compose: 'Inbox message',
   inbox_forward: 'Inbox forward',

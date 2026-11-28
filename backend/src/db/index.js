@@ -876,6 +876,12 @@ if (clientColumns.has('company')) {
   db.exec(`ALTER TABLE clients DROP COLUMN company;`);
 }
 
+// Clients who clicked "Unsubscribe" in a shop sale email. `clients` already has
+// real rows in production, so this is an ALTER TABLE, not a CREATE TABLE edit.
+if (!clientColumns.has('promo_unsubscribed')) {
+  db.exec(`ALTER TABLE clients ADD COLUMN promo_unsubscribed INTEGER NOT NULL DEFAULT 0;`);
+}
+
 // Same pattern again: `tax_rate` added to `products` after that table
 // already existed in production with real catalog rows.
 const productColumns = new Set(db.prepare('PRAGMA table_info(products)').all().map((c) => c.name));
@@ -1619,6 +1625,13 @@ db.exec(`
   INSERT OR IGNORE INTO shop_settings (id) VALUES (1);
 `);
 
+
+// shop_orders has shipped (the shop is live), so later columns are ALTERs.
+// `payment_link` = the card payment link staff send for a "card" order.
+const shopOrderColumns = new Set(db.prepare('PRAGMA table_info(shop_orders)').all().map((c) => c.name));
+if (!shopOrderColumns.has('payment_link')) {
+  db.exec(`ALTER TABLE shop_orders ADD COLUMN payment_link TEXT NOT NULL DEFAULT '';`);
+}
 // The activity log was removed; drop its table (and indexes) from older databases.
 db.exec('DROP TABLE IF EXISTS activity_log');
 

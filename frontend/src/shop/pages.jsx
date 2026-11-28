@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { endsLabel } from '../components/FlashBanner';
 import { shopApi, imgUrl, promoImgUrl, heroImgUrl, money } from './shopApi.js';
 import { useCart } from './cart.jsx';
 import { useShop } from './ShopApp.jsx';
@@ -56,6 +57,7 @@ function PromoBanner({ promo }) {
             <div>
               <div className="mb-1 text-[11px] font-bold uppercase tracking-widest text-white/70">Ends in</div>
               <Countdown endsAt={promo.ends_at} />
+              <div className="mt-1 text-xs font-semibold text-white/80">{endsLabel(promo.ends_at)}</div>
             </div>
           )}
         </div>
