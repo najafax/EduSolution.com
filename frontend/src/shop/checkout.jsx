@@ -152,6 +152,7 @@ export function Checkout() {
 const STEPS = [['new', 'Received'], ['confirmed', 'Confirmed'], ['packed', 'Packed'], ['dispatched', 'On its way'], ['delivered', 'Delivered']];
 
 export function OrderPage() {
+  const loc = useLocation();
   const { token } = useParams();
   const { settings } = useShop();
   const [data, setData] = useState(null);
@@ -168,7 +169,6 @@ export function OrderPage() {
   const o = data.order;
   const cur = settings.currency;
   const idx = STEPS.findIndex(([s]) => s === o.status);
-  const loc = useLocation();
   const wa = whatsappLink(settings.whatsapp, `Hi, about my order ${o.number}.`);
   const sentWa = loc.state && loc.state.wa;
   const payNote = {
