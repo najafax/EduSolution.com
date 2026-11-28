@@ -529,6 +529,7 @@ export const api = {
     updateOrder: (id, payload, token) => request(`/shop/orders/${id}`, { method: 'PUT', body: payload, token }),
     createInvoice: (id, token) => request(`/shop/orders/${id}/create-invoice`, { method: 'POST', body: {}, token }),
   },
+  publicShopSale: () => request('/public/shop/products?sale=1&sort=featured'),
   publicPromotions: () => request('/public/shop/promotions?main=1'),
   website: {
     enquiries: {

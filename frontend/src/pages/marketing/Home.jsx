@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import MarketingLayout from './MarketingLayout';
 import VideoThumbnail from '../../components/VideoThumbnail';
+import FlashHeroBanner from '../../components/FlashHeroBanner';
 import { CheckCircleIcon, GraduationCapIcon, ProductIcon } from '../../components/icons';
 
 // The public marketing site's front page — replaces the old behavior where
@@ -95,6 +96,7 @@ export default function Home() {
       </div>
 
       {/* TWO WAYS WE HELP */}
+      <FlashHeroBanner />
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
         <h2 className="font-display max-w-lg text-3xl font-bold text-slate-900 dark:text-white">Two ways we help</h2>
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
