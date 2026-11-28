@@ -119,6 +119,13 @@ app.use((err, req, res, next) => {
   if (err && err.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
+  // Bad requests from clients or internet scanners (unsupported Content-Encoding,
+  // corrupt gzip body, bad charset, ...) are not server faults: answer with their
+  // own 4xx status and don't log them as errors or page anyone.
+  const status = err && (err.status || err.statusCode);
+  if (status >= 400 && status < 500) {
+    return res.status(status).json({ error: 'Bad request' });
+  }
   recordError({
     source: 'server',
     message: err && err.message,
