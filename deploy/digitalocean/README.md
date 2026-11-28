@@ -346,3 +346,13 @@ The React build is plain static files, so nginx on the droplet can serve it.
 6. `CLIENT_ORIGIN` in `backend/.env` stays `https://www.edusolutionsmv.com`.
 
 Installed PWAs pick up the new host automatically (same origin, same service worker URL). Delete the Render static service afterwards.
+
+## Retail shop (shop.edusolutionsmv.com)
+
+The shop is the same frontend build served on a second hostname; the app shows the storefront whenever the hostname starts with `shop.`.
+
+1. DNS: add an `A` record `shop` → the droplet's IP.
+2. nginx: copy `nginx-shop.conf.template` to `/etc/nginx/sites-available/edusolution-shop`, enable it, `nginx -t && systemctl reload nginx`, then `certbot --nginx -d shop.edusolutionsmv.com`.
+3. Backend `.env`: `SHOP_ORIGIN=https://shop.edusolutionsmv.com` (lets the shop call the API; also the link target in promotion emails) and `PUBLIC_API_URL=https://api.edusolutionsmv.com` (picture URLs in emails). Restart the backend.
+4. Deploy as usual (`deploy.sh`), sign in, grant the `shop` module to staff who need it (admins have no access to sensitive modules by default, but `shop` is an ordinary module so admins already do), open **Shop** and click **Load starter catalogue** once (112 appliances, retail prices only), then add pictures.
+5. Card payments: tick "Offer card payment" in Shop → Settings; you send each customer a payment link from your bank. A fully automatic gateway needs a merchant account and is a separate build.

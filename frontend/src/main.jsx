@@ -3,13 +3,15 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
-import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { installGlobalErrorReporting } from './lib/reportError.js'
 import { setUpdateReady } from './lib/appUpdate.js'
 import { applyFontSize, getFontSize } from './lib/fontSize.js'
+
+// shop.<domain> serves the public storefront from this same build.
+const isShop = /^shop\./i.test(window.location.hostname);
 
 applyFontSize(getFontSize());
 installGlobalErrorReporting();
@@ -65,7 +67,7 @@ const SW_UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 // banner (components/UpdateBanner.jsx); tapping Update calls updateSW(true),
 // which activates the new service worker and reloads. Checks run hourly, when
 // the tab/app comes back to the foreground, and shortly after opening.
-const updateSW = registerSW({
+const updateSW = isShop ? null : registerSW({
   onNeedRefresh() {
     setUpdateReady(updateSW);
   },
@@ -80,16 +82,33 @@ const updateSW = registerSW({
   },
 });
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </ToastProvider>
-      </ThemeProvider>
-    </BrowserRouter>
-  </StrictMode>,
-)
+if (isShop) {
+  // The storefront has no installable-app shell; drop any stale service worker
+  // so visitors always get the current shop.
+  navigator.serviceWorker?.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+  import('./shop/ShopApp.jsx').then(({ default: ShopApp }) => {
+    createRoot(document.getElementById('root')).render(
+      <StrictMode>
+        <BrowserRouter>
+          <ShopApp />
+        </BrowserRouter>
+      </StrictMode>,
+    );
+  });
+} else {
+  import('./App.jsx').then(({ default: App }) => {
+    createRoot(document.getElementById('root')).render(
+      <StrictMode>
+        <BrowserRouter>
+          <ThemeProvider>
+            <ToastProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </ToastProvider>
+          </ThemeProvider>
+        </BrowserRouter>
+      </StrictMode>,
+    );
+  });
+}

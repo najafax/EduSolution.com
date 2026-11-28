@@ -1,0 +1,1154 @@
+{
+ "categories": [
+  {
+   "slug": "air-conditioners",
+   "name": "Air Conditioners"
+  },
+  {
+   "slug": "televisions",
+   "name": "Televisions"
+  },
+  {
+   "slug": "refrigerators",
+   "name": "Refrigerators"
+  },
+  {
+   "slug": "freezers-chillers",
+   "name": "Freezers & Chillers"
+  },
+  {
+   "slug": "washing-machines",
+   "name": "Washing Machines"
+  },
+  {
+   "slug": "kitchen-appliances",
+   "name": "Kitchen Appliances"
+  },
+  {
+   "slug": "ac-spare-parts",
+   "name": "AC Spare Parts"
+  }
+ ],
+ "products": [
+  {
+   "sku": "I101974",
+   "name": "9K BTU Inverter Expert Air Conditioner (WIFI)",
+   "brand": "Hisense",
+   "model": "AS-09TW4RYRKG01B",
+   "size": "9000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense AC",
+   "retail_price": 5199.0
+  },
+  {
+   "sku": "I101975",
+   "name": "12K BTU Inverter Expert Air Conditioner (WIFI)",
+   "brand": "Hisense",
+   "model": "AS-12TW4RYRKG05B",
+   "size": "12000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense AC",
+   "retail_price": 5999.0
+  },
+  {
+   "sku": "I104109",
+   "name": "18K BTU Inverter Expert Air Conditioner (WIFI)",
+   "brand": "Hisense",
+   "model": "AS-18TW4RGSKG02E",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense AC",
+   "retail_price": 7690.0
+  },
+  {
+   "sku": "I104512",
+   "name": "24K BTU Inverter Expert Air Conditioner (WIFI)",
+   "brand": "Hisense",
+   "model": "AS-24TW4RXTKG00B",
+   "size": "24000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense AC",
+   "retail_price": 9790.0
+  },
+  {
+   "sku": "I109513",
+   "name": "10K BTU Inverter Expert Air Conditioner (WIFI) 5 Star",
+   "brand": "Hisense",
+   "model": "AS-10TR4RLRCA00",
+   "size": "10000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense AC 5 Star",
+   "retail_price": 5590.0
+  },
+  {
+   "sku": "I109512",
+   "name": "12K BTU Inverter Expert Air Conditioner (WIFI) 5 Star",
+   "brand": "Hisense",
+   "model": "AS-12TR4RGRCA01",
+   "size": "12000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense AC 5 Star",
+   "retail_price": 6290.0
+  },
+  {
+   "sku": "I109510",
+   "name": "18K BTU Inverter Expert Air Conditioner (WIFI) 5 Star",
+   "brand": "Hisense",
+   "model": "AS-18TR4RWSCA00",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense AC 5 Star",
+   "retail_price": 7890.0
+  },
+  {
+   "sku": "I109511",
+   "name": "24K BTU Inverter Expert Air Conditioner (WIFI) 5 Star",
+   "brand": "Hisense",
+   "model": "AS-24TW4RXTCA01",
+   "size": "24000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense AC 5 Star",
+   "retail_price": 9990.0
+  },
+  {
+   "sku": "I100667",
+   "name": "18K BTU Hisense Cassette Air Conditioner Inverter new",
+   "brand": "Hisense",
+   "model": "AUC-18TRERSJA2",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense Casset AC",
+   "retail_price": 13104.0
+  },
+  {
+   "sku": "I100668",
+   "name": "24K BTU Hisense Cassette Air Conditioner Inverter new",
+   "brand": "Hisense",
+   "model": "AUC-24TRERJJA2",
+   "size": "24000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense Casset AC",
+   "retail_price": 17136.0
+  },
+  {
+   "sku": "I100669",
+   "name": "36K BTU Hisense Cassette Air Conditioner Inverter new",
+   "brand": "Hisense",
+   "model": "AUC-36TRERKKA2",
+   "size": "36000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense Casset AC",
+   "retail_price": 23472.0
+  },
+  {
+   "sku": "I112009",
+   "name": "48K BTU Hisense Cassette Air Conditioner Inverter new",
+   "brand": "Hisense",
+   "model": "AUC-48TRFRQKA2",
+   "size": "48000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense Casset AC",
+   "retail_price": 30990.0
+  },
+  {
+   "sku": "I097791",
+   "name": "60K BTU Hisense Cassette Air Conditioner Inverter",
+   "brand": "Hisense",
+   "model": "AUC-60TR6RNKA",
+   "size": "60000BTU",
+   "category": "air-conditioners",
+   "group": "Hisense Casset AC",
+   "retail_price": 39990.0
+  },
+  {
+   "sku": "I067249",
+   "name": "9K BTU J-Tech Inverter Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHX9VED2",
+   "size": "9000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Standard AC",
+   "retail_price": 5590.0
+  },
+  {
+   "sku": "I067250",
+   "name": "12K BTU J-Tech Inverter Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHX12VED2",
+   "size": "12000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Standard AC",
+   "retail_price": 6190.0
+  },
+  {
+   "sku": "I067251",
+   "name": "18K BTU J-Tech Inverter Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHX18VED",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Standard AC",
+   "retail_price": 9590.0
+  },
+  {
+   "sku": "I081210",
+   "name": "18K BTU Model- Indoor AHX18XEV,Outdoor AUX18XEV (R410A) Standard",
+   "brand": "Sharp",
+   "model": "AUX18XEV",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Standard AC",
+   "retail_price": 9590.0
+  },
+  {
+   "sku": "I067252",
+   "name": "24K BTU J-Tech Inverter Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHX24VED",
+   "size": "24000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Standard AC",
+   "retail_price": 10990.0
+  },
+  {
+   "sku": "I099289",
+   "name": "10K BTU J-Tech Inverter Air Conditioner",
+   "brand": "Sharp",
+   "model": "HX10BED",
+   "size": "10000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Standard AC (NEW)",
+   "retail_price": 6090.0
+  },
+  {
+   "sku": "I097328",
+   "name": "13K BTU J-Tech Inverter Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHX13BED",
+   "size": "13000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Standard AC (NEW)",
+   "retail_price": 6590.0
+  },
+  {
+   "sku": "I097329",
+   "name": "18K BTU J-Tech Inverter Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHX18BED",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Standard AC (NEW)",
+   "retail_price": 8790.0
+  },
+  {
+   "sku": "I097330",
+   "name": "24K BTU J-Tech Inverter Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHX24BED",
+   "size": "24000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Standard AC (NEW)",
+   "retail_price": 10390.0
+  },
+  {
+   "sku": "I067253",
+   "name": "10K BTU J-Tech Inverter Plasmacluster Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHXP10WMD",
+   "size": "10000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Premium AC",
+   "retail_price": 6290.0
+  },
+  {
+   "sku": "I067254",
+   "name": "13K BTU J-Tech Inverter Plasmacluster Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHXP13WMD",
+   "size": "13000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Premium AC",
+   "retail_price": 6990.0
+  },
+  {
+   "sku": "I067255",
+   "name": "18K BTU J-Tech Inverter Plasmacluster Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHXP18WMD",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Premium AC",
+   "retail_price": 9890.0
+  },
+  {
+   "sku": "I067256",
+   "name": "24K BTU J-Tech Inverter Plasmacluster Air Conditioner",
+   "brand": "Sharp",
+   "model": "AHXP24WMD",
+   "size": "24000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Premium AC",
+   "retail_price": 11390.0
+  },
+  {
+   "sku": "I085268",
+   "name": "Sharp AC 10000BTU MODEL:AHXP10YMD Premium (NEW)",
+   "brand": "Sharp",
+   "model": "AHXP10YMD",
+   "size": "10000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Premium AC (NEW)",
+   "retail_price": 6590.0
+  },
+  {
+   "sku": "I085269",
+   "name": "Sharp AC 13000BTU MODEL:AHXP13YMD Premium (NEW)",
+   "brand": "Sharp",
+   "model": "AHXP13YMD",
+   "size": "13000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Premium AC (NEW)",
+   "retail_price": 7390.0
+  },
+  {
+   "sku": "I085271",
+   "name": "Sharp AC 18000BTU MODEL:AHXP18YMD Premium (NEW)",
+   "brand": "Sharp",
+   "model": "AHXP18YMD",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Premium AC (NEW)",
+   "retail_price": 9890.0
+  },
+  {
+   "sku": "I085270",
+   "name": "Sharp AC 24000BTU MODEL:AHXP24YMD Premium (NEW)",
+   "brand": "Sharp",
+   "model": "AHXP24YMD",
+   "size": "24000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 Premium AC (NEW)",
+   "retail_price": 11850.0
+  },
+  {
+   "sku": "I104292",
+   "name": "Sharp AC 1000BTU Inverter Air Conditioner Model:AU-X10BEF",
+   "brand": "Sharp",
+   "model": "AU-X10BEF",
+   "size": "10000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 5990.0
+  },
+  {
+   "sku": "I104293",
+   "name": "Sharp AC 12000BTU Inverter Air Conditioner Model:AU-X15BEF",
+   "brand": "Sharp",
+   "model": "AU-X15BEF",
+   "size": "12000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 6490.0
+  },
+  {
+   "sku": "I104294",
+   "name": "Sharp AC 18000BTU Inverter Air Conditioner Model:AU-X20BEF",
+   "brand": "Sharp",
+   "model": "AU-X20BEF",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 8790.0
+  },
+  {
+   "sku": "I084444",
+   "name": "9K BTU Inverter Expert Air Conditioner",
+   "brand": "Hisense",
+   "model": "AS-9TR4RYRCD00",
+   "size": "9000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 4990.0
+  },
+  {
+   "sku": "I084445",
+   "name": "12K BTU Inverter Expert Air Conditioner (New Model)",
+   "brand": "Hisense",
+   "model": "AS-12TR4RYRCD05",
+   "size": "12000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 5990.0
+  },
+  {
+   "sku": "I070357",
+   "name": "18K BTU Inverter Expert Air Conditioner",
+   "brand": "Hisense",
+   "model": "AS-18TR4RGSCD00",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 7599.0
+  },
+  {
+   "sku": "I070358",
+   "name": "24K BTU Inverter Expert Air Conditioner",
+   "brand": "Hisense",
+   "model": "AS-22TR4RXTCD00",
+   "size": "24000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 8990.0
+  },
+  {
+   "sku": "I084897",
+   "name": "18K BTU Hisense Cassette Air Conditioner Inverter",
+   "brand": "Hisense",
+   "model": "AUC-18TR4RSJA",
+   "size": "18000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 13990.0
+  },
+  {
+   "sku": "I079956",
+   "name": "24K BTU Hisense Cassette Air Conditioner Inverter",
+   "brand": "Hisense",
+   "model": "AUC-24TR4RJJA",
+   "size": "24000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 16990.0
+  },
+  {
+   "sku": "I079957",
+   "name": "36K BTU Hisense Cassette Air Conditioner Inverter",
+   "brand": "Hisense",
+   "model": "AUC-36TR4RKKA",
+   "size": "36000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 24490.0
+  },
+  {
+   "sku": "I097790",
+   "name": "48K BTU Hisense Cassette Air Conditioner Inverter",
+   "brand": "Hisense",
+   "model": "AUC-48TR6RNKA",
+   "size": "48000BTU",
+   "category": "air-conditioners",
+   "group": "Sharp R32 AC (NEW)",
+   "retail_price": 29990.0
+  },
+  {
+   "sku": "I111154",
+   "name": "Hisense 32\" HD Smart TV Model:32A4Q",
+   "brand": "Hisense",
+   "model": "32A4Q",
+   "size": "32\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 3290.0
+  },
+  {
+   "sku": "I111153",
+   "name": "Hisense 43\" 4K UHD Smart TV Model:43A6Q",
+   "brand": "Hisense",
+   "model": "43A6Q",
+   "size": "43\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 5990.0
+  },
+  {
+   "sku": "I110296",
+   "name": "Hisense 50\" UHD 4K LED SMART TV VIDAA Model:50A6Q",
+   "brand": "Hisense",
+   "model": "50A6Q",
+   "size": "50\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 7890.0
+  },
+  {
+   "sku": "I110295",
+   "name": "Hisense 55\" UHD 4K LED SMART TV VIDAA Model:55A6Q",
+   "brand": "Hisense",
+   "model": "55A6Q",
+   "size": "55\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 8399.0
+  },
+  {
+   "sku": "I109853",
+   "name": "Hisense 65\" UHD 4K LED SMART TV VIDAA Model:65A6Q",
+   "brand": "Hisense",
+   "model": "65A6Q",
+   "size": "65\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 10990.0
+  },
+  {
+   "sku": "I110294",
+   "name": "Hisense 65\" Mini-LED 4K SMART TV VIDAA Model:65U7Q",
+   "brand": "Hisense",
+   "model": "65U7Q",
+   "size": "65\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 17500.0
+  },
+  {
+   "sku": "I110747",
+   "name": "Hisense 75\" ULED Smart TV Model:75U7Q",
+   "brand": "Hisense",
+   "model": "75U7Q",
+   "size": "75\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 20990.0
+  },
+  {
+   "sku": "I109854",
+   "name": "Hisense 75\" UHD 4K LED SMART TV VIDAA Model:75A6Q",
+   "brand": "Hisense",
+   "model": "75A6Q",
+   "size": "75\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 16590.0
+  },
+  {
+   "sku": "I110746",
+   "name": "Hisense 85\" ULED Smart TV Model:85U7Q",
+   "brand": "Hisense",
+   "model": "85U7Q",
+   "size": "85\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 27990.0
+  },
+  {
+   "sku": "I109223",
+   "name": "Hisense 85\" UHD 4K LED SMART TV VIDAA Model:85A6Q",
+   "brand": "Hisense",
+   "model": "85A6Q",
+   "size": "85\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 22990.0
+  },
+  {
+   "sku": "I107773",
+   "name": "Hisense 100\" RGB-MiniLED SMART TV VIDAA Model:100UX",
+   "brand": "Hisense",
+   "model": "100UX",
+   "size": "100\"",
+   "category": "televisions",
+   "group": "Hisense Tv",
+   "retail_price": 99999.0
+  },
+  {
+   "sku": "I106425",
+   "name": "Sharp 43- Inch Google TV Model: 2T-C43GH3000X",
+   "brand": "Sharp",
+   "model": "2TC43GH3000X",
+   "size": "43\"",
+   "category": "televisions",
+   "group": "Sharp",
+   "retail_price": 5490.0
+  },
+  {
+   "sku": "I081563",
+   "name": "Sharp AQUOS 50\" Full HD TV Model:2TC50AD1X",
+   "brand": "Sharp",
+   "model": "2TC50AD1X",
+   "size": "50\"",
+   "category": "televisions",
+   "group": "Sharp",
+   "retail_price": 6499.0
+  },
+  {
+   "sku": "I110329",
+   "name": "Sharp 50- Inch Google TV Model: 4T-C50HJ6000X",
+   "brand": "Sharp",
+   "model": "4T-C50HJ6000X",
+   "size": "50\"",
+   "category": "televisions",
+   "group": "Sharp",
+   "retail_price": 7490.0
+  },
+  {
+   "sku": "I106427",
+   "name": "Sharp 65-Inch Google TV AI Version Model: 4T-C65HN7000X",
+   "brand": "Sharp",
+   "model": "4TC65HN7000X",
+   "size": "65\"",
+   "category": "televisions",
+   "group": "Sharp",
+   "retail_price": 15890.0
+  },
+  {
+   "sku": "I110578",
+   "name": "Sharp 65-Inch Google TV Model: 4T-C65HJ6000X",
+   "brand": "Sharp",
+   "model": "4T-C65HJ6000X",
+   "size": "65\"",
+   "category": "televisions",
+   "group": "Sharp",
+   "retail_price": 11990.0
+  },
+  {
+   "sku": "I094039",
+   "name": "Innos 50” Smart 4K UHD Smart TV Bazless Google TV",
+   "brand": "Innos",
+   "model": "New G50 Zero Edition",
+   "size": "50\"",
+   "category": "televisions",
+   "group": "Innos Tv",
+   "retail_price": 5500.0
+  },
+  {
+   "sku": "I094040",
+   "name": "Innos 55” Smart 4K UHD Smart TV Bazless Google TV",
+   "brand": "Innos",
+   "model": "S5501KU",
+   "size": "55\"",
+   "category": "televisions",
+   "group": "Innos Tv",
+   "retail_price": 6490.0
+  },
+  {
+   "sku": "I110645",
+   "name": "Toshiba 40 Inch Google TV 40V35NP",
+   "brand": "Toshiba",
+   "model": "40V35NP",
+   "size": "40\"",
+   "category": "televisions",
+   "group": "Toshiba",
+   "retail_price": 4290.0
+  },
+  {
+   "sku": "I109728",
+   "name": "Toshiba 55 Inch 4K QLED Vidaa TV Model:55C450NP",
+   "brand": "Toshiba",
+   "model": "55C450NP",
+   "size": "55\"",
+   "category": "televisions",
+   "group": "Toshiba",
+   "retail_price": 7200.0
+  },
+  {
+   "sku": "I109736",
+   "name": "Toshiba 65\" 4K Qled Vidaa Tv Model:65C450NP",
+   "brand": "Toshiba",
+   "model": "65C450NP",
+   "size": "65\"",
+   "category": "televisions",
+   "group": "Toshiba",
+   "retail_price": 8990.0
+  },
+  {
+   "sku": "I109915",
+   "name": "Toshiba 65\" Z Series (AI & Gaming Model)",
+   "brand": "Toshiba",
+   "model": "65Z670RP",
+   "size": "65\"",
+   "category": "televisions",
+   "group": "Toshiba",
+   "retail_price": 17490.0
+  },
+  {
+   "sku": "I045233",
+   "name": "Lanza Showcase Chiller Lg-382Bf",
+   "brand": "Lanza",
+   "model": "LG382BF",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Showcase Chiller",
+   "retail_price": 11990.0
+  },
+  {
+   "sku": "I045230",
+   "name": "Lanza Showcase Chiller Lg-1000Bfs",
+   "brand": "Lanza",
+   "model": "LG1000BFS",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Showcase Chiller",
+   "retail_price": 22990.0
+  },
+  {
+   "sku": "I062357",
+   "name": "Lanza Showcase Chiller Lg-1320",
+   "brand": "Lanza",
+   "model": "LG1320",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Showcase Chiller",
+   "retail_price": 34000.0
+  },
+  {
+   "sku": "I048305",
+   "name": "Lanza Chest Freezer Wd-300Y",
+   "brand": "Lanza",
+   "model": "WD330Y",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 9990.0
+  },
+  {
+   "sku": "I105835",
+   "name": "Lanza Chest Freezer Model:WD-330Y",
+   "brand": "Lanza",
+   "model": "WD-300Y",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 11690.0
+  },
+  {
+   "sku": "I045237",
+   "name": "Lanza Chest Freezer Wd-500Y",
+   "brand": "Lanza",
+   "model": "WD500Y",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 16990.0
+  },
+  {
+   "sku": "I051584",
+   "name": "Lanza Chest Freezer Model:Wd-700Y",
+   "brand": "Lanza",
+   "model": "WD700Y",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 21590.0
+  },
+  {
+   "sku": "I065405",
+   "name": "Lanza Chest Freezer Wd/Wg-200",
+   "brand": "Lanza",
+   "model": "WD/WG-200",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 6250.0
+  },
+  {
+   "sku": "I048304",
+   "name": "Lanza Chest Freezer Wd/Wg-620",
+   "brand": "Lanza",
+   "model": "WDWG620",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 16290.0
+  },
+  {
+   "sku": "I045234",
+   "name": "Lanza Chest Freezer Bd/Bg-620",
+   "brand": "Lanza",
+   "model": "BDBG620",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 17590.0
+  },
+  {
+   "sku": "I045235",
+   "name": "Lanza Chest Freezer Bd/Bg-720",
+   "brand": "Lanza",
+   "model": "BDBG720",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 19990.0
+  },
+  {
+   "sku": "I067673",
+   "name": "Sharp Chest Freezer 110L Model:SJC118",
+   "brand": "Sharp",
+   "model": "SJC118",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 4790.0
+  },
+  {
+   "sku": "I067674",
+   "name": "Sharp Chest Freezer 160L Model:SJC168",
+   "brand": "Sharp",
+   "model": "SJC168",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 5390.0
+  },
+  {
+   "sku": "I110579",
+   "name": "Sharp Chest Freezer 200L Model:SJC-200-G",
+   "brand": "Sharp",
+   "model": "SJC-200-G",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 5990.0
+  },
+  {
+   "sku": "I067675",
+   "name": "Sharp Chest Freezer 220L Model:SJC218",
+   "brand": "Sharp",
+   "model": "SJC218",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 6090.0
+  },
+  {
+   "sku": "I110580",
+   "name": "Sharp Chest Freezer 300L Model:SJC-300-G",
+   "brand": "Sharp",
+   "model": "SJC-300-G",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 7290.0
+  },
+  {
+   "sku": "I067676",
+   "name": "Sharp Chest Freezer 310L Model:SJC318",
+   "brand": "Sharp",
+   "model": "SJC318",
+   "size": "",
+   "category": "freezers-chillers",
+   "group": "Chest Freezer",
+   "retail_price": 7490.0
+  },
+  {
+   "sku": "I111088",
+   "name": "Sharp Top Load Washing Machine 8.5Kg Model:ES-W85TWXT-SA2",
+   "brand": "Sharp",
+   "model": "ES-W85TWXT-SA2",
+   "size": "",
+   "category": "washing-machines",
+   "group": "",
+   "retail_price": 8890.0
+  },
+  {
+   "sku": "I111089",
+   "name": "Sharp Washing Machine Top Load 8.5Kg Model :Es-X8512",
+   "brand": "Sharp",
+   "model": "ES-X8512",
+   "size": "",
+   "category": "washing-machines",
+   "group": "",
+   "retail_price": 6790.0
+  },
+  {
+   "sku": "I081205",
+   "name": "Sharp Refrigerator 180L NON INVERTER Model:SJS192K3SL",
+   "brand": "Sharp",
+   "model": "SJS192K3SL",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 5990.0
+  },
+  {
+   "sku": "I107843",
+   "name": "Sharp Refrigerator 299L Model: SJ-RF30E-DS",
+   "brand": "Sharp",
+   "model": "SJ-RF30E-DS",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 9990.0
+  },
+  {
+   "sku": "I107844",
+   "name": "Sharp Refrigerator 430L Model: SJ-RF43E-WH",
+   "brand": "Sharp",
+   "model": "SJ-RF43E-WH",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 13990.0
+  },
+  {
+   "sku": "I110327",
+   "name": "Sharp Twin Door Refrigerator 170L Model:SJ-189S-SS",
+   "brand": "Sharp",
+   "model": "SJ-189S-SS",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 7990.0
+  },
+  {
+   "sku": "I110328",
+   "name": "Sharp Twin Door Refrigerator 190L Model:SJ-209S-SS",
+   "brand": "Sharp",
+   "model": "SJ-209S-SS",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 8290.0
+  },
+  {
+   "sku": "I110330",
+   "name": "Sharp 521Ltr side-by-side inverter refrigerator model:SJ-SS52ES2-SL",
+   "brand": "Sharp",
+   "model": "SJ-SS52ES2-SL",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 16990.0
+  },
+  {
+   "sku": "I111085",
+   "name": "Sharp 2-Door top-freezer Refrigerator 512Ltr Model:SJ-PG51P2-BK",
+   "brand": "Sharp",
+   "model": "SJ-PG51P2-BK",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 17990.0
+  },
+  {
+   "sku": "I106423",
+   "name": "Sharp Refrigerator 315L model : SJ-FB32E-DS",
+   "brand": "Sharp",
+   "model": "SJFB32EDS",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 12990.0
+  },
+  {
+   "sku": "I106422",
+   "name": "Sharp Refrigerator 317L Model: SJ-RX42E-SL2",
+   "brand": "Sharp",
+   "model": "SJRX42ESL2",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 10790.0
+  },
+  {
+   "sku": "I106625",
+   "name": "Sharp Refrigerator 220L MODEL: SJ-RF22E-DS",
+   "brand": "Sharp",
+   "model": "SJRF22EDS",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 9290.0
+  },
+  {
+   "sku": "I105258",
+   "name": "Hisense Refrigerator French Door RT-64WC (Silver)",
+   "brand": "Hisense",
+   "model": "RT-64WC",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 16490.0
+  },
+  {
+   "sku": "I106886",
+   "name": "Hisense Side-by-Side 540L Refrigerator Model:HRSBS540BW",
+   "brand": "Hisense",
+   "model": "HRSBS540BW",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 16990.0
+  },
+  {
+   "sku": "I108045",
+   "name": "Hisense Refrigerator 304Ltr Model:RB390N4BFC",
+   "brand": "Hisense",
+   "model": "RB390N4BFC",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 10990.0
+  },
+  {
+   "sku": "I108046",
+   "name": "Hisense Refrigerator 304Ltr Model:RB390N4DWD",
+   "brand": "Hisense",
+   "model": "RB390N4DWD",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 10990.0
+  },
+  {
+   "sku": "I097413",
+   "name": "Hisense Refrigerator 485L Model:RF632N4WFE",
+   "brand": "Hisense",
+   "model": "RF632N4WFE",
+   "size": "",
+   "category": "refrigerators",
+   "group": "",
+   "retail_price": 19990.0
+  },
+  {
+   "sku": "I077236",
+   "name": "Hisense Air Fry Toaster Oven 28L Model:H28EOXS7",
+   "brand": "Hisense",
+   "model": "H28EOXS7",
+   "size": "",
+   "category": "kitchen-appliances",
+   "group": "",
+   "retail_price": 1890.0
+  },
+  {
+   "sku": "I098145",
+   "name": "Hisense Gas Burner Buld In 4 Burner Model:GM643XHC",
+   "brand": "Hisense",
+   "model": "GM643XHC",
+   "size": "",
+   "category": "kitchen-appliances",
+   "group": "",
+   "retail_price": 2900.0
+  },
+  {
+   "sku": "I098146",
+   "name": "Hisense Gas Burner Buld In 4 Burner Model:HHU60GAGR",
+   "brand": "Hisense",
+   "model": "HHU60GAGR",
+   "size": "",
+   "category": "kitchen-appliances",
+   "group": "",
+   "retail_price": 2900.0
+  },
+  {
+   "sku": "I079712",
+   "name": "Hisense Cooker Hood Model:HHO60TASS Colour:Stainless Steel",
+   "brand": "Hisense",
+   "model": "HHO60TASS",
+   "size": "",
+   "category": "kitchen-appliances",
+   "group": "",
+   "retail_price": 1890.0
+  },
+  {
+   "sku": "I078442",
+   "name": "AC Spare Part Hisense 10000BTU / 12000BTU Evaporator coil Part No:2113889",
+   "brand": "Hisense",
+   "model": "",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 1690.0
+  },
+  {
+   "sku": "I078441",
+   "name": "AC Spare Part Hisense 18000BTU Evaporator coil Part No:2089937",
+   "brand": "Hisense",
+   "model": "",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 1990.0
+  },
+  {
+   "sku": "I078440",
+   "name": "AC Spare Part Hisense 24000BTU Evaporator coil Part No:2091198",
+   "brand": "Hisense",
+   "model": "",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 2590.0
+  },
+  {
+   "sku": "I086923",
+   "name": "AC Spare Hisense 9000BTU Indoor Main Control Board Component AS-09TR4RYRCD00 Part No 2004602",
+   "brand": "Hisense",
+   "model": "2004602",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 1200.0
+  },
+  {
+   "sku": "I097772",
+   "name": "AC Spare Hisense 9000BTU Indoor Main Control Board Component Part with cover No 2299656",
+   "brand": "Hisense",
+   "model": "2299656",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 1400.0
+  },
+  {
+   "sku": "I074698",
+   "name": "AC Spare Hisense 12000BTU Indoor Main Control Board Component AS-12TR4RYRCD05 Part No 2001807",
+   "brand": "Hisense",
+   "model": "2001807",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 1300.0
+  },
+  {
+   "sku": "I091066",
+   "name": "AC Spare Hisense 12000BTU Outdoor Controller Component Part No 2214849",
+   "brand": "Hisense",
+   "model": "2214849",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 1800.0
+  },
+  {
+   "sku": "I074708",
+   "name": "AC Spare Hisense 18000BTU 18 HZ Outdoor Controller Component AS-18TR4RGSCD00 Part No 2104034",
+   "brand": "Hisense",
+   "model": "2104034",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 2400.0
+  },
+  {
+   "sku": "I074700",
+   "name": "AC Spare Hisense 18000BTU Indoor Main Control Board Component AS-18TR4RGSCD00 Part No 2104207",
+   "brand": "Hisense",
+   "model": "2104207",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 1400.0
+  },
+  {
+   "sku": "I078445",
+   "name": "AC Spare Hisense 24000BTU 24 HZ Outdoor Controller Component AS-22TR4RXTCD00 Part no 2003675",
+   "brand": "Hisense",
+   "model": "2003675",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 2600.0
+  },
+  {
+   "sku": "I074699",
+   "name": "AC Spare Hisense 24000BTU Indoor Main Control Board Component AS-22TR4RXTCD00 Part No 2004004",
+   "brand": "Hisense",
+   "model": "2004004",
+   "size": "",
+   "category": "ac-spare-parts",
+   "group": "",
+   "retail_price": 1500.0
+  }
+ ]
+}

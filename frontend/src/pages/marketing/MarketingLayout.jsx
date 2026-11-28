@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../../components/ThemeToggle';
 import { MenuIcon, XIcon } from '../../components/icons';
 import { useEdgeSwipeOpen } from '../../lib/useEdgeSwipeOpen';
+import FlashBanner from '../../components/FlashBanner';
 
 // The shared header for the public marketing site (/, /services,
 // /tutorials, /testimonials, /news, /about, /contact) — deliberately separate from the internal app's own
@@ -127,6 +128,7 @@ export default function MarketingLayout({ children }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas dark:bg-slate-950">
+      <FlashBanner />
       <header className="sticky top-0 z-20 bg-canvas/85 backdrop-blur dark:border-b dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Top-left: hamburger (below sm: only — the full link row takes

@@ -500,6 +500,36 @@ export const api = {
   // The staff-side CMS behind the public marketing site (routes/website.js)
   // — six small resources, each following the plain list/create/update/
   // remove shape every other simple resource in this app uses.
+  shop: {
+    stats: (token) => request('/shop/stats', { token }),
+    settings: (token) => request('/shop/settings', { token }),
+    saveSettings: (payload, token) => request('/shop/settings', { method: 'PUT', body: payload, token }),
+    categories: (token) => request('/shop/categories', { token }),
+    createCategory: (payload, token) => request('/shop/categories', { method: 'POST', body: payload, token }),
+    updateCategory: (id, payload, token) => request(`/shop/categories/${id}`, { method: 'PUT', body: payload, token }),
+    removeCategory: (id, token) => request(`/shop/categories/${id}`, { method: 'DELETE', token }),
+    products: (token, { q, category, flag, page } = {}) => request(`/shop/products${qs({ q, category, flag, page })}`, { token }),
+    product: (id, token) => request(`/shop/products/${id}`, { token }),
+    createProduct: (payload, token) => request('/shop/products', { method: 'POST', body: payload, token }),
+    updateProduct: (id, payload, token) => request(`/shop/products/${id}`, { method: 'PUT', body: payload, token }),
+    removeProduct: (id, token) => request(`/shop/products/${id}`, { method: 'DELETE', token }),
+    addImages: (id, images, token) => request(`/shop/products/${id}/images`, { method: 'POST', body: { images }, token }),
+    orderImages: (id, ids, token) => request(`/shop/products/${id}/images/order`, { method: 'PUT', body: { ids }, token }),
+    removeImage: (id, imageId, token) => request(`/shop/products/${id}/images/${imageId}`, { method: 'DELETE', token }),
+    bulk: (payload, token) => request('/shop/products-bulk', { method: 'POST', body: payload, token }),
+    loadStarter: (token) => request('/shop/load-starter', { method: 'POST', body: {}, token }),
+    promotions: (token) => request('/shop/promotions', { token }),
+    createPromotion: (payload, token) => request('/shop/promotions', { method: 'POST', body: payload, token }),
+    updatePromotion: (id, payload, token) => request(`/shop/promotions/${id}`, { method: 'PUT', body: payload, token }),
+    removePromotion: (id, token) => request(`/shop/promotions/${id}`, { method: 'DELETE', token }),
+    promoEmailPreview: (id, token) => request(`/shop/promotions/${id}/email-preview`, { token }),
+    promoSendEmail: (id, payload, token) => request(`/shop/promotions/${id}/send-email`, { method: 'POST', body: payload, token }),
+    orders: (token, { status, q, page } = {}) => request(`/shop/orders${qs({ status, q, page })}`, { token }),
+    order: (id, token) => request(`/shop/orders/${id}`, { token }),
+    updateOrder: (id, payload, token) => request(`/shop/orders/${id}`, { method: 'PUT', body: payload, token }),
+    createInvoice: (id, token) => request(`/shop/orders/${id}/create-invoice`, { method: 'POST', body: {}, token }),
+  },
+  publicPromotions: () => request('/public/shop/promotions?main=1'),
   website: {
     enquiries: {
       list: (token, { status } = {}) => request(`/website/enquiries${qs({ status })}`, { token }),

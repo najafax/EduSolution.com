@@ -35,6 +35,8 @@ const facebookPostsRoutes = require('./routes/facebookPosts');
 const errorLogRoutes = require('./routes/errorLog');
 const inboxRoutes = require('./routes/inbox');
 const resendWebhook = require('./routes/inboxWebhook');
+const shopRoutes = require('./routes/shop');
+const shopPublicRoutes = require('./routes/shopPublic');
 const { recordError } = require('./lib/errorLog');
 const { startScheduler } = require('./lib/scheduler');
 
@@ -56,9 +58,11 @@ app.use(compression());
 // API too, e.g. an old domain whose installed PWA is still open after a move.
 const corsOrigins = [
   process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  process.env.SHOP_ORIGIN || 'https://shop.edusolutionsmv.com',
+  'http://shop.localhost:5173',
   ...(process.env.CORS_EXTRA_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),
 ];
-app.use(cors({ origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins }));
+app.use(cors({ origin: corsOrigins }));
 // Default 100kb is too small for PUT /api/settings once it carries the
 // signature/stamp images (see routes/settings.js) — 2mb comfortably covers
 // two base64-encoded 400KB images plus the rest of the settings payload.
@@ -88,7 +92,9 @@ app.use('/api/capital-contributions', capitalContributionsRoutes);
 app.use('/api/owner-draws', ownerDrawsRoutes);
 app.use('/api/recurring-invoices', recurringRoutes);
 app.use('/api/licenses', licensesRoutes);
+app.use('/api/public/shop', shopPublicRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/shop', shopRoutes);
 app.use('/api/portal', clientPortalRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/import', importRoutes);

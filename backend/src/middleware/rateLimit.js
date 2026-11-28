@@ -109,7 +109,16 @@ const enquiryLimiter = rateLimit({
   handler: jsonHandler('Too many requests from this connection. Please try again later or call us.'),
 });
 
+// Shop checkout is an unauthenticated write that also sends email.
+const shopOrderLimiter = rateLimit({
+  ...base,
+  windowMs: 60 * 60 * 1000,
+  limit: 12,
+  handler: jsonHandler('Too many orders from this connection. Please try again later or call us.'),
+});
+
 module.exports = {
+  shopOrderLimiter,
   enquiryLimiter,
   publicRespondLimiter,
   loginLimiter,

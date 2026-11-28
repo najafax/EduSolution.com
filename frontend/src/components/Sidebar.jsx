@@ -46,6 +46,7 @@ export const LINK_ICONS = {
   '/users': UsersIcon,
   '/email-center': SendIcon,
   '/website-content': GlobeIcon,
+  '/shop-admin': ProductIcon,
   '/facebook-posts': FacebookIcon,
   '/settings': SettingsIcon,
 };

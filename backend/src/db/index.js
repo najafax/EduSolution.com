@@ -1495,6 +1495,129 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_error_log_seen ON error_log(last_seen_at);
 `);
 
+// ---- Retail shop (shop.edusolutionsmv.com) ---------------------------------
+// A public storefront on its own subdomain, run from the same backend. Staff
+// manage it under the `shop` permission. Wholesale/agent prices are never
+// stored here: only the retail price is imported.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS shop_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    display_order INTEGER NOT NULL DEFAULT 0,
+    visible INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS shop_products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sku TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    brand TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    size TEXT NOT NULL DEFAULT '',
+    category_id INTEGER REFERENCES shop_categories(id) ON DELETE SET NULL,
+    group_label TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    highlights TEXT NOT NULL DEFAULT '',
+    warranty_note TEXT NOT NULL DEFAULT '',
+    retail_price REAL NOT NULL DEFAULT 0,
+    sale_price REAL,
+    sale_ends_at TEXT,
+    stock_status TEXT NOT NULL DEFAULT 'in_stock',
+    featured INTEGER NOT NULL DEFAULT 0,
+    visible INTEGER NOT NULL DEFAULT 1,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_shop_products_category ON shop_products(category_id, visible);
+
+  CREATE TABLE IF NOT EXISTS shop_product_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES shop_products(id) ON DELETE CASCADE,
+    mime TEXT NOT NULL,
+    data BLOB NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_shop_product_images_product ON shop_product_images(product_id, position);
+
+  CREATE TABLE IF NOT EXISTS shop_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    number TEXT NOT NULL UNIQUE,
+    public_token TEXT NOT NULL UNIQUE,
+    customer_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT NOT NULL DEFAULT '',
+    island TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    boat TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    payment_method TEXT NOT NULL DEFAULT 'cod',
+    payment_status TEXT NOT NULL DEFAULT 'unpaid',
+    status TEXT NOT NULL DEFAULT 'new',
+    subtotal REAL NOT NULL DEFAULT 0,
+    total REAL NOT NULL DEFAULT 0,
+    staff_notes TEXT NOT NULL DEFAULT '',
+    client_id INTEGER,
+    invoice_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_shop_orders_status ON shop_orders(status, created_at);
+
+  CREATE TABLE IF NOT EXISTS shop_order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL REFERENCES shop_orders(id) ON DELETE CASCADE,
+    product_id INTEGER,
+    sku TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL,
+    unit_price REAL NOT NULL DEFAULT 0,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    amount REAL NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS shop_promotions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    subtitle TEXT NOT NULL DEFAULT '',
+    badge TEXT NOT NULL DEFAULT 'FLASH SALE',
+    cta_label TEXT NOT NULL DEFAULT 'Shop the sale',
+    link_path TEXT NOT NULL DEFAULT '/sale',
+    theme TEXT NOT NULL DEFAULT 'ember',
+    image TEXT NOT NULL DEFAULT '',
+    starts_at TEXT,
+    ends_at TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    show_on_main_site INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS shop_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    shop_name TEXT NOT NULL DEFAULT 'Edu Solutions Shop',
+    tagline TEXT NOT NULL DEFAULT 'Home appliances, delivered to your island',
+    announcement TEXT NOT NULL DEFAULT '',
+    hero_title TEXT NOT NULL DEFAULT 'Cool homes. Smart prices.',
+    hero_subtitle TEXT NOT NULL DEFAULT 'Air conditioners, TVs, fridges and more from trusted brands, delivered to the boat you choose.',
+    hero_image TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    whatsapp TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    delivery_note TEXT NOT NULL DEFAULT 'We deliver to the boat or ferry you choose. Tell us the island and boat name at checkout.',
+    warranty_note TEXT NOT NULL DEFAULT 'Brand warranty on every item.',
+    bank_details TEXT NOT NULL DEFAULT '',
+    terms TEXT NOT NULL DEFAULT '',
+    card_enabled INTEGER NOT NULL DEFAULT 0,
+    card_provider TEXT NOT NULL DEFAULT '',
+    notify_email TEXT NOT NULL DEFAULT ''
+  );
+  INSERT OR IGNORE INTO shop_settings (id) VALUES (1);
+`);
+
 // The activity log was removed; drop its table (and indexes) from older databases.
 db.exec('DROP TABLE IF EXISTS activity_log');
 

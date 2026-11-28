@@ -40,6 +40,7 @@ export const BUSINESS_LINKS = [
   { to: '/error-log', label: 'Error log', module: 'settings', group: 'Admin', adminOnly: true },
   { to: '/users', label: 'Users', module: 'users', group: 'Admin' },
   { to: '/email-center', label: 'Email center', module: 'email_center', group: 'Admin' },
+  { to: '/shop-admin', label: 'Shop', module: 'shop', group: 'Sales & clients' },
   { to: '/website-content', label: 'Website content', module: 'website', group: 'Admin' },
   { to: '/facebook-posts', label: 'Facebook posts', module: 'facebook', group: 'Admin' },
   { to: '/settings', label: 'Settings', module: 'settings', group: 'Admin' },

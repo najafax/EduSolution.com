@@ -40,6 +40,7 @@ const TYPE_LABELS = {
   overdue_reminder: 'Automated overdue reminder',
   license_expiry_alert: 'Automated license expiry alert',
   campaign: 'Promotional campaign',
+  shop_promo: 'Shop flash-sale email',
   inbox_reply: 'Inbox reply',
   inbox_compose: 'Inbox message',
   inbox_forward: 'Inbox forward',
