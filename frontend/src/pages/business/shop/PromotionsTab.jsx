@@ -110,7 +110,7 @@ export default function PromotionsTab({ token, canManage }) {
       <Modal open={Boolean(mail)} onClose={() => setMail(null)} title="Email banner" maxWidthClass="max-w-3xl">
         {mail && (
           <div className="space-y-3">
-            <p className="text-sm text-slate-600 dark:text-slate-300">Subject: <b>{mail.subject}</b> · shows {mail.products.length} on-sale product(s).</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Subject: <b>{mail.subject}</b> · shows {mail.products} on-sale product(s).</p>
             <iframe title="Email preview" sandbox="" srcDoc={mail.html} className="h-[26rem] w-full rounded-xl border border-slate-200 bg-white" />
             <div className="flex flex-wrap items-end gap-2">
               <label className="text-xs">Send a test to<input className={`${INPUT} !mt-0 w-64`} value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="your email (blank = you)" /></label>
