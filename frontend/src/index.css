@@ -512,3 +512,30 @@ html:not(.dark) body::before {
     border-radius: 0.9rem;
   }
 }
+
+/* Flash-sale ad animations (main-site strip + homepage ad, shop banners).
+   Everything is off when the visitor prefers reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .ad-shimmer { position: relative; overflow: hidden; }
+  .ad-shimmer::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%);
+    transform: translateX(-120%); animation: ad-sweep 3.8s ease-in-out infinite;
+  }
+  .ad-flash { animation: ad-flash 1s steps(1, end) infinite; }
+  .ad-pulse { animation: ad-pulse 1.4s ease-in-out infinite; }
+  .ad-wiggle { animation: ad-wiggle 2.4s ease-in-out infinite; }
+  .ad-arrow { display: inline-block; animation: ad-arrow 1s ease-in-out infinite; }
+  .ad-marquee { display: flex; width: max-content; animation: ad-marquee 28s linear infinite; }
+  .ad-marquee:hover { animation-play-state: paused; }
+  .ad-pop { animation: ad-pop .55s cubic-bezier(.2,1.4,.4,1) both; }
+  .ad-tick { animation: ad-tick 1s ease-in-out infinite; }
+}
+@keyframes ad-sweep { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@keyframes ad-flash { 0% { background: #fff; color: #0f172a; } 50% { background: #FFD43B; color: #0f172a; } }
+@keyframes ad-pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,.55); } 50% { transform: scale(1.06); box-shadow: 0 0 0 10px rgba(255,255,255,0); } }
+@keyframes ad-wiggle { 0%, 88%, 100% { transform: rotate(0); } 92% { transform: rotate(-6deg); } 96% { transform: rotate(6deg); } }
+@keyframes ad-arrow { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+@keyframes ad-marquee { to { transform: translateX(-50%); } }
+@keyframes ad-pop { from { opacity: 0; transform: translateY(10px) scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes ad-tick { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
