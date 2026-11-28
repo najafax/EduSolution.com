@@ -2,6 +2,7 @@ const db = require('../db');
 const mailer = require('./mailer');
 const { logEmail } = require('./emailLog');
 const { splitEmails, EMAIL_RE } = require('./emails');
+const { renderSignatureHtml } = require('./signatureHtml');
 
 // Everything the Inbox sends (new mail, replies, forwards). One place validates
 // recipients and attachments, sends through lib/mailer.js, and records the
@@ -145,7 +146,25 @@ function checkMessage(message, files) {
  * nothing is recorded unless the send succeeded.
  */
 async function sendAndRecord({ kind, addressing, subject, text, extraHtml = '', files = [], headers, inReplyToId = null, clientId = null, user }) {
-  const html = mailer.textToHtml(text) + extraHtml;
+  // If the message ends with the sender's saved signature (the compose form
+  // pre-fills it), send that part as a styled block instead of plain text. The
+  // stored copy in Sent keeps the plain text as typed.
+  let body = text;
+  let signatureHtml = '';
+  try {
+    const row = user && user.id ? db.prepare('SELECT email_signature FROM users WHERE id = ?').get(user.id) : null;
+    const sig = String((row && row.email_signature) || '').replace(/\r\n/g, '\n').trim();
+    const normalised = String(text).replace(/\r\n/g, '\n').trimEnd();
+    if (sig && normalised.endsWith(sig)) {
+      body = normalised.slice(0, normalised.length - sig.length).trimEnd();
+      signatureHtml = renderSignatureHtml(sig, { origin: process.env.CLIENT_ORIGIN || '' });
+    }
+  } catch (err) {
+    console.error('signature render failed', err.message);
+    body = text;
+    signatureHtml = '';
+  }
+  const html = (body ? mailer.textToHtml(body) : '') + signatureHtml + extraHtml;
   await mailer.sendMail({
     to: addressing.to,
     cc: addressing.cc,

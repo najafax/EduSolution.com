@@ -142,3 +142,66 @@ test('trash older than 30 days is purged, recent trash and inbox mail are kept',
   const left = db.prepare('SELECT resend_email_id FROM inbound_emails ORDER BY id').all().map((r) => r.resend_email_id);
   assert.deepEqual(left, ['recent', 'inbox']);
 });
+
+test('a saved signature at the end of the message is sent as a styled block', async () => {
+  const SIG = [
+    'Best regards,',
+    '',
+    'Hassan Najah',
+    'Founder & CEO',
+    'EDU SOLUTIONS PVT LTD',
+    'Authorised EduPage partner · Maldives',
+    '',
+    'Phone / WhatsApp: +960 792 1335',
+    'Email: info@edusolutionsmv.com',
+    'Web: www.edusolutionsmv.com',
+    '',
+    'Smarter Schools Start Here.',
+    'Book a free demo: www.edusolutionsmv.com/contact',
+  ].join('\n');
+  const info = db
+    .prepare("INSERT INTO users (name, email, password_hash, role, email_signature) VALUES ('Hassan','h@edu.test','x','admin', ?)")
+    .run(SIG);
+  const user = { id: Number(info.lastInsertRowid), name: 'Hassan' };
+  const sent = [];
+  const realSend = mailer.sendMail;
+  mailer.sendMail = async (args) => {
+    sent.push(args);
+  };
+  process.env.CLIENT_ORIGIN = 'https://www.edusolutionsmv.com';
+  try {
+    const addressing = outbox.parseAddressing({ to: 'head@school.test' });
+    const id = await outbox.sendAndRecord({
+      kind: 'compose',
+      addressing,
+      subject: 'Hello',
+      text: `Dear Sir,\n\nThanks for your time.\n\n${SIG}`,
+      user,
+    });
+    const html = sent[0].html;
+    assert.match(html, /<p>Dear Sir,<\/p><p>Thanks for your time\.<\/p>/);
+    assert.match(html, /<table/);
+    assert.match(html, />Hassan Najah</);
+    assert.match(html, /logo-symbol\.png/);
+    assert.match(html, /mailto:info@edusolutionsmv\.com/);
+    assert.match(html, /tel:\+9607921335/);
+    assert.match(html, /href="https:\/\/www\.edusolutionsmv\.com\/contact"[^>]*>Book a free demo</);
+    assert.equal((html.match(/Hassan Najah/g) || []).length, 1); // not also left in the plain body
+    // Sent folder keeps the text exactly as typed.
+    const row = db.prepare('SELECT text_body FROM sent_emails WHERE id = ?').get(id);
+    assert.ok(row.text_body.endsWith(SIG));
+
+    // A message without the signature, or one the user edited, stays plain.
+    sent.length = 0;
+    await outbox.sendAndRecord({ kind: 'compose', addressing, subject: 'x', text: 'Just text', user });
+    assert.equal(sent[0].html, '<p>Just text</p>');
+    await outbox.sendAndRecord({ kind: 'compose', addressing, subject: 'x', text: 'Hi\n\n' + SIG.replace('Hassan', 'Hasan'), user });
+    assert.doesNotMatch(sent[1].html, /<table/);
+    // HTML in a signature is escaped.
+    db.prepare('UPDATE users SET email_signature = ? WHERE id = ?').run('Bye,\n\n<b>Evil</b>\nRole', user.id);
+    await outbox.sendAndRecord({ kind: 'compose', addressing, subject: 'x', text: 'Hi\n\nBye,\n\n<b>Evil</b>\nRole', user });
+    assert.doesNotMatch(sent[2].html, /<b>Evil<\/b>/);
+  } finally {
+    mailer.sendMail = realSend;
+  }
+});
